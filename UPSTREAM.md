@@ -1,5 +1,7 @@
 # Source provenance
 
+- Model settings self-hosted preset support: aligned with [d5z/loom-local](https://github.com/d5z/loom-local/blob/a18812c35d2e2322f745f841d1d94fdec6015893/loom.html), `main` at `a18812c35d2e2322f745f841d1d94fdec6015893` (checked 2026-09-16). Presets come from the connected Being's `/api/llm/config`; `self-hosted` models appear first and switch directly without an API key form. The PATCH preserves the full model ID and uses the upstream canonical base URL `http://115.190.110.33:7860/v1`. The desktop uses the server's returned config, including rollback, to confirm the current model. This does not start or deploy a local model server.
+
 - Client: https://github.com/baiye0/loom-local, original base commit `5d347107326fd754fafea1c1dc373a42986ff49f`.
 - Heart Portal fork: https://github.com/d5z/heart-portal, Git submodule at `heart-portal/`, tracking `codex/portal-desktop-compat` for explicit source updates.
 - Upstream Heart Portal: https://github.com/baiye0/heart-portal.

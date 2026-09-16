@@ -321,6 +321,8 @@ export function createChatRuntime(state, options = {}) {
   const HEALTH_OK_INTERVAL_MS = 15000;
   const jitter = (ms) => Math.round(ms * (0.75 + Math.random() * 0.5)); // ±25%，防惊群
   let pendingFiles = [];
+  const pendingFileReads = new Set();
+  let preparingSend = false;
   let toolCount = 0,
     connectTime = null;
   let lastMessageTime = null;
@@ -905,25 +907,53 @@ export function createChatRuntime(state, options = {}) {
         addMessage("system", "⚠ File too large: " + file.name);
         continue;
       }
-      const reader = new FileReader();
-      reader.onload = () => {
-        if (disposed) return;
-        pendingFiles.push({
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          base64: reader.result.split(",")[1] || reader.result,
-        });
-        renderPendingFiles();
+      const pending = {
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        base64: "",
+        loading: true,
       };
+      pendingFiles.push(pending);
+      renderPendingFiles();
+      const reader = new FileReader();
+      const reading = new Promise((resolve) => {
+        let settled = false;
+        const finish = () => {
+          if (settled) return;
+          settled = true;
+          resolve();
+        };
+        reader.onload = () => {
+          if (!disposed && pendingFiles.includes(pending)) {
+            pending.base64 = reader.result.split(",")[1] || reader.result;
+            pending.loading = false;
+            renderPendingFiles();
+          }
+          finish();
+        };
+        reader.onerror = () => {
+          if (!disposed) {
+            pendingFiles = pendingFiles.filter((item) => item !== pending);
+            renderPendingFiles();
+            addMessage("system", "⚠ 无法读取附件：" + file.name);
+          }
+          finish();
+        };
+        reader.onabort = finish;
+      });
+      pendingFileReads.add(reading);
+      reading.finally(() => pendingFileReads.delete(reading));
       cleanups.push(() => {
         if (reader.readyState === FileReader.LOADING) reader.abort();
       });
-      reader.onerror = () => {
-        if (!disposed) addMessage("system", "⚠ 无法读取附件：" + file.name);
-      };
-      reader.readAsDataURL(file);
+      try { reader.readAsDataURL(file); }
+      catch { reader.onerror(); }
     }
+  }
+  async function waitForPendingFiles() {
+    while (pendingFileReads.size)
+      await Promise.allSettled([...pendingFileReads]);
   }
   function renderPendingFiles() {
     state.files = [...pendingFiles];
@@ -1801,6 +1831,23 @@ export function createChatRuntime(state, options = {}) {
   }
 
   async function send(text, filesOverride = null, sendOptions = {}) {
+    if (disposed || preparingSend) return;
+    if (!Array.isArray(filesOverride) && pendingFileReads.size) {
+      const draftBeforeRead = state.draft;
+      const filesBeforeRead = [...pendingFiles];
+      preparingSend = true;
+      try {
+        await waitForPendingFiles();
+      } finally {
+        preparingSend = false;
+      }
+      if (disposed) return;
+      if (state.draft !== draftBeforeRead || pendingFiles.length !== filesBeforeRead.length ||
+          filesBeforeRead.some((file, index) => pendingFiles[index] !== file)) {
+        addMessage("system", "草稿或附件已变更，请确认后重新发送。");
+        return;
+      }
+    }
     if (location.protocol === "beings:" && !state.currentScene.sceneId) {
       addMessage("system", "客户端场景不可用，暂时无法发送消息。请检查启动提示并重启客户端。");
       return;

@@ -15,7 +15,7 @@ import { Markdown } from "../shared/components/markdown";
 import { TemperatureGlow, ChatActivity } from "./components/messages";
 import { ChatSettings } from "./components/settings";
 import { ChatInfoPanels } from "./components/panels";
-import { ChatContextMenu } from "./components/context-menu";
+import { EditContextMenu } from "../shared/components/context-menu";
 import {
   ChatIndex,
   ChatPlaces,
@@ -444,7 +444,21 @@ function ChatView({
           >
             {state.files.map((file, i) => (
               <div className="pending-file" key={`${file.name}-${i}`}>
-                📄 {file.name} ({formatSize(file.size)}){" "}
+                {file.type.startsWith("image/") && file.base64 ? (
+                  <img
+                    className="pending-file-preview"
+                    src={`data:${file.type};base64,${file.base64}`}
+                    alt=""
+                  />
+                ) : (
+                  <span className="pending-file-icon" aria-hidden="true">
+                    {file.type.startsWith("image/") ? "🖼️" : "📄"}
+                  </span>
+                )}
+                <span>
+                  {file.name} ({formatSize(file.size)})
+                  {file.loading ? " · 正在读取…" : ""}
+                </span>{" "}
                 <button
                   className="remove"
                   type="button"
@@ -545,7 +559,7 @@ function ChatView({
         close={close}
       />
       <ChatInfoPanels state={state} panel={panel} close={close} />
-      <ChatContextMenu edit={bridge.edit} onOpenChange={setContextMenuOpen} />
+      <EditContextMenu edit={bridge.edit} onOpenChange={setContextMenuOpen} />
       <button
         id="scene-selection-action"
         type="button"

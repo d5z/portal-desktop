@@ -16,11 +16,13 @@ for (let i = 1; i <= 12; i++) { append('user', `历史问题 ${i}`); append('bei
 append('being', '打开篝火，然后看 `seeds`。\n\n```javascript\nconst safe = "<script>never()</script>";\n```\n\n`https://example.com/manual`\n\n| 列一 | 列二 |\n| --- | --- |\n| 内容 | 内容 |\n\n[恶意链接](javascript:alert(1))\n\n<img src=x onerror=alert(1)>');
 history.at(-1).content += '\n\n' + markdownFence('markdown');
 history.at(-1).content += '\n\n```md\n## 第二个文档\n\n独立切换。\n```';
-const presets = [{ id: 'a', label: 'Claude Alpha', provider: 'anthropic', model: 'alpha', has_key: true }, { id: 'b', label: 'DeepSeek Beta', provider: 'deepseek', model: 'beta', has_key: false }];
+const presets = [{ id: 'a', label: 'Claude Alpha', provider: 'anthropic', model: 'alpha', has_key: true }, { id: 'b', label: 'DeepSeek Beta', provider: 'deepseek', model: 'beta', has_key: false },
+  { id: 'local', label: 'Qwen Local', provider: 'self-hosted', model: 'local/qwen-fixture', has_key: false }];
 let config = { model: 'alpha', presets, thinking: 'medium', temperature: 0.7, sbs_enabled: false };
 const requests = [], patches = [];
 let active = null, heldResponse = null, rejectConfig = false, requireKey = false, stopCount = 0, oauthRequests = 0;
 let markdownResponse = null;
+let rollbackSelfHosted = false;
 const event = (response, name, data) => response.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, 'http://localhost');
@@ -34,6 +36,7 @@ const server = createServer(async (request, response) => {
     const patch = JSON.parse(body); patches.push(patch);
     if (rejectConfig) return json({ error: 'fixture rejected config' }, 500);
     if (requireKey && !patch.api_key) return json({ needs_key: true, error: 'fixture needs key' });
+    if (rollbackSelfHosted && patch.provider === 'self-hosted') return json({ ok: true, rolled_back: true, config });
     config = { ...config, ...patch, sbs_enabled: patch.sbs_enabled ? patch.sbs_enabled === 'on' : config.sbs_enabled };
     return json({ ok: true, config });
   }
@@ -139,6 +142,16 @@ try {
   await frame.locator('#settings-panel.active').waitFor();
   await frame.locator('#llm-current').getByText('Claude Alpha', { exact: true }).waitFor();
   assert.equal(await frame.locator('#oauth-section').count(), 0);
+  assert.equal(await frame.locator('.provider-group-label').first().textContent(), '自部署');
+  await frame.getByRole('searchbox', { name: '搜索模型' }).fill('自部署');
+  assert.equal(await frame.locator('.llm-item').count(), 1);
+  assert.match(await frame.locator('.llm-item').textContent(), /Qwen Local.*无需密钥/);
+  await frame.getByRole('searchbox', { name: '搜索模型' }).fill('');
+  await frame.locator('#settings-panel').screenshot({ path: 'test-results/chat-self-hosted-light.png', animations: 'disabled' });
+  await post({ type: 'beings:appearance', theme: 'dark' });
+  await child().waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+  await frame.locator('#settings-panel').screenshot({ path: 'test-results/chat-self-hosted-dark.png', animations: 'disabled' });
+  await post({ type: 'beings:appearance', theme: 'light' });
   await frame.getByRole('searchbox', { name: '搜索模型' }).fill('missing-provider');
   await frame.getByText('没有匹配的模型，试试其他名称。').waitFor();
   await frame.getByRole('searchbox', { name: '搜索模型' }).fill('deepseek');
@@ -159,6 +172,22 @@ try {
   await frame.locator('#s2-api-key').fill('fixture-key'); await frame.locator('#s2-apply').click();
   await frame.locator('#llm-current').getByText('DeepSeek Beta', { exact: true }).waitFor();
   assert.equal(patches.at(-1).api_key, 'fixture-key'); requireKey = false;
+  const selfHosted = frame.getByRole('button', { name: /^Qwen Local/ });
+  rejectConfig = true;
+  await selfHosted.click(); await frame.locator('#cfg-status').getByText(/fixture rejected/).waitFor();
+  assert.match(await frame.locator('#llm-current').textContent(), /DeepSeek Beta/);
+  assert.equal(await frame.locator('#llm-step2').count(), 0, 'Self-hosted selection skips the provider/key form');
+  rejectConfig = false; rollbackSelfHosted = true;
+  await selfHosted.click(); await frame.locator('#cfg-status').getByText('已恢复上次可用配置').waitFor();
+  assert.match(await frame.locator('#llm-current').textContent(), /DeepSeek Beta/);
+  rollbackSelfHosted = false; requireKey = true;
+  await selfHosted.click(); await frame.locator('#cfg-status').getByText('fixture needs key').waitFor();
+  assert.match(await frame.locator('#llm-current').textContent(), /DeepSeek Beta/);
+  requireKey = false;
+  await selfHosted.click(); await frame.locator('#llm-current').getByText('Qwen Local', { exact: true }).waitFor();
+  assert.deepEqual(patches.at(-1), { model: 'local/qwen-fixture', provider: 'self-hosted', base_url: 'http://115.190.110.33:7860/v1' });
+  assert.match(await frame.locator('#llm-current .model-detail').textContent(), /自部署/);
+  assert.equal(await selfHosted.count(), 0, 'The confirmed current model is removed from alternatives');
   await frame.locator('.model-parameters summary').click();
   await frame.locator('#cfg-thinking [data-val="high"]').click(); await frame.locator('#cfg-thinking [data-val="high"].active').waitFor();
   await frame.locator('#cfg-temperature').focus(); await page.keyboard.press('Home');
@@ -174,12 +203,20 @@ try {
   await frame.getByRole('button', { name: '关闭 Being 信息' }).click();
   await post({ type: 'beings:chat-action', action: 'privacy' }); await frame.locator('#privacy-panel.active').waitFor(); await frame.getByRole('button', { name: '关闭隐私说明' }).click();
   assert.equal(await frame.locator('#input').inputValue(), '保留草稿');
-  await frame.locator('#file-input').setInputFiles({ name: 'note.txt', mimeType: 'text/plain', buffer: Buffer.from('react attachment') });
+  await child().evaluate(() => {
+    const readAsDataURL = FileReader.prototype.readAsDataURL;
+    FileReader.prototype.readAsDataURL = function (file) {
+      setTimeout(() => readAsDataURL.call(this, file), 500);
+    };
+  });
+  const image = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64');
+  await frame.locator('#file-input').setInputFiles({ name: 'pixel.png', mimeType: 'image/png', buffer: image });
   await frame.locator('#pending-files.active').waitFor();
+  await frame.getByText(/pixel\.png.*正在读取/).waitFor();
   await frame.locator('#input').fill('send-test'); await frame.locator('#send-btn').click();
   await frame.getByText('React 回复完成', { exact: true }).waitFor();
   await frame.locator('.run-activity[data-outcome="done"]').waitFor();
-  assert.equal(requests.length, 1); assert.equal(requests[0].attachments[0].data, Buffer.from('react attachment').toString('base64'));
+  assert.equal(requests.length, 1); assert.equal(requests[0].attachments[0].media_type, 'image/png'); assert.equal(requests[0].attachments[0].data, image.toString('base64'));
   assert.equal(await frame.locator('.run-activity').count(), 1, 'One process record per completed turn');
   assert.equal(await frame.locator('.run-activity.running').count(), 0);
   await frame.locator('.run-activity summary').click(); assert.match(await frame.locator('.run-list').innerText(), /fixture file read/);

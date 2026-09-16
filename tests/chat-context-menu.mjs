@@ -19,15 +19,30 @@ async function bundle(name, contents, platform = 'node') {
 await bundle('preload.cjs', "import './desktop/preload/preload';");
 await bundle('shell.js', `
   import { createRoot } from 'react-dom/client';
-  import { useRef } from 'react';
+  import { useRef, useState } from 'react';
   import { useChatBridge } from './desktop/renderer/app/hooks/use-chat-bridge';
   import { AppModel } from './desktop/renderer/app/models/app';
+  import { EditContextMenu } from './desktop/renderer/shared/components/context-menu';
+  import { Dialog } from './desktop/renderer/shared/components/dialog';
+  import { TownFeed } from './desktop/renderer/town/components/feed';
   const model = new AppModel(window.beings);
   window.fixtureModel = model;
   function Shell() {
     const frame = useRef(null);
+    const [place, setPlace] = useState('');
     useChatBridge(model, frame);
-    return <iframe ref={frame} id="chat" src="beings://chat/?revision=fixture&scene_id=desktop-fixture&theme=light" />;
+    model.town.view = place;
+    return <><iframe ref={frame} id="chat" src="beings://chat/?revision=fixture&scene_id=desktop-fixture&theme=light" />
+      <div style={{ position: 'fixed', top: 0, left: 0 }}>
+        <button onClick={() => setPlace('bonfire')}>打开篝火</button><button onClick={() => setPlace('firesides')}>打开围炉</button>
+      </div>
+      <Dialog id="place-sheet" open={!!place} onClose={() => setPlace('')}>
+        <h2>{place === 'bonfire' ? '篝火' : '围炉'}</h2>
+        <TownFeed key={place} town={model.town} filterKey={place} data={{ messages: [{ seq: 1, being: 'Willow', message: '**弹窗正文** 可以复制。', at: new Date().toISOString() }] }} />
+        <textarea aria-label="弹窗草稿" defaultValue="弹窗输入测试" />
+      </Dialog>
+      <EditContextMenu edit={command => window.fixtureEditFailure ? Promise.resolve(false) : window.beings.editSelection(command)} rootSelector="dialog[open]" selectionSelector=".reading-text, .dialog-body, #town-body" />
+    </>;
   }
   createRoot(document.getElementById('root')).render(<Shell />);
 `, 'browser');
@@ -44,8 +59,9 @@ await bundle('main.cjs', `
     protocol.handle('beings', async request => {
       const url = new URL(request.url);
       if (url.hostname === 'desktop') {
+        if (url.pathname === '/shell.css') return new Response(await readFile(${JSON.stringify(path.resolve('desktop/renderer/app/styles.css'))}), { headers: { 'Content-Type': 'text/css' } });
         if (url.pathname === '/shell.js') return new Response(await readFile(path.join(__dirname, 'shell.js')), { headers: { 'Content-Type': 'text/javascript' } });
-        return new Response('<!doctype html><meta charset="utf-8"><style>html,body,#root{margin:0;height:100%;overflow:hidden}iframe{display:block;border:0;width:100%;height:100%}</style><div id="root"></div><script src="/shell.js"></script>', { headers: { 'Content-Type': 'text/html' } });
+        return new Response('<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="/shell.css"><style>html,body,#root{margin:0;height:100%;width:100%;overflow:hidden}iframe{display:block;border:0;width:100%;height:100%}</style><div id="root"></div><script src="/shell.js"></script>', { headers: { 'Content-Type': 'text/html' } });
       }
       if (url.pathname === '/api/history') return Response.json({ messages: [{ seq: 1, role: 'being', content: '右键选择文字，复制到剪贴板。', at: new Date().toISOString() }] });
       if (url.pathname === '/api/status') return Response.json({ being_name: '菜单测试' });
@@ -57,10 +73,14 @@ await bundle('main.cjs', `
       return new Response(await readFile(path.join(${JSON.stringify(path.resolve('desktop/generated'))}, file)), { headers: { 'Content-Type': type } });
     });
     const win = new BrowserWindow({ width: 1000, height: 780, webPreferences: { preload: path.join(__dirname, 'preload.cjs'), sandbox: true, contextIsolation: true } });
-    globalThis.fixtureEdit = command => editChat(win, command);
+    globalThis.fixtureEdit = (command, scope) => editChat(win, command, scope);
     ipcMain.handle('beings:chat-edit', (event, command) => {
       if (event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame || event.senderFrame.url !== 'beings://desktop/') throw new Error('Untrusted sender');
       return editChat(win, command);
+    });
+    ipcMain.handle('beings:selection-edit', (event, command) => {
+      if (event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame || event.senderFrame.url !== 'beings://desktop/') throw new Error('Untrusted sender');
+      return editChat(win, command, 'shell');
     });
     await win.loadURL('beings://desktop/');
   });
@@ -134,11 +154,50 @@ try {
     await page.keyboard.press('Escape');
   }
   assert.equal(await app.evaluate(() => globalThis.fixtureEdit('undo')), false);
+  assert.equal(await app.evaluate(() => globalThis.fixtureEdit('copy', 'shell')), false);
+  for (const [place, theme] of [['篝火', 'light'], ['围炉', 'dark']]) {
+    await page.evaluate(theme => { document.documentElement.dataset.theme = theme; }, theme);
+    await page.getByRole('button', { name: '打开' + place }).click();
+    const dialog = page.locator('#place-sheet'), body = dialog.locator('.reading-text');
+    const popup = page.getByRole('menu', { name: '编辑菜单' });
+    await body.click({ button: 'right' });
+    await popup.waitFor();
+    assert.equal(await popup.getByRole('menuitem').count(), 2);
+    assert.equal(await popup.evaluate(el => el === document.activeElement && el.matches(':popover-open') && getComputedStyle(el).outlineStyle === 'none'), true);
+    await popup.getByRole('menuitem', { name: /^全选/ }).click();
+    assert.equal(await page.evaluate(() => getSelection().toString().trim()), '弹窗正文 可以复制。');
+    await body.click({ button: 'right' });
+    await page.screenshot({ path: 'test-results/dialog-context-menu-' + theme + '.png', animations: 'disabled' });
+    await popup.getByRole('menuitem', { name: /^复制/ }).click();
+    assert.equal((await app.evaluate(({ clipboard }) => clipboard.readText())).trim(), '弹窗正文 可以复制。');
+    const draft = dialog.getByRole('textbox', { name: '弹窗草稿' });
+    await draft.click({ button: 'right' });
+    await popup.getByRole('menuitem', { name: /^全选/ }).click();
+    await draft.click({ button: 'right' });
+    await popup.getByRole('menuitem', { name: /^粘贴/ }).click();
+    await page.waitForFunction(() => document.querySelector('textarea').value.trim() === '弹窗正文 可以复制。');
+    await draft.click({ button: 'right' });
+    await page.keyboard.press('Escape');
+    await popup.waitFor({ state: 'hidden' });
+    assert.equal(await dialog.evaluate(el => el.open), true);
+    assert.equal(await draft.evaluate(el => el === document.activeElement), true);
+    await page.evaluate(() => { window.fixtureEditFailure = true; });
+    await draft.click({ button: 'right' });
+    await popup.getByRole('menuitem', { name: /^粘贴/ }).click();
+    const notice = dialog.getByRole('status').filter({ hasText: '操作未完成' });
+    await notice.waitFor();
+    assert.equal(await notice.evaluate(el => el.matches(':popover-open')), true);
+    await page.evaluate(() => { window.fixtureEditFailure = false; });
+    await draft.click({ button: 'right' });
+    await page.keyboard.press('Escape');
+    await page.keyboard.press('Escape');
+    await dialog.waitFor({ state: 'hidden' });
+  }
   await page.locator('body').click({ position: { x: 1, y: 1 } });
   await page.evaluate(() => { const el = document.createElement('input'); document.body.append(el); el.focus(); });
   assert.equal(await app.evaluate(() => globalThis.fixtureEdit('paste')), false);
   assert.deepEqual(errors, []);
-  console.log('PASS: themed context menu, iframe copy/cut/text and image paste, selection replacement, keyboard/dismissal, bounds and command/frame restrictions.');
+  console.log('PASS: themed context menu, iframe editing, bonfire/fireside modal copy/select-all/paste, modal stacking and Escape, keyboard/dismissal, bounds and command/frame restrictions.');
 } catch (error) {
   if (app) {
     const page = await app.firstWindow();

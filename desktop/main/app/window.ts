@@ -32,6 +32,12 @@ export function createMainWindow(options: MainWindowOptions) {
     },
   });
   if (process.platform === 'win32') window.setMenuBarVisibility(false);
+  window.webContents.on('before-input-event', (event, input) => {
+    if (input.type !== 'keyDown' || input.key !== 'F12' || input.isAutoRepeat) return;
+    event.preventDefault();
+    if (window.webContents.isDevToolsOpened()) window.webContents.closeDevTools();
+    else window.webContents.openDevTools({ mode: 'detach' });
+  });
   window.webContents.setWindowOpenHandler(({ url }) => { options.openExternal(url); return { action: 'deny' }; });
   window.webContents.on('will-navigate', event => event.preventDefault());
   window.webContents.on('will-frame-navigate', event => {

@@ -56,6 +56,7 @@ export interface DesktopAPI {
   openBrowser(url?: string): Promise<void>;
   copyText(text: string): Promise<void>;
   editChat(command: ChatEditCommand): Promise<boolean>;
+  editSelection(command: ChatEditCommand): Promise<boolean>;
   browserAction(action: BrowserAction): Promise<void>;
   browserBounds(bounds: BrowserBounds): Promise<void>;
   onBrowser(callback: (state: BrowserState) => void): () => void;

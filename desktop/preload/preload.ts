@@ -8,6 +8,7 @@ const api: DesktopAPI = {
   openBrowser: url => ipcRenderer.invoke('beings:browser-open', url),
   copyText: text => ipcRenderer.invoke('beings:clipboard-copy', text),
   editChat: command => ipcRenderer.invoke('beings:chat-edit', command),
+  editSelection: command => ipcRenderer.invoke('beings:selection-edit', command),
   browserAction: action => ipcRenderer.invoke('beings:browser-action', action),
   browserBounds: bounds => ipcRenderer.invoke('beings:browser-bounds', bounds),
   onBrowser: callback => {

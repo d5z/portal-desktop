@@ -218,6 +218,7 @@ async function ready() {
   handle('beings:browser-state', () => browser?.state);
   handle('beings:browser-open', (url?: string) => browser?.open(url));
   handle('beings:chat-edit', (command: import('../shared/types').ChatEditCommand) => editChat(window, command));
+  handle('beings:selection-edit', (command: import('../shared/types').ChatEditCommand) => editChat(window, command, 'shell'));
   handle('beings:clipboard-copy', (text: string) => {
     if (typeof text !== 'string' || text.length > 200000) throw new Error('复制内容过长。');
     clipboard.writeText(text);

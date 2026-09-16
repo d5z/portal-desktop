@@ -35,6 +35,36 @@ const response = (value: unknown) =>
 const flush = () => vi.advanceTimersByTimeAsync(0);
 
 describe("React chat runtime lifecycle", () => {
+  it.each(['edit', 'remove', 'read-error'])('does not send stale text or incomplete attachments after %s during file reading', async change => {
+    let reader!: { onload(): void; onerror(): void; result: string; readyState: number };
+    vi.stubGlobal('FileReader', class {
+      static LOADING = 1;
+      readyState = 1;
+      result = 'data:image/png;base64,YWJj';
+      onload = () => {};
+      onerror = () => {};
+      readAsDataURL() { reader = this; }
+    });
+    const fetcher = vi.fn(async (url: string) => url.includes('/chat/stream')
+      ? new Response('event: message_stop\ndata: {}\n\n', { headers: { 'Content-Type': 'text/event-stream' } })
+      : response({ messages: [] }));
+    vi.stubGlobal('fetch', fetcher);
+    const state = new ChatState(), runtime = createChatRuntime(state);
+    state.draft = '原始草稿';
+    runtime.handleFiles([new File(['abc'], 'image.png', { type: 'image/png' })]);
+    const sending = runtime.send(state.draft);
+    expect(fetcher).not.toHaveBeenCalled();
+    if (change === 'edit') state.draft = '修改后的草稿';
+    if (change === 'remove') runtime.removePending(0);
+    reader.readyState = 2;
+    if (change === 'read-error') reader.onerror(); else reader.onload();
+    try {
+      await sending;
+      expect(fetcher).not.toHaveBeenCalled();
+      expect(state.draft).toBe(change === 'edit' ? '修改后的草稿' : '原始草稿');
+      expect(state.files).toHaveLength(change === 'edit' ? 1 : 0);
+    } finally { runtime.dispose(); }
+  });
   it("binds diagnostic sends to their original Being even if the proxy connection changes", async () => {
     const alice = parseConnection('https://fixture.test/alice/?token=alice-fixture');
     const bob = parseConnection('https://fixture.test/bob/?token=bob-fixture');

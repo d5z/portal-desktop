@@ -8,6 +8,7 @@ export interface Attachment {
   type: string;
   size: number;
   base64: string;
+  loading?: boolean;
 }
 export interface Message extends MessageScene {
   kind: "message";

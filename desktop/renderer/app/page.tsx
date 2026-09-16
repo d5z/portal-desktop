@@ -14,6 +14,7 @@ import { ChatSearch } from "./components/search";
 import { ConnectionSettings, ClientSettings } from "./components/settings";
 import { Diagnostics } from "./components/diagnostics";
 import { Dialog } from "../shared/components/dialog";
+import { EditContextMenu } from "../shared/components/context-menu";
 import { PlaceHeading } from "./components/navigation";
 import logo from "../../../resources/branding/logo.png";
 export function App({ model }: { model: AppModel }) {
@@ -163,6 +164,8 @@ export function App({ model }: { model: AppModel }) {
       <ConnectionSettings model={app} />
       <KitInstall model={app.town} />
       <Toast message={app.toastMessage} />
+      <EditContextMenu edit={app.api.editSelection} rootSelector="#client-main, dialog[open]"
+        selectionSelector=".reading-text, .dialog-body, #town-body" />
     </>
   );
 }

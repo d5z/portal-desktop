@@ -8,6 +8,8 @@ const baseUrls: Record<string, string> = {
   deepseek: "https://api.deepseek.com",
   kimi: "https://api.moonshot.cn/v1",
   google: "https://generativelanguage.googleapis.com",
+  // Canonical self-hosted endpoint from loom-local a18812c (inferBaseUrl).
+  "self-hosted": "http://115.190.110.33:7860/v1",
 };
 const providerNames: Record<string, string> = {
   anthropic: "Anthropic",
@@ -18,6 +20,7 @@ const providerNames: Record<string, string> = {
   google: "Google",
   glm: "智谱",
   openrouter: "OpenRouter",
+  "self-hosted": "自部署",
 };
 const thinkingOptions = [
   ["off", "关闭"],
@@ -93,6 +96,11 @@ export function ChatSettings({
   }
   const disabled = busy || state.configLoading;
   function select(preset: Preset) {
+    if (disabled) return;
+    if (preset.provider === "self-hosted") {
+      void selectSelfHosted(preset);
+      return;
+    }
     setError("");
     setDraft({
       preset,
@@ -102,6 +110,22 @@ export function ChatSettings({
       apiKey: "",
       route: "official",
     });
+  }
+  async function selectSelfHosted(preset: Preset) {
+    setBusy(true);
+    setDraft(null);
+    setError("");
+    try {
+      await runtime.applyConfigChange({
+        model: preset.model,
+        provider: preset.provider,
+        base_url: baseUrls["self-hosted"],
+      });
+      // applyConfigChange owns the confirmed config and error status.
+      // Never promote a failed or rolled-back switch to the current model.
+    } finally {
+      setBusy(false);
+    }
   }
   const custom = draft?.preset.id === "__custom";
   const update = (patch: Partial<ModelDraft>) =>
@@ -242,7 +266,7 @@ export function ChatSettings({
               />
             </div>
             <div id="llm-preset-list" className="llm-list">
-              {[...groups].map(([name, items]) => (
+              {[...groups].sort(([a], [b]) => a === b ? 0 : a === "self-hosted" ? -1 : b === "self-hosted" ? 1 : 0).map(([name, items]) => (
                 <div className="provider-group" key={name}>
                   <div className="provider-group-label">
                     {providerNames[name] || name}
@@ -260,7 +284,9 @@ export function ChatSettings({
                           {preset.label}
                         </span>
                         <span className="model-option-detail">
-                          {preset.has_key === false
+                          {preset.provider === "self-hosted"
+                            ? "无需密钥 · 点击切换"
+                            : preset.has_key === false
                             ? "需配置密钥"
                             : "选择此模型"}
                           <span aria-hidden="true">↗</span>

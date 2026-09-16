@@ -14,6 +14,31 @@
 }
 
 *{box-sizing:border-box}
+.chat-context-menu {
+  position: fixed; z-index: 10000; margin: 0; inset: auto; width: 208px;
+  max-width: calc(100vw - 16px); max-height: calc(100vh - 16px); overflow-y: auto; padding: 8px;
+  background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 16px;
+  box-shadow: 0 14px 44px #15251b18, 0 2px 8px #15251b08;
+  user-select: none; font: inherit; outline: none; -webkit-app-region: no-drag;
+}
+.chat-context-menu button {
+  display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  width: 100%; min-height: 36px; padding: 8px 12px; border: 0; border-radius: 9px;
+  background: transparent; color: var(--secondary); font: inherit; font-size: 13px;
+  cursor: pointer; text-align: left; transition: background-color 120ms ease, color 120ms ease;
+}
+.chat-context-menu button:hover:not(:disabled), .chat-context-menu button:focus-visible { background: var(--hover); color: var(--text); }
+.chat-context-menu button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.chat-context-menu button:disabled { opacity: .4; cursor: default; }
+.chat-context-menu kbd { font: inherit; font-size: 11px; color: var(--muted); }
+.chat-context-menu [role=separator] { height: 1px; margin: 5px 8px; background: var(--line); }
+.chat-context-notice {
+  margin: 0; inset: auto;
+  position: fixed; z-index: 10001; left: 50%; bottom: 120px; transform: translateX(-50%);
+  max-width: calc(100vw - 32px); padding: 10px 16px; border: 1px solid var(--line);
+  border-radius: 12px; background: var(--bg); color: var(--text); font-size: 12px;
+}
+@media(prefers-reduced-motion:reduce) { .chat-context-menu button { transition: none; } }
 html,body{margin:0;background:transparent;color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
 body{display:flex;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
 button,input{font:inherit}button{cursor:pointer;color:inherit;border:0;background:none;transition:background .15s,color .15s}
