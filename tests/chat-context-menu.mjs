@@ -99,9 +99,30 @@ try {
   const child = page.frames().find(frame => frame.url().startsWith('beings://chat/'));
   await child.waitForFunction(() => performance.getEntriesByName('loom:ready').length > 0);
   await app.evaluate(async ({ clipboard, ClipboardItem }) => {
-    globalThis.savedClipboard = await Promise.all((await clipboard.read()).map(async item => new ClipboardItem(
+    // Electron can return an item with no formats for an empty native clipboard.
+    // Such items carry no data and cannot be passed to the ClipboardItem constructor.
+    globalThis.snapshotClipboard = async () => Promise.all((await clipboard.read()).filter(item => item.types.length > 0).map(async item => new ClipboardItem(
       Object.fromEntries(await Promise.all(item.types.map(async type => [type, await item.getType(type)]))))));
+    globalThis.savedClipboard = await globalThis.snapshotClipboard();
   });
+  // A fresh Windows runner can expose an empty item, rather than an empty array.
+  assert.deepEqual(await app.evaluate(async ({ clipboard }) => {
+    await clipboard.clear();
+    const empty = await globalThis.snapshotClipboard();
+    await clipboard.write(empty);
+    return empty.map(item => item.types);
+  }), []);
+  assert.deepEqual(await app.evaluate(async ({ clipboard, ClipboardItem }) => {
+    await clipboard.write([new ClipboardItem({
+      'text/plain': new Blob(['剪贴板备份测试'], { type: 'text/plain' }),
+      'text/html': new Blob(['<b>剪贴板备份测试</b>'], { type: 'text/html' }),
+    })]);
+    const saved = await globalThis.snapshotClipboard();
+    await clipboard.clear();
+    await clipboard.write(saved);
+    const restored = (await clipboard.read()).find(item => item.types.includes('text/html'));
+    return { text: await clipboard.readText(), hasHtml: (await (await restored.getType('text/html')).text()).includes('<b>剪贴板备份测试</b>') };
+  }), { text: '剪贴板备份测试', hasHtml: true });
   const menu = frame.getByRole('menu', { name: '编辑菜单' });
   async function open(target = input) { await target.click({ button: 'right' }); await menu.waitFor(); }
   async function choose(label) { await menu.getByRole('menuitem', { name: new RegExp('^' + label) }).click(); await menu.waitFor({ state: 'hidden' }); }
@@ -130,6 +151,11 @@ try {
   await app.evaluate(({ clipboard, ClipboardItem }) => clipboard.write([new ClipboardItem({ 'image/png': new Blob([
     Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=', 'base64'),
   ], { type: 'image/png' }) })]));
+  await app.evaluate(async ({ clipboard }) => {
+    const image = await globalThis.snapshotClipboard();
+    await clipboard.clear();
+    await clipboard.write(image);
+  });
   await open(); await choose('粘贴'); await frame.locator('#pending-files.active').waitFor();
   const message = frame.locator('.message.being .content').first();
   await message.evaluate(el => { const range = document.createRange(); range.selectNodeContents(el); getSelection().removeAllRanges(); getSelection().addRange(range); });
@@ -197,7 +223,7 @@ try {
   await page.evaluate(() => { const el = document.createElement('input'); document.body.append(el); el.focus(); });
   assert.equal(await app.evaluate(() => globalThis.fixtureEdit('paste')), false);
   assert.deepEqual(errors, []);
-  console.log('PASS: themed context menu, iframe editing, bonfire/fireside modal copy/select-all/paste, modal stacking and Escape, keyboard/dismissal, bounds and command/frame restrictions.');
+  console.log('PASS: empty/text/HTML/image clipboard backup, themed context menu, iframe editing, bonfire/fireside modal copy/select-all/paste, modal stacking and Escape, keyboard/dismissal, bounds and command/frame restrictions.');
 } catch (error) {
   if (app) {
     const page = await app.firstWindow();
@@ -211,7 +237,8 @@ try {
   throw error;
 } finally {
   if (app) {
-    await app.evaluate(async ({ clipboard }) => { if (globalThis.savedClipboard) await clipboard.write(globalThis.savedClipboard); });
-    await app.close();
+    try {
+      await app.evaluate(async ({ clipboard }) => { if (globalThis.savedClipboard) await clipboard.write(globalThis.savedClipboard); });
+    } finally { await app.close(); }
   }
 }
