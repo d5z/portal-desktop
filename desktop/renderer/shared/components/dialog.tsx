@@ -25,6 +25,11 @@ export function Dialog({
     const dialog = ref.current!;
     if (open && !dialog.open) dialog.showModal();
     else if (!open && dialog.open) dialog.close();
+    // Removing a still-open modal from the tree leaves Chromium's top-layer
+    // backdrop painted until the next unrelated layout/paint.
+    return () => {
+      if (dialog.open) dialog.close();
+    };
   }, [open]);
   return (
     <dialog
