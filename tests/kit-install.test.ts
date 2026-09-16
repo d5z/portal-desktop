@@ -38,6 +38,16 @@ it('downloads and atomically activates a Kit for Portal without a manual import'
   expect(f.requests[0][1].headers.Authorization).toBeUndefined();
   await expect(f.installer.prepare('fixture-id', f.settings)).rejects.toThrow('同名');
 });
+it('honors provision.platforms from a downloaded Windows-only Kit', async () => {
+  const f = await fixture({ provision: { platforms: ['win32'] } });
+  if (process.platform === 'win32') {
+    const plan = await f.installer.prepare('fixture-id', f.settings);
+    expect(plan.name).toBe('fixture-kit');
+    await f.installer.discard(plan.ticket);
+  } else {
+    await expect(f.installer.prepare('fixture-id', f.settings)).rejects.toThrow('不支持当前系统');
+  }
+});
 it('persists scoped environment in Portal dotenv without wrapping the command', async () => {
   const f = await fixture({ provision: { env: [{ name: 'FIXTURE_KEY', required: true }] } });
   const plan = await f.installer.prepare('fixture-id', f.settings);

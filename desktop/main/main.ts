@@ -3,6 +3,7 @@ import { clientStartup } from './app/startup';
 import { clientUserData } from './app/profile';
 import type { ClientBrowser } from './browser/browser';
 import { createMainWindow } from './app/window';
+import { editChat } from './app/context-menu';
 import { configureLocalSession, registerLocalProtocol } from './app/protocol';
 import { createApplicationTray, installApplicationMenu } from './app/tray';
 import path from 'node:path';
@@ -216,6 +217,7 @@ async function ready() {
   handle('beings:quit', () => { setImmediate(() => app.quit()); });
   handle('beings:browser-state', () => browser?.state);
   handle('beings:browser-open', (url?: string) => browser?.open(url));
+  handle('beings:chat-edit', (command: import('../shared/types').ChatEditCommand) => editChat(window, command));
   handle('beings:clipboard-copy', (text: string) => {
     if (typeof text !== 'string' || text.length > 200000) throw new Error('复制内容过长。');
     clipboard.writeText(text);

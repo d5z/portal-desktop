@@ -15,6 +15,7 @@ import { Markdown } from "../shared/components/markdown";
 import { TemperatureGlow, ChatActivity } from "./components/messages";
 import { ChatSettings } from "./components/settings";
 import { ChatInfoPanels } from "./components/panels";
+import { ChatContextMenu } from "./components/context-menu";
 import {
   ChatIndex,
   ChatPlaces,
@@ -97,6 +98,7 @@ function ChatView({
       : "light",
   );
   const [viewport, setViewport] = useState({ height: innerHeight, offset: 0 });
+  const [contextMenuOpen, setContextMenuOpen] = useState(false);
   const [selection, setSelection] = useState<{
     id: string;
     text: string;
@@ -543,10 +545,11 @@ function ChatView({
         close={close}
       />
       <ChatInfoPanels state={state} panel={panel} close={close} />
+      <ChatContextMenu edit={bridge.edit} onOpenChange={setContextMenuOpen} />
       <button
         id="scene-selection-action"
         type="button"
-        hidden={!selection || parent === window}
+        hidden={!selection || parent === window || contextMenuOpen}
         style={
           selection ? { left: selection.left, top: selection.top } : undefined
         }

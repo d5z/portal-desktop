@@ -23,8 +23,9 @@ export async function readKit(directory: string, platform: string = process.plat
   if (typeof manifest.version !== 'string' || !manifest.version || !Array.isArray(manifest.command) || !manifest.command.length || !manifest.command.every((v: unknown) => typeof v === 'string' && !v.includes('\0'))) throw new Error('manifest.json 缺少 version 或 Portal 所需的 command 数组。');
   if (!Array.isArray(manifest.tools) || manifest.tools.length > 1000 || !manifest.tools.every((v: any) => v && typeof v.name === 'string' && typeof v.description === 'string')) throw new Error('manifest.json 的 tools 格式不符合 Portal 要求。');
   if (manifest.platform !== undefined && (!Array.isArray(manifest.platform) || !manifest.platform.every((v: unknown) => typeof v === 'string'))) throw new Error('platform 必须是字符串数组。');
-  const current = platform === 'win32' ? 'windows' : platform;
-  const platforms = manifest.platform?.map((v: string) => v.toLowerCase().replace(/^macos$/, 'darwin'));
+  const normalizePlatform = (value: string) => value.toLowerCase().replace(/^macos$/, 'darwin').replace(/^win32$/, 'windows');
+  const current = normalizePlatform(platform);
+  const platforms = manifest.platform?.map(normalizePlatform);
   return { name: manifest.name, version: manifest.version, description: String(manifest.description || ''),
     directory, command: manifest.command, tools: manifest.tools.map((v: any) => ({ name: v.name, description: v.description, params: v.params })),
     compatible: !platforms || platforms.includes(current), eager: manifest.eager === true };

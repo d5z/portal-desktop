@@ -31,6 +31,7 @@
     "test:browser": "node tests/browser-e2e.mjs",
     "build:chat": "node scripts/build-chat.mjs",
     "test:chat-react": "npm run build:chat && node tests/chat-react.mjs",
+    "test:chat-context-menu": "npm run build:chat && node tests/chat-context-menu.mjs",
     "test:chat-history": "npm run build:chat && node tests/chat-history.mjs"
   },
   "devDependencies": {

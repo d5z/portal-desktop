@@ -12,6 +12,12 @@ afterEach(async () => { await rm(dir, { recursive: true, force: true }); });
 async function source() { const src = path.join(dir, 'source'); await mkdir(src); await writeFile(path.join(src, 'manifest.json'), JSON.stringify(fixture)); await writeFile(path.join(src, 'server.mjs'), 'throw new Error("Import must never execute this script");'); return src; }
 
 describe('Portal Kit integration', () => {
+  it.each(['win32', 'windows', 'WIN32'])('accepts the Windows platform alias %s used by Grove kits', async platform => {
+    const src = await source();
+    await writeFile(path.join(src, 'manifest.json'), JSON.stringify({ ...fixture, platform: [platform] }));
+    expect((await readKit(src, 'win32')).compatible).toBe(true);
+    expect((await readKit(src, 'darwin')).compatible).toBe(false);
+  });
   it('uses the client switch while retaining the imported kits directory', async () => {
     const config = path.join(dir, 'portal.toml'); await writeFile(config, 'kits_dir = "~/my-kits"\nkits_enabled = false\n');
     const result = await kitLocation({ ...settings(dir), portalConfigPath: config }, dir);

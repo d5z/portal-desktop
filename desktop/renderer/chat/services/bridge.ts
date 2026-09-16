@@ -1,5 +1,6 @@
 import type { ChatRuntime, ChatState, ChatPanel } from "../models/chat";
 import type { HistoryScope } from "../models/scenes";
+import type { ChatEditCommand } from "../../../shared/types";
 
 /** Source-checked desktop transport. It never reads or mutates rendered UI. */
 export function createChatBridge(state: ChatState) {
@@ -15,6 +16,18 @@ export function createChatBridge(state: ChatState) {
     sbsRequest = 0,
     disposed = false;
   const waiting = new Map<string, () => void>();
+  const edits = new Map<string, (ok: boolean) => void>();
+  function edit(command: ChatEditCommand): Promise<boolean> {
+    if (!embedded || location.protocol !== "beings:") return Promise.resolve(document.execCommand(command));
+    if (disposed) return Promise.resolve(false);
+    const id = crypto.randomUUID();
+    return new Promise(resolve => {
+      const finish = (ok: boolean) => { clearTimeout(timer); edits.delete(id); resolve(ok); };
+      const timer = setTimeout(() => finish(false), 3000);
+      edits.set(id, finish);
+      send({ type: "beings:chat-edit", id, command });
+    });
+  }
   let removeListener = () => {};
   function onSbs(enabled: boolean) {
     ++sbsRequest;
@@ -83,6 +96,9 @@ export function createChatBridge(state: ChatState) {
       const data = event.data;
       if (!data || typeof data !== "object") return;
       switch (data.type) {
+        case "beings:chat-edit-result":
+          if (data.revision === revision && typeof data.id === "string") edits.get(data.id)?.(data.ok === true);
+          return;
         case "beings:history-scope":
           if (data.revision !== revision || !["current", "all"].includes(data.scope)) return;
           ui.scope(data.scope);
@@ -156,6 +172,7 @@ export function createChatBridge(state: ChatState) {
   }
   return {
     send,
+    edit,
     onSbs,
     beforeSend,
     start,
@@ -164,6 +181,8 @@ export function createChatBridge(state: ChatState) {
       removeListener();
       waiting.forEach((finish) => finish());
       waiting.clear();
+      edits.forEach(finish => finish(false));
+      edits.clear();
     },
   };
 }

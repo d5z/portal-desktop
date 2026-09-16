@@ -47,6 +47,7 @@ export interface BrowserState { open: boolean; address: string; title: string; l
 export interface DiagnosticReport { version: string; build: string; platform: string; pid: number; startedAt: string; checkedAt: string; checks: { name: string; status: 'ok' | 'warning' | 'error'; detail: string }[]; logs: string[] }
 export interface BrowserBounds { x: number; y: number; width: number; height: number; visible: boolean }
 export type BrowserAction = 'back' | 'forward' | 'reload' | 'stop' | 'external' | 'close';
+export type ChatEditCommand = 'cut' | 'copy' | 'paste';
 export interface DesktopAPI {
   platform: string;
   clientStartup(enabled?: boolean): Promise<ClientStartup>;
@@ -54,6 +55,7 @@ export interface DesktopAPI {
   browserState(): Promise<BrowserState>;
   openBrowser(url?: string): Promise<void>;
   copyText(text: string): Promise<void>;
+  editChat(command: ChatEditCommand): Promise<boolean>;
   browserAction(action: BrowserAction): Promise<void>;
   browserBounds(bounds: BrowserBounds): Promise<void>;
   onBrowser(callback: (state: BrowserState) => void): () => void;

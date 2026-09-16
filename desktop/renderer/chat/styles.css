@@ -76,6 +76,35 @@
   --panel-width: 380px;
 }
 
+.chat-context-menu {
+  position: fixed; z-index: 10000; width: 208px; max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px); overflow-y: auto; padding: 8px;
+  background: var(--context-surface, #fffefa); color: var(--text);
+  border: 1px solid var(--border); border-radius: 16px;
+  box-shadow: 0 14px 44px #15251b18, 0 2px 8px #15251b08;
+  user-select: none; font-family: var(--font-sans); outline: none;
+}
+:root[data-theme=dark] .chat-context-menu { --context-surface: #252e27; }
+.chat-context-menu button {
+  display: flex; align-items: center; justify-content: space-between; gap: 24px;
+  width: 100%; min-height: 36px; padding: 8px 12px; border: 0; border-radius: 9px;
+  background: transparent; color: var(--text-dim); font: inherit; font-size: 13px;
+  cursor: pointer; text-align: left; transition: background-color 120ms ease, color 120ms ease;
+}
+.chat-context-menu button:hover:not(:disabled), .chat-context-menu button:focus-visible {
+  background: var(--hover-overlay); color: var(--text);
+}
+.chat-context-menu button:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.chat-context-menu button:disabled { opacity: .4; cursor: default; }
+.chat-context-menu kbd { font: inherit; font-size: 11px; color: var(--text-muted); }
+.chat-context-menu [role=separator] { height: 1px; margin: 5px 8px; background: var(--border); }
+.chat-context-notice {
+  position: fixed; z-index: 10001; left: 50%; bottom: 120px; transform: translateX(-50%);
+  max-width: calc(100vw - 32px); padding: 10px 16px; border: 1px solid var(--border);
+  border-radius: 12px; background: var(--bg-soft); color: var(--text); font-size: 12px;
+}
+@media(prefers-reduced-motion:reduce) { .chat-context-menu button { transition: none; } }
+
 html, body {
   height: 100%;
   background: var(--bg);

@@ -44,6 +44,15 @@ export function useChatBridge(
       }
       if (message.revision !== new URL(target.src).searchParams.get("revision"))
         return;
+      if (message.type === "beings:chat-edit" && typeof message.id === "string" && message.id.length <= 64 &&
+          ["cut", "copy", "paste"].includes(message.command)) {
+        const reply = (ok: boolean) => {
+          if (frame.current === target && new URL(target.src).searchParams.get("revision") === message.revision)
+            app.post({ type: "beings:chat-edit-result", id: message.id, revision: message.revision, ok });
+        };
+        void app.api.editChat(message.command).then(reply, () => reply(false));
+        return;
+      }
       if (message.type === "beings:history-scope-state") {
         if (message.scope === "current" || message.scope === "all") app.setChatHistoryScope(message.scope);
         return;
