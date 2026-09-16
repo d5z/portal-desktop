@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { AppModel } from "../models/app";
 import { useModel } from "../../shared/hooks/use-model";
 import { ChatSceneIndicator } from "./chat-scene";
+import { UpdateProgress } from "./update-progress";
 export function Topbar({ model }: { model: AppModel }) {
   const app = useModel(model);
   const [expanded, setExpanded] = useState(false),
@@ -152,6 +153,12 @@ export function Topbar({ model }: { model: AppModel }) {
         </button>
       </div>
       <div className="topbar-actions">
+        <UpdateProgress
+          state={app.update}
+          onDownload={() => void app.run(() => app.api.downloadUpdate())}
+          onCancel={() => void app.run(() => app.api.cancelUpdate())}
+          onInstall={() => void app.run(() => app.api.installUpdate())}
+        />
         <button
           id="refresh-chat"
           className="topbar-icon-button"

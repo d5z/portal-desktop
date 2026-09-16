@@ -57,7 +57,9 @@ export interface DesktopAPI {
   browserAction(action: BrowserAction): Promise<void>;
   browserBounds(bounds: BrowserBounds): Promise<void>;
   onBrowser(callback: (state: BrowserState) => void): () => void;
-  checkUpdates(): Promise<void>;
+  checkUpdates(): Promise<UpdateState>;
+  downloadUpdate(): Promise<void>;
+  installUpdate(): Promise<void>;
   cancelUpdate(): Promise<void>;
   updateState(): Promise<UpdateState>;
   onUpdate(callback: (state: UpdateState) => void): () => void;

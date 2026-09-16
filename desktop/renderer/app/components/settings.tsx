@@ -281,14 +281,24 @@ export function ClientSettings({ model }: { model: AppModel }) {
             </button>
             <button
               id="check-updates"
-              disabled={Boolean(app.update?.activity)}
-              onClick={() => void app.run(() => app.api.checkUpdates())}
+              disabled={app.update?.phase === "checking"}
+              onClick={() => void app.run(async () => {
+                const activity = app.update?.activity;
+                if (activity) {
+                  app.toast(activity.phase === "ready"
+                    ? "安装包已就绪，请点击右上角安装。"
+                    : "正在处理更新，请稍候。");
+                  return;
+                }
+                const state = await app.api.checkUpdates();
+                app.toast(state.message);
+              })}
             >
-              {app.update?.phase === "available"
-                ? `更新至 ${app.update.latestVersion}`
-                : app.update?.phase === "checking"
-                  ? "正在检查更新…"
-                  : "检查更新"}
+              {app.update?.phase === "checking"
+                ? "正在检查更新…"
+                : app.update?.phase === "available"
+                  ? `重新检查更新 · ${app.update.latestVersion}`
+                  : "手动检查更新"}
             </button>
           </section>
         </div>

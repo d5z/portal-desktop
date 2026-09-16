@@ -154,7 +154,11 @@ try {
     };
   }, { version: pkg.version, asset, sums, archive, requests: path.join(root, 'release-requests.log'), repository: process.env.PORTAL_DESKTOP_UPDATE_REPOSITORY || 'd5z/portal-desktop' });
   const exited = new Promise(resolve => app.process().once('exit', resolve));
-  await page.evaluate(() => { void window.beings.checkUpdates().catch(() => {}); });
+  await page.evaluate(async () => {
+    await window.beings.checkUpdates();
+    await window.beings.downloadUpdate();
+    await window.beings.installUpdate();
+  });
   let exitTimeout;
   try { await Promise.race([exited, new Promise((_, reject) => { exitTimeout = setTimeout(() => reject(new Error('Installer did not quit the old client.')), 60_000); })]); }
   finally { clearTimeout(exitTimeout); }

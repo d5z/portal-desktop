@@ -1,32 +1,59 @@
-import type { UpdateActivity } from '../../../shared/types';
-import { Dialog } from '../../shared/components/dialog';
+import type { CSSProperties } from 'react';
+import type { UpdateState } from '../../../shared/types';
 
-const stages: Record<UpdateActivity['phase'], string> = {
+const stages: Record<NonNullable<UpdateState['activity']>['phase'], string> = {
   metadata: '正在读取更新信息…',
-  downloading: '正在下载安装包…',
+  downloading: '正在下载更新…',
   verifying: '正在校验安装包…',
   preparing: '正在准备安装文件…',
-  ready: '下载和校验已完成',
+  ready: '下载完成，点击安装',
   installing: '正在停止 Portal，准备安装…',
 };
-const size = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 
-export function UpdateProgress({ activity, onCancel }: { activity?: UpdateActivity; onCancel: () => void }) {
-  const cancellable = activity && !['ready', 'installing'].includes(activity.phase);
+export function UpdateProgress({ state, onDownload, onCancel, onInstall }: {
+  state?: UpdateState;
+  onDownload: () => void;
+  onCancel: () => void;
+  onInstall: () => void;
+}) {
+  const activity = state?.activity;
+  if (!activity && state?.phase !== 'available') return null;
+  const downloading = Boolean(activity && !['ready', 'installing'].includes(activity.phase));
   const ratio = activity?.phase === 'downloading' && activity.total
     ? Math.min(1, (activity.received || 0) / activity.total) : undefined;
+  const label = activity
+    ? stages[activity.phase]
+    : `发现新版本 ${state?.latestVersion}，点击下载`;
+  const action = activity?.phase === 'ready'
+    ? onInstall
+    : downloading
+      ? onCancel
+      : onDownload;
   return (
-    <Dialog id="update-progress-dialog" open={Boolean(activity)} onClose={onCancel} busy={!cancellable} aria-labelledby="update-progress-title">
-      <h2 id="update-progress-title">更新至 {activity?.version}</h2>
-      <p id="update-progress-status" role="status">{activity ? stages[activity.phase] : ''}</p>
-      <progress max={1} value={activity?.phase === 'ready' ? 1 : ratio} aria-label="客户端更新进度" />
-      {activity?.phase === 'downloading' && <p id="update-progress-bytes">
-        已下载 {size(activity.received || 0)}{activity.total ? ` / ${size(activity.total)} · ${Math.floor((ratio || 0) * 100)}%` : ''}
-      </p>}
-      <p className="update-progress-note">{activity?.phase === 'installing'
-        ? '客户端即将退出，安装器会继续显示安装进度。'
-        : activity?.phase === 'ready' ? '请在确认窗口中选择是否停止 Portal 并安装。' : '下载完成后再确认安装，下载期间不会停止 Portal。'}</p>
-      {cancellable && <button id="cancel-update-download" type="button" onClick={onCancel}>取消下载</button>}
-    </Dialog>
+    <button
+      id="client-update"
+      className={`client-update${downloading ? ' is-progress' : ''}${activity?.phase === 'ready' ? ' is-ready' : ''}`}
+      type="button"
+      aria-label={label}
+      title={downloading ? `${label}（点击取消）` : label}
+      aria-busy={downloading || activity?.phase === 'installing'}
+      disabled={activity?.phase === 'installing'}
+      onClick={action}
+      style={ratio === undefined ? undefined : { '--update-angle': `${ratio * 360}deg` } as CSSProperties}
+    >
+      {downloading ? (
+        <span className="client-update-progress" aria-hidden="true">
+          {ratio === undefined ? null : <span>{Math.floor(ratio * 100)}</span>}
+        </span>
+      ) : activity?.phase === 'ready' ? (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M7 17h10M12 4v9m0 0 3-3m-3 3-3-3" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" aria-hidden="true">
+          <path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18v2h14v-2" />
+        </svg>
+      )}
+    </button>
   );
 }

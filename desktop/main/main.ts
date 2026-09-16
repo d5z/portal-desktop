@@ -272,67 +272,78 @@ async function ready() {
   let runtimeUpdate: RuntimeUpdateResult = { phase: 'current', message: 'Portal 升级状态将在启动检查后显示。' };
   const updates = new UpdateChecker(app.getVersion(), PORTAL_DESKTOP_UPDATE_REPOSITORY, net.fetch.bind(net) as typeof fetch,
     state => { if (window && !window.isDestroyed()) window.webContents.send('beings:update-state', state); });
-  let showingUpdates = false;
   let updateDownload: AbortController | undefined;
-  const showUpdates = async () => {
-    if (showingUpdates || !window) return;
-    showingUpdates = true;
+  let updateHandoff: Awaited<ReturnType<typeof stageInstaller>> | undefined;
+  const downloadUpdate = async () => {
+    if (updateDownload || updateHandoff || updates.state.activity) return;
+    if (!app.isPackaged) throw new Error('开发版本不能下载安装更新。');
+    const state = updates.state.phase === 'available' ? updates.state : await updates.check();
+    if (state.phase !== 'available' || !state.latestVersion) throw new Error('当前没有可下载的客户端更新。');
+    const controller = new AbortController();
+    updateDownload = controller;
+    updates.setActivity({ phase: 'metadata', version: state.latestVersion });
+    window?.setProgressBar(2);
+    let lastProgress = 0;
     try {
-      const state = await updates.check();
-      const answer = await dialog.showMessageBox(window, { type: state.phase === 'available' ? 'info' : 'none', title: '客户端更新',
-        message: state.phase === 'available' ? `发现 ${CLIENT_NAME} ${state.latestVersion}` : state.message,
-        detail: `当前客户端：${app.getVersion()}${runtimeUpdate.portalVersion ? ` · Portal：${runtimeUpdate.portalVersion}` : ''}\n${runtimeUpdate.message}\n\n下载并校验安装包后，先停止客户端 Portal 和对应守护，再安装客户端。安装完成自动打开新版，沿用原配置启动最新 Portal。请先完成本机任务并保存草稿。`,
-        buttons: state.phase === 'available' && app.isPackaged ? ['稍后', '下载并升级', '打开发布页'] : ['关闭', '打开发布页'], defaultId: 0, cancelId: 0 });
-      if (state.phase === 'available' && app.isPackaged && answer.response === 1) {
-        const controller = new AbortController();
-        updateDownload = controller;
-        updates.setActivity({ phase: 'metadata', version: state.latestVersion! });
-        window?.setProgressBar(2);
-        let handoff: Awaited<ReturnType<typeof stageInstaller>>;
-        let lastProgress = 0;
-        try {
-          handoff = await stageInstaller(directory, state.latestVersion!, PORTAL_DESKTOP_UPDATE_REPOSITORY, process.execPath, net.fetch.bind(net) as typeof fetch, {
-            signal: controller.signal,
-            onProgress: progress => {
-              const now = Date.now();
-              if (progress.phase === 'downloading' && progress.received && progress.received !== progress.total && now - lastProgress < 200) return;
-              lastProgress = now;
-              updates.setActivity({ ...progress, version: state.latestVersion! });
-              window?.setProgressBar(progress.phase === 'downloading' && progress.total ? Math.min(1, (progress.received || 0) / progress.total) : 2);
-            },
-          });
-        } catch (error) {
-          if (controller.signal.aborted) return;
-          throw error;
-        } finally { updateDownload = undefined; window?.setProgressBar(-1); }
-        if (!window || quitting) { await handoff.discard(); return; }
-        updates.setActivity({ phase: 'ready', version: state.latestVersion! });
-        const confirmed = await dialog.showMessageBox(window, { type: 'info', title: '安装包已就绪', message: `安装 ${CLIENT_NAME} ${state.latestVersion}`, detail: '已完成下载和校验。继续将停止 Portal 及守护、关闭客户端，安装成功后自动打开新版并恢复运行。执行中的本机任务会中断，请先保存草稿。', buttons: ['稍后', '停止 Portal 并安装'], defaultId: 0, cancelId: 0 });
-        if (confirmed.response !== 1) { await handoff.discard(); return; }
-        updates.setActivity({ phase: 'installing', version: state.latestVersion! });
-        await exclusive(async () => {
-          if (recoveryBlocked) throw new Error('请先完成上次升级恢复。');
-          const intent = await clientInstall.prepare(app.getVersion(), state.latestVersion!, store.connection, portal.managing);
-          try {
-            recoveryBlocked = true;
-            await portal.stop();
-            await handoff();
-            app.quit();
-          } catch (error) {
-            await clientInstall.resume(intent);
-            if (intent.foreground && store.connection) await portal.start(store.settings, store.connection);
-            recoveryBlocked = false;
-            throw error;
-          }
-        });
-      } else if (answer.response > 0) await shell.openExternal(state.releaseUrl);
+      updateHandoff = await stageInstaller(directory, state.latestVersion, PORTAL_DESKTOP_UPDATE_REPOSITORY, process.execPath, net.fetch.bind(net) as typeof fetch, {
+        signal: controller.signal,
+        onProgress: progress => {
+          const now = Date.now();
+          if (progress.phase === 'downloading' && progress.received && progress.received !== progress.total && now - lastProgress < 200) return;
+          lastProgress = now;
+          updates.setActivity({ ...progress, version: state.latestVersion! });
+          window?.setProgressBar(progress.phase === 'downloading' && progress.total ? Math.min(1, (progress.received || 0) / progress.total) : 2);
+        },
+      });
+      if (!window || quitting) {
+        await updateHandoff.discard();
+        updateHandoff = undefined;
+        updates.setActivity();
+        return;
+      }
+      updates.setActivity({ phase: 'ready', version: state.latestVersion });
     } catch (error) {
+      if (controller.signal.aborted) {
+        updates.setActivity();
+        return;
+      }
       updates.setActivity();
-      const message = errorLog.report('client-update', error, '客户端升级未完成，请稍后重试。');
-      if (window && !quitting) await dialog.showMessageBox(window, { type: 'error', title: '客户端升级未完成', message, detail: '原配置和恢复记录已保留。可重新打开客户端恢复，或稍后重试。', buttons: ['知道了'] });
-    } finally { showingUpdates = false; updates.setActivity(); }
+      throw error;
+    } finally {
+      updateDownload = undefined;
+      window?.setProgressBar(-1);
+    }
   };
-  handle('beings:check-updates', showUpdates);
+  const installUpdate = async () => {
+    const handoff = updateHandoff;
+    const activity = updates.state.activity;
+    if (!handoff || activity?.phase !== 'ready') throw new Error('安装包尚未准备完成。');
+    if (recoveryBlocked) throw new Error('请先完成上次升级恢复。');
+    updates.setActivity({ phase: 'installing', version: activity.version });
+    try {
+      await exclusive(async () => {
+        const intent = await clientInstall.prepare(app.getVersion(), activity.version, store.connection, portal.managing);
+        try {
+          recoveryBlocked = true;
+          await portal.stop();
+          await handoff();
+          updateHandoff = undefined;
+          app.quit();
+        } catch (error) {
+          await clientInstall.resume(intent);
+          if (intent.foreground && store.connection) await portal.start(store.settings, store.connection);
+          recoveryBlocked = false;
+          throw error;
+        }
+      });
+    } catch (error) {
+      updates.setActivity({ phase: 'ready', version: activity.version });
+      throw error;
+    }
+  };
+  handle('beings:check-updates', () => updates.check());
+  handle('beings:download-update', downloadUpdate);
+  handle('beings:install-update', installUpdate);
   handle('beings:cancel-update', () => { updateDownload?.abort(); });
   handle('beings:update-state', () => updates.state);
   const snapshot = () => ({ settings: store.settings, portal: portal.state, background: background.state, chatScene, notice: [startupNotice && errorLog.report('startup-notice', startupNotice), chatSceneNotice].filter(Boolean).join('\n') || undefined });
@@ -495,7 +506,10 @@ async function ready() {
       }).finally(() => { handlingConflict = false; });
     }
   });
-  installApplicationMenu(showWindow, () => { void showUpdates(); });
+  installApplicationMenu(showWindow, () => {
+    showWindow();
+    void updates.check();
+  });
   tray = createApplicationTray(showWindow, app.isPackaged);
   async function restoreStartup(intent: 'manual' | 'automatic' = 'automatic') {
     if (!store.connection) {

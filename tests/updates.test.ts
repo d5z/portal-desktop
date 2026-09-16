@@ -42,6 +42,17 @@ it('coalesces overlapping manual and automatic checks', async () => {
   await Promise.all([a, b]); expect(count).toBe(1);
 });
 
+it('runs a fresh check after a completed one and returns a user-facing message', async () => {
+  let count = 0;
+  const checker = new UpdateChecker('0.1.1', 'd5z/portal-desktop', (async () => {
+    count++;
+    return Response.json(release(count === 1 ? 'v0.2.0' : 'v0.1.1'));
+  }) as typeof fetch);
+  expect(await checker.check()).toMatchObject({ phase: 'available', message: expect.stringContaining('发现新版本') });
+  expect(await checker.check()).toMatchObject({ phase: 'current', message: expect.stringContaining('最新') });
+  expect(count).toBe(2);
+});
+
 it('publishes download activity and keeps periodic checks from replacing an active upgrade', async () => {
   let calls = 0;
   const published: import('../desktop/shared/types').UpdateState[] = [];

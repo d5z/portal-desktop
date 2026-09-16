@@ -15,6 +15,8 @@ const api: DesktopAPI = {
     return () => ipcRenderer.removeListener('beings:browser-state', listener);
   },
   checkUpdates: () => ipcRenderer.invoke('beings:check-updates'),
+  downloadUpdate: () => ipcRenderer.invoke('beings:download-update'),
+  installUpdate: () => ipcRenderer.invoke('beings:install-update'),
   cancelUpdate: () => ipcRenderer.invoke('beings:cancel-update'),
   updateState: () => ipcRenderer.invoke('beings:update-state'),
   onUpdate: callback => {
