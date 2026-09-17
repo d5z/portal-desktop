@@ -5,7 +5,7 @@ import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
 import { DesktopNotifications } from '../desktop/main/app/notifications';
 import { AppModel } from '../desktop/renderer/app/models/app';
-import type { DesktopAPI, NotificationTarget } from '../desktop/shared/types';
+import type { DesktopAPI, NotificationSettings, NotificationTarget } from '../desktop/shared/types';
 
 const directories: string[] = [];
 afterEach(async () => { await Promise.all(directories.splice(0).map(dir => rm(dir, { recursive: true, force: true }))); });
@@ -80,6 +80,36 @@ it('allows foreground test notifications and handles native failures without thr
   created[0].emit('failed'); expect(service.state.message).toContain('系统未能显示');
   options.focused.mockReturnValue(false); options.create.mockImplementation(() => { throw new Error('OS failed'); });
   expect(() => service.receive({ channel: 'mail' })).not.toThrow();
+});
+it.each(['enabled', 'mail', 'firesides', 'bonfire'] as const)('keeps the %s switch checked during a slow save and blocks duplicate writes', async key => {
+  let finish!: (settings: NotificationSettings) => void;
+  const notifications = vi.fn(() => new Promise<NotificationSettings>(resolve => { finish = resolve; }));
+  const model = new AppModel({ notifications } as unknown as DesktopAPI);
+  model.notificationSettings = { supported: true, message: '',
+    preferences: { enabled: key !== 'enabled', mail: false, firesides: false, bonfire: false } };
+  const saving = model.changeNotifications({ [key]: true });
+  expect(model.notificationSettings.preferences[key]).toBe(true);
+  expect(model.notificationsBusy).toBe(true);
+  await model.changeNotifications({ [key]: false });
+  expect(notifications).toHaveBeenCalledTimes(1);
+  const saved = { ...model.notificationSettings, message: 'saved' };
+  finish(saved);
+  await saving;
+  expect(model.notificationSettings).toEqual(saved);
+  expect(model.notificationsBusy).toBe(false);
+});
+it('restores the saved notification settings and shows an error if persistence fails', async () => {
+  let fail!: (error: Error) => void;
+  const model = new AppModel({ notifications: () => new Promise<NotificationSettings>((_, reject) => { fail = reject; }) } as unknown as DesktopAPI);
+  const previous = { supported: true, message: '', preferences: { enabled: true, mail: true, firesides: false, bonfire: false } };
+  model.notificationSettings = previous;
+  const saving = model.changeNotifications({ mail: false });
+  expect(model.notificationSettings.preferences.mail).toBe(false);
+  fail(new Error('通知设置保存失败'));
+  await saving;
+  expect(model.notificationSettings).toEqual(previous);
+  expect(model.notificationsError).toContain('通知设置保存失败');
+  expect(model.notificationsBusy).toBe(false);
 });
 it('opens pending notifications after initialization, choosing the inbox instead of the last sent-mail tab', async () => {
   let target: NotificationTarget | null = { channel: 'mail' };

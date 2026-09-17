@@ -480,11 +480,18 @@ export class AppModel extends Store {
   }
   async changeNotifications(patch: Partial<NotificationPreferences>) {
     if (this.notificationsBusy) return;
+    const previous = this.notificationSettings;
+    if (previous) this.notificationSettings = {
+      ...previous, preferences: { ...previous.preferences, ...patch },
+    };
     this.notificationsBusy = true;
     this.notificationsError = "";
     this.changed();
     try { this.notificationSettings = await this.api.notifications(patch); }
-    catch (error) { this.notificationsError = errorText(error); }
+    catch (error) {
+      this.notificationSettings = previous;
+      this.notificationsError = errorText(error);
+    }
     finally { this.notificationsBusy = false; this.changed(); }
   }
   async testNotification() {

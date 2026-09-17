@@ -28,11 +28,29 @@ try {
   assert.equal(await page.locator('#notification-firesides').isChecked(), false);
   assert.equal(await page.locator('#notification-bonfire').isChecked(), false);
   assert.equal(await page.locator('#notification-mail').isDisabled(), true);
+  // Keep real persistence, but expose the pending-save state even on fast disks.
+  await app.evaluate(() => {
+    const fs = process.getBuiltinModule('node:fs/promises');
+    const writeFile = fs.writeFile;
+    globalThis.notificationDelayedWrites = 0;
+    globalThis.restoreNotificationWrites = () => { fs.writeFile = writeFile; };
+    fs.writeFile = async function (file, ...args) {
+      if (String(file).endsWith('notifications.json.tmp')) {
+        globalThis.notificationDelayedWrites++;
+        await new Promise(resolve => setTimeout(resolve, 300));
+      }
+      return writeFile.call(this, file, ...args);
+    };
+  });
   await page.locator('#notification-enabled').check();
   await page.locator('#notification-mail').check();
   await page.locator('#notification-bonfire').check();
   await page.waitForFunction(async () => (await window.beings.notifications()).preferences.bonfire);
   assert.deepEqual(JSON.parse(await readFile(path.join(directory, 'notifications.json'), 'utf8')), { enabled: true, mail: true, firesides: false, bonfire: true });
+  assert.equal(await app.evaluate(() => {
+    globalThis.restoreNotificationWrites();
+    return globalThis.notificationDelayedWrites;
+  }), 3);
   await app.evaluate(({ Notification, protocol }) => {
     globalThis.notificationEvents = [];
     globalThis.notificationObjects = [];
