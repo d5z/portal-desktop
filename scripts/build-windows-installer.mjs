@@ -20,6 +20,7 @@ export async function buildWindowsInstaller(prepackaged, output, version = pkg.v
       artifactName: `portal-desktop-${version}-windows-x64.\${ext}`,
       win: { executableName: identity.executableName, icon: 'resources/branding/app.ico' },
       nsis: {
+        installerIcon: 'resources/branding/logo-black.ico',
         guid: identity.guid, oneClick: true, perMachine: false,
         allowElevation: false, allowToChangeInstallationDirectory: false,
         runAfterFinish: true, deleteAppDataOnUninstall: false,

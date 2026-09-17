@@ -112,14 +112,6 @@ export function Topbar({ model }: { model: AppModel }) {
     };
   }, []);
   const hasToken = Boolean(app.snapshot?.settings.hasToken);
-  const labels: Record<string, string> = {
-    online: "已连接",
-    connecting: "正在连接",
-    reconnecting: "正在重连",
-    degraded: "网络不稳定",
-    offline: "已离线",
-  };
-  const label = labels[app.connection] || "尚未连接";
   const portal = app.snapshot?.portal;
   const portalLabels = {
     running: "运行中",
@@ -332,7 +324,9 @@ export function Topbar({ model }: { model: AppModel }) {
               >
                 退出客户端
               </button>
-              <span id="cloud-status">{label}</span>
+              <span id="client-version" aria-label="当前客户端版本">
+                {app.update?.currentVersion ? `v${app.update.currentVersion}` : "正在读取版本…"}
+              </span>
             </div>
             <div id="options-secondary" hidden={!help}>
               <button

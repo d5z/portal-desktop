@@ -5,7 +5,7 @@ import { publicErrorMessage } from '../desktop/shared/errors';
 const fixture = vi.hoisted(() => ({ startup: undefined as Promise<void> | undefined }));
 vi.mock('electron', () => ({
   app: {
-    setName: vi.fn(), setAboutPanelOptions: vi.fn(), setPath: vi.fn(), quit: vi.fn(),
+    setName: vi.fn(), setAppUserModelId: vi.fn(), setAboutPanelOptions: vi.fn(), setPath: vi.fn(), quit: vi.fn(),
     getPath: () => { throw new Error("Failed to get 'appData' path"); },
     whenReady: () => ({ then: (ready: () => Promise<void>) => (fixture.startup = Promise.resolve().then(ready)) }),
     requestSingleInstanceLock: vi.fn(),

@@ -10,14 +10,14 @@ const fixture = vi.hoisted(() => ({ directory: '', startup: undefined as Promise
 vi.mock('electron', async () => {
   const { EventEmitter } = await import('node:events');
   const app = Object.assign(new EventEmitter(), {
-    isPackaged: false, setName: vi.fn(), setAboutPanelOptions: vi.fn(), setPath: vi.fn(),
+    isPackaged: false, setName: vi.fn(), setAppUserModelId: vi.fn(), setAboutPanelOptions: vi.fn(), setPath: vi.fn(),
     getPath: (name: string) => { if (name === 'appData') throw new Error("Failed to get 'appData' path"); return fixture.directory; },
     getAppPath: () => fixture.directory, getVersion: () => '0.1.6',
     requestSingleInstanceLock: () => true, quit: vi.fn(),
     whenReady: () => ({ then: (ready: () => Promise<void>) => (fixture.startup = Promise.resolve().then(ready)) }),
   });
-  return { app, clipboard: {}, ipcMain: { handle: vi.fn() }, net: { fetch: vi.fn() },
-    dialog: { showErrorBox: vi.fn(), showMessageBox: vi.fn() }, nativeTheme: {}, shell: {},
+  return { app, clipboard: {}, Notification: { isSupported: () => true }, ipcMain: { handle: vi.fn() }, net: { fetch: vi.fn() },
+    dialog: { showErrorBox: vi.fn(), showMessageBox: vi.fn() }, nativeTheme: new EventEmitter(), nativeImage: {}, shell: {},
     safeStorage: { isEncryptionAvailable: () => true },
     protocol: { registerSchemesAsPrivileged: vi.fn(), handle: vi.fn() },
     session: { defaultSession: { setPermissionRequestHandler: vi.fn(), setPermissionCheckHandler: vi.fn() } },
@@ -68,6 +68,11 @@ it('defers repeated launch until initialization and opens one usable window even
     window.webContents.mainFrame = { url: 'beings://desktop/' };
     const request = { sender: window.webContents, senderFrame: window.webContents.mainFrame };
     const handlers = new Map(vi.mocked(ipcMain.handle).mock.calls);
+    if (process.platform === 'win32') expect(app.setAppUserModelId).toHaveBeenCalledWith('town.beings.portal-desktop.development');
+    const notifications = await handlers.get('beings:notifications')!(request as never, { enabled: true, bonfire: true });
+    expect(notifications.preferences).toMatchObject({ enabled: true, bonfire: true });
+    expect(await handlers.get('beings:notification-target')!(request as never)).toBeNull();
+    await expect(handlers.get('beings:notifications')!({ ...request, senderFrame: {} } as never, { enabled: false })).rejects.toThrow('Untrusted');
     const snapshot = await handlers.get('beings:snapshot')!(request as never);
     expect(snapshot.portal.message).toBe('Windows 命令环境不可用，请检查后重试。');
     expect(snapshot.notice).not.toContain('ENOENT');

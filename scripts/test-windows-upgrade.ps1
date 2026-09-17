@@ -71,7 +71,7 @@ $taskName = 'Portal-Installer-Test-' + [Guid]::NewGuid().ToString('N')
 $taskResult = Join-Path $taskLogs "$taskName.exit"
 $taskScript = ''
 # Copy only test configuration, never the runner's complete environment.
-foreach ($taskVariable in @('PORTAL_DESKTOP_UPDATE_REPOSITORY', 'PORTAL_DESKTOP_PACKAGE_OUT', 'PORTAL_DESKTOP_EXECUTABLE', 'GITHUB_ACTIONS')) {
+foreach ($taskVariable in @('PORTAL_DESKTOP_UPDATE_REPOSITORY', 'PORTAL_DESKTOP_PACKAGE_OUT', 'PORTAL_DESKTOP_EXECUTABLE', 'PORTAL_DESKTOP_BASELINE_SETUP', 'GITHUB_ACTIONS')) {
   $taskValue = [Environment]::GetEnvironmentVariable($taskVariable)
   if ($taskValue) { $taskScript += '$env:' + $taskVariable + '=' + (Quote-TaskValue $taskValue) + '; ' }
 }

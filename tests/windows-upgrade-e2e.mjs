@@ -1,5 +1,6 @@
 // Real NSIS Setup and client update handoff, with an isolated installation,
-// profile and local Being. The older version is a fixture, not a past release.
+// profile and local Being. PORTAL_DESKTOP_BASELINE_SETUP selects a real historical
+// installer; without it the older version is a generated version fixture.
 import assert from 'node:assert/strict';
 import { execFile, spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
@@ -11,7 +12,7 @@ import { promisify } from 'node:util';
 import * as asar from '@electron/asar';
 import { buildWindowsInstaller } from '../scripts/build-windows-installer.mjs';
 import { WebSocketServer } from 'ws';
-import { desktopExecutable } from './support/desktop.mjs';
+import { desktopExecutable, waitForChatReady } from './support/desktop.mjs';
 import { launchDesktop } from './support/electron-lifecycle.mjs';
 import { isolateWindowsInstallation, powershell, psQuote } from './support/windows-installation.mjs';
 
@@ -37,6 +38,7 @@ const root = await mkdtemp(path.join(os.tmpdir(), 'portal-win-upgrade-'));
 const profile = path.join(root, 'profile'), workspace = path.join(root, '工作目录'), kits = path.join(root, 'kits');
 const pkg = await json(new URL('../package.json', import.meta.url));
 const previous = pkg.version.replace(/\d+$/, value => String(Number(value) - 1));
+const historicalSetup = process.env.PORTAL_DESKTOP_BASELINE_SETUP;
 assert.match(previous, /^\d+\.\d+\.\d+$/);
 const packaged = path.dirname(await desktopExecutable());
 const bundle = await json(path.join(packaged, 'resources/runtime-bundle.json'));
@@ -121,6 +123,8 @@ public static class PortalTestWindows {
 }
 try {
   await Promise.all([mkdir(workspace), mkdir(kits)]);
+  let baselineSetup = historicalSetup && path.resolve(historicalSetup);
+  if (!baselineSetup) {
   const baseline = path.join(root, 'baseline'), unpacked = path.join(root, 'asar');
   await cp(packaged, baseline, { recursive: true });
   const appAsar = path.join(baseline, 'resources/app.asar');
@@ -132,7 +136,9 @@ try {
   await writeFile(path.join(baseline, 'resources/runtime-bundle.json'), JSON.stringify({ ...bundle, clientVersion: previous, id: sha('baseline:' + bundle.id) }));
   const baselineOutput = path.join(root, 'baseline-setup');
   await buildWindowsInstaller(baseline, baselineOutput, previous, false);
-  await runProcess(path.join(baselineOutput, `portal-desktop-${previous}-windows-x64-Setup.exe`), [`/D=${installation.installedRoot}`], env);
+  baselineSetup = path.join(baselineOutput, `portal-desktop-${previous}-windows-x64-Setup.exe`);
+  }
+  await runProcess(baselineSetup, [`/D=${installation.installedRoot}`], env);
   console.log('NSIS installation completed; checking automatic startup.');
   const firstClient = await until('NSIS automatically opens the installed client window', async () => {
     const opened = await clients();
@@ -143,7 +149,8 @@ try {
   await runProcess(installed(), ['--quit-for-update'], env, 30_000);
   await until('baseline client closes before controlled test launch', async () => (await clients()).length === 0);
   assert.equal(JSON.parse(asar.extractFile(path.join(path.dirname(installed(previous)), 'resources/app.asar'), 'package.json').toString()).version, previous);
-  assert.equal(sha(await readFile(path.join(path.dirname(installed(previous)), 'resources/heart-portal.exe'))), bundle.sha256);
+  const baselineBundle = await json(path.join(path.dirname(installed()), 'resources/runtime-bundle.json'));
+  assert.equal(sha(await readFile(path.join(path.dirname(installed(previous)), 'resources/heart-portal.exe'))), baselineBundle.sha256);
   console.log(`PASS: real Setup installs ${previous} under the isolated installation root with its bundled Portal.`);
   await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
   const configPath = path.join(root, 'custom portal.toml');
@@ -162,6 +169,7 @@ try {
   }, { connectionLink: `http://127.0.0.1:${server.address().port}/upgrade-fixture/?token=${token}`, portalName: 'upgrade-fixture', workspace, portalConfigPath: configPath });
   await until('old client Portal connects', async () => (await page.evaluate(() => window.beings.snapshot())).portal.phase === 'connected');
   const before = await page.evaluate(() => window.beings.snapshot());
+  await page.evaluate(() => window.beings.appearance('dark'));
   const oldClientPid = await app.evaluate(() => process.pid);
   ownedPids.add(before.portal.pid);
   const oldTools = (await rpc('tools/list')).tools.map(tool => tool.name).sort();
@@ -211,6 +219,7 @@ try {
   assert.equal(await readFile(path.join(workspace, 'retained.txt'), 'utf8'), '原工作文件');
   assert.equal(await readFile(path.join(kits, 'retained.txt'), 'utf8'), 'Existing Kit files');
   assert.equal(await readFile(path.join(profile, 'retained.txt'), 'utf8'), 'Keep user profile');
+  assert.equal((await json(path.join(profile, 'appearance.json'))).theme, 'dark');
   assert.deepEqual((await rpc('tools/list')).tools.map(tool => tool.name).sort(), oldTools);
   assert.notEqual((await rpc('tools/call', { name: 'portal_file_write', arguments: { path: 'after-upgrade.txt', content: '升级后调用成功' } })).isError, true);
   assert.equal(await readFile(path.join(workspace, 'after-upgrade.txt'), 'utf8'), '升级后调用成功');
@@ -240,6 +249,30 @@ try {
   assert.equal(await readFile(path.join(profile, 'retained.txt'), 'utf8'), 'Keep user profile');
   await assertSingleClientWindow(upgradedPid);
   console.log('PASS: manually opening NSIS while the client and Portal run gracefully stops both, reinstalls, and automatically restores the same profile and Portal.');
+  await runProcess(installed(), ['--quit-for-update'], env, 30_000);
+  await until('upgraded client closes for final UI validation', async () => (await clients()).length === 0);
+  app = await launchDesktop({ executablePath: installed(), env });
+  const upgradedPage = await app.firstWindow();
+  assert.equal(await app.evaluate(({ app }) => app.getVersion()), pkg.version);
+  const notificationSettings = await upgradedPage.evaluate(() => window.beings.notifications());
+  assert.equal(notificationSettings.preferences.enabled, false);
+  assert.equal(await upgradedPage.evaluate(() => window.beings.appearance()), 'dark');
+  await waitForChatReady(upgradedPage);
+  await upgradedPage.locator('#options-trigger').click();
+  await upgradedPage.locator('#client-settings-button').click();
+  await upgradedPage.locator('#settings-tab-general').click();
+  await upgradedPage.locator('#notification-enabled').check();
+  assert.equal(await upgradedPage.locator('#notification-test').count(), 0);
+  await assert.rejects(upgradedPage.evaluate(() => window.beings.testNotification()), /No handler registered/);
+  const reportDirectory = path.resolve('test-results/windows-installer');
+  await mkdir(reportDirectory, { recursive: true });
+  await upgradedPage.screenshot({ path: path.join(reportDirectory, 'upgraded-notifications.png') });
+  await writeFile(path.join(reportDirectory, 'upgrade-success.json'), JSON.stringify({ from: previous, to: pkg.version,
+    historicalBaseline: Boolean(historicalSetup), baselineSha256: sha(await readFile(baselineSetup)), setupSha256: sha(await readFile(setup)),
+    settingsPreserved: true, manualReinstallPassed: true, testNotificationHidden: true,
+
+    completedAt: new Date().toISOString() }, null, 2));
+  console.log('PASS: installed upgraded client retains appearance, starts notifications disabled, and exposes no development notification button or handler.');
   passed = true;
 } catch (error) {
   console.error('Windows upgrade failed. Isolated artifacts:', root);

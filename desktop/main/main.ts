@@ -1,4 +1,8 @@
-import { app, clipboard, dialog, ipcMain, net, nativeTheme, protocol, safeStorage, shell, type BrowserWindow, type Tray } from 'electron';
+import { app, clipboard, dialog, ipcMain, net, nativeImage, nativeTheme, Notification, protocol, safeStorage, shell, type BrowserWindow, type Tray } from 'electron';
+import { DesktopNotifications } from './app/notifications';
+import { repairDevelopmentShortcut, updateNotificationShortcutIcon, windowsAppId } from './app/windows-identity';
+import { brandingPath, notificationIcon } from './app/branding';
+import { systemUsesDarkColors, watchSystemTheme } from './app/system-theme';
 import { clientStartup } from './app/startup';
 import { clientUserData } from './app/profile';
 import type { ClientBrowser } from './browser/browser';
@@ -26,7 +30,7 @@ import { ChatProxy } from './chat/proxy';
 import { loadDesktopScene } from './chat/scene';
 import { verifyBeingConnection } from './chat/ready';
 import { redact } from './chat/connection';
-import type { ChatScene, SaveSettings } from '../shared/types';
+import type { ChatScene, NotificationTarget, SaveSettings } from '../shared/types';
 import { TownLive } from './town/live';
 import { TownClient, TownCredentials, TOWN_ORIGIN } from './town/client';
 import { registerTownIpc } from './town/ipc';
@@ -47,6 +51,7 @@ let profileError: unknown;
 let userData: string;
 try {
   app.setName(CLIENT_ID);
+  if (process.platform === 'win32') app.setAppUserModelId(windowsAppId(app.isPackaged));
   app.setAboutPanelOptions({ applicationName: CLIENT_NAME });
   userData = clientUserData(() => app.getPath('appData'), process.env.PORTAL_DESKTOP_USER_DATA);
   app.setPath('userData', userData);
@@ -66,6 +71,7 @@ let store: SettingsStore;
 let background: BackgroundPortal;
 let kitInstaller: KitInstaller;
 let townLive: TownLive;
+let notifications: DesktopNotifications;
 let cancelTownPairing: (() => void) | undefined;
 let updatePoll: ReturnType<typeof setInterval> | undefined;
 let backgroundPoll: ReturnType<typeof setInterval> | undefined;
@@ -116,6 +122,10 @@ function createWindow() {
 }
 
 async function ready() {
+  if (process.platform === 'win32') {
+    try { repairDevelopmentShortcut(app.getPath('appData'), shell); }
+    catch (error) { errorLog.report('notification-identity', error); }
+  }
   let appearance: 'light' | 'dark' = 'light';
   try { const saved = JSON.parse(await readFile(path.join(app.getPath('userData'), 'appearance.json'), 'utf8')); if (saved.theme === 'dark') appearance = 'dark'; } catch { /* First launch uses the light workspace. */ }
   nativeTheme.themeSource = appearance;
@@ -153,7 +163,39 @@ async function ready() {
   const townCredentials = new TownCredentials(directory, secretStorage);
   let townWarning: string | undefined;
   try { await townCredentials.load(); } catch (error) { townWarning = errorLog.report('town-credentials', error, 'Town 凭据读取失败，请重新连接。'); }
-  townLive = new TownLive(() => townCredentials.token, () => townCredentials.beingId, state => { if (window && !window.webContents.isDestroyed()) window.webContents.send('beings:town-live', state); }, net.fetch.bind(net) as typeof fetch, TOWN_ORIGIN, () => townCredentials.display);
+  let pendingNotification: { target: NotificationTarget; generation: number } | undefined;
+  let notificationDark = await systemUsesDarkColors();
+  const updateNotificationIcon = () => {
+    if (process.platform !== 'win32' || !app.isPackaged) return;
+    try { updateNotificationShortcutIcon(app.getPath('appData'), process.execPath,
+      brandingPath(notificationDark ? 'logo-white.ico' : 'logo-black.ico'), shell); }
+    catch (error) { errorLog.report('notification-icon', error); }
+  };
+  updateNotificationIcon();
+  const stopNotificationTheme = watchSystemTheme(dark => { notificationDark = dark; updateNotificationIcon(); });
+  app.once('will-quit', stopNotificationTheme);
+  notifications = new DesktopNotifications(directory, {
+    supported: () => Notification.isSupported(),
+    focused: () => quitting || Boolean(window && !window.isDestroyed() && window.isVisible() && window.isFocused()),
+    create: content => {
+      const notification = new Notification({ ...content, icon: nativeImage.createFromPath(notificationIcon(notificationDark)) });
+      // Electron may create its notification shortcut lazily in the constructor.
+      updateNotificationIcon();
+      return notification;
+    },
+    open: target => {
+      if (quitting) return;
+      pendingNotification = { target, generation: townLive.state.generation };
+      showWindow();
+      window?.webContents.send('beings:notification-open');
+    },
+  });
+  await notifications.load();
+  townLive = new TownLive(() => townCredentials.token, () => townCredentials.beingId, state => {
+    notifications.reset(state.generation);
+    if (state.phase === 'auth-error' || state.phase === 'unpaired') { notifications.clear(); pendingNotification = undefined; }
+    if (window && !window.webContents.isDestroyed()) window.webContents.send('beings:town-live', state);
+  }, net.fetch.bind(net) as typeof fetch, TOWN_ORIGIN, () => townCredentials.display, target => notifications.receive(target));
   const town = new TownClient(() => townCredentials.token, net.fetch.bind(net) as typeof fetch, TOWN_ORIGIN, () => townLive.state.beingId || '');
   townLive.restart();
   kitInstaller = new KitInstaller(directory, net.fetch.bind(net) as typeof fetch);
@@ -214,6 +256,18 @@ async function ready() {
     });
   };
   handle('beings:client-startup', (enabled?: boolean) => clientStartup(app, process.platform, process.execPath, enabled));
+  handle('beings:notifications', (patch?: unknown) => exclusive(async () => {
+    const state = patch === undefined ? notifications.state : await notifications.save(patch);
+    if (pendingNotification && (!state.preferences.enabled || !state.preferences[pendingNotification.target.channel])) pendingNotification = undefined;
+    return state;
+  }));
+  if (!app.isPackaged && MAIN_WINDOW_VITE_DEV_SERVER_URL)
+    handle('beings:notification-test', () => notifications.test());
+  handle('beings:notification-target', () => {
+    const pending = pendingNotification;
+    pendingNotification = undefined;
+    return pending?.generation === townLive.state.generation ? pending.target : null;
+  });
   handle('beings:quit', () => { setImmediate(() => app.quit()); });
   handle('beings:browser-state', () => browser?.state);
   handle('beings:browser-open', (url?: string) => browser?.open(url));
@@ -451,7 +505,6 @@ async function ready() {
       if (previousConnection) await store.save({ ...previous, connectionLink: previousConnection.link + '&relay_secret=' + encodeURIComponent(previousConnection.relaySecret) });
       throw error;
     }
-    townLive?.dispose();
     proxy.abortAll(); return snapshot();
   }));
   handle('beings:choose', async (kind: string) => {
@@ -639,7 +692,7 @@ else {
     lifecycleError = '';
     void exclusive(async () => { await kitInstaller?.dispose(); await portal.stop(); browser?.close(); await errorLog.flush(); }).then(() => {
       clearInterval(backgroundPoll); clearInterval(updatePoll);
-      townLive?.dispose(); proxy.abortAll();
+      townLive?.dispose(); notifications?.clear(); proxy.abortAll();
       quitCleanupDone = true; tray?.destroy(); app.quit();
     }).catch(error => {
       errorLog.report('client-quit', error);

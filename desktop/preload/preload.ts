@@ -3,6 +3,14 @@ import type { DesktopAPI, PortalState, TownLiveState } from '../shared/types';
 const api: DesktopAPI = {
   platform: process.platform,
   clientStartup: enabled => ipcRenderer.invoke('beings:client-startup', enabled),
+  notifications: patch => ipcRenderer.invoke('beings:notifications', patch),
+  testNotification: () => ipcRenderer.invoke('beings:notification-test'),
+  takeNotificationTarget: () => ipcRenderer.invoke('beings:notification-target'),
+  onNotificationOpen: callback => {
+    const listener = () => callback();
+    ipcRenderer.on('beings:notification-open', listener);
+    return () => ipcRenderer.removeListener('beings:notification-open', listener);
+  },
   quit: () => ipcRenderer.invoke('beings:quit'),
   browserState: () => ipcRenderer.invoke('beings:browser-state'),
   openBrowser: url => ipcRenderer.invoke('beings:browser-open', url),

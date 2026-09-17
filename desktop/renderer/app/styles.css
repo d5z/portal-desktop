@@ -53,7 +53,7 @@ main{min-width:0;flex:1;display:flex;flex-direction:column;background:var(--bg)}
 .topbar strong{font-size:13px;font-weight:550;white-space:nowrap}
 #conversation-name{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 body:not([data-view=chat]) #conversation-name{display:none}
-#cloud-status{font-size:11px;color:var(--muted);white-space:nowrap}
+#client-version{font-size:11px;color:var(--muted);white-space:nowrap}
 .icon-button,.close{display:inline-grid;place-items:center;flex-shrink:0;width:32px;height:32px;border-radius:8px;padding:0;font-size:19px;line-height:1;-webkit-app-region:no-drag}
 /* Draw the close mark independently of the platform font and its baseline. */
 .close{color:var(--secondary)}
@@ -358,7 +358,7 @@ body[data-view] #conversation-name{display:inline;font-size:13px;color:var(--tex
 .options-menu button{display:flex;justify-content:space-between;align-items:center;width:100%;padding:8px 11px;border-radius:6px;text-align:left;font-size:12px;color:var(--secondary)}
 .options-menu button:hover:not(:disabled){color:var(--text)}.options-menu small{font-size:10px;color:var(--muted)}
 .options-divider{height:1px;background:var(--line);margin:5px 8px}
-.options-menu #cloud-status{display:block;padding:9px 11px 4px;font-size:10px}
+.options-menu #client-version{display:block;padding:9px 11px 4px;font-size:10px}
 .scene-ribbon{display:none!important}
 body[data-view=chat].has-topic .scene-ribbon{display:flex!important;min-height:0;padding:8px max(24px,calc((100% - 720px)/2));gap:12px;border:0;background:transparent}
 .scene-orbit,.scene-caption,#scene-invitation{display:none!important}

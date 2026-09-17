@@ -43,6 +43,9 @@ export interface BackgroundState { supported: boolean; installed: boolean; enabl
 export interface ChatScene { scene_id: string; scene_meta: { client: string; scene_label: string } }
 export interface Snapshot { settings: Settings; portal: PortalState; background?: BackgroundState; chatScene?: ChatScene; notice?: string }
 export interface ClientStartup { supported: boolean; enabled: boolean; message: string }
+export interface NotificationPreferences { enabled: boolean; mail: boolean; firesides: boolean; bonfire: boolean }
+export interface NotificationSettings { preferences: NotificationPreferences; supported: boolean; message: string }
+export interface NotificationTarget { channel: TownChannel; firesideId?: string }
 export interface BrowserState { open: boolean; address: string; title: string; loading: boolean; canGoBack: boolean; canGoForward: boolean; error?: string }
 export interface DiagnosticReport { version: string; build: string; platform: string; pid: number; startedAt: string; checkedAt: string; checks: { name: string; status: 'ok' | 'warning' | 'error'; detail: string }[]; logs: string[] }
 export interface BrowserBounds { x: number; y: number; width: number; height: number; visible: boolean }
@@ -51,6 +54,10 @@ export type ChatEditCommand = 'cut' | 'copy' | 'paste';
 export interface DesktopAPI {
   platform: string;
   clientStartup(enabled?: boolean): Promise<ClientStartup>;
+  notifications(patch?: Partial<NotificationPreferences>): Promise<NotificationSettings>;
+  testNotification(): Promise<void>;
+  takeNotificationTarget(): Promise<NotificationTarget | null>;
+  onNotificationOpen(callback: () => void): () => void;
   quit(): Promise<void>;
   browserState(): Promise<BrowserState>;
   openBrowser(url?: string): Promise<void>;

@@ -73,6 +73,9 @@ function api(overrides: Partial<DesktopAPI> = {}) {
     onPortal: on,
     onUpdate: on,
     onTownLive: on,
+    onNotificationOpen: on,
+    takeNotificationTarget: vi.fn(async () => null),
+    notifications: vi.fn(async () => ({ supported: true, message: '', preferences: { enabled: false, mail: true, firesides: true, bonfire: false } })),
     townLive: vi.fn(async () => live()),
     townAuth: vi.fn(async () => ({ configured: true, beingId: "willow" })),
     town: vi.fn(async () => result({ messages: [] })),
@@ -340,11 +343,11 @@ describe("React desktop state lifecycle", () => {
     });
     const app = new AppModel(fixture.value),
       stop = app.start();
-    expect(fixture.subscriptions.size).toBe(3);
+    expect(fixture.subscriptions.size).toBe(4);
     stop();
     expect(fixture.subscriptions.size).toBe(0);
     const stopAgain = app.start();
-    expect(fixture.subscriptions.size).toBe(3);
+    expect(fixture.subscriptions.size).toBe(4);
     fresh.resolve(state("river"));
     await settle();
     old.resolve(state("willow"));

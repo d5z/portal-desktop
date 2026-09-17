@@ -71,6 +71,7 @@ try {
   await npm('client-lifecycle', ['run', 'test:client-lifecycle']);
   await npm('portal-runtime', ['run', 'test:portal-e2e']);
   await npm('town-sdk', ['run', 'test:town-sdk']);
+  await npm('notifications', ['run', 'test:notifications']);
   await npm('desktop-e2e', ['run', 'test:e2e']);
   await npm('town-e2e', ['run', 'test:town-ui']);
   await npm('browser-e2e', ['run', 'test:browser']);

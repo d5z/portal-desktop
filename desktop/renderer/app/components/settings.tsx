@@ -221,6 +221,33 @@ export function ClientSettings({ model }: { model: AppModel }) {
           aria-labelledby="settings-tab-general"
           hidden={tab !== "general"}
         >
+          <section className="settings-group" aria-labelledby="settings-notifications">
+            <h3 id="settings-notifications">桌面通知</h3>
+            <p className="field-help">
+              {app.notificationSettings?.message || "正在读取通知设置…"}
+              关闭窗口后仍可接收通知，退出客户端后停止；需先配对 Town。
+            </p>
+            <div className="switch-list">
+              {([
+                ["enabled", "开启桌面通知", "使用 Windows / macOS 系统通知，设置自动保存"],
+                ["mail", "私信通知", "收到新的私信时提醒"],
+                ["firesides", "围炉通知", "已加入的围炉有新消息时提醒"],
+                ["bonfire", "篝火通知", "公共篝火有新消息时提醒，默认关闭"],
+              ] as const).map(([key, title, help]) => (
+                <label key={key}>
+                  <span><strong>{title}</strong><small>{help}</small></span>
+                  <input id={`notification-${key}`} type="checkbox" role="switch"
+                    checked={Boolean(app.notificationSettings?.preferences[key])}
+                    disabled={app.notificationsBusy || !app.notificationSettings?.supported || (key !== "enabled" && !app.notificationSettings.preferences.enabled)}
+                    onChange={event => void app.changeNotifications({ [key]: event.target.checked })} />
+                </label>
+              ))}
+            </div>
+            {import.meta.env.DEV && <button id="notification-test" type="button"
+              disabled={app.notificationsBusy || !app.notificationSettings?.supported || !app.notificationSettings.preferences.enabled}
+              onClick={() => void app.testNotification()}>发送测试通知</button>}
+            <p className="form-error" role="alert">{app.notificationsError}</p>
+          </section>
           <section
             className="settings-group"
             aria-labelledby="settings-startup"

@@ -1,6 +1,7 @@
 ; Keep the standard one-click progress UI. Ask the running client to journal
 ; and stop its Portal before NSIS replaces files; never forcibly kill Portal.
 !ifndef BUILD_UNINSTALLER
+  !include "${PROJECT_DIR}\scripts\windows-installer-theme.nsh"
   !macro customHeader
     !include "${PROJECT_DIR}\scripts\windows-start-app.nsh"
   !macroend

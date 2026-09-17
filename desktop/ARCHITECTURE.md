@@ -136,6 +136,10 @@ Seed Garden 是公开阅读模块：主进程开放 `/api/seeds` 的分页/搜�
 
 凭据切换/清除会中断旧 SSE、清空去重状态、私密缓存、引用和发送草稿；旧请求不能覆盖新身份。退出客户端关闭 Town SSE，不影响独立 Portal。Town 实时连接与 Loom 对话连接、Portal Relay、Heart 环境接收是不同的状态；本次并未接通 Heart 场景协议。详见 [SDK 接入状态](TOWN-SDK.md)。
 
+「设置 → 通用 → 桌面通知」提供总开关和私信、围炉、篝火分类开关。总开关默认关闭，分类默认开启私信和围炉；独立保存到 profile 的 `notifications.json`，无需先连接 Being。主进程在通过身份确认和去重的 SSE 事件上触发 Electron 原生通知，过滤当前身份发送的消息及明确发给其他身份的私信。窗口在前台时不提示，每个分类最多每 5 秒提醒一次；通知只包含分类提示，不含正文、凭据和发件人。切换身份、禁用分类和退出时清理原生通知，最多保留 20 个对象。点击恢复窗口并通过受信 IPC 打开收件箱或对应围炉，未就绪的窗口暂存导航目标并在初始化后读取，旧身份目标失效。保存 Loom 连接设置不再停止独立的 Town SSE。
+
+Windows 通知使用与 NSIS 安装包一致的 `town.beings.portal-desktop` AppUserModelID，开发版增加 `.development` 避免 Electron 快捷方式污染正式通知来源；只对误用正式标识且指向 `node_modules/electron/dist/electron.exe` 的 `Electron.lnk` 自动修正标识。主窗口左上角固定使用最初的黑色 `logo.png`，不随系统主题改变；任务栏快捷方式及托盘独立跟随 `SystemUsesLightTheme`。不设置额外的窗口 AppUserModelID 或 relaunch 属性。通知使用带留白的黑/白 Logo，并只更新指向当前安装的通知快捷方式图标。NSIS 运行中的任务栏图标也跟随系统主题，浅色安装界面保留黑色 Logo。macOS 依赖现有签名包的原生通知支持。`Notification.isSupported()` 只代表系统能力，不代表已授权或必定显示；界面提供系统权限/勿扰模式提示；“发送测试通知”仅在本地 Vite 开发环境显示，打包版不注册对应 IPC。原生通知依据 [Electron 通知文档](https://www.electronjs.org/docs/latest/tutorial/notifications) 接入。
+
 `main/kits/catalog.ts` 读取 Portal TOML 和各目录的 manifest，不启动 Kit 来获取列表。导入通过原生文件选择器
 和具体清单预览，拒绝符号链接/特殊文件、超额体积与同名覆盖，先在 Kits 目录外暂存、验证，
 再原子移动。`{{KIT_DIR}}` 转成安装路径，未填写的命令占位符会阻止导入。

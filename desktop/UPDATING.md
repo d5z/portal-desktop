@@ -62,7 +62,7 @@ macOS 更新流程读取 GitHub `releases/latest`，使用 `vX.Y.Z` 正式 tag �
 
 Windows 发布构建还会运行实际 Setup，确认安装助手自动打开安装目录中的新客户端。macOS 的 `npm test` 使用真实签名、解压和文件替换，验证损坏包拒绝、取消清理、等待旧进程、替换及启动请求失败回滚；LaunchServices 用测试启动器替代，不打开额外的客户端窗口。
 
-当前 Windows 升级 E2E 的基线是当前源码修改版本号后构建的 NSIS fixture，验证的是现有安装协议；它没有运行正式发布的 0.1.1 Squirrel 升级器，不能证明这条历史迁移路径成功。`tests/installer-handoff-native.test.ts` 单独验证当前 Windows 助手在父进程退出后继续执行。
+Windows 升级 E2E 默认以当前源码修改版本号后构建 NSIS fixture；设置 `PORTAL_DESKTOP_BASELINE_SETUP` 为已校验摘要的历史 Setup 绝对路径，可改用真正发布的上一版本安装包（版本必须为当前 patch 版本减一）。例如本地 0.1.4 验证：`$env:PORTAL_DESKTOP_BASELINE_SETUP='D:\downloads\portal-desktop-0.1.3-windows-x64-Setup.exe'` 后运行 `npm run test:windows-upgrade`。新版 Release 元数据、摘要和下载仍由本地 fixture 提供实际新包，不发布到 GitHub。测试还检查外观配置保留、通知默认关闭、开发测试按钮隐藏且测试 IPC 不可调用，结果写入 `test-results/windows-installer/upgrade-success.json`。这不代表已验证 0.1.1 Squirrel 历史迁移；`tests/installer-handoff-native.test.ts` 单独验证当前 Windows 助手在父进程退出后继续执行。
 
 构建后运行 `npm run test:macos-package`，校验实际 `.app`、Portal 和 DMG 的 Developer ID、完整签名及时间戳，验证可执行文件的 Hardened Runtime、架构、版本和清单。实际挂载只读 DMG，检查 Applications 快捷方式，复制到临时应用目录并推出，验证安装后签名及包内容一致，再让同一 Release 的 ZIP 经过完整安装前暂存流程。版本 tag 触发的 macOS 发布构建会运行此检查。它不代表公证或干净机器上的 Gatekeeper 验收。
 

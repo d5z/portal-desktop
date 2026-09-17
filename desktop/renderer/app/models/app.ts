@@ -4,6 +4,8 @@ import type {
   PortalState,
   SaveSettings,
   ClientStartup,
+  NotificationPreferences,
+  NotificationSettings,
   UpdateState,
 } from "../../../shared/types";
 import { Store, errorText } from "../../shared/models/store";
@@ -41,6 +43,9 @@ export class AppModel extends Store {
   logsLoading = false;
   private logsRequest = "";
   clientStartup?: ClientStartup;
+  notificationSettings?: NotificationSettings;
+  notificationsBusy = false;
+  notificationsError = "";
   startupBusy = false;
   clientError = "";
   form?: SaveSettings;
@@ -98,6 +103,9 @@ export class AppModel extends Store {
     const cleanups = [
       cleanupWorkspace,
       this.town.start(),
+      this.api.onNotificationOpen(() => {
+        if (this.startup === "ready") void this.openNotification();
+      }),
       this.api.onPortal((state) => {
         if (this.snapshot) {
           this.snapshot = { ...this.snapshot, portal: state };
@@ -149,6 +157,7 @@ export class AppModel extends Store {
       this.theme = theme;
       this.applySnapshot(state);
       this.startup = "ready";
+      await this.openNotification();
     } catch {
       if (revision === this.initializeRevision) this.startup = "error";
     }
@@ -411,6 +420,7 @@ export class AppModel extends Store {
     this.clientError = "";
     this.startupBusy = true;
     this.changed();
+    void this.loadNotifications();
     try {
       this.clientStartup = await this.api.clientStartup();
     } catch (error) {
@@ -439,6 +449,55 @@ export class AppModel extends Store {
       this.startupBusy = false;
       this.changed();
     }
+  }
+  private async openNotification() {
+    const revision = this.initializeRevision;
+    await this.run(async () => {
+      const target = await this.api.takeNotificationTarget();
+      if (!target || revision !== this.initializeRevision) return;
+      this.closeClientSettings();
+      this.closeSettings();
+      this.diagnosticsOpen = false;
+      this.searchOpen = false;
+      if (target.channel === "mail") this.town.tabs.mail = "inbox";
+      if (target.channel === "firesides") {
+        if (target.firesideId) this.town.selectedRing = target.firesideId;
+        this.town.ringSearch = "";
+      }
+      // Open the normal group page, with its room list and selected group.
+      // directId is reserved for content links and bypasses that page.
+      this.navigate(target.channel);
+    });
+  }
+  async loadNotifications() {
+    if (this.notificationsBusy) return;
+    this.notificationsBusy = true;
+    this.notificationsError = "";
+    this.changed();
+    try { this.notificationSettings = await this.api.notifications(); }
+    catch (error) { this.notificationsError = errorText(error); }
+    finally { this.notificationsBusy = false; this.changed(); }
+  }
+  async changeNotifications(patch: Partial<NotificationPreferences>) {
+    if (this.notificationsBusy) return;
+    this.notificationsBusy = true;
+    this.notificationsError = "";
+    this.changed();
+    try { this.notificationSettings = await this.api.notifications(patch); }
+    catch (error) { this.notificationsError = errorText(error); }
+    finally { this.notificationsBusy = false; this.changed(); }
+  }
+  async testNotification() {
+    if (this.notificationsBusy) return;
+    this.notificationsBusy = true;
+    this.notificationsError = "";
+    this.changed();
+    try {
+      await this.api.testNotification();
+      this.toast("已请求系统显示测试通知；若未看到，请检查系统通知权限与勿扰模式。");
+      this.notificationSettings = await this.api.notifications();
+    } catch (error) { this.notificationsError = errorText(error); }
+    finally { this.notificationsBusy = false; this.changed(); }
   }
   showSettings(fromClientSettings = false) {
     if (!this.snapshot) return;

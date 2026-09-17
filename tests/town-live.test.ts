@@ -68,7 +68,8 @@ it('accepts documented SSE payloads, decodes split UTF-8 and deduplicates REST/S
   let stream!: ReadableStreamDefaultController<Uint8Array>;
   const fetcher = vi.fn(async () => new Response(new ReadableStream<Uint8Array>({ start(controller) { stream = controller; } }), { headers: { 'Content-Type': 'text/event-stream' } }));
   const publish = vi.fn();
-  const live = new TownLive(() => 'private-client-token', () => 'willow', publish, fetcher as typeof fetch);
+  const notify = vi.fn();
+  const live = new TownLive(() => 'private-client-token', () => 'willow', publish, fetcher as typeof fetch, undefined, undefined, notify);
   try {
     live.restart();
     await vi.waitFor(() => expect(stream).toBeDefined());
@@ -83,11 +84,35 @@ it('accepts documented SSE payloads, decodes split UTF-8 and deduplicates REST/S
     for (let i = 0; i < bytes.length; i += 7) stream.enqueue(bytes.slice(i, i + 7));
     await vi.waitFor(() => expect(live.state.versions).toEqual({ bonfire: 1, mail: 1, firesides: 2 }));
     expect(live.state.firesideVersions).toEqual({ '10': 1, '11': 1 });
+    expect(notify.mock.calls.map(([target]) => target)).toEqual([
+      { channel: 'bonfire' }, { channel: 'mail' },
+      { channel: 'firesides', firesideId: '10' }, { channel: 'firesides', firesideId: '11' },
+    ]);
     expect(live.state).toMatchObject({ phase: 'connected', beingId: 'willow' });
     const [url, options] = (fetcher.mock.calls as unknown[][])[0];
     expect(url).toBe('https://beings.town/api/client/stream?token=private-client-token');
     expect(options).toMatchObject({ credentials: 'omit', redirect: 'error', headers: { Accept: 'text/event-stream' } });
     expect(JSON.stringify(publish.mock.calls)).not.toMatch(/private-client-token|只供主进程读取|私信|phone/);
+  } finally { live.dispose(); }
+});
+
+it('filters self-sent and other-recipient events without suppressing live counters', async () => {
+  const encode = (type: string, data: unknown) => `event: ${type}\ndata: ${JSON.stringify(data)}\n\n`;
+  const notify = vi.fn();
+  const events = encode('hello', { town_id: 't_Willow', being_id: 'willow', anonymous: false, token_kind: 'client' }) +
+    encode('dm', { id: '1', sender_town_id: 't_Willow', recipient_town_id: 't_River' }) +
+    encode('dm', { id: '2', sender_town_id: 't_River', recipient_town_id: 't_Other' }) +
+    encode('bonfire', { seq: 1, town_id: 't_Willow' }) +
+    encode('fireside', { seq: 1, fireside_id: 10, being_id: 'willow' }) +
+    encode('dm', { id: '3', sender_town_id: 't_River', recipient_town_id: 't_Willow', content: 'private body' });
+  const fetcher = vi.fn(async () => new Response(new ReadableStream({ start(controller) {
+    controller.enqueue(new TextEncoder().encode(events));
+  } }), { headers: { 'Content-Type': 'text/event-stream' } }));
+  const live = new TownLive(() => 'token', () => 'willow', () => {}, fetcher as typeof fetch, undefined, undefined, notify);
+  try {
+    live.restart();
+    await vi.waitFor(() => expect(live.state.versions.mail).toBe(3));
+    expect(notify.mock.calls).toEqual([[{ channel: 'mail' }]]);
   } finally { live.dispose(); }
 });
 

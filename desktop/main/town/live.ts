@@ -1,4 +1,4 @@
-import type { TownChannel, TownLiveState, TownQuery } from '../../shared/types';
+import type { NotificationTarget, TownChannel, TownLiveState, TownQuery } from '../../shared/types';
 import { TOWN_ORIGIN } from './client';
 import { townDisplayName, validTownIdentity } from '../../shared/town-identity';
 
@@ -19,7 +19,7 @@ export class TownLive {
   private retry?: ReturnType<typeof setTimeout>;
   private seen = new Set<string>();
   private attempts = 0;
-  constructor(private getToken: () => string, private getExpectedBeing: () => string, private publish: (state: TownLiveState) => void, private fetcher: typeof fetch = fetch, private origin = TOWN_ORIGIN, private getDisplay: () => string = () => '') {}
+  constructor(private getToken: () => string, private getExpectedBeing: () => string, private publish: (state: TownLiveState) => void, private fetcher: typeof fetch = fetch, private origin = TOWN_ORIGIN, private getDisplay: () => string = () => '', private notify: (target: NotificationTarget) => void = () => {}) {}
   private update(patch: Partial<TownLiveState>) {
     this.state = { ...this.state, ...patch, revision: this.state.revision + 1 };
     this.publish(this.state);
@@ -108,6 +108,15 @@ export class TownLive {
               },
             } : {}),
           });
+          const sender = id(type === 'dm'
+            ? data.sender_town_id ?? data.sender_being_id ?? data.sender
+            : data.town_id ?? data.being_id ?? data.speaker_town_id ?? data.speaker_being_id ?? data.speaker);
+          const recipient = id(data.recipient_town_id ?? data.recipient_being_id ?? data.recipient);
+          const identities = [this.state.beingId, this.getExpectedBeing()].filter(Boolean);
+          if (!identities.includes(sender) && (type !== 'dm' || !recipient || identities.includes(recipient))) {
+            // Notification failures must never interrupt the live connection.
+            try { this.notify({ channel, ...(firesideId ? { firesideId } : {}) }); } catch { /* Best effort. */ }
+          }
         }
       };
       while (current()) {
