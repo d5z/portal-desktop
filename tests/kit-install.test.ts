@@ -92,3 +92,16 @@ it('uses Grove provision fields missing from the archive and refuses a mismatche
   await installer.discard(plan.ticket); name = 'different-kit';
   await expect(installer.prepare('fixture-id', f.settings)).rejects.toThrow('不一致');
 });
+it('does not download App repositories or entries without an installable Kit bundle', async () => {
+  const f = await fixture();
+  const fetcher = async (url: string | URL | Request) => {
+    if (String(url).endsWith('/download')) throw new Error('Unexpected download');
+    return Response.json({ name: 'fixture-kit', version: '1', kind: 'app', repo_url: 'https://github.com/example/app', has_bundle: false });
+  };
+  await expect(new KitInstaller(f.dir, fetcher as typeof fetch).prepare('app-id', f.settings)).rejects.toThrow('App 没有 Kit bundle');
+  const noBundle = async (url: string | URL | Request) => {
+    if (String(url).endsWith('/download')) throw new Error('Unexpected download');
+    return Response.json({ name: 'fixture-kit', version: '1', kind: 'kit', has_bundle: false });
+  };
+  await expect(new KitInstaller(f.dir, noBundle as typeof fetch).prepare('kit-id', f.settings)).rejects.toThrow('没有可下载');
+});

@@ -10,14 +10,17 @@ describe('Town reads', () => {
     expect(townRoute({ kind: 'sent' }).route).toBe('/api/messages?with=sent');
     expect(townRoute({ kind: 'fireside-members', id: '10' }).route).toBe('/api/fireside/members?fireside_id=10');
     expect(townRoute({ kind: 'scrolls', offset: 24 }).route).toContain('visibility=public&limit=24&offset=24');
-    for (const query of [{ kind: 'kit', id: '../messages' }, { kind: 'kit', id: 'x?token=secret' }, { kind: 'grove', offset: -1 }, { kind: 'exec' }]) expect(() => townRoute(query as TownQuery)).toThrow();
+    expect(townRoute({ kind: 'grove', offset: 24, groveStatus: 'growing' })).toEqual({ route: '/api/grove?limit=24&offset=24&status=growing', private: false });
+    expect(townRoute({ kind: 'grove' }).route).toBe('/api/grove?limit=24&offset=0');
+    for (const query of [{ kind: 'kit', id: '../messages' }, { kind: 'kit', id: 'x?token=secret' }, { kind: 'grove', offset: -1 }, { kind: 'grove', groveStatus: 'rot&token=secret' }, { kind: 'exec' }]) expect(() => townRoute(query as TownQuery)).toThrow();
   });
   it('uses dedicated bearer only for restricted routes, never public requests', async () => {
     const fetcher = vi.fn(async () => Response.json({ messages: [] }));
     const client = new TownClient(() => 'town-credential', fetcher as typeof fetch);
-    await client.query({ kind: 'home' }); await client.query({ kind: 'inbox' });
+    await client.query({ kind: 'home' }); await client.query({ kind: 'inbox' }); await client.query({ kind: 'grove', groveStatus: 'grown' });
     expect(fetcher.mock.calls[0]).toEqual(['https://beings.town/api', expect.objectContaining({ headers: { Accept: 'application/json' }, credentials: 'omit', redirect: 'error', method: 'GET' })]);
     expect(fetcher.mock.calls[1]).toEqual(['https://beings.town/api/messages?with=received', expect.objectContaining({ headers: { Accept: 'application/json', Authorization: 'Bearer town-credential' } })]);
+    expect(fetcher.mock.calls[2]).toEqual(['https://beings.town/api/grove?limit=24&offset=0&status=grown', expect.objectContaining({ headers: { Accept: 'application/json' }, credentials: 'omit' })]);
   });
   it('normalizes the fireside members array while keeping the route authenticated', async () => {
     const members = [{ town_id: 't_Willow', display_name: '柳树', joined_at: '2026-09-01T12:00:00+08:00' }];

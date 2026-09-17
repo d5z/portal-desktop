@@ -93,6 +93,22 @@ export function Town({ model }: { model: TownModel }) {
               </option>
             ))}
           </select>
+          <select
+            id="grove-status"
+            aria-label="Grove 成长阶段"
+            hidden={town.view !== "kits" || town.tab !== "grove" || Boolean(town.directId)}
+            value={town.groveStatus}
+            onChange={(event) => {
+              town.groveStatus = event.target.value;
+              town.offset = 0;
+              void town.load();
+            }}
+          >
+            <option value="">全部阶段（含停维护）</option>
+            <option value="grown">🌳 已长成</option>
+            <option value="growing">🌿 成长中</option>
+            <option value="sprouting">🌱 发芽中</option>
+          </select>
           <input
             id="town-search"
             type="search"

@@ -171,6 +171,7 @@ export class TownModel extends Store {
   offset = 0;
   search = "";
   scrollKind = "";
+  groveStatus = "";
   seedFilters: SeedFilters = { q: "", domain: "", tag: "", kit: "", lifecycle: "" };
   data: Data | null = null;
   mentionNames: MentionNames = new Map();
@@ -243,7 +244,7 @@ export class TownModel extends Store {
   constructor(
     readonly api: DesktopAPI,
     readonly toast: (error: unknown) => void,
-    readonly navigate: (view: string) => void,
+    readonly navigate: (view: string, id?: string) => void,
     readonly scenes: SceneStore,
     private showCompanion: () => void,
     private post: (data: unknown) => void,
@@ -571,6 +572,7 @@ export class TownModel extends Store {
       kind: (this.view === "town" ? "home" : this.tab) as TownKind,
       offset: this.offset,
       ...(this.view === "scrolls" ? { scrollKind: this.scrollKind } : {}),
+      ...(this.view === "kits" && this.tab === "grove" ? { groveStatus: this.groveStatus } : {}),
       ...(this.view === "seeds" ? this.seedFilters : {}),
     };
   }

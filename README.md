@@ -18,7 +18,7 @@ Portal Desktop is an open-source desktop client built with **React, TypeScript, 
 | Reading and navigation | Conversation search and message index, quotations added to drafts, light/dark themes, adjustable reading size, and community reading panels that return you to the conversation |
 | Town community | Service directory and recent updates, Bonfire, Firesides, direct messages, Seed Garden, Embers, and Scrolls; pairing, message filters, sending, native replies, quote previews, and live activity indicators |
 | Local Portal | Workspace selection, start/stop controls, Relay status, redacted logs, background operation and login startup, existing-service detection, bundled engine updates, and recovery |
-| Kit library | Grove browsing, package details and setup instructions, local Kit import, supported Grove Kit installation, configuration, and MCP tool-list checks |
+| Kit library | Grove browsing with growth-stage filters, vitality and usage indicators, experience seeds, and App repository links; local Kit import, supported Grove Kit installation, configuration, and MCP tool-list checks |
 | Embedded browser | One web panel with an address bar, back/forward, reload/stop, and an option to open in the system browser; a draggable divider remembers the split ratio |
 | Desktop behavior | Close-to-hide, tray/Dock restore, single-instance control, an optional client login item, connection diagnostics, and status-report export |
 | Updates | Release checks and user-initiated download and installation; paired Portal updates retain configuration and recovery records |
@@ -59,6 +59,8 @@ The event stream subscribes to activity after confirming identity. It reconnects
 Portal runs as a separate Rust process. Its source is pinned through a Git submodule and built and distributed with the client. File tools and search use the selected workspace. Command execution, Kits, and custom tools are enabled by default, matching native Portal, and can be disabled in connection settings. Existing configurations retain their tool settings.
 
 Kit tools use Portal's existing MCP call path. The installer currently supports Grove / GitHub-hosted `tar.gz` packages, stdio Kits, and dependency installation from `package.json` or `requirements.txt`. Prepare Node, Python, or other required runtimes separately. Installation presents configuration and dependencies, then checks MCP `initialize` / `tools/list` before completing. Local directory import does not run installation scripts or overwrite a Kit with the same name. Custom `provision.install` / `post_install` commands are not run automatically.
+
+Grove growth-stage filters use the public API; the default includes unmaintained entries. App entries link to their GitHub repository or release and are not installable as Portal Kits. Browsing does not report Grove adoption, heartbeat usage, or feedback on behalf of the Being.
 
 Portal can refresh its Kit inventory. An installed manifest, a running process, and authorization to a third-party service are separate facts. Existing Portal installations can retain their TOML, PATH, and Kit directory; the original configuration remains authoritative. See [Architecture](desktop/ARCHITECTURE.md) and [Source provenance](UPSTREAM.md).
 

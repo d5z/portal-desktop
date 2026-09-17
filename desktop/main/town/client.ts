@@ -46,7 +46,10 @@ export function townRoute(query: TownQuery, beingId = ''): { route: string; priv
       const scope = query.kind === 'my-scrolls' ? `${beingId.startsWith('t_') ? 'author' : 'being_id'}=${beingId}` : 'visibility=public';
       return { route: `/api/scrolls?${scope}&limit=24&offset=${offset}${kind ? '&kind=' + kind : ''}`, private: true };
     }
-    case 'grove': return { route: `/api/grove?limit=24&offset=${offset}`, private: false };
+    case 'grove': {
+      if (query.groveStatus !== undefined && !['', 'grown', 'growing', 'sprouting'].includes(query.groveStatus)) throw new Error('无效的 Grove 成长阶段。');
+      return { route: `/api/grove?limit=24&offset=${offset}${query.groveStatus ? '&status=' + query.groveStatus : ''}`, private: false };
+    }
     case 'kit': case 'ember': case 'scroll': {
       if (typeof query.id !== 'string' || !idPattern.test(query.id)) throw new Error('无效的内容编号。');
       const resource = { kit: 'grove', ember: 'embers', scroll: 'scrolls' }[query.kind];

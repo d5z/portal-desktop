@@ -119,6 +119,40 @@ function KitInstallationNotice({ town }: { town: TownModel }) {
     <button className="secondary" onClick={() => void town.refreshInstalledKits()}>重新检查安装状态</button>
   </div>;
 }
+const groveStages: Record<string, string> = {
+  grown: "🌳 已长成", growing: "🌿 成长中", sprouting: "🌱 发芽中",
+  unmaintained: "🥀 已停维护", rot: "🥀 已停维护",
+};
+function groveStage(data: Data) {
+  return groveStages[str(data.status)] || "成长阶段未标注";
+}
+function groveKind(data: Data) { return data.kind === "app" ? "App" : "Kit"; }
+function groveAuthor(data: Data) {
+  return str(data.display_name) || str(data.display).replace(/\s*\(t_[\w-]+\)$/, "") || "未命名 Being";
+}
+function groveCount(value: unknown) { return typeof value === "number" && Number.isSafeInteger(value) && value >= 0 ? value : 0; }
+function GroveMaturity({ data }: { data: Data }) {
+  const maturity = record(data.maturity);
+  const progress = typeof maturity.progress === "number" && Number.isFinite(maturity.progress)
+    ? Math.round(Math.min(1, Math.max(0, maturity.progress)) * 100) : null;
+  return <>
+    {str(maturity.progress_label) && <div className="grove-growth">
+      <span>{str(maturity.progress_label)}</span>
+      {progress !== null && <div className="grove-progress" role="progressbar" aria-label="成长进度" aria-valuenow={progress} aria-valuemin={0} aria-valuemax={100}>
+        <span style={{ width: `${progress}%` }} />
+      </div>}
+    </div>}
+    {str(maturity.vitality_label) && <span className="card-meta">{maturity.vitality === "active" ? "🟢" : maturity.vitality === "quiet" || maturity.vitality === "idle" ? "🟡" : "⚪"}{str(maturity.vitality_label)}</span>}
+  </>;
+}
+function groveRepo(data: Data) {
+  try {
+    const url = new URL(str(data.repo_url));
+    if (url.protocol !== "https:" || url.hostname !== "github.com" || url.port || url.username || url.password || url.search || url.hash || !/^\/[\w.-]+\/[\w.-]+\/?$/.test(url.pathname)) return "";
+    const tag = str(data.release_tag);
+    return tag && /^[\w.-]{1,120}$/.test(tag) ? `${url.origin}${url.pathname.replace(/\/$/, "")}/releases/tag/${encodeURIComponent(tag)}` : url.href;
+  } catch { return ""; }
+}
 export function Catalog({ town, data }: { town: TownModel; data: Data }) {
   const kit = town.tab === "grove",
     book = town.view === "embers";
@@ -129,6 +163,8 @@ export function Catalog({ town, data }: { town: TownModel; data: Data }) {
       entry.description,
       entry.display_name,
       entry.being_id,
+      entry.kind,
+      entry.status,
       ...(Array.isArray(entry.tags) ? entry.tags : []),
     ),
   );
@@ -149,19 +185,19 @@ export function Catalog({ town, data }: { town: TownModel; data: Data }) {
             }
           >
             <span className="catalog-title">
-              {str(entry.name, str(entry.title))}
+              {kit && `${entry.kind === "app" ? "📱" : "🧩"} `}{str(entry.name, str(entry.title))}
             </span>
             <span className="card-meta">
-              {str(entry.display_name, str(entry.being_id))} ·{" "}
+              {kit ? groveAuthor(entry) : str(entry.display_name, str(entry.being_id))} ·{" "}
               {kit ? "v" + str(entry.version) : date(entry.updated_at)}
             </span>
             {kit ? (
               <>
                 <p>{str(entry.description)}</p>
-                <span className="mini-tag">
-                  {entry.status === "grown" ? "已成长" : "萌芽中"}
-                </span>
-                {town.installedKit(str(entry.name)) && <InstalledKitStatus kit={town.installedKit(str(entry.name))!} />}
+                <span className="mini-tag">{groveKind(entry)} · {groveStage(entry)}</span>
+                <GroveMaturity data={entry} />
+                <span className="card-meta">🤝 {groveCount(entry.adopter_count)} beings 在用 · ⚡ {groveCount(entry.total_calls)} 次使用{entry.community_verified === true ? " · ⭐ 社区验证" : ""}</span>
+                {entry.kind !== "app" && town.installedKit(str(entry.name)) && <InstalledKitStatus kit={town.installedKit(str(entry.name))!} />}
               </>
             ) : book ? (
               <span className="mini-tag">公开故事</span>
@@ -392,9 +428,11 @@ function KitDetail({ town, data }: { town: TownModel; data: Data }) {
   const manifest = record(data.manifest),
     tools = Array.isArray(manifest.tools) ? manifest.tools.map(record) : [],
     provision = record(manifest.provision),
-    installed = town.installedKit(str(data.name));
+    installed = data.kind === "app" ? undefined : town.installedKit(str(data.name)),
+    app = data.kind === "app",
+    repo = app ? groveRepo(data) : "";
   const downloadable =
-    data.has_bundle === true || Boolean(str(data.source_url));
+    !app && (data.has_bundle === true || Boolean(str(data.source_url)));
   const requirements = [
     ...(Array.isArray(provision.deps) ? provision.deps : []).map((raw) => {
       const d = record(raw);
@@ -411,16 +449,20 @@ function KitDetail({ town, data }: { town: TownModel; data: Data }) {
       <div className="kit-summary">
         <h2 className="reading-title">{str(data.name)}</h2>
         <p className="card-meta">
-          {str(data.display_name, str(data.being_id))} · v{str(data.version)} ·{" "}
-          {tools.length} 个声明工具
+          {groveKind(data)} · {groveAuthor(data)} · v{str(data.version)}
+          {!app && ` · ${tools.length} 个声明工具`}
         </p>
+        <span className="mini-tag">{groveStage(data)}</span>
         {installed && <InstalledKitStatus kit={installed} />}
         <p className="kit-description">{str(data.description)}</p>
+        <GroveMaturity data={data} />
+        <p className="card-meta grove-stats">🤝 {groveCount(data.adopter_count)} beings 在用 · ⚡ {groveCount(data.total_calls)} 次使用 · 📦 {groveCount(data.install_count)} 次安装{data.community_verified === true ? " · ⭐ 社区验证" : ""}{str(data.updated_at) ? ` · 更新于 ${date(data.updated_at)}` : ""}</p>
       </div>
       <div className="kit-actions">
         <button className="secondary" onClick={() => town.seedWall(str(data.name))}>
           查看经验墙
         </button>
+        {repo && <button className="secondary" onClick={() => void town.run(() => town.api.openBrowser(repo))}>查看 App 仓库 ↗</button>}
         {downloadable && (
           <button
             className="primary"
@@ -454,11 +496,19 @@ function KitDetail({ town, data }: { town: TownModel; data: Data }) {
       {installed ? <p className="field-help">
         {installed.problem ? "本机已有此 Kit 的文件，请在“本机 Kits”中查看异常详情。"
           : `本机已安装 v${installed.version}，可在“本机 Kits”中查看工具与配置。${town.installedLibrary?.enabled === false ? "当前 Portal 尚未启用 Kits。" : ""}`}
-      </p> : downloadable && (
+      </p> : app ? <p className="field-help">App 不提供 Kit 安装包，请查看发布者的 GitHub 仓库获取安装方式。</p> : downloadable && (
         <p className="field-help">
           在客户端完成下载、解压、依赖安装和工具检查。需要的凭据将在安装时填写。
         </p>
       )}
+      {Array.isArray(data.seed_summaries) && data.seed_summaries.some(raw => {
+        const seed = record(raw); return /^[a-zA-Z0-9_-]{1,160}$/.test(str(seed.id)) && str(seed.domain) !== "grove-feedback";
+      }) && <section className="grove-seeds"><h3>关联经验种子</h3>{data.seed_summaries.map((raw, index) => {
+        const seed = record(raw), id = str(seed.id);
+        return /^[a-zA-Z0-9_-]{1,160}$/.test(id) && str(seed.domain) !== "grove-feedback"
+          ? <button key={id || index} className="secondary" onClick={() => town.navigate("seeds", id)}>{str(seed.name, str(seed.domain, "经验种子"))} →</button> : null;
+      })}</section>}
+      {app ? null : <>
       {Boolean(manifest.command) && (
         <>
           <h3>启动命令</h3>
@@ -478,6 +528,7 @@ function KitDetail({ town, data }: { town: TownModel; data: Data }) {
         </>
       )}
       <Tools tools={tools} />
+      </>}
     </>
   );
 }

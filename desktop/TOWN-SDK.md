@@ -1,5 +1,9 @@
 # Town SDK 接入状态
 
+## Grove 公开目录适配（2026-09-17）
+
+对照 [Grove 页面](https://beings.town/grove)、[公开列表](https://beings.town/api/grove) 与 [API 帮助](https://beings.town/api/grove/help)：列表默认保留全部条目（含停维护），阶段筛选仅使用官方 `grown|growing|sprouting` 参数，翻页时延续筛选。列表和详情展示服务端的成长阶段、成熟进度、活力、采纳和使用次数、社区验证及关联经验种子；同名 Kit 仍以 ID 打开详情。`kind=app` 只打开经过校验的 GitHub 仓库或 Release，不走 Portal Kit 安装；主进程也在下载前拒绝 App 或无包 Kit。客户端不主动调用 Grove install、heartbeat、反馈或发布接口，不把本机安装误报为 Town 的采纳记录。筛选、详情与拒绝安装由本地 fixture 测试覆盖，不向线上服务写入数据。
+
 ## 启动身份与围炉独立加载（2026-09-17）
 
 启动时沿用已保存的 Town 凭据连接 SSE，不需要打开连接窗口，也不会在缺少 Town 配对时自动申请配对。顶部先读取本地配对显示名，SSE 确认身份后优先显示握手返回的名称；握手只有 Town ID 时保留配对名字，缺少名字时回退到本地 Being 名称。此流程不读取公开居民目录，迟到的配对元数据不能覆盖已切换或失效的身份。

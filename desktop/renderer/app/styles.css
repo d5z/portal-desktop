@@ -216,6 +216,7 @@ html[data-theme=dark] .mention-tag,html[data-theme=dark] .mentions-me .social-av
 #place-sheet :is(.kit-catalog,.seed-catalog) .detail-placeholder{min-height:0;height:100%;padding:24px;text-align:center;line-height:1.8}
 #place-sheet :is(.kit-catalog,.seed-catalog) .loading-block,#place-sheet :is(.kit-catalog,.seed-catalog) .empty-state{min-height:0;width:100%;margin:auto}
 .kit-detail{overflow-wrap:anywhere}
+.grove-growth{font-size:11px;color:var(--secondary);line-height:1.6;width:100%}.grove-progress{height:5px;background:var(--hover);border-radius:6px;overflow:hidden;margin:5px 0}.grove-progress>span{display:block;height:100%;background:var(--green);border-radius:6px}.grove-stats{margin:12px 0 18px}.grove-seeds{margin:18px 0}.grove-seeds .secondary{margin:4px 8px 4px 0}
 .kit-summary .reading-title{margin-bottom:6px}
 .kit-summary .card-meta{font-size:11px;line-height:1.8;margin-bottom:16px}
 .kit-description{font-size:13px;line-height:1.85;color:var(--secondary);margin-bottom:20px}

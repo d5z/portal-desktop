@@ -110,6 +110,8 @@ export class KitInstaller {
     const details = await new TownClient(() => '', this.fetcher).query({ kind: 'kit', id });
     if (!details.ok) throw new Error(details.message);
     if (details.data.ambiguous) throw new Error('此名称对应多个 Kit，请通过市集中的具体条目安装。');
+    if (details.data.kind === 'app') throw new Error('Grove App 没有 Kit bundle，请前往其仓库获取安装方式。');
+    if (details.data.has_bundle === false && !details.data.source_url) throw new Error('此 Kit 没有可下载的安装包。');
     const data = await downloadKit(id, this.fetcher);
     // Stage beside kits_dir, so final activation uses an atomic same-filesystem rename.
     await mkdir(path.dirname(directory), { recursive: true });
