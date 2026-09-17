@@ -10,7 +10,8 @@ export function portalLogText(input: { version: string; platform: string; portal
     client: `Portal Desktop ${input.version}`,
     platform: input.platform,
     captured_at: new Date().toISOString(),
-    portal: { phase: input.portal.phase, message: clean(input.portal.message).slice(0, 500), managed: input.portal.managed },
+    portal: { phase: input.portal.phase, message: clean(input.portal.message).slice(0, 500), managed: input.portal.managed,
+      pid: input.portal.pid, runtime_path: input.portal.runtimePath ? clean(input.portal.runtimePath).slice(0, 1000) : undefined },
     recent_client_errors: clean(input.errors).slice(-6_000),
     recent_portal_logs: clean(input.portal.logs.slice(-60).join('\n')).slice(-4_000),
   };

@@ -160,6 +160,21 @@ for (const platform of ['darwin', 'win32'] as const) {
     await restoreRuntimeMode(f.background, settings, start, false);
     expect(start).toHaveBeenCalledTimes(1);
   });
+  it(`retries an enabled but exited ${platform} service on ordinary client startup without enabling a stopped service`, async () => {
+    const f = await fixture(platform);
+    const load = vi.spyOn(f.background, 'load').mockResolvedValue(undefined);
+    const foreground = vi.fn();
+    f.background.state = { ...f.background.state, enabled: true, running: false };
+    await restoreRuntimeMode(f.background, f.settings, foreground, false);
+    expect(load).toHaveBeenCalledWith(f.background.installedService);
+    load.mockClear();
+    f.background.state = { ...f.background.state, enabled: true, running: true };
+    await restoreRuntimeMode(f.background, f.settings, foreground, false);
+    f.background.state = { ...f.background.state, enabled: false, running: false };
+    await restoreRuntimeMode(f.background, f.settings, foreground, false);
+    expect(load).not.toHaveBeenCalled();
+    expect(foreground).not.toHaveBeenCalled();
+  });
 }
 it('activates the exact bundled engine once even when the old service used a different binary, and rejects corrupt packages', async () => {
   const f = await fixture();

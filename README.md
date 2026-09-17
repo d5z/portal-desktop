@@ -219,6 +219,7 @@ The detailed implementation documents below are currently primarily in Chinese. 
 | [Testing](desktop/TESTING.md) | Individual commands, isolation, coverage, and validation records |
 | [Town SDK integration](desktop/TOWN-SDK.md) | Pairing, REST, SSE, posting, and native replies |
 | [Paired updates](desktop/UPDATING.md) | Client and Portal upgrades, recovery, and release workflow |
+| [Portal recovery](desktop/PORTAL-RECOVERY.md) | Startup failures, manual restart, diagnostic logs, and Windows launch guidance (Chinese) |
 | [Release notes](desktop/RELEASE_NOTES.md) | Release delivery notes |
 | [Community extension proposal](desktop/EXTENSIONS.md) | Proposed contracts, SDK, distribution, and lifecycle |
 | [Shared workspace exploration](desktop/SHARED-WORKSPACE.md) | Historical design and protocols requiring agreement; not implemented features or the current roadmap |

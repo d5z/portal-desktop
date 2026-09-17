@@ -97,6 +97,7 @@ export interface DesktopAPI {
   connectionDefaults(input: Pick<SaveSettings, 'connectionLink'>): Promise<{ portalName: string; source?: string }>;
   choose(kind: 'workspace'): Promise<string | null>;
   startPortal(): Promise<PortalState>;
+  restartPortal(): Promise<PortalState>;
   stopPortal(): Promise<PortalState>;
   openWorkspace(): Promise<void>;
   diagnostics(): Promise<DiagnosticReport>;

@@ -94,6 +94,16 @@ export function Portal({ model }: { model: AppModel }) {
               {app.portalAction === "stop" ? "正在停止…" : "停止"}
             </button>
             <button
+              className="secondary"
+              id="restart-portal"
+              disabled={Boolean(app.portalAction) || !snapshot?.settings.hasToken ||
+                !state || state.phase === "stopped" || state.phase === "stopping" || state.managed === false}
+              onClick={() => void app.changePortal("restart")}
+              title="重启客户端管理的引擎并重建连接，会中断当前工具任务"
+            >
+              {app.portalAction === "restart" ? "正在重启…" : "重启 Portal"}
+            </button>
+            <button
               className="text-button"
               id="portal-settings"
               onClick={() => app.showSettings()}

@@ -25,13 +25,14 @@ const server = createServer(async (request, response) => {
   response.end(JSON.stringify({ being_name: 'fixture', messages: [] }));
 });
 const wss = new WebSocketServer({ server, path: '/_relay' });
-let relay, handshakes = 0, nextId = 0, app;
+let relay, handshakes = 0, nextId = 0, app, acceptRelay = true;
 const pending = new Map();
 wss.on('connection', socket => {
   let ready = false;
   socket.on('message', bytes => {
     const message = JSON.parse(bytes.toString());
     if (!ready) {
+      if (!acceptRelay) { socket.close(); return; }
       assert.equal(message.loom_token, token);
       assert.equal(message.being_id, 'fixture');
       ready = true; relay = socket; handshakes++;
@@ -136,6 +137,18 @@ try {
     await page.locator('#portal-view').waitFor({ state: 'visible' });
   };
   await openPortal();
+  // Recover a stalled relay through the visible control, preserving runtime mode.
+  const beforeRestart = await state();
+  acceptRelay = false;
+  relay.terminate();
+  await until(async () => (await state()).phase === 'reconnecting');
+  assert.equal(await page.locator('#restart-portal').isEnabled(), true);
+  acceptRelay = true;
+  await page.locator('#restart-portal').click();
+  await until(async () => { const current = await state(); return current.phase === 'connected' && current.pid !== beforeRestart.pid; });
+  assert.throws(() => process.kill(beforeRestart.pid, 0), /ESRCH/);
+  assert.equal((await page.evaluate(() => window.beings.snapshot())).settings.backgroundEnabled, false);
+  assert.ok((await rpc('tools/list')).tools.length > 0);
   await app.evaluate(({ shell }) => {
     globalThis.openedLogDirectory = '';
     shell.openPath = async directory => { globalThis.openedLogDirectory = directory; return ''; };

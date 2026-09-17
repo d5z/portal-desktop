@@ -139,6 +139,37 @@ it('registers Windows login supervision with DPAPI stdin and disables the task a
   expect(scripts.at(-2)).toContain('ExecutablePath -eq');
 });
 
+it('resets a stopped Windows failure marker on explicit load and exports supervisor evidence from its saved runtime', async () => {
+  const f = await fixture(); let running = false;
+  const run: Command = async (_bin, args) => {
+    const script = Buffer.from(args.at(-1)!, 'base64').toString('utf16le');
+    if (script.includes('[Console]::In.ReadToEnd()')) return 'dpapi-fixture';
+    if (script.includes('Enable-ScheduledTask')) running = true;
+    if (script.includes('ConvertTo-Json')) return JSON.stringify({ enabled: true, running, pid: running ? 12345 : undefined });
+    return running ? 'Running' : 'Ready';
+  };
+  const background = new BackgroundPortal(path.join(f.root, 'windows-profile'), run, 'win32');
+  await background.enable(f.settings, f.connection);
+  const service = background.installedService!;
+  running = false;
+  await writeFile(path.join(service.root, '.portal-start-failure'), 'crash-limit');
+  await writeFile(path.join(service.root, '.portal-start-attempt'), '1 6');
+  await writeFile(path.join(service.root, 'portal.err.log.previous'), 'prior engine crash');
+  await writeFile(path.join(service.root, 'supervisor.log'), 'engine-exit pid=12345 code=17');
+  await writeFile(path.join(service.root, 'supervisor.err.log'), 'decrypt failed ' + f.connection.token);
+  const state = await background.portalState();
+  expect(state).toMatchObject({ phase: 'error', managed: true, runtimePath: service.root });
+  expect(state.logs.join('\n')).toContain('prior engine crash');
+  expect(state.logs.join('\n')).toContain('code=17');
+  expect(state.logs.join('\n')).toContain('decrypt failed');
+  expect(state.logs.join('\n')).not.toContain(f.connection.token);
+  await background.load(service);
+  expect((await background.refresh()).running).toBe(true);
+  expect(background.installedService!.root).toBe(service.root);
+  await expect(readFile(path.join(service.root, '.portal-start-failure'))).rejects.toMatchObject({ code: 'ENOENT' });
+  await expect(readFile(path.join(service.root, '.portal-start-attempt'))).rejects.toMatchObject({ code: 'ENOENT' });
+});
+
 it.skipIf(process.platform === 'win32')('shows terminal startup failure and explicitly restarts a loaded but exited service', async () => {
   const f = await fixture(); await f.service.enable(f.settings, f.connection);
   const root = f.service.installedService!.root;

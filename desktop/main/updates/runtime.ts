@@ -39,7 +39,9 @@ export async function restoreRuntimeMode(background: BackgroundPortal, settings:
   if (!settings.backgroundEnabled) {
     await background.disable();
     if (start || settings.autoStart) await startForeground();
-  } else if (start && !background.state.enabled) {
+  } else if ((start && !background.state.enabled) || (background.state.enabled && !background.state.running)) {
+    // A current bundle can still have exhausted its recovery budget. A fresh
+    // client launch retries that enabled job once, through load's marker reset.
     await background.load(background.installedService!);
   }
 }

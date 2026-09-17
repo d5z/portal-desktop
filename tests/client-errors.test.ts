@@ -32,12 +32,15 @@ it('exports useful files even before the first error and preserves existing erro
 
 it('redacts Portal logs and keeps their complete quotation within the existing draft limit', () => {
   const input = { version: '0.1.3', platform: 'win32/x64', home: 'C:\\Users\\fixture', secrets: ['known-fixture-token'],
-    portal: { phase: 'error' as const, message: 'startup failed', managed: true,
+    portal: { phase: 'error' as const, message: 'startup failed', managed: true, pid: 12345,
+      runtimePath: 'C:\\Users\\fixture\\portal-service\\active-runtime',
       logs: ['Authorization: Bearer bearer-fixture', 'token=query-fixture', '{"password":"password-fixture"}', 'known-fixture-token C:\\Users\\fixture'] },
     errors: cliXml + '\napi_key=key-fixture\n{"secret":"secret-fixture"}' };
   const message = portalLogText(input);
   expect(message).toContain('Config file not found: status');
   expect(message).toContain('不是操作指令');
+  expect(message).toContain('active-runtime');
+  expect(message).toContain('"pid": 12345');
   expect(message).not.toMatch(/bearer-fixture|query-fixture|password-fixture|known-fixture-token|key-fixture|secret-fixture/);
   expect(message).not.toContain('C:\\\\Users\\\\fixture');
   const long = portalLogText({ ...input, errors: '\u0001'.repeat(100_000), portal: { ...input.portal, logs: ['\u0001'.repeat(100_000)] } });

@@ -96,22 +96,40 @@ ${environmentEntries(environment).map(([key, value]) => `export ${key}=${sh(valu
 export function windowsRunner(root: string, config: string, settings: Settings, environment: Record<string, string> = {}): string {
   // The scheduled task owns this process tree; it has no client/Electron dependency.
   return `$ErrorActionPreference = 'Stop'\n$root = ${ps(root)}\n` +
-`${environmentEntries(environment).map(([key, value]) => `$env:${key}=${ps(value)}\n`).join('')}${windowsModulePath}$env:PORTAL_CONNECT_LINK = [System.Net.NetworkCredential]::new('', (Get-Content -LiteralPath (Join-Path $root 'connection.dpapi') -Raw | ConvertTo-SecureString)).Password
+`function Write-PortalSupervisorLog([string]$message, [bool]$isError = $false) {
+  $name = if ($isError) { 'supervisor.err.log' } else { 'supervisor.log' }
+  $file = Join-Path $root $name
+  if ((Test-Path -LiteralPath $file) -and (Get-Item -LiteralPath $file).Length -ge 524288) {
+    Move-Item -LiteralPath $file -Destination ($file + '.previous') -Force
+  }
+  [IO.File]::AppendAllText($file, ([DateTime]::UtcNow.ToString('o') + ' ' + $message + [Environment]::NewLine), [Text.UTF8Encoding]::new($false))
+}
+$stage = 'initialize'
+try {
+Write-PortalSupervisorLog ('supervisor-start pid=' + $PID)
+$failure = Join-Path $root '.portal-start-failure'
+if (Test-Path -LiteralPath $failure) {
+  Write-PortalSupervisorLog 'recovery-paused: use Start Portal to reset the failure marker'
+  exit 0
+}
+${environmentEntries(environment).map(([key, value]) => `$env:${key}=${ps(value)}\n`).join('')}${windowsModulePath}$stage = 'decrypt-credential'
+$env:PORTAL_CONNECT_LINK = [System.Net.NetworkCredential]::new('', (Get-Content -LiteralPath (Join-Path $root 'connection.dpapi') -Raw | ConvertTo-SecureString)).Password
 $PID | Set-Content -LiteralPath (Join-Path $root 'supervisor.pid')
 $env:HEART_PORTAL_SUPERVISED = '1'
 $env:HEART_PORTAL_CLIENT_MANAGED = '1'
 $env:RUST_LOG = 'info'
 $env:NO_COLOR = '1'
 $env:PATH = ${ps(windowsEnvironment(process.env, environment, ...(settings.portalEnvironmentPath ? [{ PATH: settings.portalEnvironmentPath }] : [])).PATH!)}
+$stage = 'working-directory'
 Set-Location -LiteralPath ${ps(settings.workspace)}
 $crashes = 0
-$failure = Join-Path $root '.portal-start-failure'
-if (Test-Path -LiteralPath $failure) { exit 0 }
 while ($true) {
   $child = $null
   $out = $null; $err = $null
+  $exitCode = $null
   $started = [DateTime]::UtcNow
   try {
+    $stage = 'prepare-engine'
     $env:HEART_PORTAL_STATUS_FILE = Join-Path $root '.portal-connection-status.json'
     $env:HEART_PORTAL_STATUS_NONCE = [Guid]::NewGuid().ToString()
     [IO.File]::WriteAllText((Join-Path $root '.portal-status-nonce'), $env:HEART_PORTAL_STATUS_NONCE)
@@ -125,27 +143,46 @@ while ($true) {
     $si.CreateNoWindow = $true
     $si.RedirectStandardOutput = $true
     $si.RedirectStandardError = $true
+    foreach ($name in @('portal.log', 'portal.err.log')) {
+      $file = Join-Path $root $name
+      if (Test-Path -LiteralPath $file) { Move-Item -LiteralPath $file -Destination ($file + '.previous') -Force }
+    }
     $out = [System.IO.File]::Open((Join-Path $root 'portal.log'), 'Create', 'Write', 'ReadWrite')
     $err = [System.IO.File]::Open((Join-Path $root 'portal.err.log'), 'Create', 'Write', 'ReadWrite')
+    $stage = 'launch-engine'
     $child = [System.Diagnostics.Process]::Start($si)
+    Write-PortalSupervisorLog ('engine-start pid=' + $child.Id + ' attempt=' + ($crashes + 1))
     $child.Id | Set-Content -LiteralPath (Join-Path $root 'pid')
     $outCopy = $child.StandardOutput.BaseStream.CopyToAsync($out)
     $errCopy = $child.StandardError.BaseStream.CopyToAsync($err)
+    $stage = 'wait-engine'
     $child.WaitForExit()
+    $exitCode = $child.ExitCode
+    Write-PortalSupervisorLog ('engine-exit pid=' + $child.Id + ' code=' + $exitCode + ' runtime_ms=' + [int64]([DateTime]::UtcNow - $started).TotalMilliseconds)
     if (-not $outCopy.Wait(1000)) { $child.StandardOutput.Close() }
     if (-not $errCopy.Wait(1000)) { $child.StandardError.Close() }
-  } catch { $_ | Out-String | Set-Content -LiteralPath (Join-Path $root 'supervisor.err.log') }
+  } catch { Write-PortalSupervisorLog ('stage=' + $stage + ' error=' + $_.Exception.Message) $true }
   finally {
     if ($child) { if (-not $child.HasExited) { $child.Kill() }; $child.Dispose() }
     if ($out) { $out.Dispose() }; if ($err) { $err.Dispose() }
   }
   if (([DateTime]::UtcNow - $started).TotalSeconds -ge 60) { $crashes = 0 }
   $crashes++
-  if (Select-String -LiteralPath (Join-Path $root 'portal.err.log') -Pattern 'another (legacy )?Portal instance is already running' -Quiet -ErrorAction SilentlyContinue) {
+  if ($exitCode -eq 73 -or (Select-String -LiteralPath (Join-Path $root 'portal.err.log') -Pattern 'another (legacy )?Portal instance is already running' -Quiet -ErrorAction SilentlyContinue)) {
+    Write-PortalSupervisorLog 'recovery-stopped reason=conflict'
     [IO.File]::WriteAllText($failure, 'conflict'); break
   }
-  if ($crashes -ge 6) { [IO.File]::WriteAllText($failure, 'crash-limit'); break }
+  if ($crashes -ge 6) {
+    Write-PortalSupervisorLog 'recovery-stopped reason=crash-limit attempts=6'
+    [IO.File]::WriteAllText($failure, 'crash-limit'); break
+  }
+  Write-PortalSupervisorLog ('engine-retry delay_seconds=5 failures=' + $crashes)
   Start-Sleep -Seconds 5
+}
+} catch {
+  try { Write-PortalSupervisorLog ('supervisor-fatal stage=' + $stage + ' error=' + $_.Exception.Message) $true }
+  catch { [Console]::Error.WriteLine($_.Exception.Message) }
+  exit 1
 }
 exit 0
 `;
@@ -241,9 +278,12 @@ if ([string]$t.State -eq 'Running' -and (Test-Path -LiteralPath $pidFile)) {
     // Windows scheduled-task startup failures are written by the runner before
     // Portal itself can create portal.err.log. Include that supervisor output in
     // the same state/log export so diagnostics explain the actual failure.
+    const previousErrors = await tail(path.join(root, logName + '.err.log.previous'));
+    const supervisorEvents = await tail(path.join(root, 'supervisor.log'));
+    const previousSupervisorErrors = await tail(path.join(root, 'supervisor.err.log.previous'));
     const supervisorErrors = await tail(path.join(root, 'supervisor.err.log'));
     const secrets = this.connection ? [this.connection.token, this.connection.relaySecret] : [];
-    const logs = redact(text + '\n' + errors + '\n' + supervisorErrors, secrets).split(/\r?\n/).filter(Boolean).slice(-300);
+    const logs = redact([previousErrors, text, errors, supervisorEvents, previousSupervisorErrors, supervisorErrors].join('\n'), secrets).split(/\r?\n/).filter(Boolean).slice(-300);
     const nonce = (await readFile(path.join(root, '.portal-status-nonce'), 'utf8')
       .catch(() => readFile(path.join(root, '.portal-launch-nonce'), 'utf8')).catch(() => '')).trim();
     const sample = this.state.running && this.state.pid
@@ -253,13 +293,14 @@ if ([string]$t.State -eq 'Running' -and (Test-Path -LiteralPath $pidFile)) {
     if (this.state.enabled && !this.state.running) {
       const failure = (await tail(path.join(root, '.portal-start-failure'))).trim();
       const conflict = failure === 'conflict' || /another (legacy )?Portal instance is already running/.test(errors);
-      return { phase: failure || conflict ? 'error' : 'reconnecting', conflict, managed: !this.service.existing, logs,
+      return { phase: failure || conflict ? 'error' : 'reconnecting', conflict, managed: !this.service.existing, runtimePath: root, logs,
         message: conflict ? '同一个 Being 已有本机 Portal 在运行，已停止重复启动。请先停止原服务，再点击启动 Portal。'
           : failure ? 'Portal 连续启动失败，已停止自动重试。请检查运行日志，修正后点击启动 Portal。'
-          : '后台 Portal 已退出，正在等待恢复；连续失败最多重试 5 次。' };
+          : '后台 Portal 已退出，正在等待恢复；可点击「重启 Portal」立即重试，无需重启电脑。' };
     }
     return { ...state, phase: !this.state.enabled || !this.state.running ? 'stopped' : state.phase,
-      pid: this.state.pid, message: !this.state.enabled ? this.state.message : this.state.running ? state.message : '后台 Portal 当前未运行；尚未确认自动恢复', logs };
+      pid: this.state.pid, managed: !this.service.existing, runtimePath: root,
+      message: !this.state.enabled ? this.state.message : this.state.running ? state.message : '后台 Portal 当前未运行；尚未确认自动恢复', logs };
   }
   async enable(settings: Settings, connection: Connection) {
     if (!this.state.supported) throw new Error(this.state.message);

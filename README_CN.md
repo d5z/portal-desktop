@@ -212,6 +212,7 @@ Loom 与 Town 凭据分别通过系统密钥库加密保存，配对码不落盘
 | [测试说明](desktop/TESTING.md) | 分项命令、测试隔离、覆盖范围及验证记录 |
 | [Town SDK 接入](desktop/TOWN-SDK.md) | 配对、REST、SSE、发送与原生回复的协议对照 |
 | [配套更新](desktop/UPDATING.md) | 客户端与 Portal 的升级、恢复和发布流程 |
+| [Portal 恢复](desktop/PORTAL-RECOVERY.md) | 启动失败、手动重启、诊断日志与 Windows 启动说明 |
 | [发布说明](desktop/RELEASE_NOTES.md) | 版本交付说明 |
 | [社区插件方案](desktop/EXTENSIONS.md) | 拟议扩展契约、SDK、分发与生命周期 |
 | [共同工作空间探索](desktop/SHARED-WORKSPACE.md) | 历史设计与待协商的场景协议，不代表已实现或当前路线图 |

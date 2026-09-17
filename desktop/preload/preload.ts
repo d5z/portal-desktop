@@ -61,6 +61,7 @@ const api: DesktopAPI = {
   save: input => ipcRenderer.invoke('beings:save', input),
   choose: kind => ipcRenderer.invoke('beings:choose', kind),
   startPortal: () => ipcRenderer.invoke('beings:portal-start'),
+  restartPortal: () => ipcRenderer.invoke('beings:portal-restart'),
   connectionDefaults: input => ipcRenderer.invoke('beings:connection-defaults', input),
   stopPortal: () => ipcRenderer.invoke('beings:portal-stop'),
   openWorkspace: () => ipcRenderer.invoke('beings:workspace'),

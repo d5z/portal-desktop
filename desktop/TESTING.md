@@ -90,6 +90,8 @@ Windows 的 `npm run test:windows-upgrade` 通过 `scripts/test-windows-upgrade.
 `tests/architecture.test.ts` 随单元测试检查进程与模块依赖：renderer 不导入本机实现、
 主进程不依赖界面、共享契约不依赖具体功能、模型不反向导入组件或 hooks。
 
+`tests/windows-runner.test.ts` 在 Windows 上直接执行生成的 PowerShell runner，使用临时 DPAPI 凭据和编译的本地 fixture 引擎；验证解密前/工作目录错误留痕、退出码、上一轮错误保留、实例冲突暂停及 6 次快速失败上限，不注册计划任务。`background.test.ts` 覆盖 Windows 显式恢复清除标记和日志脱敏；`runtime-update.test.ts` 覆盖同版本启动恢复且不启用主动停用的服务。`test:portal-e2e` 通过本地 Relay 中断及界面的「重启 Portal」验证新 PID、连接恢复和后台偏好保持。
+
 macOS 临时签名包每次重建后可能等待真实钥匙串授权。仅在界面 fixture 回归时可设置
 `PORTAL_DESKTOP_TEST_MOCK_KEYCHAIN=1`，测试启动器将启用 Chromium 的测试钥匙串。
 报告会明确显示 `Keychain coverage: MOCK`；它不修改客户端源码中的凭据策略，也不代表

@@ -250,7 +250,7 @@ async function ready() {
       const frame = event.senderFrame;
       if (!window || event.sender !== window.webContents || frame !== window.webContents.mainFrame || frame.url !== shellURL()) throw new Error('Untrusted IPC sender');
       if (quitting && !['beings:browser-bounds', 'beings:diagnostics'].includes(channel)) throw new Error('客户端正在退出，请稍候。');
-      if (recoveryBlocked && ['beings:save', 'beings:portal-start', 'beings:portal-stop'].includes(channel)) throw new Error('Portal 升级恢复尚未完成，请重新启动客户端完成恢复。');
+      if (recoveryBlocked && ['beings:save', 'beings:portal-start', 'beings:portal-stop', 'beings:portal-restart'].includes(channel)) throw new Error('Portal 升级恢复尚未完成，请重新启动客户端完成恢复。');
       try { return await callback(...args); }
       catch (error) { throw new Error(errorLog.report(channel, error)); }
     });
@@ -436,7 +436,7 @@ async function ready() {
     if (!store.connection) throw new Error('请先连接 Being。');
     if (restart) {
       await portal.stop();
-      if (!store.settings.backgroundEnabled && background.state.enabled) await background.disable();
+      if (background.state.enabled) await background.disable();
     }
     if (app.isPackaged) await loadRuntimeBundle(process.resourcesPath);
     if (replacing) await portal.stop();
@@ -512,7 +512,8 @@ async function ready() {
     const result = await dialog.showOpenDialog(window!, { title: '选择 Being 工作目录', properties: ['openDirectory', 'createDirectory'] });
     return result.canceled ? null : result.filePaths[0];
   });
-  handle('beings:portal-start', () => exclusive(async () => {
+  const requestPortalStart = (restart = false) => exclusive(async () => {
+    if (restart && portal.state.managed === false) throw new Error('当前 Portal 由外部管理，请使用原管理方式重启。');
     if (startupDeferred) {
       await restoreStartup('manual');
       if (startupDeferred) throw new Error(startupNotice);
@@ -520,9 +521,11 @@ async function ready() {
     }
     if (!store.connection) throw new Error('请先连接 Being。');
     await verifyConnection();
-    await takeover.run(store.connection, 'manual', startClientPortal);
+    await takeover.run(store.connection, 'manual', replacing => startClientPortal(replacing, restart));
     await publishCurrentPortal(); return portal.state;
-  }));
+  });
+  handle('beings:portal-start', () => requestPortalStart());
+  handle('beings:portal-restart', () => requestPortalStart(true));
   handle('beings:portal-stop', () => exclusive(async () => {
     if (portal.state.managed === false) throw new Error('当前 Portal 由外部管理，请使用原管理方式停止。');
     if (background.state.enabled) {
