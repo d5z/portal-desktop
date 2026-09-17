@@ -340,7 +340,7 @@ function FiresideThread({ town, room }: { town: TownModel; room?: Data }) {
       memberDetails.length,
     ),
     ownerId = str(room?.owner_town_id),
-    memberLoading = town.detailLoading && !loadedMembers;
+    memberLoading = town.memberLoading;
   const heading = (
     <div className="fireside-thread-heading">
       <div>
@@ -354,7 +354,7 @@ function FiresideThread({ town, room }: { town: TownModel; room?: Data }) {
           ownerId={ownerId}
           currentId={town.me}
           error={town.memberError}
-          retry={() => void town.loadFireside(activeId, town.ringTitle, true)}
+          retry={() => void town.loadFiresideMembers(activeId)}
         />
       </div>
     </div>

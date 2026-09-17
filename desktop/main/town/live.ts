@@ -89,10 +89,8 @@ export class TownLive {
           }
           if (!hello) {
             hello = true; this.attempts = 0;
-            const display = townDisplayName(
-              data.display_name || data.speaker_name || data.display || this.getDisplay(),
-              beingId,
-            ) || undefined;
+            const display = [data.display_name, data.speaker_name, data.display, this.getDisplay()]
+              .map(value => townDisplayName(value, beingId)).find(Boolean);
             this.update({ phase: 'connected', beingId, display, sync: this.state.sync + 1, message: `Town 已连接 · ${display || '@' + beingId}` });
           }
           return;

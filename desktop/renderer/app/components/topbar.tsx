@@ -155,7 +155,7 @@ export function Topbar({ model }: { model: AppModel }) {
           ·
         </span>
         <span id="conversation-name">
-          {town.displayName || (town.live?.beingId ? "Being" : app.snapshot?.settings.being) || "Being"}
+          {town.displayName || app.snapshot?.settings.being || "Being"}
         </span>
         <button
           className={`sbs-header-switch${app.sbsKnown && app.sbsEnabled ? " enabled" : ""}`}

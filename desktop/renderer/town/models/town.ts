@@ -190,6 +190,7 @@ export class TownModel extends Store {
   ringData: { id: string; data: Data } | null = null;
   ringMembers: { id: string; members: Data[] } | null = null;
   memberError = "";
+  memberLoading = false;
   directId?: string;
   returnView = "";
   forwardView = "";
@@ -226,6 +227,9 @@ export class TownModel extends Store {
   environment: Record<string, string> = {};
   private request = 0;
   private detailRequest = 0;
+  private memberRequest = 0;
+  private identityRequest = 0;
+  private pairedIdentity?: { beingId: string; display: string };
   private installedRequest = 0;
   private authRequest = 0;
   private lifecycleRevision = 0;
@@ -267,6 +271,7 @@ export class TownModel extends Store {
       clearTimeout(this.reconcileTimer);
       this.request++;
       this.detailRequest++;
+      this.identityRequest++;
       this.installedRequest++;
       this.authRequest++;
       this.drafts.clear();
@@ -307,6 +312,8 @@ export class TownModel extends Store {
     this.changed();
   }
   private resetIdentity() {
+    ++this.identityRequest;
+    this.pairedIdentity = undefined;
     this.mentionNames = new Map();
     clearTimeout(this.reconcileTimer);
     this.seen = { bonfire: 0, mail: 0, firesides: 0 };
@@ -331,6 +338,7 @@ export class TownModel extends Store {
     this.ringData = null;
     this.ringMembers = null;
     this.memberError = "";
+    this.memberLoading = false;
     this.me = "";
     this.selectedRing = "";
     this.selectedId = "";
@@ -363,6 +371,8 @@ export class TownModel extends Store {
       }
     }
     if (rejected) {
+      ++this.identityRequest;
+      this.pairedIdentity = undefined;
       // A stream may lose authorization while the last REST response is still
       // perfectly readable. Keep that snapshot visible and only gate writes.
       const hasReadableData = Boolean(this.data || this.ringData || this.detail);
@@ -376,6 +386,10 @@ export class TownModel extends Store {
       });
       this.changed();
     }
+    if (["connecting", "connected", "reconnecting"].includes(state.phase) &&
+        (state.phase !== previous?.phase || state.generation !== previous?.generation ||
+          state.beingId !== previous?.beingId || state.sync !== previous?.sync))
+      void this.refreshPairedIdentity(state);
     if (state.phase === "connected") {
       if (this.me !== state.beingId) {
         this.me = state.beingId || "";
@@ -389,6 +403,25 @@ export class TownModel extends Store {
         this.scheduleReconcile();
     }
     this.updateLive();
+  }
+  private async refreshPairedIdentity(state: TownLiveState) {
+    const request = ++this.identityRequest;
+    try {
+      // Read the existing local pairing metadata without opening the auth dialog.
+      // Only the SSE hello confirms connection state and permission to send.
+      const saved = await this.api.townAuth();
+      if (request !== this.identityRequest || this.live?.generation !== state.generation ||
+          !["connecting", "connected", "reconnecting"].includes(this.live.phase))
+        return;
+      const beingId = saved.pairedBeingId || "";
+      const display = townDisplayName(saved.display, beingId);
+      this.pairedIdentity = saved.configured && beingId && display &&
+        (!this.live.beingId || this.live.beingId === beingId)
+        ? { beingId, display } : undefined;
+      this.changed();
+    } catch {
+      // Metadata failure must not change the connection or hide a known name.
+    }
   }
   private scheduleReconcile() {
     clearTimeout(this.reconcileTimer);
@@ -459,6 +492,7 @@ export class TownModel extends Store {
     this.view = view;
     this.request++;
     this.detailRequest++;
+    this.memberLoading = false;
     this.installedRequest++;
     this.directId = id;
     clearTimeout(this.reconcileTimer);
@@ -574,6 +608,7 @@ export class TownModel extends Store {
     if (!definitions[this.view]) return;
     const generation = ++this.request;
     ++this.detailRequest;
+    this.memberLoading = false;
     const liveAtStart = this.live,
       channel = this.channel(),
       preserveFireside = refresh && this.view === "firesides" && Boolean(this.data || this.ringData);
@@ -753,6 +788,7 @@ export class TownModel extends Store {
     this.ringTitle = title;
     this.detailLoading = true;
     this.detailError = undefined;
+    this.memberLoading = false;
     this.scenes.update({
       sceneId: `town:https://beings.town:fireside:${id}`,
       title: `围炉 · ${title}`,
@@ -766,29 +802,13 @@ export class TownModel extends Store {
     try {
       const loadMessages = refresh || this.ringData?.id !== id || this.firesideUnread(id);
       const loadMembers = refresh || this.ringMembers?.id !== id;
-      if (loadMembers) this.memberError = "";
-      const [result, memberResult] = await Promise.all([
-        loadMessages
-          ? this.api.town({ kind: "fireside", id })
-          : Promise.resolve(undefined),
-        loadMembers
-          ? this.api.town({ kind: "fireside-members", id }).catch(() => null)
-          : Promise.resolve(undefined),
-      ]);
+      const messages = loadMessages
+        ? this.api.town({ kind: "fireside", id })
+        : Promise.resolve(undefined);
+      // Members have their own loading/error state and never gate the thread.
+      if (loadMembers) void this.loadFiresideMembers(id);
+      const result = await messages;
       if (generation !== this.detailRequest) return;
-      if (memberResult === null) {
-        this.memberError = "成员名单读取失败。";
-      } else if (memberResult) {
-        if (!memberResult.ok) this.memberError = memberResult.message;
-        else if (!Array.isArray(memberResult.data.members))
-          this.memberError = "Town 返回的成员名单格式不正确。";
-        else {
-          const members = memberResult.data.members.map(record);
-          this.ringMembers = { id, members };
-          this.mentionNames = collectMentionNames(members, this.mentionNames);
-          this.memberError = "";
-        }
-      }
       if (result) {
         if (!result.ok) {
           this.detailError = {
@@ -816,6 +836,33 @@ export class TownModel extends Store {
     } finally {
       if (generation === this.detailRequest) {
         this.detailLoading = false;
+        this.changed();
+      }
+    }
+  }
+  async loadFiresideMembers(id: string) {
+    const request = ++this.memberRequest,
+      generation = this.detailRequest;
+    const current = () => request === this.memberRequest && generation === this.detailRequest;
+    this.memberLoading = true;
+    this.memberError = "";
+    this.changed();
+    try {
+      const result = await this.api.town({ kind: "fireside-members", id });
+      if (!current()) return;
+      if (!result.ok) this.memberError = result.message;
+      else if (!Array.isArray(result.data.members))
+        this.memberError = "Town 返回的成员名单格式不正确。";
+      else {
+        const members = result.data.members.map(record);
+        this.ringMembers = { id, members };
+        this.mentionNames = collectMentionNames(members, this.mentionNames);
+      }
+    } catch {
+      if (current()) this.memberError = "成员名单读取失败。";
+    } finally {
+      if (current()) {
+        this.memberLoading = false;
         this.changed();
       }
     }
@@ -1037,7 +1084,12 @@ export class TownModel extends Store {
     return this.sendTarget?.kind === "bonfire" ? 4000 : 32000;
   }
   get displayName() {
-    return this.mentionNames.get(this.me)?.name || townDisplayName(this.live?.display, this.me);
+    const beingId = this.live?.beingId || this.me;
+    const saved = this.pairedIdentity &&
+      (this.pairedIdentity.beingId === beingId || !beingId &&
+        (this.live?.phase === "connecting" || this.live?.phase === "reconnecting"))
+      ? this.pairedIdentity.display : "";
+    return townDisplayName(this.live?.display, beingId) || this.mentionNames.get(beingId)?.name || saved;
   }
   get canAskBeing() {
     return Boolean(this.scenes.being && this.hasChat());

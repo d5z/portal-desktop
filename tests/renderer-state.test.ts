@@ -100,6 +100,62 @@ const settle = async () => {
 };
 afterEach(() => vi.useRealTimers());
 describe("React desktop state lifecycle", () => {
+  it("loads the saved Town name at startup without opening pairing or querying public pages", async () => {
+    let receive!: (state: TownLiveState) => void;
+    const townQuery = vi.fn(), autoPairTown = vi.fn();
+    const saved = { configured: true, pairedBeingId: "t_Willow", display: "柳树 (t_Willow)" };
+    const { model } = town({
+      town: townQuery,
+      autoPairTown,
+      townAuth: vi.fn(async () => saved),
+      townLive: vi.fn(async () => ({ ...live(), phase: "connecting" as const, beingId: undefined, sync: 0 })),
+      onTownLive: callback => { receive = callback; return () => {}; },
+    });
+    const stop = model.start();
+    try {
+      await settle();
+      expect(model.displayName).toBe("柳树");
+      expect(model.live?.phase).toBe("connecting");
+      expect(model.authOpen).toBe(false);
+      const changed = vi.fn();
+      const unsubscribe = model.subscribe(changed);
+      receive({ ...live(1, 2, "t_Willow"), display: "新柳树" });
+      await settle();
+      expect(model.displayName).toBe("新柳树");
+      expect(changed).toHaveBeenCalled();
+      expect(model.live?.phase).toBe("connected");
+      expect(model.authOpen).toBe(false);
+      expect(townQuery).not.toHaveBeenCalled();
+      expect(autoPairTown).not.toHaveBeenCalled();
+      unsubscribe();
+    } finally { stop(); }
+  });
+  it("keeps saved names while reconnecting and ignores names for a different confirmed identity", async () => {
+    const { model } = town({ townAuth: vi.fn(async () => ({ configured: true, pairedBeingId: "t_Willow", display: "柳树" })) });
+    model.receiveLive({ ...live(), phase: "reconnecting", beingId: undefined });
+    await settle();
+    expect(model.displayName).toBe("柳树");
+    model.receiveLive(live(1, 2, "t_River"));
+    await settle();
+    expect(model.displayName).toBe("");
+  });
+  it.each(["identity", "auth-error", "disposal"])("ignores delayed pairing metadata after %s", async change => {
+    const pending = deferred<Awaited<ReturnType<DesktopAPI["townAuth"]>>>();
+    const { model } = town({
+      townAuth: vi.fn().mockReturnValueOnce(pending.promise).mockResolvedValue({ configured: false }),
+      townLive: vi.fn(async () => live(1, 1, "t_Willow")),
+    });
+    const stop = model.start();
+    try {
+      await settle();
+      if (change === "identity") model.receiveLive(live(2, 2, "t_River"));
+      else if (change === "auth-error") model.receiveLive({ ...live(1, 2), phase: "auth-error", beingId: undefined });
+      else stop();
+      pending.resolve({ configured: true, pairedBeingId: "t_Willow", display: "旧配对名" });
+      await settle();
+      expect(model.displayName).toBe("");
+    } finally { stop(); }
+  });
   it("sends a selected Town message straight to the Being chat for reply drafting", () => {
     const post = vi.fn(), navigate = vi.fn(), scenes = new SceneStore();
     scenes.configure("willow", "https://fixture.test/willow");
@@ -698,6 +754,86 @@ describe("Town request and identity isolation", () => {
     expect(model.ringData?.data.messages).toEqual([{ seq: 2, message: "刷新后消息" }]);
     expect(model.ringMembers?.members).toHaveLength(1);
     expect(model.memberError).toBe("成员接口暂时不可用");
+  });
+  it("shows fireside messages before a slow member request finishes", async () => {
+    const members = deferred<TownResult>();
+    const { model } = town({ town: vi.fn(async query => query.kind === "fireside-members"
+      ? members.promise : result({ messages: [{ seq: 1, message: "已返回的消息" }] })) });
+    const loading = model.loadFireside("10", "十号炉");
+    let messagesFinished = false;
+    void loading.then(() => { messagesFinished = true; });
+    await settle();
+    expect(messagesFinished).toBe(true);
+    expect(model.ringData?.data.messages).toHaveLength(1);
+    expect(model.detailLoading).toBe(false);
+    expect(model.scenes.current.status).toBe("ready");
+    expect(model.memberLoading).toBe(true);
+    members.resolve({ ok: false, code: "network", message: "成员读取超时" });
+    await settle();
+    expect(model.memberLoading).toBe(false);
+    expect(model.memberError).toBe("成员读取超时");
+    expect(model.detailError).toBeUndefined();
+    expect(model.ringData?.data.messages).toHaveLength(1);
+    expect(model.scenes.current.status).toBe("ready");
+  });
+  it("shows members before messages and retries only the member request", async () => {
+    const messages = deferred<TownResult>();
+    const townApi = vi.fn(async (query: import("../desktop/shared/types").TownQuery) =>
+      query.kind === "fireside" ? messages.promise
+        : result({ members: [{ town_id: "t_Willow", display_name: "柳树" }] }));
+    const { model } = town({ town: townApi });
+    const loading = model.loadFireside("10", "十号炉");
+    await settle();
+    expect(model.ringMembers?.members).toHaveLength(1);
+    expect(model.memberLoading).toBe(false);
+    expect(model.detailLoading).toBe(true);
+    expect(model.scenes.current.status).toBe("loading");
+    await model.loadFiresideMembers("10");
+    expect(townApi.mock.calls.map(([query]) => query.kind)).toEqual([
+      "fireside", "fireside-members", "fireside-members",
+    ]);
+    expect(model.detailLoading).toBe(true);
+    messages.resolve(result({ messages: [{ seq: 1, message: "消息仍正常完成" }] }));
+    await loading;
+    expect(model.ringData?.data.messages).toHaveLength(1);
+    expect(model.detailLoading).toBe(false);
+  });
+  it.each(["room", "identity", "navigation"])("ignores pending members after a %s change", async change => {
+    const oldMembers = deferred<TownResult>(), newMembers = deferred<TownResult>();
+    const { model } = town({ town: vi.fn(async query => query.kind === "fireside-members"
+      ? (query.id === "10" ? oldMembers.promise : newMembers.promise)
+      : result({ messages: [] })) });
+    model.live = live();
+    await model.loadFireside("10", "十号炉");
+    if (change === "room") await model.loadFireside("11", "十一号炉");
+    else if (change === "identity") model.receiveLive(live(2, 2, "river"));
+    else model.show("chat");
+    oldMembers.resolve(result({ members: [{ town_id: "t_Private", display_name: "旧身份成员" }] }));
+    await settle();
+    expect(model.ringMembers).toBeNull();
+    expect(model.mentionNames.has("t_Private")).toBe(false);
+    expect(model.memberError).toBe("");
+    expect(model.memberLoading).toBe(change === "room");
+    if (change === "room") {
+      newMembers.resolve(result({ members: [{ town_id: "t_New", display_name: "新成员" }] }));
+      await settle();
+      expect(model.ringMembers?.id).toBe("11");
+      expect(model.memberLoading).toBe(false);
+    }
+  });
+  it("keeps the newest member retry when an older request fails later", async () => {
+    const older = deferred<TownResult>(), newer = deferred<TownResult>();
+    const townApi = vi.fn().mockReturnValueOnce(older.promise).mockReturnValueOnce(newer.promise);
+    const { model } = town({ town: townApi });
+    const first = model.loadFiresideMembers("10");
+    const second = model.loadFiresideMembers("10");
+    newer.resolve(result({ members: [{ town_id: "t_New", display_name: "新成员" }] }));
+    await second;
+    older.resolve({ ok: false, code: "network", message: "旧请求失败" });
+    await first;
+    expect(model.ringMembers?.members[0].town_id).toBe("t_New");
+    expect(model.memberError).toBe("");
+    expect(model.memberLoading).toBe(false);
   });
 });
 describe("shared reading behavior", () => {

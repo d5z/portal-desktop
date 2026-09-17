@@ -38,6 +38,32 @@ it('prefers the live Town display name and removes a parenthesized Town ID fallb
   } finally { live.dispose(); }
 });
 
+it('keeps the saved pairing name when hello only supplies an opaque display ID', async () => {
+  const fetcher = vi.fn(async () => new Response(new ReadableStream({ start(controller) {
+    controller.enqueue(new TextEncoder().encode(
+      'event: hello\ndata: {"town_id":"t_Willow","display":"t_Willow","token_kind":"client","anonymous":false}\n\n',
+    ));
+  } }), { headers: { 'Content-Type': 'text/event-stream' } }));
+  const live = new TownLive(() => 'fixture-token', () => 't_Willow', () => {}, fetcher as typeof fetch,
+    'https://beings.town', () => '柳树 (t_Willow)');
+  try {
+    live.restart();
+    await vi.waitFor(() => expect(live.state.phase).toBe('connected'));
+    expect(live.state.display).toBe('柳树');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+  } finally { live.dispose(); }
+});
+
+it('does not connect or request pairing when no Town credential is configured', () => {
+  const fetcher = vi.fn();
+  const live = new TownLive(() => '', () => '', () => {}, fetcher);
+  try {
+    live.restart();
+    expect(live.state.phase).toBe('unpaired');
+    expect(fetcher).not.toHaveBeenCalled();
+  } finally { live.dispose(); }
+});
+
 it('accepts documented SSE payloads, decodes split UTF-8 and deduplicates REST/SSE IDs per channel', async () => {
   let stream!: ReadableStreamDefaultController<Uint8Array>;
   const fetcher = vi.fn(async () => new Response(new ReadableStream<Uint8Array>({ start(controller) { stream = controller; } }), { headers: { 'Content-Type': 'text/event-stream' } }));
