@@ -106,7 +106,7 @@ export function Town({ model }: { model: TownModel }) {
           <div className="town-header-actions">
             <button
               id="town-write"
-              className="primary town-write-button"
+              className="town-write-button"
               aria-label={town.view === "mail" ? "写私信" : "写一句"}
               hidden={!channel}
               disabled={
@@ -116,7 +116,9 @@ export function Town({ model }: { model: TownModel }) {
               }
               onClick={() => town.compose()}
             >
-              <span aria-hidden="true">＋</span>
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="m12.5 3.5 4 4M4 12l9-9a1.4 1.4 0 0 1 2 0l2 2a1.4 1.4 0 0 1 0 2l-9 9-5 1 1-5Z" />
+              </svg>
               {town.view === "mail" ? "写私信" : "写一句"}
             </button>
             <button

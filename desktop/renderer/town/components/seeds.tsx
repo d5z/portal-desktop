@@ -20,6 +20,13 @@ export function SeedSearch({ town }: { town: TownModel }) {
   const [filters, setFilters] = useState(town.seedFilters);
   const more = useRef<HTMLDetailsElement>(null);
   useEffect(() => setFilters(town.seedFilters), [town.seedFilters]);
+  useEffect(() => {
+    const outside = (event: MouseEvent) => {
+      if (more.current && !more.current.contains(event.target as Node)) more.current.open = false;
+    };
+    document.addEventListener("click", outside);
+    return () => document.removeEventListener("click", outside);
+  }, []);
   const active = Object.values(town.seedFilters).some(Boolean);
   return (
     <form className="seed-search" onSubmit={event => {
@@ -29,7 +36,14 @@ export function SeedSearch({ town }: { town: TownModel }) {
     }}>
       <input type="search" aria-label="搜索种子" placeholder="搜索种子、领域或经验…" maxLength={300}
         value={filters.q} onChange={event => setFilters({ ...filters, q: event.target.value })} />
-      <details className="seed-filter-menu" ref={more}>
+      <details className="seed-filter-menu" ref={more} onKeyDown={event => {
+        if (event.key !== "Escape") return;
+        event.stopPropagation();
+        if (event.target instanceof Element && event.target.closest("select:open")) return;
+        event.preventDefault();
+        event.currentTarget.open = false;
+        event.currentTarget.querySelector("summary")?.focus();
+      }}>
         <summary>筛选{Object.entries(town.seedFilters).some(([key, value]) => key !== "q" && value) ? " · 已设置" : ""}</summary>
         <div className="seed-filter-fields">
           {([["domain", "领域"], ["tag", "标签"], ["kit", "Kit 经验墙"]] as [keyof SeedFilters, string][]).map(([key, label]) => (

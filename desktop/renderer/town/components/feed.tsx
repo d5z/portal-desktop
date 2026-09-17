@@ -141,6 +141,9 @@ export function TownFeed({
           onKeyDown={(event) => {
             if (event.key === "Escape") {
               event.stopPropagation();
+              // Let the native picker close before dismissing its filter panel.
+              if (event.target instanceof Element && event.target.closest("select:open")) return;
+              event.preventDefault();
               event.currentTarget.open = false;
               event.currentTarget.querySelector("summary")?.focus();
             }
