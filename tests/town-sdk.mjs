@@ -187,7 +187,8 @@ try {
   await page.screenshot({ path: path.join(os.tmpdir(), 'town-sdk-via.png') });
   assert.equal(await page.locator('.social-message').getByRole('button', { name: '回复', exact: true }).count(), 4);
   assert.equal(await page.locator('.social-message').getByRole('button', { name: '让 Being 回复', exact: true }).count(), 0);
-  assert.equal(await page.locator('#conversation-name').textContent(), '服务端展示名');
+  // The header prefers the connected identity over names from feed messages.
+  assert.equal(await page.locator('#conversation-name').textContent(), '柳树');
   assert.doesNotMatch(await page.locator('#conversation-name').textContent(), /t_[a-zA-Z0-9_-]+/);
   await chatInput.fill('保留手写草稿');
   await partner.getByRole('button', { name: '回复', exact: true }).click();
