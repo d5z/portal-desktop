@@ -75,7 +75,7 @@ function api(overrides: Partial<DesktopAPI> = {}) {
     onTownLive: on,
     onNotificationOpen: on,
     takeNotificationTarget: vi.fn(async () => null),
-    notifications: vi.fn(async () => ({ supported: true, message: '', preferences: { enabled: false, mail: true, firesides: true, bonfire: false } })),
+    notifications: vi.fn(async () => ({ supported: true, message: '', preferences: { enabled: false, mail: false, firesides: false, bonfire: false } })),
     townLive: vi.fn(async () => live()),
     townAuth: vi.fn(async () => ({ configured: true, beingId: "willow" })),
     town: vi.fn(async () => result({ messages: [] })),

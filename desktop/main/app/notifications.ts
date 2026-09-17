@@ -2,7 +2,7 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { NotificationPreferences, NotificationSettings, NotificationTarget } from '../../shared/types';
 
-const defaults: NotificationPreferences = { enabled: false, mail: true, firesides: true, bonfire: false };
+const defaults: NotificationPreferences = { enabled: false, mail: false, firesides: false, bonfire: false };
 export interface NativeNotification {
   on(event: 'click' | 'close' | 'failed', callback: () => void): unknown;
   show(): void;

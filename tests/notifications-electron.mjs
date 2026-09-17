@@ -24,9 +24,12 @@ try {
   assert.equal(await page.locator('#notification-test').count(), 0);
   await assert.rejects(page.evaluate(() => window.beings.testNotification()), /No handler registered/);
   assert.equal(await page.locator('#notification-enabled').isChecked(), false);
+  assert.equal(await page.locator('#notification-mail').isChecked(), false);
+  assert.equal(await page.locator('#notification-firesides').isChecked(), false);
+  assert.equal(await page.locator('#notification-bonfire').isChecked(), false);
   assert.equal(await page.locator('#notification-mail').isDisabled(), true);
   await page.locator('#notification-enabled').check();
-  await page.locator('#notification-firesides').uncheck();
+  await page.locator('#notification-mail').check();
   await page.locator('#notification-bonfire').check();
   await page.waitForFunction(async () => (await window.beings.notifications()).preferences.bonfire);
   assert.deepEqual(JSON.parse(await readFile(path.join(directory, 'notifications.json'), 'utf8')), { enabled: true, mail: true, firesides: false, bonfire: true });

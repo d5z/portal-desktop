@@ -24,8 +24,8 @@ async function fixture() {
 }
 it('persists independent preferences before Being pairing, validates patches and preserves disabled categories', async () => {
   const { service, directory, options } = await fixture();
-  expect(service.state.preferences).toEqual({ enabled: false, mail: true, firesides: true, bonfire: false });
-  await service.save({ enabled: true, firesides: false });
+  expect(service.state.preferences).toEqual({ enabled: false, mail: false, firesides: false, bonfire: false });
+  await service.save({ enabled: true, mail: true, firesides: false });
   await service.save({ enabled: false });
   const restored = new DesktopNotifications(directory, options); await restored.load();
   expect(restored.state.preferences).toMatchObject({ enabled: false, firesides: false, mail: true });
@@ -45,9 +45,11 @@ it('falls back to disabled notifications on a corrupt settings file', async () =
 it('respects master/category switches, foreground focus and system support', async () => {
   const { service, options, created } = await fixture();
   service.receive({ channel: 'mail' }); expect(created).toHaveLength(0);
-  await service.save({ enabled: true, firesides: false });
+  await service.save({ enabled: true });
+  service.receive({ channel: 'mail' });
   service.receive({ channel: 'firesides', firesideId: '10' });
   service.receive({ channel: 'bonfire' }); expect(created).toHaveLength(0);
+  await service.save({ mail: true });
   options.focused.mockReturnValue(true);
   service.receive({ channel: 'mail' }); expect(created).toHaveLength(0);
   options.focused.mockReturnValue(false); options.supported.mockReturnValue(false);
@@ -57,7 +59,7 @@ it('respects master/category switches, foreground focus and system support', asy
 });
 it('bounds bursts, routes clicks to a fireside, and invalidates notifications on identity changes or disabling', async () => {
   const { service, options, created } = await fixture();
-  await service.save({ enabled: true });
+  await service.save({ enabled: true, mail: true, firesides: true });
   const target = { channel: 'firesides' as const, firesideId: '10' };
   service.receive(target); service.receive(target);
   expect(created).toHaveLength(1);
@@ -73,7 +75,7 @@ it('bounds bursts, routes clicks to a fireside, and invalidates notifications on
 it('allows foreground test notifications and handles native failures without throwing on live messages', async () => {
   const { service, options, created } = await fixture();
   expect(() => service.test()).toThrow('开启');
-  await service.save({ enabled: true }); options.focused.mockReturnValue(true);
+  await service.save({ enabled: true, mail: true }); options.focused.mockReturnValue(true);
   service.test(); expect(created[0].show).toHaveBeenCalled();
   created[0].emit('failed'); expect(service.state.message).toContain('系统未能显示');
   options.focused.mockReturnValue(false); options.create.mockImplementation(() => { throw new Error('OS failed'); });
