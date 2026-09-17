@@ -98,6 +98,7 @@ export interface DesktopAPI {
   choose(kind: 'workspace'): Promise<string | null>;
   startPortal(): Promise<PortalState>;
   restartPortal(): Promise<PortalState>;
+  forceStartPortal(): Promise<PortalState>;
   stopPortal(): Promise<PortalState>;
   openWorkspace(): Promise<void>;
   diagnostics(): Promise<DiagnosticReport>;

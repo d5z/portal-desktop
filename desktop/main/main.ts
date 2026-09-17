@@ -19,6 +19,7 @@ import { portalLogText } from './portal/diagnostics';
 import { PortalSupervisor } from './portal/supervisor';
 import { ExternalPortalObserver } from './portal/external';
 import { PortalTakeover } from './portal/takeover';
+import { WindowsForcePortal } from './portal/windows-force';
 import { RuntimeUpdater, loadRuntimeBundle, restoreRuntimeMode, type RuntimeUpdateResult } from './updates/runtime';
 import { UpdateChecker } from './updates/checker';
 import { ClientInstall } from './updates/client-install';
@@ -250,7 +251,7 @@ async function ready() {
       const frame = event.senderFrame;
       if (!window || event.sender !== window.webContents || frame !== window.webContents.mainFrame || frame.url !== shellURL()) throw new Error('Untrusted IPC sender');
       if (quitting && !['beings:browser-bounds', 'beings:diagnostics'].includes(channel)) throw new Error('客户端正在退出，请稍候。');
-      if (recoveryBlocked && ['beings:save', 'beings:portal-start', 'beings:portal-stop', 'beings:portal-restart'].includes(channel)) throw new Error('Portal 升级恢复尚未完成，请重新启动客户端完成恢复。');
+      if (recoveryBlocked && ['beings:save', 'beings:portal-start', 'beings:portal-stop', 'beings:portal-restart', 'beings:portal-force-start'].includes(channel)) throw new Error('Portal 升级恢复尚未完成，请重新启动客户端完成恢复。');
       try { return await callback(...args); }
       catch (error) { throw new Error(errorLog.report(channel, error)); }
     });
@@ -410,6 +411,7 @@ async function ready() {
     startupNotice = undefined;
   };
   const externalPortal = new ExternalPortalObserver();
+  const forcePortal = new WindowsForcePortal();
   const ownedRoot = () => background.installedService?.label === background.label && !background.installedService.existing ? background.installedService.root : undefined;
   const publishBackground = async () => {
     const state = await background.portalState();
@@ -422,15 +424,20 @@ async function ready() {
     portal.emit('state', portal.state);
   };
   const takeover = new PortalTakeover(directory, {
-    discover: connection => externalPortal.conflicts(connection, ownedRoot()),
-    preflight: async targets => {
+    discover: (connection, force) => force ? forcePortal.conflicts(connection) : externalPortal.conflicts(connection, ownedRoot()),
+    preflight: async (targets, force) => {
       await verifyConnection();
-      await store.reusePortalConfig(targets.map(item => item.service?.configPath || path.join(item.root, 'portal.toml')));
+      if (!force) await store.reusePortalConfig(targets.map(item => item.service?.configPath || path.join(item.root, 'portal.toml')));
       await store.save(store.settings);
       if (app.isPackaged) await loadRuntimeBundle(process.resourcesPath);
       else await access(binary);
     },
-    stop: async target => { await background.unload(target.service!); },
+    stop: async (target, force) => {
+      if (force) {
+        const details = await forcePortal.stop(target);
+        errorLog.report('portal-force-stop', `runtime=${target.root}\n${details}`);
+      } else await background.unload(target.service!);
+    },
   });
   const startClientPortal = async (replacing = false, restart = false) => {
     if (!store.connection) throw new Error('请先连接 Being。');
@@ -526,6 +533,28 @@ async function ready() {
   });
   handle('beings:portal-start', () => requestPortalStart());
   handle('beings:portal-restart', () => requestPortalStart(true));
+  handle('beings:portal-force-start', () => exclusive(async () => {
+    if (process.platform !== 'win32') throw new Error('强制接管目前仅支持 Windows。');
+    if (!store.connection) throw new Error('请先连接 Being。');
+    await verifyConnection();
+    if (app.isPackaged) await loadRuntimeBundle(process.resourcesPath);
+    else await access(binary);
+    await takeover.run(store.connection, 'manual', async () => {
+      // Force recovery always selects the bundled engine, preserves user settings,
+      // and waits for local readiness before reporting a successful replacement.
+      await portal.stop();
+      if (background.installedService) {
+        await background.disable();
+        // Do not reuse a stale binary just because its settings fingerprint matches.
+        await background.forget();
+      }
+      await store.save({ ...store.settings, portalBinary: binary });
+      await startClientPortal(true);
+      startupDeferred = false;
+      if (installIntent) await clientInstall.finish();
+    }, false, true);
+    await publishCurrentPortal(); return portal.state;
+  }));
   handle('beings:portal-stop', () => exclusive(async () => {
     if (portal.state.managed === false) throw new Error('当前 Portal 由外部管理，请使用原管理方式停止。');
     if (background.state.enabled) {

@@ -80,3 +80,15 @@ it('requires manual recovery after an interrupted stop transaction', async () =>
   expect(await f.takeover.run(connection, 'manual', f.start)).toBe(true);
   expect(f.start).toHaveBeenCalledWith(true);
 });
+it('uses the force discovery and stop path only after a manual action and validates even without conflicts', async () => {
+  const f = await fixture();
+  await expect(f.takeover.run(connection, 'automatic', f.start, false, true)).rejects.toThrow('只能手动');
+  expect(f.options.discover).not.toHaveBeenCalled();
+  expect(await f.takeover.run(connection, 'manual', f.start, false, true)).toBe(true);
+  expect(f.options.discover).toHaveBeenCalledWith(connection, true);
+  expect(f.options.stop).toHaveBeenCalledWith(f.a, true);
+  expect(f.start).toHaveBeenCalledWith(true);
+  f.events.length = 0;
+  expect(await f.takeover.run(connection, 'manual', f.start, false, true)).toBe(true);
+  expect(f.events).toEqual(['validate', 'start:true']);
+});

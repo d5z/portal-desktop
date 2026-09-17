@@ -149,6 +149,15 @@ try {
   assert.throws(() => process.kill(beforeRestart.pid, 0), /ESRCH/);
   assert.equal((await page.evaluate(() => window.beings.snapshot())).settings.backgroundEnabled, false);
   assert.ok((await rpc('tools/list')).tools.length > 0);
+  if (process.platform === 'win32') {
+    await page.screenshot({ path: path.join(os.tmpdir(), 'portal-force-recovery.png') });
+    const beforeForce = await state();
+    await page.locator('#force-start-portal').click();
+    await until(async () => { const current = await state(); return current.phase === 'connected' && current.pid !== beforeForce.pid; });
+    assert.throws(() => process.kill(beforeForce.pid, 0), /ESRCH/);
+    assert.equal((await page.evaluate(() => window.beings.snapshot())).settings.backgroundEnabled, false);
+    assert.ok((await rpc('tools/list')).tools.length > 0);
+  }
   await app.evaluate(({ shell }) => {
     globalThis.openedLogDirectory = '';
     shell.openPath = async directory => { globalThis.openedLogDirectory = directory; return ''; };

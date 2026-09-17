@@ -86,6 +86,7 @@ body:not([data-view=chat]) #conversation-name{display:none}
 .log-heading{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}.log-heading h2{font-size:13px}.log-heading span{font-size:11px;color:var(--muted)}
 #portal-logs{background:var(--code);border:1px solid var(--line);border-radius:10px;padding:18px;color:var(--secondary);font:11px/1.9 ui-monospace,SFMono-Regular,Consolas,monospace;height:230px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere}
 .portal-foot{font-size:11px;color:var(--muted);margin-top:14px}
+.portal-recovery{margin-top:18px;padding-top:14px;border-top:1px solid var(--line)}.portal-recovery p{margin:6px 0 0;font-size:11px;line-height:1.6;color:var(--muted)}
 dialog{padding:0;width:580px;max-height:90vh;overflow:hidden;background:var(--bg);border:1px solid var(--line);border-radius:16px;color:var(--text);box-shadow:0 24px 100px #0003}dialog::backdrop{background:#0004;backdrop-filter:blur(5px)}
 dialog[open]:not(#place-sheet){display:flex;flex-direction:column}
 #settings-form,#town-auth-form,.kit-install-form,.client-settings-content,#town-send-form{display:flex;flex-direction:column;min-height:0;flex:1;width:100%;overflow:hidden;padding:0}

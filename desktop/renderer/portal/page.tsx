@@ -111,6 +111,14 @@ export function Portal({ model }: { model: AppModel }) {
               本机设置 ↗
             </button>
           </div>
+          {app.api.platform === "win32" && <div className="portal-recovery">
+            <button className="text-button" id="force-start-portal"
+              disabled={Boolean(app.portalAction) || !snapshot?.settings.hasToken}
+              onClick={() => void app.changePortal("force")}>
+              {app.portalAction === "force" ? "正在强制关闭并启动…" : "强制关闭旧 Portal 并启动"}
+            </button>
+            <p className="field-hint">停止当前 Being 的旧 Portal 和后台守护，启动客户端内置版本。正在执行的工具任务会中断。</p>
+          </div>}
           <p
             id="portal-action-error"
             className="form-error"

@@ -38,7 +38,7 @@ export class AppModel extends Store {
   searchEntries: { id: string; text: string }[] = [];
   readingSize = 15;
   update?: UpdateState;
-  portalAction: "start" | "stop" | "restart" | null = null;
+  portalAction: "start" | "stop" | "restart" | "force" | null = null;
   portalError = "";
   logsLoading = false;
   private logsRequest = "";
@@ -398,7 +398,7 @@ export class AppModel extends Store {
       }
     }
   }
-  async changePortal(operation: "start" | "stop" | "restart") {
+  async changePortal(operation: "start" | "stop" | "restart" | "force") {
     if (this.portalAction || !this.snapshot) return;
     this.portalAction = operation;
     this.portalError = "";
@@ -406,7 +406,8 @@ export class AppModel extends Store {
     try {
       const portal: PortalState = await (operation === "start"
         ? this.api.startPortal()
-        : operation === "restart" ? this.api.restartPortal() : this.api.stopPortal());
+        : operation === "restart" ? this.api.restartPortal()
+          : operation === "force" ? this.api.forceStartPortal() : this.api.stopPortal());
       this.snapshot = { ...this.snapshot, portal };
       this.changed();
       this.applySnapshot(await this.api.snapshot());

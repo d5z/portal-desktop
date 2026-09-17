@@ -8,6 +8,8 @@
 
 ## 覆盖与边界
 
+Windows 强制接管由 `tests/windows-force.test.ts` 验证：真实临时引擎/守护进程、旧进程反复拉起、另一 Being 保留、旧版本无状态命令；计划任务分支在原生 PowerShell 中使用隔离的注册 fixture，不修改真实任务。`test:portal-e2e` 通过打包客户端的强制启动按钮验证新 PID、Relay 重连及工具调用。
+
 | 测试层 | 自动验证内容 | 命令 |
 | --- | --- | --- |
 | 类型检查 | 桌面 IPC、设置、渲染器与后台服务的类型契约 | `npm run typecheck` |
