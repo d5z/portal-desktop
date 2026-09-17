@@ -45,6 +45,23 @@ try {
   await page.waitForFunction(() => getComputedStyle(document.querySelector('.local-portal-name')).opacity === '1');
   await page.locator('#local-portal-status').click();
   assert.equal(await page.evaluate(() => window.navigated), 'portal');
+  await page.locator('#options-trigger').click();
+  await page.waitForFunction(() => document.querySelector('.options-menu').getAnimations().length === 0);
+  const blurred = await page.evaluate(async () => {
+    const details = document.querySelector('#conversation-options');
+    const menu = document.querySelector('.options-menu');
+    window.dispatchEvent(new Event('blur'));
+    while (document.querySelector('#options-trigger').getAttribute('aria-expanded') !== 'false')
+      await new Promise(requestAnimationFrame);
+    const closing = menu.getAnimations()[0];
+    return new Promise(resolve => closing.addEventListener('finish', () => {
+      // Sample after the menu's finish handler, before React hides <details>.
+      // A completed fade must never reveal the opaque menu again.
+      resolve({ open: details.open, opacity: getComputedStyle(menu).opacity });
+    }, { once: true }));
+  });
+  assert.ok(!blurred.open || blurred.opacity === '0', `Menu reappeared after blur: ${JSON.stringify(blurred)}`);
+  await page.waitForFunction(() => !document.querySelector('#conversation-options').open);
   for (const reducedMotion of ['no-preference', 'reduce']) {
     await page.emulateMedia({ reducedMotion });
     await page.locator('#options-trigger').click();
@@ -83,7 +100,7 @@ try {
     assert.equal(await page.locator('#outside').evaluate(el => el === document.activeElement), true);
   }
   assert.deepEqual(errors, []);
-  console.log('PASS: submenu Escape and Back restore focus after rendering; double Escape, keyboard entry, interrupted motion and reduced motion close correctly.');
+  console.log('PASS: blur closes without flashing; submenu Escape and Back restore focus after rendering; double Escape, keyboard entry, interrupted motion and reduced motion close correctly.');
 } catch (error) {
   console.error('Menu keyboard assertion failed:', error);
   if (page && !page.isClosed()) {

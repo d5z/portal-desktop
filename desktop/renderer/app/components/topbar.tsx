@@ -52,7 +52,11 @@ export function Topbar({ model }: { model: AppModel }) {
     if (restore) trigger.current?.focus();
   };
   useLayoutEffect(() => {
-    if (!visible) return;
+    if (!visible) {
+      motion.current?.cancel();
+      motion.current = null;
+      return;
+    }
     const node = menu.current!;
     const from = motion.current
       ? {
@@ -88,7 +92,12 @@ export function Topbar({ model }: { model: AppModel }) {
     );
     motion.current = animation;
     animation.onfinish = () => {
-      if (!expanded) setVisible(false);
+      if (!expanded) {
+        // Keep the final transparent frame until React closes <details>.
+        // Cancelling here reveals the menu before that render commits.
+        setVisible(false);
+        return;
+      }
       animation.cancel();
       motion.current = null;
     };
