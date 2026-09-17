@@ -320,7 +320,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   }
   await openClientSettings(page);
   await page.locator('#settings-tab-appearance').click();
-  await page.locator('#theme-toggle').click();
+  await page.locator('#theme-dark').click();
   await page.locator('#close-client-settings').click();
   await childFrame.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
   assert.equal(await app.evaluate(({ nativeTheme }) => nativeTheme.themeSource), 'dark');

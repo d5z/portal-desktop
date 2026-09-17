@@ -175,15 +175,25 @@ export function ClientSettings({ model }: { model: AppModel }) {
           hidden={tab !== "appearance"}
         >
           <section
-            className="settings-group"
+            className="settings-group appearance-settings-group"
             aria-labelledby="settings-appearance"
           >
-            <h3 id="settings-appearance">外观与阅读</h3>
-            <button id="theme-toggle" onClick={() => void app.toggleTheme()}>
-              {app.theme === "light"
-                ? "配色 · 浅色，点击切换"
-                : "配色 · 深色，点击切换"}
-            </button>
+            <div className="appearance-setting-row">
+              <span id="settings-appearance">主题配色</span>
+              <div id="theme-toggle" className="theme-options" role="group" aria-label="主题配色">
+                {(["light", "dark"] as const).map(theme => (
+                  <button key={theme} id={`theme-${theme}`} type="button"
+                    aria-pressed={app.theme === theme}
+                    onClick={() => { if (app.theme !== theme) void app.toggleTheme(); }}>
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      {theme === "light" ? <><circle cx="10" cy="10" r="3.25" /><path d="M10 1.5v2m0 13v2M1.5 10h2m13 0h2M4 4l1.4 1.4m9.2 9.2L16 16M4 16l1.4-1.4m9.2-9.2L16 4" /></>
+                        : <path d="M16.8 12.1A7 7 0 0 1 7.9 3.2a7 7 0 1 0 8.9 8.9Z" />}
+                    </svg>
+                    {theme === "light" ? "浅色" : "深色"}
+                  </button>
+                ))}
+              </div>
+            </div>
             <div className="reading-setting">
               <label htmlFor="reading-size">
                 阅读字号{" "}
@@ -198,20 +208,22 @@ export function ClientSettings({ model }: { model: AppModel }) {
                 max="21"
                 step="1"
                 value={app.readingSize}
+                style={{ backgroundImage: `linear-gradient(to right, var(--accent) ${(app.readingSize - 13) / 8 * 100}%, var(--line) ${(app.readingSize - 13) / 8 * 100}%)` }}
+                aria-describedby="reading-size-help"
                 onChange={(event) =>
                   app.setReadingSize(Number(event.target.value))
                 }
               />
-              <button
-                id="reading-reset"
-                type="button"
-                onClick={() => app.setReadingSize(15)}
-              >
-                恢复默认
-              </button>
-              <p className="field-help">
-                调整对话与 Town 正文字号，立即预览并记住设置。
-              </p>
+              <div className="reading-setting-footer">
+                <p id="reading-size-help">应用于对话与 Town 正文</p>
+                <button
+                  id="reading-reset"
+                  type="button"
+                  onClick={() => app.setReadingSize(15)}
+                >
+                  恢复默认
+                </button>
+              </div>
             </div>
           </section>
         </div>
@@ -221,24 +233,30 @@ export function ClientSettings({ model }: { model: AppModel }) {
           aria-labelledby="settings-tab-general"
           hidden={tab !== "general"}
         >
-          <section className="settings-group" aria-labelledby="settings-notifications">
-            <h3 id="settings-notifications">桌面通知</h3>
-            <p className="field-help">
+          <section className="general-settings-group" aria-labelledby="settings-notifications">
+            <label className="general-setting-row">
+              <span id="settings-notifications">桌面通知</span>
+              <input id="notification-enabled" type="checkbox" role="switch"
+                aria-label="开启桌面通知"
+                checked={Boolean(app.notificationSettings?.preferences.enabled)}
+                disabled={app.notificationsBusy || !app.notificationSettings?.supported}
+                onChange={event => void app.changeNotifications({ enabled: event.target.checked })} />
+            </label>
+            <p className="general-setting-help">
               {app.notificationSettings?.message || "正在读取通知设置…"}
-              关闭窗口后仍可接收通知，退出客户端后停止；需先配对 Town。
             </p>
-            <div className="switch-list">
+            <div className="notification-switches" role="group" aria-label="通知类型">
               {([
-                ["enabled", "开启桌面通知", "使用 Windows / macOS 系统通知，设置自动保存"],
-                ["mail", "私信通知", "收到新的私信时提醒"],
-                ["firesides", "围炉通知", "已加入的围炉有新消息时提醒"],
-                ["bonfire", "篝火通知", "公共篝火有新消息时提醒，默认关闭"],
+                ["mail", "私信", "私信通知"],
+                ["firesides", "围炉", "围炉通知"],
+                ["bonfire", "篝火", "篝火通知"],
               ] as const).map(([key, title, help]) => (
                 <label key={key}>
-                  <span><strong>{title}</strong><small>{help}</small></span>
+                  <span>{title}</span>
                   <input id={`notification-${key}`} type="checkbox" role="switch"
+                    aria-label={help}
                     checked={Boolean(app.notificationSettings?.preferences[key])}
-                    disabled={app.notificationsBusy || !app.notificationSettings?.supported || (key !== "enabled" && !app.notificationSettings.preferences.enabled)}
+                    disabled={app.notificationsBusy || !app.notificationSettings?.supported || !app.notificationSettings.preferences.enabled}
                     onChange={event => void app.changeNotifications({ [key]: event.target.checked })} />
                 </label>
               ))}
@@ -246,24 +264,11 @@ export function ClientSettings({ model }: { model: AppModel }) {
             {import.meta.env.DEV && <button id="notification-test" type="button"
               disabled={app.notificationsBusy || !app.notificationSettings?.supported || !app.notificationSettings.preferences.enabled}
               onClick={() => void app.testNotification()}>发送测试通知</button>}
-            <p className="form-error" role="alert">{app.notificationsError}</p>
+            {app.notificationsError && <p className="form-error" role="alert">{app.notificationsError}</p>}
           </section>
-          <section
-            className="settings-group"
-            aria-labelledby="settings-startup"
-          >
-            <h3 id="settings-startup">启动与后台</h3>
-            <p className="field-help">
-              关闭窗口后，客户端继续运行。点击托盘图标或重新打开应用可恢复窗口；选择「退出客户端」才会结束运行。
-            </p>
-            <div className="switch-list">
-              <label>
-                <span>
-                  <strong>开机自启客户端</strong>
-                  <small id="client-startup-help">
-                    {app.clientStartup?.message || "正在读取系统设置…"}
-                  </small>
-                </span>
+          <section className="general-settings-group" aria-label="启动设置">
+              <label className="general-setting-row">
+                <span>开机自启</span>
                 <input
                   id="client-startup-input"
                   type="checkbox"
@@ -275,17 +280,17 @@ export function ClientSettings({ model }: { model: AppModel }) {
                   }
                 />
               </label>
-            </div>
-            <p className="form-error" id="client-settings-error" role="alert">
+            {app.clientStartup && !app.clientStartup.supported &&
+              <p className="general-setting-help" id="client-startup-help">{app.clientStartup.message}</p>}
+            {app.clientError && <p className="form-error" id="client-settings-error" role="alert">
               {app.clientError}
-            </p>
+            </p>}
           </section>
 
           <section
-            className="settings-group"
-            aria-labelledby="settings-maintenance"
+            className="settings-group general-settings-actions"
+            aria-label="维护"
           >
-            <h3 id="settings-maintenance">维护</h3>
             <button
               id="open-diagnostics"
               data-settings-route=""

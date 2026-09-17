@@ -143,7 +143,7 @@ input[type=checkbox]{appearance:none;width:30px;height:18px;border-radius:10px;b
 .diagnostic-row strong{color:var(--accent);font-weight:500}.diagnostic-row span{color:var(--secondary)}
 .diagnostic-row[data-status=error] strong{color:#b34b47}
 
-.reading-setting{margin-top:20px;padding-top:18px;border-top:1px solid var(--line)}.reading-setting label{display:flex;justify-content:space-between}.reading-setting input{width:100%;margin:12px 0}.reading-setting button{font-size:12px}.social-body,.reading-text{font-size:var(--reading-size,15px)}
+.social-body,.reading-text{font-size:var(--reading-size,15px)}
 
 #town-view{overflow:auto}.town-content{max-width:1100px;margin:auto;padding:44px 44px 36px}
 .town-advanced-auth{border-top:1px solid var(--line);padding-top:14px;margin-top:18px}.town-advanced-auth summary{cursor:pointer;color:var(--secondary);font-size:12px}.town-advanced-auth .secondary{margin-top:10px}#town-pair-code{letter-spacing:3px}.catalog-detail>.message-feed{margin-top:18px}
@@ -417,6 +417,31 @@ body[data-view=chat].has-topic .scene-ribbon{display:flex!important;min-height:0
 #options-back{color:var(--muted)}
 #client-settings-dialog{width:min(480px,calc(100vw - 32px));max-height:calc(100dvh - 48px);border-radius:20px}
 .settings-group{margin:20px 0}
+.appearance-settings-group{margin:16px 0 8px}
+.appearance-setting-row{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:44px;font-size:13px}
+.theme-options{display:flex;gap:4px;padding:4px;background:var(--surface);border-radius:10px}
+.theme-options button{display:flex;align-items:center;justify-content:center;gap:6px;min-height:32px;padding:6px 12px;border-radius:7px;font-size:12px;color:var(--secondary)}
+.theme-options button[aria-pressed=true]{background:var(--control);color:var(--text);box-shadow:0 1px 4px #00000012}
+.theme-options button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.theme-options svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.4;stroke-linecap:round;stroke-linejoin:round}
+.reading-setting{margin-top:20px;padding-top:20px;border-top:1px solid var(--line)}
+.reading-setting label{display:flex;align-items:center;justify-content:space-between;min-height:28px;font-size:13px}
+.reading-setting output{font-size:12px;font-variant-numeric:tabular-nums;color:var(--secondary)}
+#reading-size{appearance:none;display:block;width:100%;height:24px;margin:12px 0 8px;padding:0;border:0;border-radius:0;background-color:transparent;background-position:center;background-size:100% 4px;background-repeat:no-repeat;cursor:pointer}
+#reading-size::-webkit-slider-runnable-track{height:4px;border-radius:2px}
+#reading-size::-webkit-slider-thumb{appearance:none;width:14px;height:14px;margin-top:-5px;border:2px solid var(--bg);border-radius:50%;background:var(--accent);box-shadow:0 0 0 1px var(--accent)}
+.reading-setting-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:32px}
+.reading-setting-footer p{margin:0;font-size:11px;line-height:1.6;color:var(--muted)}
+.reading-setting-footer button{flex-shrink:0;padding:6px 8px;border-radius:7px;font-size:12px;color:var(--secondary)}
+.general-settings-group{padding:12px 0;border-bottom:1px solid var(--line)}
+.general-setting-row{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:40px;padding:8px 12px;font-size:13px;cursor:pointer}
+.general-setting-help{margin:0 12px 12px;font-size:11px;line-height:1.6;color:var(--muted)}
+.notification-switches{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:0 12px 8px;padding:12px;background:var(--surface);border-radius:10px}
+.notification-switches label{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:12px;white-space:nowrap;cursor:pointer}
+.notification-switches input{flex-shrink:0}
+.notification-switches label:has(input:disabled){color:var(--muted)}
+.general-settings-actions{margin:12px 0 0}
+.general-settings-group>button{margin:4px 12px;font-size:12px}
 .settings-group h3{font-size:11px;font-weight:500;color:var(--muted);margin:0 10px 8px}
 .settings-group>button{display:flex;align-items:center;justify-content:space-between;width:100%;min-height:40px;padding:10px 12px;border-radius:10px;text-align:left;font-size:13px;color:var(--text)}
 .settings-group>button span{color:var(--muted)}
@@ -433,7 +458,7 @@ body[data-view=chat].has-topic .scene-ribbon{display:flex!important;min-height:0
 .settings-tabs button{flex:1;min-height:34px;padding:6px 8px;border-radius:9px;font-size:12px;color:var(--secondary);white-space:nowrap}
 .settings-tabs [aria-selected=true]{background:var(--control);color:var(--text);box-shadow:0 1px 4px #00000008}
 #client-settings-dialog [role=tabpanel]{min-height:270px}
-#client-settings-dialog .settings-group .reading-setting{margin-top:16px}
+#client-settings-dialog #settings-panel-appearance{min-height:0}
 #client-settings-dialog input[type=range]{accent-color:var(--accent)}
 .topbar-actions{grid-column:3;justify-self:end;display:flex;align-items:center;gap:6px;-webkit-app-region:no-drag}
 .local-portal-status{display:flex;align-items:center;gap:7px;min-height:30px;padding:5px 9px;border-radius:999px;color:var(--secondary);font-size:11px;white-space:nowrap}

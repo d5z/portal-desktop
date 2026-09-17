@@ -44,7 +44,7 @@ export class DesktopNotifications {
   get state(): NotificationSettings {
     const supported = this.options.supported();
     return { preferences: { ...this.preferences }, supported, message: this.warning || (supported
-      ? '窗口在后台时提醒，不展示消息正文。需在系统通知设置中允许 Portal Desktop；勿扰模式可能隐藏提醒。'
+      ? '后台提醒，不展示正文。需配对 Town 并允许系统通知。'
       : '当前系统暂不支持桌面通知。') };
   }
   async save(patch: unknown) {
