@@ -47,6 +47,38 @@ async function fixture(platform: 'darwin' | 'win32' = 'darwin') {
   return { root, profile, background, previous, original, settings, connection, binary, bundle, calls, updater };
 }
 for (const platform of ['darwin', 'win32'] as const) {
+  it(`repairs a missing ${platform} engine even when its recorded bundle is current`, async () => {
+    const f = await fixture(platform);
+    await f.background.setService({ ...f.previous, bundleId: f.bundle.id });
+    const name = platform === 'win32' ? 'heart-portal.exe' : 'heart-portal';
+    await rm(path.join(f.previous.root, name));
+    expect((await f.updater().sync(f.binary, f.bundle, f.settings, f.connection)).phase).toBe('updated');
+    expect(await readFile(path.join(f.background.installedService!.root, name), 'utf8')).toBe('new executable');
+    expect(await readFile(f.background.installedService!.configPath!, 'utf8')).toBe(f.original);
+  });
+
+  it(`preserves customized legacy ${platform} configs without ownership metadata`, async () => {
+    const f = await fixture(platform);
+    const old = { ...f.previous };
+    delete old.generatedConfig;
+    await f.background.setService(old);
+    await f.updater().sync(f.binary, f.bundle, { ...f.settings, portalConfigPath: old.configPath }, f.connection);
+    expect(f.background.installedService!.configPath).toBe(old.configPath);
+    expect(f.background.installedService!.generatedConfig).toBe(false);
+    expect(await readFile(old.configPath!, 'utf8')).toBe(f.original);
+  });
+
+  it.each(['missing', 'invalid'])(`rejects a %s ${platform} config before stopping the existing service`, async kind => {
+    const f = await fixture(platform);
+    if (kind === 'missing') await rm(f.previous.configPath!);
+    else await writeFile(f.previous.configPath!, 'workspace = [');
+    await expect(f.updater().sync(f.binary, f.bundle, f.settings, f.connection)).rejects.toThrow();
+    expect(f.calls).toEqual([]);
+    expect(f.background.installedService).toEqual(f.previous);
+    expect(f.background.state.running).toBe(true);
+    await expect(readFile(path.join(f.profile, 'runtime-update.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
   it(`replaces a legacy service with the current client config when ownership metadata is missing (${platform})`, async () => {
     const f = await fixture(platform);
     const legacy = portalConfig(f.settings).replace('screenshot = true', 'screenshot = false');

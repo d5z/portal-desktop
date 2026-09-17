@@ -73,6 +73,14 @@ export function useChatBridge(
         app.openSearch();
         return;
       }
+      if (message.type === "beings:return-settings" && app.settingsRoute === "model") {
+        app.returnToClientSettings();
+        return;
+      }
+      if (message.type === "beings:settings-route-dismissed" && app.settingsRoute === "model") {
+        app.dismissSettingsRoute();
+        return;
+      }
       if (message.type === "beings:open-place" && validPlaceTarget(message)) {
         app.navigate(message.view, message.id);
         return;

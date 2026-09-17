@@ -47,3 +47,13 @@ it('ignores expired drafts, untrusted frames and requests after disposal', () =>
   f.bridge.dispose(); f.send(); expect(f.state.draft).toBe('');
   expect(f.runtime.send).not.toHaveBeenCalled();
 });
+it('sends a Town reply request immediately without replacing the visible draft or attachments', async () => {
+  const f = fixture();
+  f.state.draft = '保留手写草稿';
+  f.state.files = [{ name: 'private.txt', type: 'text/plain', base64: 'cHJpdmF0ZQ==', size: 7 }];
+  f.send({ type: 'beings:town-reply', text: '请回复这条 Town 消息' });
+  expect(f.runtime.send).toHaveBeenCalledWith('请回复这条 Town 消息', []);
+  expect(f.state.draft).toBe('保留手写草稿');
+  expect(f.state.files).toHaveLength(1);
+  f.bridge.dispose();
+});

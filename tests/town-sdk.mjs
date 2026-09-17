@@ -49,6 +49,10 @@ try {
       }
       if (url.pathname === '/api/bonfire/hear') return Response.json({ ok: true, town_id: 't_WillowFull', messages });
       if (url.pathname === '/api/fireside/list') return Response.json({ owned: [{ id: 10, name: '测试围炉' }], joined: [] });
+      if (url.pathname === '/api/fireside/members') return Response.json([
+        { town_id: 't_WillowFull', display_name: '柳树', display: '柳树 (t_Willow)', joined_at: '2026-09-01T12:00:00+08:00' },
+        { town_id: 't_RiverFull', display_name: '河流', display: '河流 (t_River)', joined_at: '2026-09-02T12:00:00+08:00' },
+      ]);
       if (url.pathname === '/api/fireside/hear') return Response.json({ ok: true, messages: [messages[1]] });
       if (url.pathname === '/api/messages') return Response.json({ messages: [{ id: 'dm-1', sender_town_id: 't_RiverFull', sender_display: 'Seam Walker', recipient_town_id: 't_WillowFull', content: '来自伙伴的私信', created_at: base.at, via: 'client:tablet' }] });
       return Response.json({ error: 'fixture only' }, { status: 404 });
@@ -81,6 +85,7 @@ try {
     await window.beings.save({ ...settings, connectionLink: 'http://127.0.0.1:1/willow/?token=local-ui-fixture', workspace: dir, backgroundEnabled: false, autoStart: false });
   }, dir);
   await waitForChatReady(page);
+  const chatInput = page.frameLocator('#chat-frame').locator('#input');
   const home = async () => {
     if (await page.locator('#place-sheet').evaluate(el => el.open)) await page.locator('#back-to-chat').click();
     await page.locator('#options-trigger').click();
@@ -174,13 +179,37 @@ try {
   await open('篝火');
   await page.locator('.social-message').getByText('伙伴代发消息', { exact: true }).waitFor();
   const partner = page.locator('.social-message').filter({ hasText: '伙伴代发消息' });
-  assert.equal(await partner.locator('.via-tag').textContent(), '借 my-phone');
+  assert.equal(await partner.locator('.via-tag').textContent(), '客户端发送');
   assert.equal(await partner.locator('.social-author').textContent(), '服务端展示名');
   for (const body of ['Being 本体消息', '旧消息缺少来源']) assert.equal(await page.locator('.social-message').filter({ hasText: body }).locator('.via-tag').count(), 0);
   assert.equal(await page.locator('.via-tag img').count(), 0);
-  assert((await page.locator('.via-tag').allTextContents()).includes('借 <img src=x onerror=alert(1)>'));
+  assert((await page.locator('.via-tag').allTextContents()).every(text => text === '客户端发送'));
   await page.screenshot({ path: path.join(os.tmpdir(), 'town-sdk-via.png') });
   assert.equal(await page.locator('.social-message').getByRole('button', { name: '回复', exact: true }).count(), 4);
+  assert.equal(await page.locator('.social-message').getByRole('button', { name: '让 Being 回复', exact: true }).count(), 0);
+  assert.equal(await page.locator('#conversation-name').textContent(), '服务端展示名');
+  assert.doesNotMatch(await page.locator('#conversation-name').textContent(), /t_[a-zA-Z0-9_-]+/);
+  await chatInput.fill('保留手写草稿');
+  await partner.getByRole('button', { name: '回复', exact: true }).click();
+  await page.locator('#town-send-content').fill('语气温和一些');
+  assert.equal(await page.locator('#town-send-dialog').getByRole('button', { name: '让 Being 回复', exact: true }).count(), 1);
+  await page.locator('#town-ask-being').click();
+  await page.waitForFunction(() => document.body.dataset.view === 'chat');
+  await app.evaluate(async () => {
+    const deadline = Date.now() + 5000;
+    while (globalThis.sdkPairChats.length < 4) {
+      if (Date.now() >= deadline) throw new Error('Being reply request did not reach the chat fixture');
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+  });
+  const beingReplyRequest = await app.evaluate(() => globalThis.sdkPairChats.at(-1).body.message);
+  assert.match(beingReplyRequest, /位置：篝火/);
+  assert.match(beingReplyRequest, /回复对象：服务端展示名/);
+  assert.match(beingReplyRequest, /伙伴代发消息/);
+  assert.match(beingReplyRequest, /语气温和一些/);
+  assert.equal(await chatInput.inputValue(), '保留手写草稿');
+  await chatInput.fill('');
+  await open('篝火');
   await partner.getByRole('button', { name: '回复', exact: true }).click();
   await page.locator('#town-reply-preview').getByText('服务端展示名：伙伴代发消息', { exact: true }).waitFor();
   await page.locator('#town-send-close').click();
@@ -192,7 +221,6 @@ try {
   assert.deepEqual(await app.evaluate(() => globalThis.sdkWrites), [{ path: '/api/bonfire/speak', body: { message: 'SDK 篝火回复', reply_to: 2 } }]);
   await partner.getByRole('button', { name: '一起看', exact: true }).click();
   await page.locator('#scene-compose').click();
-  const chatInput = page.frameLocator('#chat-frame').locator('#input');
   await page.waitForFunction(() => document.querySelector('#companion-panel').hidden);
   assert.equal(await chatInput.inputValue(), '一起看看篝火里的这段（t_WillowFull）：\n\n> 伙伴代发消息');
   // An existing draft is preserved, and inserting a quote never sends it.
@@ -205,8 +233,26 @@ try {
   await page.locator('#close-companion').click();
   await chatInput.fill('');
   await open('篝火');
+  assert.equal(await page.locator('#town-write').getAttribute('class'), 'primary town-write-button');
   await page.locator('#town-write').click();
   assert((await page.locator('#town-send-context').textContent()).includes('以「柳树」的身份代发'));
+  assert.equal(await page.getByRole('button', { name: '让 Being 发送', exact: true }).isDisabled(), true);
+  await page.locator('#town-send-content').fill('邀请大家分享今天最开心的一件事，语气自然');
+  assert.equal(await page.getByRole('button', { name: '让 Being 发送', exact: true }).isEnabled(), true);
+  await page.getByRole('button', { name: '让 Being 发送', exact: true }).click();
+  await page.waitForFunction(() => document.body.dataset.view === 'chat');
+  await app.evaluate(async () => {
+    const deadline = Date.now() + 5000;
+    while (globalThis.sdkPairChats.length < 5) {
+      if (Date.now() >= deadline) throw new Error('Being send request did not reach the chat fixture');
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+  });
+  const beingSendRequest = await app.evaluate(() => globalThis.sdkPairChats.at(-1).body.message);
+  assert.match(beingSendRequest, /场景位置：篝火/);
+  assert.match(beingSendRequest, /邀请大家分享今天最开心的一件事/);
+  await open('篝火');
+  await page.locator('#town-write').click();
   await page.locator('#town-send-content').fill('SDK 测试消息');
   await page.locator('#town-send-submit').click();
   await page.waitForFunction(() => !document.querySelector('#town-send-dialog').open);
@@ -216,7 +262,7 @@ try {
   ]);
   await open('私信');
   await page.getByText('来自伙伴的私信', { exact: true }).waitFor();
-  assert.equal(await page.locator('.via-tag').textContent(), '借 tablet');
+  assert.equal(await page.locator('.via-tag').textContent(), '客户端发送');
   await page.locator('.social-message').getByRole('button', { name: '一起看', exact: true }).click();
   await page.locator('#scene-compose').click();
   await page.waitForFunction(() => document.querySelector('#companion-panel').hidden);
@@ -244,7 +290,7 @@ try {
   await page.locator('#town-send-close').click();
   await open('围炉');
   await page.locator('.social-message').getByText('伙伴代发消息', { exact: true }).waitFor();
-  assert.equal(await page.locator('.via-tag').textContent(), '借 my-phone');
+  assert.equal(await page.locator('.via-tag').textContent(), '客户端发送');
   await page.locator('.social-message').getByRole('button', { name: '一起看', exact: true }).click();
   await page.locator('#scene-compose').click();
   await page.waitForFunction(() => document.querySelector('#companion-panel').hidden);
@@ -267,7 +313,7 @@ try {
   assert.match(await chatInput.inputValue(), /来自伙伴的私信/);
   assert.equal(await app.evaluate(() => globalThis.sdkWrites.length), 4);
   assert.equal(await app.evaluate(() => globalThis.sdkPairConfirms.length), 1);
-  assert.equal(await app.evaluate(() => globalThis.sdkPairChats.length), 3);
+  assert.equal(await app.evaluate(() => globalThis.sdkPairChats.length), 5);
   await chatInput.fill('');
   // Manual pairing remains available after an automatic connection.
   await home(); await page.locator('#town-auth-button').click();
@@ -277,7 +323,7 @@ try {
   await page.locator('#town-auth-form button[type="submit"]').click();
   await page.waitForFunction(() => !document.querySelector('#town-auth-dialog').open);
   assert.equal(await app.evaluate(() => globalThis.sdkPairConfirms.length), 2);
-  assert.equal(await app.evaluate(() => globalThis.sdkPairChats.length), 3);
+  assert.equal(await app.evaluate(() => globalThis.sdkPairChats.length), 5);
   console.log('PASS: authenticated automatic pairing, stream cancellation, auth-error fallback, preserved chat drafts and manual pairing; explicit private quotations work with canonical Town IDs and imported credentials without re-pairing or sending.');
   console.log('PASS: compact menu, interrupted motion, keyboard/reduced motion, grouped settings, clean quote draft and existing-draft preservation; SDK pairing + SSE hello, server display names, via badges in all three feeds, inert via text, explicit author context, fixture-only send, self-DM blocked before network');
 } catch (error) {

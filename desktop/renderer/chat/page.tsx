@@ -89,7 +89,8 @@ function ChatView({
     compositionEnd = useRef(0);
   const [dragging, setDragging] = useState(false),
     [highlighted, setHighlighted] = useState<string | null>(null),
-    [panel, setPanel] = useState<ChatPanel>(null);
+    [panel, setPanel] = useState<ChatPanel>(null),
+    [panelReturnsToSettings, setPanelReturnsToSettings] = useState(false);
   const [channels, setChannels] = useState<string[]>([]),
     [readingSize, setReadingSize] = useState(16);
   const [theme, setTheme] = useState<"light" | "dark">(() =>
@@ -108,8 +109,10 @@ function ChatView({
   } | null>(null);
   useEffect(() => {
     bridge.start(runtime, {
-      panel: (value) =>
-        setPanel((current) => (current === value ? null : value)),
+      panel: (value, returnToSettings = false) => {
+        setPanel((current) => (current === value ? null : value));
+        setPanelReturnsToSettings(Boolean(value && returnToSettings));
+      },
       theme: setTheme,
       reading: setReadingSize,
       activity: setChannels,
@@ -124,6 +127,24 @@ function ChatView({
   useEffect(() => {
     bridge.send({ type: "beings:history-scope-state", scope: state.historyScope });
   }, [bridge, state.historyScope]);
+  useEffect(() => {
+    const shortcut = (event: KeyboardEvent) => {
+      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
+      if (event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        event.stopPropagation();
+        bridge.send({ type: "beings:chat-search" });
+      } else if (event.key === ",") {
+        event.preventDefault();
+        event.stopPropagation();
+        bridge.send({ type: "beings:open-settings" });
+      }
+    };
+    // The chat is an iframe. Capture here so its inputs and panels cannot
+    // swallow desktop-level shortcuts before they reach the React root.
+    document.addEventListener("keydown", shortcut, true);
+    return () => document.removeEventListener("keydown", shortcut, true);
+  }, [bridge]);
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
@@ -220,6 +241,9 @@ function ChatView({
   );
   const close = () => {
     setPanel(null);
+    if (panelReturnsToSettings)
+      bridge.send({ type: "beings:settings-route-dismissed" });
+    setPanelReturnsToSettings(false);
     composer.current?.focus();
   };
   const formatSize = (bytes: number) =>
@@ -236,20 +260,9 @@ function ChatView({
           "--reading-size": `${readingSize}px`,
           "--app-height": `${viewport.height}px`,
           "--app-offset": `${viewport.offset}px`,
-        } as CSSProperties
+      } as CSSProperties
       }
       onKeyDown={(event) => {
-        if ((event.metaKey || event.ctrlKey) && event.key === ",") {
-          event.preventDefault();
-          bridge.send({ type: "beings:open-settings" });
-        }
-        if (
-          (event.metaKey || event.ctrlKey) &&
-          event.key.toLowerCase() === "f"
-        ) {
-          event.preventDefault();
-          bridge.send({ type: "beings:chat-search" });
-        }
         if (event.key === "Escape") {
           setSelection(null);
           if (panel) close();
@@ -557,6 +570,7 @@ function ChatView({
         runtime={runtime}
         open={panel === "model"}
         close={close}
+        back={panelReturnsToSettings ? () => bridge.send({ type: "beings:return-settings" }) : undefined}
       />
       <ChatInfoPanels state={state} panel={panel} close={close} />
       <EditContextMenu edit={bridge.edit} onOpenChange={setContextMenuOpen} />

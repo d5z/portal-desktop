@@ -30,9 +30,11 @@ export function townRoute(query: TownQuery, beingId = ''): { route: string; priv
     }
     case 'bonfire': return { route: '/api/bonfire/hear?limit=100', private: true };
     case 'firesides': return { route: '/api/fireside/list', private: true };
-    case 'fireside': {
+    case 'fireside': case 'fireside-members': {
       if (typeof query.id !== 'string' || !/^\d{1,16}$/.test(query.id)) throw new Error('无效的围炉编号。');
-      return { route: `/api/fireside/hear?fireside_id=${query.id}&limit=50`, private: true };
+      return { route: query.kind === 'fireside'
+        ? `/api/fireside/hear?fireside_id=${query.id}&limit=50`
+        : `/api/fireside/members?fireside_id=${query.id}`, private: true };
     }
     case 'inbox': return { route: '/api/messages?with=received', private: true };
     case 'sent': return { route: '/api/messages?with=sent', private: true };
@@ -107,7 +109,7 @@ export class TownClient {
     if (data.town_id !== undefined && (!validTownIdentity(data.town_id) || !data.town_id.startsWith('t_'))) throw new Error('配对返回的 Town ID 无效。');
     // The server resolves a unique, case-sensitive Town ID prefix. Store its full ID.
     if (townIdInput ? typeof data.town_id !== 'string' || !data.town_id.startsWith(beingId) : data.being_id !== undefined && data.being_id !== beingId) throw new Error('配对返回的 Being 身份不匹配。');
-    const display = normalizeTownDisplay(data.display);
+    const display = normalizeTownDisplay(data.display_name || data.speaker_name || data.display);
     return { token: data.token, beingId: typeof data.town_id === 'string' ? data.town_id : beingId, ...(display ? { display } : {}) };
   }
   async send(input: TownPost): Promise<TownResult> {
@@ -158,13 +160,15 @@ export class TownClient {
       if (!response.ok) {
         return await townError(response, token);
       }
-      const data = await readTownJson(response);
+      const data = query.kind === 'fireside-members'
+        ? await readTownMembersJson(response)
+        : await readTownJson(response);
       return { ok: true, data, fetchedAt: new Date().toISOString() };
     } catch { return { ok: false, code: 'network', message: '未能读取 Town。请检查网络后重试；服务器需返回有效的 JSON。' }; }
   }
 }
 
-async function readTownJson(response: Response): Promise<Record<string, unknown>> {
+async function readTownJsonValue(response: Response): Promise<unknown> {
   if (!response.headers.get('content-type')?.includes('application/json')) { await response.body?.cancel(); throw new Error('format'); }
   const reader = response.body?.getReader();
   if (!reader) throw new Error('empty');
@@ -175,9 +179,23 @@ async function readTownJson(response: Response): Promise<Record<string, unknown>
     if (bytes > 4 * 1024 * 1024) { await reader.cancel(); throw new Error('size'); }
     chunks.push(value);
   }
-  const data: unknown = JSON.parse(Buffer.concat(chunks).toString('utf8'));
+  return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
+}
+
+async function readTownJson(response: Response): Promise<Record<string, unknown>> {
+  const data = await readTownJsonValue(response);
   if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('format');
   return data as Record<string, unknown>;
+}
+
+async function readTownMembersJson(response: Response): Promise<Record<string, unknown>> {
+  const data = await readTownJsonValue(response);
+  if (Array.isArray(data)) return { members: data };
+  if (data && typeof data === 'object') {
+    const object = data as Record<string, unknown>;
+    if (Array.isArray(object.members)) return object;
+  }
+  throw new Error('format');
 }
 
 const townObject = (value: unknown): Record<string, unknown> =>

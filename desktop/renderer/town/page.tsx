@@ -1,5 +1,15 @@
-import { useLayoutEffect, useRef } from "react";
-import { TownModel, definitions, list, str } from "./models/town";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  TownModel,
+  date,
+  definitions,
+  firesideMemberCount,
+  firesideMemberDetails,
+  firesideMembers,
+  list,
+  str,
+  type Data,
+} from "./models/town";
 import { useModel } from "../shared/hooks/use-model";
 import {
   TownHome,
@@ -96,7 +106,8 @@ export function Town({ model }: { model: TownModel }) {
           <div className="town-header-actions">
             <button
               id="town-write"
-              className="secondary"
+              className="primary town-write-button"
+              aria-label={town.view === "mail" ? "写私信" : "写一句"}
               hidden={!channel}
               disabled={
                 town.live?.phase !== "connected" ||
@@ -105,6 +116,7 @@ export function Town({ model }: { model: TownModel }) {
               }
               onClick={() => town.compose()}
             >
+              <span aria-hidden="true">＋</span>
               {town.view === "mail" ? "写私信" : "写一句"}
             </button>
             <button
@@ -120,7 +132,7 @@ export function Town({ model }: { model: TownModel }) {
               className="icon-button"
               title="刷新内容"
               aria-label="刷新内容"
-              onClick={() => void town.load()}
+              onClick={() => void town.load(true)}
             >
               ↻
             </button>
@@ -149,7 +161,7 @@ export function Town({ model }: { model: TownModel }) {
             id="town-updates"
             className="text-button"
             hidden={!channel || !town.unread(channel)}
-            onClick={() => void town.load()}
+            onClick={() => void town.load(true)}
           >
             有新内容 · 更新
           </button>
@@ -162,7 +174,15 @@ export function Town({ model }: { model: TownModel }) {
         >
           {town.status}
         </div>
-        <div id="town-body" aria-busy={town.loading ? true : undefined}>
+        <div
+          id="town-body"
+          className={
+            town.view === "firesides" && !town.directId
+              ? "fireside-body"
+              : undefined
+          }
+          aria-busy={town.loading ? true : undefined}
+        >
           {definition && <TownBody town={town} />}
         </div>
         <div id="town-pagination" className="pagination">
@@ -198,7 +218,8 @@ function TownBody({ town }: { town: TownModel }) {
         )}
       </div>
     );
-  if (town.loading) return <div className="loading-block">正在读取…</div>;
+  if (town.loading && !town.data && !town.ringData)
+    return <div className="loading-block">正在读取…</div>;
   if (town.directId)
     return town.view === "firesides" ? (
       <div className="direct-reading">
@@ -234,7 +255,7 @@ function Firesides({ town }: { town: TownModel }) {
       </div>
     );
   const visible = entries.filter((entry) =>
-    `${str(entry.name, `围炉 #${str(entry.id)}`)} ${str(entry.description)}`
+    `${str(entry.name, `围炉 #${str(entry.id)}`)} ${str(entry.description)} ${firesideMembers(entry).join(" ")}`
       .toLowerCase()
       .includes(query),
   );
@@ -257,18 +278,31 @@ function Firesides({ town }: { town: TownModel }) {
             .sort((a, b) => str(a.name).localeCompare(str(b.name), "zh-CN"))
             .map((entry) => {
               const id = str(entry.id),
-                title = str(entry.name, `围炉 #${id}`);
+                title = str(entry.name, `围炉 #${id}`),
+                loadedMembers = town.ringMembers?.id === id
+                  ? town.ringMembers.members
+                  : undefined,
+                memberCount = Math.max(
+                  firesideMemberCount(entry),
+                  loadedMembers?.length || 0,
+                ),
+                unread = town.firesideUnread(id);
               return (
                 <button
-                  className={`fireside-room${id === town.selectedRing ? " selected" : ""}`}
+                  className={`fireside-room${id === town.selectedRing ? " selected" : ""}${unread ? " unread" : ""}`}
                   data-id={id}
+                  data-unread={unread || undefined}
                   key={id}
                   hidden={!visible.includes(entry)}
                   aria-pressed={id === town.selectedRing}
+                  aria-label={`${title}${unread ? "，有新消息" : ""}`}
                   onClick={() => void town.loadFireside(id, title)}
                 >
-                  <strong>{title}</strong>
-                  <span>{`${owned.has(id) ? "我创建的" : "已加入"}${entry.member_count !== undefined ? " · " + str(entry.member_count) + " 位成员" : ""}`}</span>
+                  <strong>
+                    <span className="fireside-unread-dot" aria-hidden="true" />
+                    <span className="fireside-room-title">{title}</span>
+                  </strong>
+                  <span>{`${owned.has(id) ? "我创建的" : "已加入"}${memberCount ? ` · ${memberCount} 位成员` : ""}`}</span>
                 </button>
               );
             })}
@@ -277,35 +311,72 @@ function Firesides({ town }: { town: TownModel }) {
           没有匹配的围炉
         </p>
       </aside>
-      <section className="fireside-thread" aria-label="围炉消息">
-        <FiresideThread town={town} />
+      <section
+        className="fireside-thread"
+        aria-label="围炉消息"
+        aria-busy={town.detailLoading || undefined}
+      >
+        <FiresideThread
+          town={town}
+          room={entries.find((entry) => str(entry.id) === town.selectedRing)}
+        />
       </section>
     </div>
   );
 }
-function FiresideThread({ town }: { town: TownModel }) {
-  if (town.detailLoading)
-    return <p className="empty-inline">正在读取围炉消息…</p>;
-  if (town.detailError) return <DetailError town={town} />;
-  const data = town.ringData?.data;
-  if (!data) return null;
+function FiresideThread({ town, room }: { town: TownModel; room?: Data }) {
+  const activeId = town.directId || town.selectedRing,
+    data = town.ringData?.id === activeId ? town.ringData.data : undefined,
+    loadedMembers = town.ringMembers?.id === activeId
+      ? town.ringMembers.members
+      : undefined,
+    memberSource = loadedMembers
+      ? { ...(room || data || {}), members: loadedMembers }
+      : room || data || {},
+    memberDetails = firesideMemberDetails(memberSource),
+    members = memberDetails.map((member) => member.name),
+    memberCount = Math.max(
+      firesideMemberCount(room || data || {}),
+      memberDetails.length,
+    ),
+    ownerId = str(room?.owner_town_id),
+    memberLoading = town.detailLoading && !loadedMembers;
+  const heading = (
+    <div className="fireside-thread-heading">
+      <div>
+        <h2>{town.ringTitle}</h2>
+        <FiresideMembers
+          key={activeId}
+          count={memberCount}
+          loading={memberLoading}
+          names={members}
+          members={memberDetails}
+          ownerId={ownerId}
+          currentId={town.me}
+          error={town.memberError}
+          retry={() => void town.loadFireside(activeId, town.ringTitle, true)}
+        />
+      </div>
+    </div>
+  );
+  if (town.detailLoading && !data)
+    return (
+      <>
+        {heading}
+        <div className="feed-controls fireside-loading-controls" role="status">
+          正在切换围炉…
+        </div>
+        <div className="feed-summary fireside-loading-summary" aria-hidden="true">
+          &nbsp;
+        </div>
+      </>
+    );
+  if (town.detailError)
+    return <>{heading}<DetailError town={town} /></>;
+  if (!data) return heading;
   return (
     <>
-      <div className="fireside-thread-heading">
-        <h2>{town.ringTitle}</h2>
-        <button
-          className="secondary"
-          onClick={() =>
-            void town.loadFireside(
-              town.directId || town.selectedRing,
-              town.ringTitle,
-              true,
-            )
-          }
-        >
-          刷新消息
-        </button>
-      </div>
+      {heading}
       <TownFeed
         key={`${town.ringData?.id}:${town.live?.generation}`}
         town={town}
@@ -313,5 +384,135 @@ function FiresideThread({ town }: { town: TownModel }) {
         filterKey="firesides"
       />
     </>
+  );
+}
+function FiresideMembers({
+  count,
+  loading,
+  names,
+  members,
+  ownerId,
+  currentId,
+  error,
+  retry,
+}: {
+  count: number;
+  loading: boolean;
+  names: string[];
+  members: ReturnType<typeof firesideMemberDetails>;
+  ownerId: string;
+  currentId: string;
+  error: string;
+  retry: () => void;
+}) {
+  const [open, setOpen] = useState(false),
+    root = useRef<HTMLDivElement>(null),
+    trigger = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const dismiss = (event: PointerEvent) => {
+        if (!root.current?.contains(event.target as Node)) setOpen(false);
+      },
+      dismissKey = (event: KeyboardEvent) => {
+        if (event.key !== "Escape") return;
+        event.preventDefault();
+        event.stopPropagation();
+        setOpen(false);
+        requestAnimationFrame(() => trigger.current?.focus());
+      },
+      dismissWindow = () => setOpen(false);
+    document.addEventListener("pointerdown", dismiss, true);
+    document.addEventListener("keydown", dismissKey, true);
+    window.addEventListener("blur", dismissWindow);
+    return () => {
+      document.removeEventListener("pointerdown", dismiss, true);
+      document.removeEventListener("keydown", dismissKey, true);
+      window.removeEventListener("blur", dismissWindow);
+    };
+  }, [open]);
+  return (
+    <div
+      ref={root}
+      className={`fireside-members${open ? " open" : ""}`}
+      onBlur={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+          setOpen(false);
+      }}
+    >
+      <button
+        ref={trigger}
+        type="button"
+        className="fireside-members-trigger"
+        aria-expanded={open}
+        aria-haspopup="dialog"
+        title={names.join("、")}
+        onClick={() => setOpen((value) => !value)}
+      >
+        <svg viewBox="0 0 20 20" aria-hidden="true">
+          <circle cx="7" cy="7" r="2.5" />
+          <circle cx="13.5" cy="8" r="2" />
+          <path d="M2.8 15c.5-2.6 2-3.9 4.3-3.9s3.9 1.3 4.4 3.9M11.4 12c.7-.7 1.5-1 2.5-1 1.8 0 2.9 1 3.3 3" />
+        </svg>
+        <span>{count > 0 ? `${count} 位成员` : "成员"}</span>
+        {loading && <span className="fireside-members-loading" aria-label="正在读取" />}
+        <svg className="fireside-members-chevron" viewBox="0 0 12 12" aria-hidden="true">
+          <path d="m3 4.5 3 3 3-3" />
+        </svg>
+      </button>
+      {open && (
+        <div
+          className="fireside-member-panel"
+          role="dialog"
+          aria-label="围炉成员名单"
+          tabIndex={-1}
+          onPointerDown={(event) => event.currentTarget.focus({ preventScroll: true })}
+        >
+          <div className="fireside-member-panel-heading">
+            <strong>成员名单</strong>
+            <span>{count > 0 ? `${count} 位` : ""}</span>
+          </div>
+          {error && (
+            <div className="fireside-member-error" role="status">
+              <span>{error}</span>
+              <button type="button" className="text-button" onClick={retry}>
+                重试
+              </button>
+            </div>
+          )}
+          {loading && !members.length && (
+            <p className="empty-inline">正在读取成员名单…</p>
+          )}
+          {!loading && !error && !members.length && (
+            <p className="empty-inline">暂无成员信息</p>
+          )}
+          <div className="fireside-member-list" role="list">
+            {members.map((member) => (
+              <div
+                className="fireside-member"
+                role="listitem"
+                key={member.townId || member.name}
+              >
+                <div>
+                  <strong>{member.name}</strong>
+                  <span>
+                    {member.townId ||
+                      (member.display !== member.name ? member.display : "")}
+                  </span>
+                </div>
+                <div className="fireside-member-meta">
+                  {member.townId === ownerId && <span>炉主</span>}
+                  {member.townId === currentId && <span>当前 Being</span>}
+                  {member.joinedAt && (
+                    <time dateTime={member.joinedAt}>
+                      加入 {date(member.joinedAt)}
+                    </time>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
   );
 }

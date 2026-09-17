@@ -1,15 +1,27 @@
 import type { TownModel } from "../models/town";
 import { useModel } from "../../shared/hooks/use-model";
 import { Dialog } from "../../shared/components/dialog";
+import { NavigationControls } from "../../shared/components/navigation-controls";
 import { townPairPrompt } from '../../../shared/town-pairing';
-export function TownAuth({ model }: { model: TownModel }) {
+export function TownAuth({ model, returnToSettings = false, onReturnToSettings = () => {}, onDismissSettingsRoute = () => {} }: {
+  model: TownModel;
+  returnToSettings?: boolean;
+  onReturnToSettings?: () => void;
+  onDismissSettingsRoute?: () => void;
+}) {
   const town = useModel(model);
+  const close = async (back: boolean) => {
+    await town.closeAuth();
+    if (town.authOpen) return;
+    if (back) onReturnToSettings();
+    else onDismissSettingsRoute();
+  };
 
   return (
     <Dialog
       open={town.authOpen}
       busy={town.authBusy && !town.autoPairId}
-      onClose={() => town.closeAuth()}
+      onClose={() => void close(false)}
       id="town-auth-dialog"
     >
       <form
@@ -21,8 +33,9 @@ export function TownAuth({ model }: { model: TownModel }) {
         }}
       >
         <div className="dialog-heading">
-          <div>
+          <div className="dialog-heading-main">
             <h2>连接 Beings Town</h2>
+            <NavigationControls back={returnToSettings && (!town.authBusy || Boolean(town.autoPairId)) ? () => void close(true) : undefined} />
           </div>
           <button
             type="button"
@@ -30,7 +43,7 @@ export function TownAuth({ model }: { model: TownModel }) {
             className="close"
             aria-label="关闭 Town 连接"
             disabled={town.authBusy && !town.autoPairId}
-            onClick={() => town.closeAuth()}
+            onClick={() => void close(false)}
           ></button>
         </div>
         <div className="dialog-body">

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChatRuntime, ChatState, Preset } from "../models/chat";
 import { useModel } from "../../shared/hooks/use-model";
+import { NavigationControls } from "../../shared/components/navigation-controls";
 
 const baseUrls: Record<string, string> = {
   anthropic: "https://api.anthropic.com",
@@ -42,11 +43,13 @@ export function ChatSettings({
   runtime,
   open,
   close,
+  back,
 }: {
   state: ChatState;
   runtime: ChatRuntime;
   open: boolean;
   close: () => void;
+  back?: () => void;
 }) {
   useModel(state);
   const [draft, setDraft] = useState<ModelDraft | null>(null);
@@ -183,8 +186,11 @@ export function ChatSettings({
       }}
     >
       <div className="settings-header panel-header">
-        <div>
-          <h2 id="settings-title">模型设置</h2>
+        <div className="settings-heading-copy">
+          <div className="settings-title-line">
+            <h2 id="settings-title">模型设置</h2>
+            <NavigationControls back={back} />
+          </div>
           <p>选择当前 Being 使用的模型</p>
         </div>
         <button
@@ -417,11 +423,18 @@ export function ChatSettings({
         </div>
 
         {draft && (
-          <form
+          <div
             id="llm-step2"
-            onSubmit={(event) => {
-              event.preventDefault();
-              void apply();
+            aria-labelledby="step2-title"
+            onKeyDown={(event) => {
+              if (
+                event.key === "Enter" &&
+                event.target instanceof HTMLInputElement &&
+                !event.nativeEvent.isComposing
+              ) {
+                event.preventDefault();
+                void apply();
+              }
             }}
           >
             <button
@@ -565,13 +578,14 @@ export function ChatSettings({
             )}
             <button
               id="s2-apply"
-              type="submit"
+              type="button"
               className="btn-apply"
               disabled={disabled}
+              onClick={() => void apply()}
             >
               {busy ? "正在应用…" : "保存并使用"}
             </button>
-          </form>
+          </div>
         )}
         {state.configStatus && !draft && (
           <div

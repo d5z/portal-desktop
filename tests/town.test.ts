@@ -8,6 +8,7 @@ import type { TownQuery } from '../desktop/shared/types';
 describe('Town reads', () => {
   it('routes only fixed resources with constrained identifiers and pagination', () => {
     expect(townRoute({ kind: 'sent' }).route).toBe('/api/messages?with=sent');
+    expect(townRoute({ kind: 'fireside-members', id: '10' }).route).toBe('/api/fireside/members?fireside_id=10');
     expect(townRoute({ kind: 'scrolls', offset: 24 }).route).toContain('visibility=public&limit=24&offset=24');
     for (const query of [{ kind: 'kit', id: '../messages' }, { kind: 'kit', id: 'x?token=secret' }, { kind: 'grove', offset: -1 }, { kind: 'exec' }]) expect(() => townRoute(query as TownQuery)).toThrow();
   });
@@ -17,6 +18,13 @@ describe('Town reads', () => {
     await client.query({ kind: 'home' }); await client.query({ kind: 'inbox' });
     expect(fetcher.mock.calls[0]).toEqual(['https://beings.town/api', expect.objectContaining({ headers: { Accept: 'application/json' }, credentials: 'omit', redirect: 'error', method: 'GET' })]);
     expect(fetcher.mock.calls[1]).toEqual(['https://beings.town/api/messages?with=received', expect.objectContaining({ headers: { Accept: 'application/json', Authorization: 'Bearer town-credential' } })]);
+  });
+  it('normalizes the fireside members array while keeping the route authenticated', async () => {
+    const members = [{ town_id: 't_Willow', display_name: '柳树', joined_at: '2026-09-01T12:00:00+08:00' }];
+    const fetcher = vi.fn(async () => Response.json(members));
+    const client = new TownClient(() => 'town-credential', fetcher as typeof fetch);
+    expect(await client.query({ kind: 'fireside-members', id: '10' })).toMatchObject({ ok: true, data: { members } });
+    expect(fetcher).toHaveBeenCalledWith('https://beings.town/api/fireside/members?fireside_id=10', expect.objectContaining({ headers: { Accept: 'application/json', Authorization: 'Bearer town-credential' } }));
   });
   it('distinguishes authorization failure, offline, invalid HTML and upstream error', async () => {
     const fetcher = vi.fn().mockResolvedValueOnce(new Response('secret error text', { status: 401 })).mockRejectedValueOnce(new Error('URL with secret')).mockResolvedValueOnce(new Response('<html>loom</html>', { headers: { 'content-type': 'text/html' } })).mockResolvedValueOnce(new Response('', { status: 503 }));

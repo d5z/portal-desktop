@@ -11,6 +11,8 @@ import { WorkspaceModel } from "./workspace";
 import { TownModel } from "../../town/models/town";
 import type { HistoryScope } from "../../chat/models/scenes";
 
+type SettingsRoute = "" | "connection" | "town" | "model" | "portal" | "diagnostics";
+
 export class AppModel extends Store {
   snapshot?: Snapshot;
   theme: "light" | "dark" = "light";
@@ -26,6 +28,8 @@ export class AppModel extends Store {
   toastMessage = "";
   settingsOpen = false;
   clientSettingsOpen = false;
+  settingsRoute: SettingsRoute = "";
+  settingsForwardRoute: SettingsRoute = "";
   diagnosticsOpen = false;
   searchOpen = false;
   search = "";
@@ -68,6 +72,8 @@ export class AppModel extends Store {
         this.workspace.toggle(true);
       },
       (data) => this.post(data),
+      () => this.changed(),
+      () => Boolean(this.chatSource && !this.chatLoading),
     );
   }
   start() {
@@ -265,9 +271,88 @@ export class AppModel extends Store {
   }
   chatAction(action: string) {
     this.clientSettingsOpen = false;
+    this.settingsRoute = "";
+    this.settingsForwardRoute = "";
     this.navigate("chat");
     this.post({ type: "beings:chat-action", action });
   }
+  private beginSettingsRoute(route: SettingsRoute) {
+    this.settingsRoute = route;
+    this.settingsForwardRoute = "";
+    this.clientSettingsOpen = false;
+    this.changed();
+  }
+  openConnectionSettings() {
+    this.beginSettingsRoute("connection");
+    this.showSettings(true);
+  }
+  openTownSettings() {
+    this.beginSettingsRoute("town");
+    void this.town.auth();
+  }
+  openModelSettings() {
+    this.beginSettingsRoute("model");
+    this.navigate("chat");
+    this.post({ type: "beings:chat-action", action: "model", returnToSettings: true });
+  }
+  openPortalSettings() {
+    this.beginSettingsRoute("portal");
+    this.navigate("portal");
+  }
+  openDiagnostics() {
+    this.beginSettingsRoute("diagnostics");
+    this.diagnosticsOpen = true;
+    this.changed();
+  }
+  dismissSettingsRoute = () => {
+    this.settingsRoute = "";
+    this.settingsForwardRoute = "";
+    this.changed();
+  };
+  returnToClientSettings = () => {
+    const route = this.settingsRoute;
+    if (!route) return;
+    this.settingsRoute = "";
+    this.settingsForwardRoute = route;
+    if (this.settingsOpen) {
+      this.settingsOpen = false;
+      ++this.defaultsRevision;
+      clearTimeout(this.defaultsTimer);
+      if (this.form) this.form.connectionLink = "";
+    }
+    this.diagnosticsOpen = false;
+    if (route === "model")
+      this.post({ type: "beings:chat-action", action: "close" });
+    if (this.view !== "chat") this.navigate("chat");
+    void this.openClientSettings(true);
+  };
+  forwardSettingsRoute = () => {
+    const route = this.settingsForwardRoute;
+    if (!route) return;
+    if (route === "connection") this.openConnectionSettings();
+    else if (route === "town") this.openTownSettings();
+    else if (route === "model") this.openModelSettings();
+    else if (route === "portal") this.openPortalSettings();
+    else if (route === "diagnostics") this.openDiagnostics();
+  };
+  closeClientSettings = () => {
+    this.clientSettingsOpen = false;
+    this.settingsRoute = "";
+    this.settingsForwardRoute = "";
+    this.changed();
+  };
+  closePlace = () => {
+    this.settingsRoute = "";
+    this.settingsForwardRoute = "";
+    this.navigate("chat");
+  };
+  returnFromPlace = () => {
+    if (this.settingsRoute === "portal") this.returnToClientSettings();
+    else this.town.returnToSource();
+  };
+  forwardFromPlace = () => {
+    this.town.forwardToDestination();
+  };
   async sharePortalLogs() {
     if (this.logsLoading) return;
     if (!this.snapshot?.settings.hasToken || !this.chatSource) {
@@ -319,7 +404,9 @@ export class AppModel extends Store {
       this.changed();
     }
   }
-  async openClientSettings() {
+  async openClientSettings(preserveHistory = false) {
+    this.settingsRoute = "";
+    if (!preserveHistory) this.settingsForwardRoute = "";
     this.clientSettingsOpen = true;
     this.clientError = "";
     this.startupBusy = true;
@@ -353,8 +440,12 @@ export class AppModel extends Store {
       this.changed();
     }
   }
-  showSettings() {
+  showSettings(fromClientSettings = false) {
     if (!this.snapshot) return;
+    if (!fromClientSettings) {
+      this.settingsRoute = "";
+      this.settingsForwardRoute = "";
+    }
     this.clientSettingsOpen = false;
     this.settingsOpen = true;
     const s = this.snapshot.settings;
@@ -378,6 +469,8 @@ export class AppModel extends Store {
   }
   closeSettings() {
     this.settingsOpen = false;
+    this.settingsRoute = "";
+    this.settingsForwardRoute = "";
     ++this.defaultsRevision;
     clearTimeout(this.defaultsTimer);
     if (this.form) this.form.connectionLink = "";

@@ -1,6 +1,11 @@
 import { describe, expect, it, vi, afterEach } from "vitest";
 import { AppModel } from "../desktop/renderer/app/models/app";
-import { TownModel } from "../desktop/renderer/town/models/town";
+import {
+  TownModel,
+  firesideMemberCount,
+  firesideMemberDetails,
+  firesideMembers,
+} from "../desktop/renderer/town/models/town";
 import { WorkspaceModel } from "../desktop/renderer/app/models/workspace";
 import { SceneStore } from "../desktop/renderer/shared/models/scene";
 import {
@@ -95,6 +100,52 @@ const settle = async () => {
 };
 afterEach(() => vi.useRealTimers());
 describe("React desktop state lifecycle", () => {
+  it("sends a selected Town message straight to the Being chat for reply drafting", () => {
+    const post = vi.fn(), navigate = vi.fn(), scenes = new SceneStore();
+    scenes.configure("willow", "https://fixture.test/willow");
+    const model = new TownModel(api().value, vi.fn(), navigate, scenes, vi.fn(), post, vi.fn(), () => true);
+    model.view = "bonfire";
+    model.live = live();
+    model.compose({
+      id: 7,
+      author: "河流",
+      preview: "你怎么看？",
+      content: "你怎么看？",
+      context: "柳树：前一条消息",
+    });
+    model.content = "语气温和一些";
+    model.askBeing();
+    expect(navigate).toHaveBeenCalledWith("chat");
+    const request = post.mock.calls[0][0];
+    expect(request).toMatchObject({ type: "beings:town-reply" });
+    expect(request.text).toContain("请帮我拟一段回复，直接发送，并将回复正文发给我。");
+    expect(request.text).toContain("位置：篝火");
+    expect(request.text).toContain("回复对象：河流");
+    expect(request.text).toContain("> 柳树：前一条消息");
+    expect(request.text).toContain("> 你怎么看？");
+    expect(request.text).toContain("> 语气温和一些");
+    expect(model.sendOpen).toBe(false);
+  });
+  it("asks the Being to write and send a new Town post from the user's description and place", () => {
+    const post = vi.fn(), navigate = vi.fn(), scenes = new SceneStore();
+    scenes.configure("willow", "https://fixture.test/willow");
+    const model = new TownModel(api().value, vi.fn(), navigate, scenes, vi.fn(), post, vi.fn(), () => true);
+    model.view = "firesides";
+    model.selectedRing = "10";
+    model.ringTitle = "产品讨论";
+    model.live = live();
+    model.compose();
+    model.content = "提醒大家周五前提交反馈，语气轻松一些";
+    expect(model.canAskBeingSend).toBe(true);
+    model.askBeing();
+    expect(navigate).toHaveBeenCalledWith("chat");
+    const request = post.mock.calls[0][0];
+    expect(request).toMatchObject({ type: "beings:town-reply" });
+    expect(request.text).toContain("请根据我的描述和场景位置，帮我写一句适合发布的内容，直接发送");
+    expect(request.text).toContain("场景位置：围炉「产品讨论」");
+    expect(request.text).toContain("> 提醒大家周五前提交反馈，语气轻松一些");
+    expect(model.sendOpen).toBe(false);
+  });
   it("passes the proxy's exact scene identity to the chat without changing the cache identity", () => {
     const app = new AppModel(api().value);
     const snapshot = state();
@@ -291,6 +342,46 @@ describe("React desktop state lifecycle", () => {
     await settle();
     expect(app.form?.connectionLink).toBe("");
     expect(app.form?.portalName).toBe("portal");
+  });
+  it("returns from every settings destination to the settings hub", async () => {
+    const fixture = api({ clientStartup: vi.fn(async () => ({ supported: true, enabled: false, message: "关闭" })) });
+    const app = new AppModel(fixture.value), post = vi.fn();
+    app.post = post;
+    app.applySnapshot(state());
+
+    await app.openClientSettings();
+    app.openConnectionSettings();
+    expect(app.settingsRoute).toBe("connection");
+    expect(app.settingsOpen).toBe(true);
+    app.returnToClientSettings();
+    expect(app.clientSettingsOpen).toBe(true);
+    expect(app.settingsOpen).toBe(false);
+    expect(app.settingsForwardRoute).toBe("connection");
+    app.forwardSettingsRoute();
+    expect(app.settingsOpen).toBe(true);
+    app.returnToClientSettings();
+
+    app.openModelSettings();
+    expect(post).toHaveBeenLastCalledWith({ type: "beings:chat-action", action: "model", returnToSettings: true });
+    app.returnToClientSettings();
+    expect(post).toHaveBeenLastCalledWith({ type: "beings:chat-action", action: "close" });
+    expect(app.clientSettingsOpen).toBe(true);
+
+    app.openPortalSettings();
+    expect(app.view).toBe("portal");
+    app.returnFromPlace();
+    expect(app.view).toBe("chat");
+    expect(app.clientSettingsOpen).toBe(true);
+    expect(app.settingsForwardRoute).toBe("portal");
+
+    app.openDiagnostics();
+    expect(app.diagnosticsOpen).toBe(true);
+    app.returnToClientSettings();
+    expect(app.diagnosticsOpen).toBe(false);
+    expect(app.clientSettingsOpen).toBe(true);
+    expect(app.settingsForwardRoute).toBe("diagnostics");
+    app.closeClientSettings();
+    expect(app.settingsForwardRoute).toBe("");
   });
 });
 describe("Town request and identity isolation", () => {
@@ -529,6 +620,84 @@ describe("Town request and identity isolation", () => {
     expect(model.data).toEqual({ scrolls: [{ id: "story" }] });
     expect(model.error).toBeUndefined();
     expect(model.status).toContain("仍可阅读");
+  });
+  it("tracks and acknowledges new fireside messages per room", async () => {
+    const townApi = vi.fn(async () => result({ messages: [] }));
+    const { model } = town({ town: townApi });
+    model.live = {
+      ...live(),
+      versions: { bonfire: 0, mail: 0, firesides: 2 },
+      firesideVersions: { "10": 1, "11": 1 },
+    };
+    expect(model.firesideUnread("10")).toBe(true);
+    expect(model.firesideUnread("11")).toBe(true);
+    await model.loadFireside("10", "十号炉");
+    expect(model.firesideUnread("10")).toBe(false);
+    expect(model.firesideUnread("11")).toBe(true);
+    expect(model.unread("firesides")).toBe(true);
+  });
+  it("keeps the fireside list and current thread mounted during refresh", async () => {
+    const listRefresh = deferred<TownResult>();
+    const roomRefresh = deferred<TownResult>();
+    const townApi = vi.fn((query: import("../desktop/shared/types").TownQuery) =>
+      query.kind === "firesides" ? listRefresh.promise : roomRefresh.promise,
+    );
+    const { model } = town({ town: townApi });
+    const rooms = { owned: [{ id: 10, name: "十号炉" }], joined: [] };
+    const thread = { messages: [{ seq: 1, message: "现有消息" }] };
+    model.live = live();
+    model.view = "firesides";
+    model.tab = "firesides";
+    model.data = rooms;
+    model.selectedRing = "10";
+    model.ringTitle = "十号炉";
+    model.ringData = { id: "10", data: thread };
+    const refreshing = model.load(true);
+    expect(model.loading).toBe(true);
+    expect(model.data).toBe(rooms);
+    expect(model.ringData?.data).toBe(thread);
+    listRefresh.resolve(result(rooms));
+    await settle();
+    expect(model.ringData?.data).toBe(thread);
+    roomRefresh.resolve(result({ messages: [{ seq: 2, message: "刷新消息" }] }));
+    await refreshing;
+    await settle();
+    expect(model.ringData?.data.messages).toEqual([{ seq: 2, message: "刷新消息" }]);
+  });
+  it("normalizes fireside member names and count from current and legacy fields", () => {
+    const room = {
+      members: [{ display_name: "柳树" }, { town_id: "t_River" }],
+      member_names: ["柳树", "山雀"],
+      member_count: 4,
+    };
+    expect(firesideMembers(room)).toEqual(["柳树", "t_River", "山雀"]);
+    expect(firesideMemberCount(room)).toBe(4);
+    expect(firesideMemberDetails({ members: [{ town_id: "t_Willow", display_name: "柳树", display: "柳树 (t_Willow)", joined_at: "2026-09-01" }] })).toEqual([
+      { townId: "t_Willow", name: "柳树", display: "柳树 (t_Willow)", joinedAt: "2026-09-01" },
+    ]);
+  });
+  it("loads fireside members beside messages without making member failure fatal", async () => {
+    const townApi = vi.fn(async (query: import("../desktop/shared/types").TownQuery) =>
+      query.kind === "fireside-members"
+        ? result({ members: [{ town_id: "t_Willow", display_name: "柳树" }] })
+        : result({ messages: [{ seq: 1, message: "围炉消息" }] }),
+    );
+    const { model } = town({ town: townApi });
+    model.live = live();
+    await model.loadFireside("10", "十号炉");
+    expect(model.ringData?.data.messages).toHaveLength(1);
+    expect(model.ringMembers).toEqual({ id: "10", members: [{ town_id: "t_Willow", display_name: "柳树" }] });
+    expect(townApi.mock.calls.map(([query]) => query.kind)).toEqual(["fireside", "fireside-members"]);
+
+    townApi.mockImplementation(async (query) =>
+      query.kind === "fireside-members"
+        ? { ok: false, code: "network", message: "成员接口暂时不可用" }
+        : result({ messages: [{ seq: 2, message: "刷新后消息" }] }),
+    );
+    await model.loadFireside("10", "十号炉", true);
+    expect(model.ringData?.data.messages).toEqual([{ seq: 2, message: "刷新后消息" }]);
+    expect(model.ringMembers?.members).toHaveLength(1);
+    expect(model.memberError).toBe("成员接口暂时不可用");
   });
 });
 describe("shared reading behavior", () => {

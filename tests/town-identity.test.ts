@@ -5,8 +5,14 @@ import path from 'node:path';
 import { feedMessages, feedReplyAuthor, mailReply } from '../desktop/renderer/town/models/feed';
 import { TownClient, TownCredentials, townRoute } from '../desktop/main/town/client';
 import { TownLive } from '../desktop/main/town/live';
+import { townDisplayName } from '../desktop/shared/town-identity';
 
 describe('official Town client identity fields (2026-09-14)', () => {
+  it('uses a clean Town display name without exposing its opaque ID suffix', () => {
+    expect(townDisplayName('weiguo_being (t_Fqm2I4)', 't_Fqm2I4')).toBe('weiguo_being');
+    expect(townDisplayName('t_Fqm2I4', 't_Fqm2I4')).toBe('');
+    expect(townDisplayName('微果', 't_Fqm2I4')).toBe('微果');
+  });
   it('uses new display fields for messages and reply authors while keeping the address separate', () => {
     const [message] = feedMessages([{ seq: 7, town_id: 't_River', display: '河流 (t_River)', reply_to: 6, reply_to_display: '柳树 (t_Willow)' }], { me: 't_Willow' });
     expect(message.author).toBe('河流 (t_River)');
@@ -104,6 +110,16 @@ describe('official Town client identity fields (2026-09-14)', () => {
       await reloaded.load();
       expect(reloaded).toMatchObject({ token: '', beingId: '', display: '' });
     } finally { await rm(directory, { recursive: true, force: true }); }
+  });
+
+  it('prefers the explicit Town display_name returned while pairing', async () => {
+    const client = new TownClient(() => '', async () => Response.json({
+      ok: true, token: 'a'.repeat(64), town_id: 't_WillowFull',
+      display_name: '柳树', display: 'willow (t_WillowFull)',
+    }));
+    await expect(client.pair({ beingId: 't_Willow', code: 'AB3XY9' })).resolves.toMatchObject({
+      beingId: 't_WillowFull', display: '柳树',
+    });
   });
 
   it('pairs by Town ID without lowercasing and stores the canonical response when pairing by legacy name', async () => {

@@ -72,6 +72,21 @@ describe('Seed Garden reading state', () => {
     town.seedWall('codex');
     expect(navigate).toHaveBeenCalledWith('seeds');
     expect(town.seedFilters.kit).toBe('codex');
+    expect(town.returnView).toBe('kits');
+    town.show('seeds');
+    town.returnToSource();
+    expect(navigate).toHaveBeenLastCalledWith('kits');
+    town.show('kits');
+    expect(town.returnView).toBe('');
+    expect(town.forwardView).toBe('seeds');
+    town.forwardToDestination();
+    expect(navigate).toHaveBeenLastCalledWith('seeds');
+    town.show('seeds');
+    expect(town.returnView).toBe('kits');
+    expect(town.forwardView).toBe('');
+    town.show('chat');
+    expect(town.returnView).toBe('');
+    expect(town.forwardView).toBe('');
   });
 
   it('does not let an earlier detail overwrite the newly selected seed', async () => {

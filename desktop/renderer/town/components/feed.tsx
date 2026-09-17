@@ -37,6 +37,14 @@ export function TownFeed({
     () => feedMessages(list(data, "messages"), { me, mail }),
     [data, me, mail],
   );
+  const messageLocations = useMemo(() => {
+    const locations = new Map<string, { message: FeedMessage; domId: string }>();
+    for (const message of messages) {
+      const key = str(mail ? message.entry.id : message.entry.seq);
+      if (key) locations.set(key, { message, domId: `town-message-${message.index}` });
+    }
+    return locations;
+  }, [mail, messages]);
   const mentionNames = useMemo(() => collectMentionNames([
     ...list(data, 'messages'),
     { town_id: town.me, display: town.live?.display },
@@ -56,7 +64,9 @@ export function TownFeed({
   const effective = {
     ...filters,
     relation:
-      !me && (!mail || filters.relation === "mentions")
+      mail
+        ? "all"
+        : !me
         ? "all"
         : filters.relation,
     author: authors.some(([id]) => id === filters.author) ? filters.author : "",
@@ -105,24 +115,26 @@ export function TownFeed({
   return (
     <div className="social-feed">
       <div className="feed-controls">
-        <div className="feed-relations" aria-label="消息关系筛选">
-          {[
-            ["all", "全部"],
-            ["about", "关于我"],
-          ].map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              data-relation={value}
-              disabled={!me && !mail && value !== "all"}
-              className={effective.relation === value ? "selected" : ""}
-              aria-pressed={effective.relation === value}
-              onClick={() => setFilters({ ...effective, relation: value })}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
+        {!mail && (
+          <div className="feed-relations" aria-label="消息关系筛选">
+            {[
+              ["all", "全部"],
+              ["about", "关于我"],
+            ].map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                data-relation={value}
+                disabled={!me && value !== "all"}
+                className={effective.relation === value ? "selected" : ""}
+                aria-pressed={effective.relation === value}
+                onClick={() => setFilters({ ...effective, relation: value })}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        )}
         <details
           className="feed-options"
           ref={more}
@@ -175,10 +187,27 @@ export function TownFeed({
               message.entry.seq ||
               `${message.authorId}:${message.rawDate}:${message.index}`,
           );
+          const location = messageLocations.get(str(mail ? message.entry.id : message.entry.seq));
+          const replyTarget = messageLocations.get(str(message.entry.reply_to));
           return (
             <Message
               key={id}
               {...{ message, town, mail, mentionNames }}
+              domId={location?.domId || `town-message-${message.index}`}
+              replyTarget={replyTarget?.message}
+              onJumpReply={replyTarget ? () => {
+                const targetId = str(
+                  replyTarget.message.entry.id ||
+                    replyTarget.message.entry.seq ||
+                    `${replyTarget.message.authorId}:${replyTarget.message.rawDate}:${replyTarget.message.index}`,
+                );
+                setSelected(targetId);
+                requestAnimationFrame(() => {
+                  const node = document.getElementById(replyTarget.domId);
+                  node?.scrollIntoView({ behavior: "smooth", block: "center" });
+                  node?.focus({ preventScroll: true });
+                });
+              } : undefined}
               selected={selected === id}
               onSelect={() => {
                 setSelected(id);
@@ -223,6 +252,9 @@ function Message({
   town,
   mail,
   mentionNames,
+  domId,
+  replyTarget,
+  onJumpReply,
   selected,
   onSelect,
 }: {
@@ -230,6 +262,9 @@ function Message({
   town: TownModel;
   mail?: "all" | "inbox" | "sent";
   mentionNames: MentionNames;
+  domId: string;
+  replyTarget?: FeedMessage;
+  onJumpReply?: () => void;
   selected: boolean;
   onSelect: () => void;
 }) {
@@ -240,7 +275,15 @@ function Message({
     replyId = Number(m.entry.seq),
     state = str(m.entry.delivery_status);
   const reply = mail ? mailReply(m) : Number.isSafeInteger(replyId) && replyId > 0
-    ? { id: replyId, author: feedDisplayName(m.author, m.authorId), preview: m.content.slice(0, 500) }
+    ? {
+        id: replyId,
+        author: feedDisplayName(m.author, m.authorId),
+        preview: m.content.slice(0, 500),
+        content: m.content,
+        ...(m.entry.reply_to != null ? {
+          context: `${feedReplyAuthor(m.entry)}：${str(m.entry.reply_to_preview).slice(0, 500) || replyTarget?.content.slice(0, 500) || "原消息预览不可用"}`,
+        } : {}),
+      }
     : undefined;
   const authorName = feedDisplayName(m.author, m.authorId);
   const replyAuthor = feedReplyAuthor(m.entry);
@@ -264,6 +307,8 @@ function Message({
   );
   return (
     <article
+      id={domId}
+      tabIndex={-1}
       className={`social-message${m.mentioned ? " mentions-me" : ""}${selected ? " scene-selected" : ""}`}
     >
       <span className="social-avatar" aria-hidden="true">
@@ -279,7 +324,7 @@ function Message({
               className="relation-tag via-tag"
               title="人类伙伴通过客户端，以此 Being 的身份发言"
             >
-              借 {via.slice(7) || "客户端"}
+              客户端发送
             </span>
           )}
           {m.mine && <span className="relation-tag">本 Being 发送</span>}
@@ -302,15 +347,36 @@ function Message({
           </time>
         </div>
         {m.entry.reply_to != null && (
-          <blockquote className="feed-reply-preview">
-            <strong>
-              回复{" "}
-              {replyAuthor}
-            </strong>
-            <span>
-              <MentionText text={str(m.entry.reply_to_preview).slice(0, 500) || "原消息预览不可用"} names={mentionNames} />
-            </span>
-          </blockquote>
+          <details className={`feed-reply-preview${replyTarget ? " has-full-reply" : ""}`}>
+            <summary>
+              <span className="feed-reply-copy">
+                <strong>回复 {replyTarget ? feedDisplayName(replyTarget.author, replyTarget.authorId) : replyAuthor}</strong>
+                <span>
+                  <MentionText
+                    text={str(m.entry.reply_to_preview).slice(0, 500) || replyTarget?.content.slice(0, 500) || "原消息预览不可用"}
+                    names={mentionNames}
+                  />
+                </span>
+              </span>
+              <span className="feed-reply-toggle" aria-hidden="true" />
+            </summary>
+            <div className="feed-reply-full">
+              {replyTarget ? (
+                <Markdown
+                  className="reading-text social-body"
+                  content={replyTarget.content}
+                  renderText={text => <MentionText text={text} names={mentionNames} />}
+                />
+              ) : (
+                <p>原消息不在当前加载范围内，以上为 Town 返回的引用预览。</p>
+              )}
+              {onJumpReply && (
+                <button className="text-button" type="button" onClick={onJumpReply}>
+                  跳转原文
+                </button>
+              )}
+            </div>
+          </details>
         )}
         {m.content.length > 480 || m.content.split("\n").length > 8 ? (
           <details className="social-expand" ref={expanded}>

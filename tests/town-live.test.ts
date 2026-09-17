@@ -23,6 +23,21 @@ it('clears the previous display on re-pairing and publishes the new name only af
   } finally { live.dispose(); }
 });
 
+it('prefers the live Town display name and removes a parenthesized Town ID fallback', async () => {
+  const fetcher = vi.fn(async () => new Response(new ReadableStream({ start(controller) {
+    controller.enqueue(new TextEncoder().encode(
+      'event: hello\ndata: {"town_id":"t_Willow","display_name":"实时柳树","token_kind":"client","anonymous":false}\n\n',
+    ));
+  } }), { headers: { 'Content-Type': 'text/event-stream' } }));
+  const live = new TownLive(() => 'fixture-token', () => 't_Willow', () => {}, fetcher as typeof fetch,
+    'https://beings.town', () => '旧名称 (t_Willow)');
+  try {
+    live.restart();
+    await vi.waitFor(() => expect(live.state.phase).toBe('connected'));
+    expect(live.state.display).toBe('实时柳树');
+  } finally { live.dispose(); }
+});
+
 it('accepts documented SSE payloads, decodes split UTF-8 and deduplicates REST/SSE IDs per channel', async () => {
   let stream!: ReadableStreamDefaultController<Uint8Array>;
   const fetcher = vi.fn(async () => new Response(new ReadableStream<Uint8Array>({ start(controller) { stream = controller; } }), { headers: { 'Content-Type': 'text/event-stream' } }));
@@ -41,6 +56,7 @@ it('accepts documented SSE payloads, decodes split UTF-8 and deduplicates REST/S
       encode('fireside', { fireside_id: 11, seq: 2, speaker_name: '河流', content: '另一围炉', via: 'being' }));
     for (let i = 0; i < bytes.length; i += 7) stream.enqueue(bytes.slice(i, i + 7));
     await vi.waitFor(() => expect(live.state.versions).toEqual({ bonfire: 1, mail: 1, firesides: 2 }));
+    expect(live.state.firesideVersions).toEqual({ '10': 1, '11': 1 });
     expect(live.state).toMatchObject({ phase: 'connected', beingId: 'willow' });
     const [url, options] = (fetcher.mock.calls as unknown[][])[0];
     expect(url).toBe('https://beings.town/api/client/stream?token=private-client-token');

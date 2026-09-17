@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { AppModel } from "../models/app";
 import { useModel } from "../../shared/hooks/use-model";
 import { Dialog } from "../../shared/components/dialog";
+import { NavigationControls } from "../../shared/components/navigation-controls";
 export function ClientSettings({ model }: { model: AppModel }) {
   const app = useModel(model);
   const [tab, setTab] = useState("connections");
@@ -11,25 +12,22 @@ export function ClientSettings({ model }: { model: AppModel }) {
   return (
     <Dialog
       open={app.clientSettingsOpen}
-      onClose={() => {
-        app.clientSettingsOpen = false;
-        app.changed();
-      }}
+      onClose={app.closeClientSettings}
       id="client-settings-dialog"
       aria-labelledby="client-settings-title"
     >
       <div className="client-settings-content">
         <div className="dialog-heading">
-          <h2 id="client-settings-title">设置</h2>
+          <div className="dialog-heading-main">
+            <h2 id="client-settings-title">设置</h2>
+            <NavigationControls forward={app.settingsForwardRoute ? app.forwardSettingsRoute : undefined} />
+          </div>
           <button
             type="button"
             id="close-client-settings"
             className="close"
             aria-label="关闭客户端设置"
-            onClick={() => {
-              app.clientSettingsOpen = false;
-              app.changed();
-            }}
+            onClick={app.closeClientSettings}
           ></button>
         </div>
         <div className="settings-tabs" role="tablist" aria-label="设置分类">
@@ -136,35 +134,28 @@ export function ClientSettings({ model }: { model: AppModel }) {
             <button
               id="settings-button"
               data-settings-route=""
-              onClick={() => app.showSettings()}
+              onClick={() => app.openConnectionSettings()}
             >
               Being 连接与本机配置 <span>›</span>
             </button>
             <button
               id="town-settings-button"
               data-settings-route=""
-              onClick={() => {
-                app.clientSettingsOpen = false;
-                app.changed();
-                void app.town.auth();
-              }}
+              onClick={() => app.openTownSettings()}
             >
               Town 配对与身份 <span>›</span>
             </button>
             <button
               data-chat-action="model"
               disabled={!app.snapshot?.settings.hasToken}
-              onClick={() => app.chatAction("model")}
+              onClick={() => app.openModelSettings()}
               data-settings-route=""
             >
               模型设置 <span>›</span>
             </button>
             <button
               data-view="portal"
-              onClick={() => {
-                app.clientSettingsOpen = false;
-                app.navigate("portal");
-              }}
+              onClick={() => app.openPortalSettings()}
               data-settings-route=""
             >
               Portal 运行状态 <span>›</span>
@@ -271,11 +262,7 @@ export function ClientSettings({ model }: { model: AppModel }) {
             <button
               id="open-diagnostics"
               data-settings-route=""
-              onClick={() => {
-                app.clientSettingsOpen = false;
-                app.diagnosticsOpen = true;
-                app.changed();
-              }}
+              onClick={() => app.openDiagnostics()}
             >
               连接诊断 <span>›</span>
             </button>
@@ -327,8 +314,9 @@ export function ConnectionSettings({ model }: { model: AppModel }) {
         }}
       >
         <div className="dialog-heading">
-          <div>
+          <div className="dialog-heading-main">
             <h2>连接与设置</h2>
+            <NavigationControls back={app.settingsRoute === "connection" && !app.saving ? app.returnToClientSettings : undefined} />
           </div>
           <button
             type="button"

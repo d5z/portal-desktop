@@ -22,6 +22,15 @@ const dir = await mkdtemp(path.join(tmpdir(), 'beings-e2e-'));
 const token = 'local-fixture-token';
 const messages = [{ seq: 1, role: 'being', content: '你好，我在这里。我们可以从一个想法开始。', at: new Date().toISOString() }];
 let seq = 2, rpcID = 0, relay = null, chatBody = null, stopCount = 0, handshakeCount = 0;
+let llmConfig = {
+  model: 'test-model',
+  provider: 'test',
+  presets: [
+    { id: 'test', label: 'Test Model', provider: 'test', model: 'test-model', has_key: true },
+    { id: 'alternate', label: 'Alternate Model', provider: 'anthropic', model: 'alternate-model', has_key: true },
+  ],
+};
+const llmPatches = [];
 const pending = new Map();
 const rpc = (method, params = {}) => new Promise((resolve, reject) => {
   const id = ++rpcID;
@@ -40,7 +49,11 @@ const server = createServer(async (request, response) => {
   if (url.pathname.endsWith('/api/stop')) { stopCount++; return json({ ok: true }); }
   if (url.pathname.endsWith('/api/llm/config')) {
     assert.equal(request.headers['x-relay-secret'], token);
-    return json({ model: 'test-model', provider: 'test', presets: [] });
+    if (request.method !== 'PATCH') return json(llmConfig);
+    let body = ''; for await (const chunk of request) body += chunk;
+    const patch = JSON.parse(body); llmPatches.push(patch);
+    llmConfig = { ...llmConfig, ...patch };
+    return json({ ok: true, config: llmConfig });
   }
   if (url.pathname.endsWith('/api/chat/stream')) {
     let body = ''; for await (const chunk of request) body += chunk;
@@ -246,7 +259,13 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   await frame.getByText('索引浏览时收到新回复。', { exact: true }).waitFor();
   await page.waitForTimeout(100);
   assert.equal(await childFrame.evaluate(() => document.querySelector('#messages').scrollTop), readingPosition);
-  await openChatSearch(page);
+  assert.match(await page.locator('#local-portal-status').getAttribute('aria-label'), /^本机 Portal：/);
+  await childFrame.evaluate(() => {
+    document.querySelector('#input').addEventListener('keydown', event => event.stopPropagation(), { once: true });
+  });
+  await frame.locator('#input').focus();
+  await page.keyboard.press(process.platform === 'darwin' ? 'Meta+f' : 'Control+f');
+  await page.locator('#chat-search-panel[open]').waitFor();
   await page.locator('#chat-search-input').fill('第一项');
   await page.locator('.chat-search-result').waitFor();
   assert.equal(await page.locator('.chat-search-result').count(), 1);
@@ -277,6 +296,14 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   await openClientSettings(page);
   await page.locator('[data-chat-action="model"]').click();
   await frame.locator('#settings-panel.active').waitFor();
+  await frame.getByRole('button', { name: /^Alternate Model/ }).click();
+  await frame.getByRole('button', { name: '保存并使用' }).click();
+  await frame.locator('#llm-current').getByText('Alternate Model', { exact: true }).waitFor();
+  assert.deepEqual(llmPatches.at(-1), {
+    model: 'alternate-model',
+    provider: 'anthropic',
+    base_url: 'https://api.anthropic.com',
+  });
   await frame.locator('#settings-panel .btn-close').dispatchEvent('click');
   await frame.locator('#settings-panel.active').waitFor({ state: 'hidden' });
   await frame.locator('#input').fill('unsent draft');
@@ -356,7 +383,8 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
     const serviceRecord = JSON.parse(await readFile(path.join(dir, 'profile/portal-service.json'), 'utf8'));
     const runSystem = promisify(execFile);
     const definition = JSON.parse((await runSystem('/usr/bin/plutil', ['-convert', 'json', '-o', '-', serviceRecord.file])).stdout);
-    assert.equal(definition.RunAtLoad, true); assert.equal(definition.KeepAlive, true);
+    assert.equal(definition.RunAtLoad, true);
+    assert.deepEqual(definition.KeepAlive, { PathState: { [path.join(serviceRecord.root, '.portal-start-failure')]: false } });
     assert(!JSON.stringify(definition).includes(token));
     await runSystem('/bin/launchctl', ['bootout', `gui/${process.getuid()}/${serviceRecord.label}`]);
     const beforeLogin = handshakeCount;
@@ -369,6 +397,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
     assert(handshakeCount > beforeLogin, 'loading the saved login registration must connect without launching the client');
     app = await launchDesktop({ executablePath, env: { ...process.env, PORTAL_DESKTOP_USER_DATA: path.join(dir, 'profile') } });
     const reopened = await app.firstWindow();
+    await waitForChatReady(reopened);
     await reopened.waitForFunction(() => document.querySelector('#portal-phase').textContent === '已连接', { timeout: 15000 });
     const reattached = await reopened.evaluate(() => window.beings.snapshot());
     assert.notEqual(reattached.portal.pid, pid);
@@ -391,7 +420,8 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
     await app.close(); app = null;
     app = await launchDesktop({ executablePath, env: { ...process.env, PORTAL_DESKTOP_USER_DATA: path.join(dir, 'profile') } });
     const disabledWindow = await app.firstWindow();
-    await disabledWindow.waitForFunction(() => document.querySelector('#conversation-name').textContent === 'willow');
+    await waitForChatReady(disabledWindow);
+    await disabledWindow.locator('#conversation-name').getByText('willow', { exact: true }).waitFor();
     assert.equal((await disabledWindow.evaluate(() => window.beings.snapshot())).background.enabled, false);
     assert.throws(() => process.kill(pid, 0), /ESRCH/);
     console.log('PASS: real LaunchAgent install, tool call after client quit, SIGKILL recovery, login registration reload without client, reattach without restart, stop disables login startup across client restarts.');

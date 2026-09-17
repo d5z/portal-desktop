@@ -1,6 +1,6 @@
 import type { TownChannel, TownLiveState, TownQuery } from '../../shared/types';
 import { TOWN_ORIGIN } from './client';
-import { validTownIdentity } from '../../shared/town-identity';
+import { townDisplayName, validTownIdentity } from '../../shared/town-identity';
 
 type Data = Record<string, unknown>;
 const object = (value: unknown): Data => value && typeof value === 'object' && !Array.isArray(value) ? value as Data : {};
@@ -14,7 +14,7 @@ const key = (type: string, data: Data) => {
 
 // Only identity and change counters leave the main process. No event bodies or tokens.
 export class TownLive {
-  state: TownLiveState = { phase: 'unpaired', generation: 0, revision: 0, sync: 0, message: '尚未配对 Town', versions: { bonfire: 0, mail: 0, firesides: 0 } };
+  state: TownLiveState = { phase: 'unpaired', generation: 0, revision: 0, sync: 0, message: '尚未配对 Town', versions: { bonfire: 0, mail: 0, firesides: 0 }, firesideVersions: {} };
   private controller?: AbortController;
   private retry?: ReturnType<typeof setTimeout>;
   private seen = new Set<string>();
@@ -27,7 +27,7 @@ export class TownLive {
   dispose() { clearTimeout(this.retry); this.controller?.abort(); this.controller = undefined; }
   restart() {
     this.dispose(); this.seen.clear(); this.attempts = 0;
-    this.update({ generation: this.state.generation + 1, sync: 0, beingId: undefined, display: undefined, versions: { bonfire: 0, mail: 0, firesides: 0 }, phase: this.getToken() ? 'connecting' : 'unpaired', message: this.getToken() ? '正在确认 Town 身份' : '尚未配对 Town' });
+    this.update({ generation: this.state.generation + 1, sync: 0, beingId: undefined, display: undefined, versions: { bonfire: 0, mail: 0, firesides: 0 }, firesideVersions: {}, phase: this.getToken() ? 'connecting' : 'unpaired', message: this.getToken() ? '正在确认 Town 身份' : '尚未配对 Town' });
     if (this.getToken()) void this.connect(this.state.generation);
   }
   rejectAuth() {
@@ -89,14 +89,28 @@ export class TownLive {
           }
           if (!hello) {
             hello = true; this.attempts = 0;
-            const display = this.getDisplay() || undefined;
+            const display = townDisplayName(
+              data.display_name || data.speaker_name || data.display || this.getDisplay(),
+              beingId,
+            ) || undefined;
             this.update({ phase: 'connected', beingId, display, sync: this.state.sync + 1, message: `Town 已连接 · ${display || '@' + beingId}` });
           }
           return;
         }
         if (!hello) { failure = 'SSE 未先返回 hello 身份事件'; throw new Error('missing-hello'); }
         const channel: TownChannel | undefined = type === 'bonfire' ? 'bonfire' : type === 'dm' ? 'mail' : type === 'fireside' ? 'firesides' : undefined;
-        if (channel && this.rememberKey(key(type, data))) this.update({ versions: { ...this.state.versions, [channel]: this.state.versions[channel] + 1 } });
+        if (channel && this.rememberKey(key(type, data))) {
+          const firesideId = type === 'fireside' ? id(data.fireside_id) : '';
+          this.update({
+            versions: { ...this.state.versions, [channel]: this.state.versions[channel] + 1 },
+            ...(firesideId ? {
+              firesideVersions: {
+                ...this.state.firesideVersions,
+                [firesideId]: (this.state.firesideVersions?.[firesideId] || 0) + 1,
+              },
+            } : {}),
+          });
+        }
       };
       while (current()) {
         const { done, value } = await reader.read();

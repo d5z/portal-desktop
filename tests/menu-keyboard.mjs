@@ -11,9 +11,11 @@ const bundle = await build({
       import { Topbar } from './desktop/renderer/app/components/topbar';
       const model = {
         subscribe: () => () => {}, getVersion: () => 0,
-        snapshot: { settings: { hasToken: true, being: 'fixture' } },
+        snapshot: { settings: { hasToken: true, being: 'fixture', portalName: '工作室 Mac Portal' }, portal: { phase: 'connected', message: 'ready', logs: [] } },
+        town: { subscribe: () => () => {}, getVersion: () => 0, live: { display: 'Fixture Town' }, displayName: 'Fixture Town' },
         api: { platform: 'darwin' }, connection: 'online',
         chatLoading: false, sbsKnown: false, searchOpen: false,
+        navigate(view) { window.navigated = view; },
         openClientSettings() { window.settingsOpened = (window.settingsOpened || 0) + 1; },
       };
       createRoot(document.getElementById('root')).render(<Topbar model={model} />);`,
@@ -36,6 +38,13 @@ try {
   page = await browser.newPage(); page.setDefaultTimeout(5000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:' + server.address().port);
+  assert.equal(await page.locator('#local-portal-status').getAttribute('aria-label'), '本机 Portal：工作室 Mac Portal，已连接');
+  assert.equal(await page.locator('#local-portal-status').getAttribute('title'), null);
+  assert.equal(await page.locator('#local-portal-status .local-portal-name').textContent(), '工作室 Mac Portal');
+  await page.locator('#local-portal-status').hover();
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('.local-portal-name')).opacity === '1');
+  await page.locator('#local-portal-status').click();
+  assert.equal(await page.evaluate(() => window.navigated), 'portal');
   for (const reducedMotion of ['no-preference', 'reduce']) {
     await page.emulateMedia({ reducedMotion });
     await page.locator('#options-trigger').click();

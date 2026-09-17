@@ -104,6 +104,14 @@ try {
   const child = () => page.frames().find(frame => frame.url().includes('/loom.html'));
   const post = data => page.evaluate(data => document.querySelector('iframe').contentWindow.postMessage(data, location.origin), data);
   await frame.locator('.chat-index-tick').nth(11).waitFor();
+  await child().evaluate(() => {
+    document.querySelector('#input').addEventListener('keydown', event => {
+      if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') event.stopPropagation();
+    });
+  });
+  await frame.locator('#input').focus();
+  await page.keyboard.press('Control+f');
+  await page.waitForFunction(() => window.received.some(item => item.type === 'beings:chat-search'));
   assert.equal(await frame.locator('#messages .message').count(), 25);
   assert.equal(await frame.locator('#messages img').count(), 0);
   assert.equal(await frame.locator('#messages a[href^="javascript:"]').count(), 0);

@@ -57,7 +57,7 @@ export function createChatBridge(state: ChatState) {
   function start(
     runtime: ChatRuntime,
     ui: {
-      panel(value: ChatPanel): void;
+      panel(value: ChatPanel, returnToSettings?: boolean): void;
       theme(value: "light" | "dark"): void;
       reading(value: number): void;
       activity(channels: string[]): void;
@@ -134,7 +134,8 @@ export function createChatBridge(state: ChatState) {
           return;
         case "beings:chat-action":
           if (["model", "being", "privacy"].includes(data.action))
-            ui.panel(data.action);
+            ui.panel(data.action, data.returnToSettings === true);
+          else if (data.action === "close") ui.panel(null);
           return;
         case "beings:search-request":
           ui.search();
@@ -162,6 +163,24 @@ export function createChatBridge(state: ChatState) {
             ui.focus();
           }
           send({ type: "beings:scene-draft-result", id: data.id, ok });
+          return;
+        }
+        case "beings:town-reply": {
+          if (
+            typeof data.id !== "string" ||
+            typeof data.text !== "string" ||
+            !data.text.trim() ||
+            data.text.length > 33000 ||
+            typeof data.expiresAt !== "number" ||
+            Date.now() > data.expiresAt
+          )
+            return;
+          // This explicit action sends its own bounded text. Passing an empty
+          // attachment list keeps any draft and pending files in the visible
+          // composer untouched.
+          void runtime.send(data.text, []);
+          ui.focus();
+          return;
         }
       }
     };

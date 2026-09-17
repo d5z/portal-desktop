@@ -11,6 +11,8 @@ export interface FeedReply {
   id: string | number;
   author: string;
   preview: string;
+  content: string;
+  context?: string;
   recipient?: string;
   recipientName?: string;
 }
@@ -176,7 +178,10 @@ export function mailReply(message: FeedMessage): FeedReply | undefined {
   if (!/^[a-zA-Z0-9_-]{1,160}$/.test(id) || !recipient || recipient === '未知' || recipient.length > 160 || /[\u0000-\u001f]/.test(recipient)) return;
   return {
     id, author: feedDisplayName(message.author, message.authorId),
-    preview: message.content.slice(0, 500), recipient,
+    preview: message.content.slice(0, 500), content: message.content, recipient,
+    ...(message.entry.reply_to != null ? {
+      context: `${feedReplyAuthor(message.entry)}：${text(message.entry.reply_to_preview).slice(0, 500) || '原消息预览不可用'}`,
+    } : {}),
     recipientName: message.mine
       ? feedDisplayName(message.recipient, message.recipientId)
       : feedDisplayName(message.author, message.authorId),

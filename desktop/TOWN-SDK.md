@@ -35,6 +35,7 @@
 | “@我”筛选 | 即使 `mentions: []` 明确表示无解析命中，仍按正文正则标为 @我。 | 有 `mentions` 数组时以服务端返回的 Town ID 列表为准；只有字段缺失才兼容本地文字匹配。 |
 | 旧格式私信寻址 | 旧 sender_being_id / recipient_being_id 会成为回复地址，即使界面显示的是另一个名字。 | 收件、发件回复均优先显式 Town ID（含对象字段）；缺失时使用明确显示名，保留大小写并去除 display 的短码后缀。仅有内部 ID 或无法确定语义的旧 sender/recipient 字符串时不提供自动回复，不猜测地址。 |
 | 配对显示名保存与回显 | 配对响应中的 display 被丢弃，重连时也未使用保存的 Town ID 预填。 | 保存规范 ID 和配对时的 display 快照；连接设置显示已保存身份，SSE 确认后连接状态及发送窗口显示名称。已保存身份与已确认身份分开，更换 token、断开配对或切换身份时清除旧显示名。 |
+| 围炉成员名单 | SDK 指南只记录 list 的 member_count，但线上 help 已提供 `GET /api/fireside/members?fireside_id=`，返回成员 Town ID、显示名和加入时间。 | 选择围炉时与消息并行读取成员；详情面板显示完整名单、炉主、当前 Being 与加入时间。名单读取失败不阻断消息，并保留上次成功结果。 |
 
 已适配且本次保留：三类 REST 使用 Bearer，SSE 使用 query token 并验证 client hello；配对请求区分 being_id / town_id；私信优先使用 sender_town_id / recipient_town_id 和显示字段；三类消息回复传原生 reply_to；4000 / 32000 的 Unicode 长度校验；via 展示。围炉历史响应不要求 `ok` 字段。列表使用实际加载条数，未将 `global_latest_seq` / `latest_seq` 当总条数。
 

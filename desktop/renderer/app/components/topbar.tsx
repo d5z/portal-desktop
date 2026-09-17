@@ -5,6 +5,7 @@ import { ChatSceneIndicator } from "./chat-scene";
 import { UpdateProgress } from "./update-progress";
 export function Topbar({ model }: { model: AppModel }) {
   const app = useModel(model);
+  const town = useModel(model.town);
   const [expanded, setExpanded] = useState(false),
     [visible, setVisible] = useState(false),
     [help, setHelp] = useState(false);
@@ -119,6 +120,22 @@ export function Topbar({ model }: { model: AppModel }) {
     offline: "已离线",
   };
   const label = labels[app.connection] || "尚未连接";
+  const portal = app.snapshot?.portal;
+  const portalLabels = {
+    running: "运行中",
+    stopped: "未启动",
+    starting: "启动中",
+    connected: "已连接",
+    reconnecting: "重连中",
+    stopping: "停止中",
+    external: "实例冲突",
+    error: "启动失败",
+  } as const;
+  const portalPhase = portal?.phase || "stopped";
+  const portalLabel = portal?.managed === false
+    ? "外部运行"
+    : portalLabels[portalPhase];
+  const portalName = app.snapshot?.settings.portalName?.trim() || "Heart Portal";
   return (
     <header className="topbar">
       <ChatSceneIndicator
@@ -138,7 +155,7 @@ export function Topbar({ model }: { model: AppModel }) {
           ·
         </span>
         <span id="conversation-name">
-          {app.snapshot?.settings.being || "Being"}
+          {town.displayName || (town.live?.beingId ? "Being" : app.snapshot?.settings.being) || "Being"}
         </span>
         <button
           className={`sbs-header-switch${app.sbsKnown && app.sbsEnabled ? " enabled" : ""}`}
@@ -153,6 +170,24 @@ export function Topbar({ model }: { model: AppModel }) {
         </button>
       </div>
       <div className="topbar-actions">
+        <button
+          id="local-portal-status"
+          className="local-portal-status"
+          type="button"
+          data-phase={portalPhase}
+          aria-label={`本机 Portal：${portalName}，${portalLabel}`}
+          onClick={() => app.navigate("portal")}
+        >
+          <span className="local-portal-dot" aria-hidden="true" />
+          <span className="local-portal-copy" aria-hidden="true">
+            <span className="local-portal-label local-portal-state-label">
+              本机 Portal · {portalLabel}
+            </span>
+            <span className="local-portal-label local-portal-name">
+              {portalName}
+            </span>
+          </span>
+        </button>
         <UpdateProgress
           state={app.update}
           onDownload={() => void app.run(() => app.api.downloadUpdate())}

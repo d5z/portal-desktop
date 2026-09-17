@@ -127,6 +127,7 @@ it.skipIf(process.env.PORTAL_DESKTOP_NATIVE_UPGRADE_TESTS !== '1' || !['darwin',
     throw error;
   } finally {
     await background.disable();
+    if (process.platform === 'darwin' && background.installedService?.file) await rm(background.installedService.file, { force: true });
     if (process.platform === 'win32') {
       const script = windowsModulePath + `$task=Get-ScheduledTask | Where-Object TaskName -eq '${background.label}'; if ($task) { $task | Unregister-ScheduledTask -Confirm:$false -ErrorAction Stop }; exit 0`;
       await command('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')]);

@@ -96,23 +96,22 @@ export class RuntimeUpdater {
     if (digest(await readFile(binary)) !== bundle.sha256) throw new Error('Portal 文件校验失败，旧服务未修改。');
     // A client release owns one tested engine/runner pair. Preserve the user's
     // configuration, but always activate the binary covered by this manifest.
-    if (previous.bundleId === bundle.id && digest(await readFile(path.join(previous.root, this.platform === 'win32' ? 'heart-portal.exe' : 'heart-portal'))) === bundle.sha256) return { phase: 'current', message: '客户端、Portal 与守护程序已同步。', portalVersion: bundle.portalVersion };
-    let config = settings.portalConfigPath || previous.configPath || path.join(previous.root, 'portal.toml');
-    // Releases before generatedConfig was persisted cannot reliably tell an
-    // imported TOML from the client's own file. Treat that legacy record as
-    // client-owned and regenerate it from the current settings. This keeps a
-    // stale/unsupported config from disabling current Portal capabilities.
-    const legacyService = previous.generatedConfig === undefined;
-    const contents = await readFile(config, 'utf8').catch(() => '');
-    let readableConfig = Boolean(contents);
-    if (readableConfig) {
-      try { parseToml(contents.replace(/^\uFEFF/, '')); }
-      catch { readableConfig = false; }
+    if (previous.bundleId === bundle.id) {
+      const installed = await readFile(path.join(previous.root, this.platform === 'win32' ? 'heart-portal.exe' : 'heart-portal'))
+        .catch((error: NodeJS.ErrnoException) => { if (error.code === 'ENOENT') return null; throw error; });
+      if (installed && digest(installed) === bundle.sha256) return { phase: 'current', message: '客户端、Portal 与守护程序已同步。', portalVersion: bundle.portalVersion };
     }
+    let config = settings.portalConfigPath || previous.configPath || path.join(previous.root, 'portal.toml');
+    // Missing ownership metadata is not proof that a legacy TOML is disposable.
+    // Validate before stopping the service; never silently replace an unreadable
+    // or malformed custom configuration with defaults.
+    const contents = await readFile(config, 'utf8');
+    try { parseToml(contents.replace(/^\uFEFF/, '')); }
+    catch { throw new Error('原 Portal 配置无效，请修复配置后重试升级；旧服务未修改。'); }
     // Refresh only an untouched client-generated config. Imported/edited files
     // keep their exact bytes, including an explicit screenshot opt-out.
-    const generatedConfig = legacyService || !readableConfig ||
-      ((!settings.portalConfigPath || (previous.generatedConfig && settings.portalConfigPath === previous.configPath)) &&
+    const generatedConfig =
+      ((previous.generatedConfig !== false && (!settings.portalConfigPath || settings.portalConfigPath === previous.configPath)) &&
         [portalConfig(settings), portalConfig(settings).replace('screenshot = true', 'screenshot = false')].includes(contents));
     const wasEnabled = (await this.background.refresh()).enabled;
     const root = path.join(this.background.runtimeDirectory, randomUUID());

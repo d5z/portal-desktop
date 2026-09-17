@@ -55,8 +55,9 @@ export function App({ model }: { model: AppModel }) {
       if (event.key === "Escape" && !dialog && app.workspace.open)
         app.workspace.toggle(false);
     };
-    document.addEventListener("keydown", keyboard);
-    return () => document.removeEventListener("keydown", keyboard);
+    // Capture before focused controls can consume app-level shortcuts.
+    document.addEventListener("keydown", keyboard, true);
+    return () => document.removeEventListener("keydown", keyboard, true);
   }, [app]);
   return (
     <>
@@ -152,16 +153,23 @@ export function App({ model }: { model: AppModel }) {
         id="place-sheet"
         aria-labelledby="view-title"
         open={app.view !== "chat"}
-        onClose={() => app.navigate("chat")}
+        onClose={app.closePlace}
         dismissOnBackdrop
       >
-        <PlaceHeading view={app.view} navigate={app.navigate} />
+        <PlaceHeading
+          view={app.view}
+          navigate={app.navigate}
+          onBack={app.settingsRoute === "portal" || app.town.returnView ? app.returnFromPlace : undefined}
+          onForward={app.town.forwardView ? app.forwardFromPlace : undefined}
+          onClose={app.closePlace}
+        />
         <Portal model={app} />
         <Town model={app.town} />
       </Dialog>
       <ChatSearch model={app} />
       <TownComposer model={app.town} />
-      <TownAuth model={app.town} />
+      <TownAuth model={app.town} returnToSettings={app.settingsRoute === "town"}
+        onReturnToSettings={app.returnToClientSettings} onDismissSettingsRoute={app.dismissSettingsRoute} />
       <ClientSettings model={app} />
       <ConnectionSettings model={app} />
       <KitInstall model={app.town} />

@@ -101,7 +101,7 @@ export interface DesktopAPI {
 }
 declare global { interface Window { beings: DesktopAPI } }
 
-export type TownKind = 'home' | 'bonfire' | 'firesides' | 'fireside' | 'inbox' | 'sent' | 'embers' | 'scrolls' | 'my-scrolls' | 'grove' | 'kit' | 'ember' | 'scroll' | 'seeds' | 'seed' | 'seed-lineage' | 'seed-absorbs';
+export type TownKind = 'home' | 'bonfire' | 'firesides' | 'fireside' | 'fireside-members' | 'inbox' | 'sent' | 'embers' | 'scrolls' | 'my-scrolls' | 'grove' | 'kit' | 'ember' | 'scroll' | 'seeds' | 'seed' | 'seed-lineage' | 'seed-absorbs';
 export interface SeedFilters { q: string; domain: string; tag: string; kit: string; lifecycle: string }
 export interface TownQuery { kind: TownKind; offset?: number; id?: string; scrollKind?: string; q?: string; domain?: string; tag?: string; kit?: string; lifecycle?: string }
 export type TownResult = { ok: true; data: Record<string, unknown>; fetchedAt: string; warnings?: string[] } | { ok: false; code: 'auth' | 'forbidden' | 'not-found' | 'http' | 'network'; message: string };
@@ -116,6 +116,9 @@ export interface TownLiveState {
   display?: string;
   message: string;
   versions: Record<TownChannel, number>;
+  // Per-room counters let the renderer identify which fireside changed while
+  // keeping message bodies in the main process.
+  firesideVersions?: Record<string, number>;
 }
 export type TownPost = { kind: 'bonfire'; content: string; replyTo?: number } | { kind: 'dm'; recipient: string; content: string; replyTo?: string } | { kind: 'fireside'; firesideId: string; content: string; replyTo?: number };
 export interface KitTool { name: string; description: string; params?: unknown }

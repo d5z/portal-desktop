@@ -101,12 +101,20 @@ export function TownComposer({ model }: { model: TownModel }) {
             取消回复
           </button>
         </div>
-        <label htmlFor="town-send-content">内容</label>
+        <label htmlFor="town-send-content">
+          {town.sendTarget?.reply
+            ? "回复内容或给 Being 的要求"
+            : "内容或给 Being 的描述"}
+        </label>
         <textarea
           id="town-send-content"
           rows={6}
           required
-          placeholder="写下想说的话…"
+          placeholder={
+            town.sendTarget?.reply
+              ? "直接写回复，或描述希望 Being 如何回复…"
+              : "直接写下要发送的内容，或描述希望 Being 写什么…"
+          }
           ref={content}
           maxLength={kind === "bonfire" ? 8000 : 64000}
           value={town.content}
@@ -126,6 +134,11 @@ export function TownComposer({ model }: { model: TownModel }) {
             }
           }}
         ></textarea>
+        <p className="field-help town-being-send-help">
+          {town.sendTarget?.reply
+            ? "“让 Being 回复”会结合原消息、回复上文和你的要求直接发送。"
+            : "“让 Being 发送”会把这里作为描述，并附上当前场景位置，请 Being 拟写后直接发送。"}
+        </p>
         <p id="town-send-error" className="form-error" role="alert">
           {town.sendError}
         </p>
@@ -140,14 +153,38 @@ export function TownComposer({ model }: { model: TownModel }) {
             className={count > town.sendLimit ? "over-limit" : ""}
           >{`${count.toLocaleString()} / ${town.sendLimit.toLocaleString()} 字`}</span>
           <span className="send-shortcut">⌘ / Ctrl + Enter 发送</span>
-          <button
-            id="town-send-submit"
-            type="submit"
-            className="primary"
-            disabled={!town.canSend}
-          >
-            发送
-          </button>
+          <div className="town-send-actions">
+            <button
+              id="town-ask-being"
+              type="button"
+              className="secondary"
+              disabled={town.sendBusy || !town.canAskBeingSend}
+              title={
+                !town.canAskBeing
+                  ? "请先连接对话 Being"
+                  : !town.sendTarget?.reply && !town.content.trim()
+                    ? "请先写下希望 Being 参考的描述"
+                    : town.sendTarget?.kind === "dm" &&
+                        !town.sendTarget.reply &&
+                        !town.recipient.trim()
+                      ? "请先填写收件 Being"
+                      : town.sendTarget?.reply
+                        ? "连同原消息、回复上文和当前要求一起交给 Being 直接回复"
+                        : "连同当前场景位置和你的描述一起交给 Being 直接发送"
+              }
+              onClick={() => town.askBeing()}
+            >
+              {town.sendTarget?.reply ? "让 Being 回复" : "让 Being 发送"}
+            </button>
+            <button
+              id="town-send-submit"
+              type="submit"
+              className="primary"
+              disabled={!town.canSend}
+            >
+              发送
+            </button>
+          </div>
         </div>
       </form>
     </Dialog>

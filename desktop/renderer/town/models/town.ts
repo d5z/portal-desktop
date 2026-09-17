@@ -2,6 +2,7 @@ import { Store, errorText } from "../../shared/models/store";
 import { type SceneStore, type SceneResource } from "../../shared/models/scene";
 import type { FeedFilters, FeedReply } from "./feed";
 import { collectMentionNames, type MentionNames } from './mentions';
+import { townDisplayName } from '../../../shared/town-identity';
 import type {
   DesktopAPI,
   KitLibrary,
@@ -39,6 +40,49 @@ export const date = (value: unknown) => {
         hour: "2-digit",
         minute: "2-digit",
       });
+};
+const memberName = (value: unknown) => {
+  if (typeof value === "string" || typeof value === "number") return str(value);
+  const member = record(value);
+  return str(
+    member.display_name,
+    str(
+      member.displayName,
+      str(member.name, str(member.display, str(member.town_id, str(member.being_id, str(member.id))))),
+    ),
+  );
+};
+const firesideMemberValues = (entry: Data) => [
+  entry.members,
+  entry.member_names,
+  entry.member_town_ids,
+  entry.participants,
+  entry.beings,
+].flatMap((value) => (Array.isArray(value) ? value : []));
+export const firesideMembers = (entry: Data) => {
+  return [...new Set(firesideMemberValues(entry).map(memberName).filter(Boolean))];
+};
+export const firesideMemberDetails = (entry: Data) => {
+  const seen = new Set<string>();
+  return firesideMemberValues(entry).map((value) => {
+    const member = record(value),
+      townId = str(member.town_id, str(member.being_id, str(member.id))),
+      name = memberName(value),
+      display = str(member.display, name),
+      joinedAt = str(member.joined_at, str(member.joinedAt));
+    return { townId, name, display, joinedAt };
+  }).filter((member) => {
+    const key = member.townId || member.name;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+};
+export const firesideMemberCount = (entry: Data) => {
+  const explicit = Number(entry.member_count ?? entry.members_count ?? entry.participant_count);
+  return Number.isSafeInteger(explicit) && explicit >= 0
+    ? explicit
+    : firesideMembers(entry).length;
 };
 export const definitions: Record<
   string,
@@ -144,7 +188,11 @@ export class TownModel extends Store {
   ringSearch = "";
   ringTitle = "";
   ringData: { id: string; data: Data } | null = null;
+  ringMembers: { id: string; members: Data[] } | null = null;
+  memberError = "";
   directId?: string;
+  returnView = "";
+  forwardView = "";
   selectedId = "";
   localKit?: LocalKit;
   detail?: { query: TownQuery; fragments: Data[] };
@@ -182,9 +230,11 @@ export class TownModel extends Store {
   private authRequest = 0;
   private lifecycleRevision = 0;
   private seen = { bonfire: 0, mail: 0, firesides: 0 };
+  private seenFiresides = new Map<string, number>();
   private changedChannels = new Set<TownChannel>();
   private reconcileTimer?: ReturnType<typeof setTimeout>;
   private reconciling = false;
+  private historyNavigation = false;
   private drafts = new Map<string, { content: string; recipient: string }>();
   constructor(
     readonly api: DesktopAPI,
@@ -193,6 +243,8 @@ export class TownModel extends Store {
     readonly scenes: SceneStore,
     private showCompanion: () => void,
     private post: (data: unknown) => void,
+    private onLiveChange: () => void = () => {},
+    private hasChat: () => boolean = () => Boolean(this.scenes.being),
   ) {
     super();
   }
@@ -231,10 +283,19 @@ export class TownModel extends Store {
       : undefined;
   }
   unread(name: TownChannel) {
+    if (name === "firesides" && Object.keys(this.live?.firesideVersions || {}).length) {
+      const roomsChanged = Object.entries(this.live?.firesideVersions || {}).some(
+        ([id, version]) => version > (this.seenFiresides.get(id) || 0),
+      );
+      return this.changedChannels.has(name) || roomsChanged;
+    }
     return (
       this.changedChannels.has(name) ||
       (this.live?.versions[name] || 0) > this.seen[name]
     );
+  }
+  firesideUnread(id: string) {
+    return (this.live?.firesideVersions?.[id] || 0) > (this.seenFiresides.get(id) || 0);
   }
   updateLive() {
     this.post({
@@ -249,6 +310,7 @@ export class TownModel extends Store {
     this.mentionNames = new Map();
     clearTimeout(this.reconcileTimer);
     this.seen = { bonfire: 0, mail: 0, firesides: 0 };
+    this.seenFiresides.clear();
     this.changedChannels.clear();
     this.request++;
     this.detailRequest++;
@@ -267,6 +329,8 @@ export class TownModel extends Store {
     this.detailError = undefined;
     this.localKit = undefined;
     this.ringData = null;
+    this.ringMembers = null;
+    this.memberError = "";
     this.me = "";
     this.selectedRing = "";
     this.selectedId = "";
@@ -284,6 +348,7 @@ export class TownModel extends Store {
     if (this.live && state.revision <= this.live.revision) return;
     const previous = this.live;
     this.live = state;
+    this.onLiveChange();
     const identityChanged =
       previous &&
       state.phase !== "auth-error" &&
@@ -375,14 +440,22 @@ export class TownModel extends Store {
   private acknowledge(
     channel: TownChannel | undefined,
     start: TownLiveState | undefined,
+    firesideId?: string,
   ) {
     if (!channel || !start || start.generation !== this.live?.generation)
       return;
     this.seen[channel] = start.versions[channel];
+    if (channel === "firesides" && firesideId)
+      this.seenFiresides.set(firesideId, start.firesideVersions?.[firesideId] || 0);
     this.changedChannels.delete(channel);
     this.updateLive();
   }
   show(view: string, id?: string) {
+    if (!this.historyNavigation) {
+      this.returnView = "";
+      this.forwardView = "";
+    }
+    this.historyNavigation = false;
     this.view = view;
     this.request++;
     this.detailRequest++;
@@ -425,7 +498,28 @@ export class TownModel extends Store {
   seedWall(kit: string) {
     this.seedFilters = { q: "", domain: "", tag: "", kit, lifecycle: "" };
     if (this.view === "seeds") this.filterSeeds(this.seedFilters);
-    else this.navigate("seeds");
+    else {
+      this.returnView = this.view;
+      this.forwardView = "";
+      this.historyNavigation = true;
+      this.navigate("seeds");
+    }
+  }
+  returnToSource() {
+    const view = this.returnView;
+    if (!view) return;
+    this.forwardView = this.view;
+    this.returnView = "";
+    this.historyNavigation = true;
+    this.navigate(view);
+  }
+  forwardToDestination() {
+    const view = this.forwardView;
+    if (!view) return;
+    this.returnView = this.view;
+    this.forwardView = "";
+    this.historyNavigation = true;
+    this.navigate(view);
   }
   matches(...values: unknown[]) {
     const query = this.search.toLocaleLowerCase().trim();
@@ -476,12 +570,13 @@ export class TownModel extends Store {
       fetchedAt: sent.fetchedAt > inbox.fetchedAt ? sent.fetchedAt : inbox.fetchedAt,
     };
   }
-  async load() {
+  async load(refresh = false) {
     if (!definitions[this.view]) return;
     const generation = ++this.request;
     ++this.detailRequest;
     const liveAtStart = this.live,
-      channel = this.channel();
+      channel = this.channel(),
+      preserveFireside = refresh && this.view === "firesides" && Boolean(this.data || this.ringData);
     this.scenes.update({
       sceneId: `town:https://beings.town:${this.view}:${this.tab}`,
       title: definitions[this.view].title,
@@ -491,14 +586,18 @@ export class TownModel extends Store {
       scope: "正在读取当前页",
       filters: { tab: this.tab, offset: String(this.offset), ...(this.view === "seeds" ? this.seedFilters : {}) },
     });
-    this.data = null;
-    this.library = null;
-    this.ringData = null;
-    this.detail = undefined;
-    this.localKit = undefined;
-    this.selectedId = "";
-    this.detailLoading = false;
-    this.detailError = undefined;
+    if (!preserveFireside) {
+      this.data = null;
+      this.library = null;
+      this.ringData = null;
+      this.ringMembers = null;
+      this.memberError = "";
+      this.detail = undefined;
+      this.localKit = undefined;
+      this.selectedId = "";
+      this.detailLoading = false;
+      this.detailError = undefined;
+    }
     this.error = undefined;
     this.loading = true;
     this.status = "";
@@ -517,7 +616,7 @@ export class TownModel extends Store {
         this.scenes.update({ identity: this.me });
         this.status = "来自对话中的内容链接";
         if (this.view === "firesides")
-          await this.loadFireside(id, `围炉 #${id}`);
+          await this.loadFireside(id, `围炉 #${id}`, refresh);
         else
           await this.loadDetail({
             kind:
@@ -582,6 +681,7 @@ export class TownModel extends Store {
           void this.loadFireside(
             this.selectedRing,
             str(entry.name, `围炉 #${this.selectedRing}`),
+            refresh,
           );
       }
     } catch (error) {
@@ -664,9 +764,32 @@ export class TownModel extends Store {
     });
     this.updateLive();
     try {
-      if (refresh || this.ringData?.id !== id) {
-        const result = await this.api.town({ kind: "fireside", id });
-        if (generation !== this.detailRequest) return;
+      const loadMessages = refresh || this.ringData?.id !== id || this.firesideUnread(id);
+      const loadMembers = refresh || this.ringMembers?.id !== id;
+      if (loadMembers) this.memberError = "";
+      const [result, memberResult] = await Promise.all([
+        loadMessages
+          ? this.api.town({ kind: "fireside", id })
+          : Promise.resolve(undefined),
+        loadMembers
+          ? this.api.town({ kind: "fireside-members", id }).catch(() => null)
+          : Promise.resolve(undefined),
+      ]);
+      if (generation !== this.detailRequest) return;
+      if (memberResult === null) {
+        this.memberError = "成员名单读取失败。";
+      } else if (memberResult) {
+        if (!memberResult.ok) this.memberError = memberResult.message;
+        else if (!Array.isArray(memberResult.data.members))
+          this.memberError = "Town 返回的成员名单格式不正确。";
+        else {
+          const members = memberResult.data.members.map(record);
+          this.ringMembers = { id, members };
+          this.mentionNames = collectMentionNames(members, this.mentionNames);
+          this.memberError = "";
+        }
+      }
+      if (result) {
         if (!result.ok) {
           this.detailError = {
             message: result.message,
@@ -679,7 +802,7 @@ export class TownModel extends Store {
         list(result.data, "messages");
         this.mentionNames = collectMentionNames(list(result.data, 'messages'), this.mentionNames);
         this.ringData = { id, data: result.data };
-        this.acknowledge("firesides", liveAtStart);
+        this.acknowledge("firesides", liveAtStart, id);
       }
       this.scenes.update({ status: "ready" });
     } catch {
@@ -913,6 +1036,68 @@ export class TownModel extends Store {
   get sendLimit() {
     return this.sendTarget?.kind === "bonfire" ? 4000 : 32000;
   }
+  get displayName() {
+    return this.mentionNames.get(this.me)?.name || townDisplayName(this.live?.display, this.me);
+  }
+  get canAskBeing() {
+    return Boolean(this.scenes.being && this.hasChat());
+  }
+  get canAskBeingSend() {
+    const target = this.sendTarget;
+    if (!this.canAskBeing || !target) return false;
+    if (target.reply) return Boolean(target.reply.content.trim());
+    return Boolean(
+      this.content.trim() &&
+        (target.kind !== "dm" || this.recipient.trim()),
+    );
+  }
+  askBeing() {
+    if (!this.canAskBeing) {
+      this.toast("请先连接对话 Being。");
+      return;
+    }
+    const target = this.sendTarget;
+    const reply = target?.reply;
+    if (!target || !this.canAskBeingSend) return;
+    const description = this.content.trim();
+    const content = reply?.content.trim() || "";
+    const place = target.kind === "fireside"
+      ? this.ringTitle ? `围炉「${this.ringTitle}」` : "围炉"
+      : target.kind === "dm"
+        ? reply
+          ? `与 ${reply.recipientName || reply.author} 的私信`
+          : `发给 ${this.recipient.trim()} 的私信`
+        : "篝火";
+    const quote = (value: string) => value
+      .slice(0, 32000)
+      .split("\n")
+      .map((line) => `> ${line}`)
+      .join("\n");
+    const text = (reply
+      ? [
+          "请帮我拟一段回复，直接发送，并将回复正文发给我。",
+          `位置：${place}`,
+          `回复对象：${reply.author}`,
+          reply.context ? `这条消息所回复的上文：\n${quote(reply.context)}` : "",
+          `要回复的原消息：\n${quote(content)}`,
+          description ? `我已经手写的内容或要求，请结合它完善回复：\n${quote(description)}` : "",
+        ]
+      : [
+          "请根据我的描述和场景位置，帮我写一句适合发布的内容，直接发送，并将发送正文发给我。",
+          `场景位置：${place}`,
+          `我的描述：\n${quote(description)}`,
+        ]
+    ).filter(Boolean).join("\n\n").slice(0, 33000);
+    this.sendOpen = false;
+    this.changed();
+    this.navigate("chat");
+    this.post({
+      type: "beings:town-reply",
+      id: crypto.randomUUID(),
+      text,
+      expiresAt: Date.now() + 2500,
+    });
+  }
   get canSend() {
     return (
       !this.sendBusy &&
@@ -962,7 +1147,7 @@ export class TownModel extends Store {
         ? `消息已发送，但部分 @ 提及未解析成功：${result.warnings.join('；')}。请核对目标，无需重复发送原消息。`
         : "";
       this.sendOpen = Boolean(this.sendNotice);
-      await this.load();
+      await this.load(true);
     } catch (error) {
       if (target === this.sendTarget) this.sendError = errorText(error);
     } finally {

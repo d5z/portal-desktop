@@ -3,6 +3,7 @@ import type { DiagnosticReport } from "../../../shared/types";
 import type { AppModel } from "../models/app";
 import { useModel } from "../../shared/hooks/use-model";
 import { Dialog } from "../../shared/components/dialog";
+import { NavigationControls } from "../../shared/components/navigation-controls";
 export function Diagnostics({ model }: { model: AppModel }) {
   const app = useModel(model),
     [state, setState] = useState<DiagnosticReport>(),
@@ -40,17 +41,22 @@ export function Diagnostics({ model }: { model: AppModel }) {
       open={app.diagnosticsOpen}
       onClose={() => {
         app.diagnosticsOpen = false;
+        app.dismissSettingsRoute();
         app.changed();
       }}
     >
       <div className="dialog-heading">
-        <h2 id="diagnostics-heading">连接诊断</h2>
+        <div className="dialog-heading-main">
+          <h2 id="diagnostics-heading">连接诊断</h2>
+          <NavigationControls back={app.settingsRoute === "diagnostics" ? app.returnToClientSettings : undefined} />
+        </div>
         <button
           id="diagnostics-close"
           className="close"
           aria-label="关闭诊断"
           onClick={() => {
             app.diagnosticsOpen = false;
+            app.dismissSettingsRoute();
             app.changed();
           }}
         />
