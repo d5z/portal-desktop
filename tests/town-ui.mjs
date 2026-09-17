@@ -200,7 +200,13 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.pa
   await nav('kits'); await page.locator('.catalog-item').first().click(); await page.getByText('test_tool', { exact: true }).waitFor();
   await page.locator('.tool-item summary').click(); await page.getByText('"query":', { exact: false }).waitFor();
   await page.getByRole('button', { name: '查看经验墙', exact: true }).click();
-  await page.locator('#place-sheet').dispatchEvent('wheel', { deltaX: -80, deltaY: 0, deltaMode: 0 });
+  await page.waitForFunction(() => document.body.dataset.view === 'seeds' && !document.querySelector('#town-body').hasAttribute('aria-busy'));
+  // Horizontal history gestures are enabled only on macOS.
+  if (process.platform === 'darwin') {
+    await page.locator('#place-sheet').dispatchEvent('wheel', { deltaX: -80, deltaY: 0, deltaMode: 0 });
+  } else {
+    await page.getByRole('button', { name: '回退', exact: true }).click();
+  }
   await page.waitForFunction(() => document.body.dataset.view === 'kits' && !document.querySelector('#town-body').hasAttribute('aria-busy'));
   await page.getByRole('button', { name: '前进', exact: true }).click();
   await page.waitForFunction(() => document.body.dataset.view === 'seeds' && !document.querySelector('#town-body').hasAttribute('aria-busy'));
