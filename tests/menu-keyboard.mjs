@@ -85,15 +85,27 @@ try {
   assert.deepEqual(errors, []);
   console.log('PASS: submenu Escape and Back restore focus after rendering; double Escape, keyboard entry, interrupted motion and reduced motion close correctly.');
 } catch (error) {
-  if (page) {
-    await mkdir('test-results', { recursive: true });
-    await page.screenshot({ path: 'test-results/menu-keyboard-failure.png' });
-    const state = await page.evaluate(() => ({ active: document.activeElement?.id || document.activeElement?.tagName,
-      open: document.querySelector('#conversation-options')?.open,
-      homeHidden: document.querySelector('#options-home')?.hidden,
-      secondaryHidden: document.querySelector('#options-secondary')?.hidden }));
-    await writeFile('test-results/menu-keyboard-failure.json', JSON.stringify(state, null, 2));
-    console.error('Menu keyboard failure state:', state);
+  console.error('Menu keyboard assertion failed:', error);
+  if (page && !page.isClosed()) {
+    // Capture focus before a screenshot can finish animations and change it.
+    // Diagnostic failures must never replace the original test failure.
+    try {
+      const state = await page.evaluate(() => ({ active: document.activeElement?.id || document.activeElement?.tagName,
+        open: document.querySelector('#conversation-options')?.open,
+        homeHidden: document.querySelector('#options-home')?.hidden,
+        secondaryHidden: document.querySelector('#options-secondary')?.hidden }));
+      console.error('Menu keyboard failure state:', state);
+      await mkdir('test-results', { recursive: true });
+      await writeFile('test-results/menu-keyboard-failure.json', JSON.stringify(state, null, 2));
+    } catch (diagnosticError) {
+      console.error('Menu keyboard state capture failed:', diagnosticError);
+    }
+    try {
+      await mkdir('test-results', { recursive: true });
+      await page.screenshot({ path: 'test-results/menu-keyboard-failure.png', animations: 'disabled', timeout: 15000 });
+    } catch (diagnosticError) {
+      console.error('Menu keyboard screenshot failed:', diagnosticError);
+    }
   }
   throw error;
 } finally {
