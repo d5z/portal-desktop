@@ -85,7 +85,7 @@ export class ChatState extends Store {
   items: ChatItem[] = [];
   currentScene = messageScene(Object.fromEntries(new URLSearchParams(location.search)));
   activeScene: MessageScene = this.currentScene;
-  historyScope: HistoryScope = this.currentScene.sceneId ? "current" : "all";
+  historyScope: HistoryScope = this.currentScene.sceneId && new URLSearchParams(location.search).get("scene_scope") !== "all" ? "current" : "all";
   name = new URLSearchParams(location.search).get("name") || "being";
   soul: Soul = {};
   draft = "";

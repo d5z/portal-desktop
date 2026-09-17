@@ -187,6 +187,10 @@ export class AppModel extends Store {
     this.changed();
   };
   applySnapshot(next: Snapshot, reload = false) {
+    const sameChat = Boolean(this.chatSource &&
+      this.snapshot?.settings.endpoint === next.settings.endpoint &&
+      this.snapshot?.settings.being === next.settings.being &&
+      this.snapshot?.chatScene?.scene_id === next.chatScene?.scene_id);
     if (reload || !next.settings.hasToken || (this.snapshot && next.settings.endpoint !== this.snapshot.settings.endpoint)) {
       this.logsRequest = "";
       this.logsLoading = false;
@@ -197,10 +201,10 @@ export class AppModel extends Store {
     if (next.settings.hasToken && (!this.chatSource || reload)) {
       this.sbsKnown = false;
       this.chatLoading = true;
-      this.chatHistoryScope = next.chatScene ? "current" : "all";
+      if (!sameChat) this.chatHistoryScope = next.chatScene ? "current" : "all";
       this.chatHistoryScopeKnown = false;
       this.connection = "connecting";
-      this.chatSource = `beings://chat/?name=${encodeURIComponent(next.settings.being)}&history_scope=${encodeURIComponent(next.settings.endpoint)}&theme=${this.theme}&revision=${crypto.randomUUID()}`;
+      this.chatSource = `beings://chat/?name=${encodeURIComponent(next.settings.being)}&history_scope=${encodeURIComponent(next.settings.endpoint)}&scene_scope=${this.chatHistoryScope}&theme=${this.theme}&revision=${crypto.randomUUID()}`;
       if (next.chatScene) {
         this.chatSource += `&scene_id=${encodeURIComponent(next.chatScene.scene_id)}&scene_label=${encodeURIComponent(next.chatScene.scene_meta.scene_label)}`;
       }

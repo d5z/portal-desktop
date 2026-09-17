@@ -126,6 +126,12 @@ describe("chat scene scopes", () => {
     vi.stubGlobal("location", new URL("beings://chat/?scene_id=desktop-test&scene_label=桌面·测试机"));
     expect(new ChatState().currentScene).toEqual(current);
     expect(new ChatState().historyScope).toBe("current");
+    vi.stubGlobal("location", new URL("beings://chat/?scene_id=desktop-test&scene_scope=all"));
+    expect(new ChatState().historyScope).toBe("all");
+    vi.stubGlobal("location", new URL("beings://chat/?scene_id=desktop-test&scene_scope=current"));
+    expect(new ChatState().historyScope).toBe("current");
+    vi.stubGlobal("location", new URL("beings://chat/?scene_scope=current"));
+    expect(new ChatState().historyScope).toBe("all");
     vi.stubGlobal("location", new URL("https://fixture.test/loom.html"));
     expect(new ChatState().historyScope).toBe("all");
   });

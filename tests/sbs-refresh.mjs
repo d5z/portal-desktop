@@ -184,6 +184,24 @@ try {
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.evaluate(async () => { await window.sbsApp.toggleTheme(); document.documentElement.dataset.theme = window.sbsApp.theme; });
 
+  // Refresh preserves either explicitly selected history view in the real frame.
+  for (const scope of ['all', 'current']) {
+    await sceneButton.click();
+    await page.getByRole('menuitemradio', { name: scope === 'all' ? '全部场景' : '当前场景', exact: true }).click();
+    await page.waitForFunction(scope => window.sbsApp.chatHistoryScopeKnown && window.sbsApp.chatHistoryScope === scope, scope);
+    const source = await page.locator('#chat-frame').getAttribute('src');
+    await page.getByRole('button', { name: '刷新 Being 对话', exact: true }).click();
+    await page.waitForFunction(source => document.querySelector('#chat-frame').getAttribute('src') !== source && window.sbsApp.chatHistoryScopeKnown && !window.sbsApp.chatLoading, source);
+    assert.equal(await page.evaluate(() => window.sbsApp.chatHistoryScope), scope);
+    await chat.getByText('当前桌面的对话', { exact: true }).waitFor();
+    if (scope === 'all') await chat.getByText('这是来自 Loom 网页的对话', { exact: true }).waitFor();
+    else assert.equal(await chat.getByText('这是来自 Loom 网页的对话', { exact: true }).count(), 0);
+    await sceneButton.click();
+    assert.equal(await page.getByRole('menuitemradio', { name: scope === 'all' ? '全部场景' : '当前场景', exact: true }).getAttribute('aria-checked'), 'true');
+    await page.keyboard.press('Escape');
+    await confirmed(false);
+  }
+
   // External SBS change + real refresh button reloads the frame and issues a new GET.
   enabled = true; holdReads = true;
   const beforeRefresh = reads.length;

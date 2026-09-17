@@ -216,6 +216,30 @@ describe("React desktop state lifecycle", () => {
     expect(url.searchParams.get("history_scope")).toBe(snapshot.settings.endpoint);
     expect(url.searchParams.has("token")).toBe(false);
   });
+  it.each(['all', 'current'] as const)("preserves the selected %s history view when refreshing the same chat", scope => {
+    const app = new AppModel(api().value);
+    const snapshot = { ...state(), chatScene: { scene_id: 'desktop-fixed', scene_meta: { client: 'portal-desktop', scene_label: 'Desktop' } } };
+    app.applySnapshot(snapshot);
+    app.frameLoaded();
+    app.setChatHistoryScope('current');
+    app.changeChatHistoryScope('all');
+    app.setChatHistoryScope('all');
+    if (scope === 'current') {
+      app.changeChatHistoryScope('current');
+      app.setChatHistoryScope('current');
+    }
+    const source = app.chatSource;
+    app.applySnapshot(snapshot, true);
+    expect(app.chatSource).not.toBe(source);
+    expect(app.chatHistoryScope).toBe(scope);
+    expect(new URL(app.chatSource).searchParams.get('scene_scope')).toBe(scope);
+    expect(app.chatHistoryScopeKnown).toBe(false);
+    app.applySnapshot(snapshot, true);
+    expect(new URL(app.chatSource).searchParams.get('scene_scope')).toBe(scope);
+    app.applySnapshot({ ...snapshot, settings: state('river').settings }, true);
+    expect(app.chatHistoryScope).toBe('current');
+    expect(new URL(app.chatSource).searchParams.get('scene_scope')).toBe('current');
+  });
   it("previews Portal logs through Together without posting until the user composes a reference", async () => {
     vi.useFakeTimers();
     const pending = deferred<{ endpoint: string; text: string }>();
