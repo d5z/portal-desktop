@@ -1,17 +1,27 @@
 import { app, Menu, nativeImage, Tray } from 'electron';
 import path from 'node:path';
+import { watchSystemTheme } from './system-theme';
 
 const CLIENT_NAME = 'Portal Desktop';
 
 export function createApplicationTray(showWindow: () => void, isPackaged: boolean) {
-  const trayIcon = nativeImage.createFromPath(path.join(
+  const branding = path.join(
     isPackaged ? process.resourcesPath : app.getAppPath(),
-    isPackaged ? 'branding/app.png' : 'resources/branding/app.png',
-  ));
-  const tray = new Tray(trayIcon.resize({
-    width: process.platform === 'darwin' ? 18 : 24,
-    height: process.platform === 'darwin' ? 18 : 24,
-  }));
+    isPackaged ? 'branding' : 'resources/branding',
+  );
+  const image = (dark = true) => {
+    if (process.platform === 'darwin') {
+      const icon = nativeImage.createFromPath(path.join(branding, 'trayTemplate.png'));
+      icon.setTemplateImage(true);
+      return icon;
+    }
+    return nativeImage.createFromPath(path.join(branding, `tray-${dark ? 'white' : 'black'}.png`));
+  };
+  const tray = new Tray(image());
+  if (process.platform !== 'darwin') {
+    const stopWatching = watchSystemTheme(dark => { if (!tray.isDestroyed()) tray.setImage(image(dark)); });
+    app.once('will-quit', stopWatching);
+  }
   tray.setToolTip(CLIENT_NAME);
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: '显示主窗口', click: showWindow },

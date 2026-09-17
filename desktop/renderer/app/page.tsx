@@ -17,9 +17,11 @@ import { Dialog } from "../shared/components/dialog";
 import { EditContextMenu } from "../shared/components/context-menu";
 import { PlaceHeading } from "./components/navigation";
 import logo from "../../../resources/branding/logo.png";
+import logoWhite from "../../../resources/branding/logo-white.png";
 export function App({ model }: { model: AppModel }) {
   const app = useModel(model),
     frame = useRef<HTMLIFrameElement>(null);
+  const themedLogo = app.theme === "dark" ? logoWhite : logo;
   useChatBridge(app, frame);
   useEffect(() => app.start(), [app]);
   useLayoutEffect(() => {
@@ -66,7 +68,7 @@ export function App({ model }: { model: AppModel }) {
         hidden={app.startup === "ready"}
       >
         <div className="startup-content">
-          <img src={logo} alt="Portal Desktop" width={56} height={56} />
+          <img src={themedLogo} alt="Portal Desktop" width={56} height={56} />
           <span
             id="startup-spinner"
             className="startup-spinner"
@@ -109,7 +111,7 @@ export function App({ model }: { model: AppModel }) {
                 <div className="welcome-intro">
                   <img
                     className="welcome-logo"
-                    src={logo}
+                    src={themedLogo}
                     alt="Portal Desktop"
                     width={88}
                     height={88}

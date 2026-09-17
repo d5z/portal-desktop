@@ -2,6 +2,7 @@ import { app, BrowserWindow, nativeTheme } from 'electron';
 import os from 'node:os';
 import path from 'node:path';
 import { ClientBrowser } from '../browser/browser';
+import { refreshSystemTheme, watchSystemTheme } from './system-theme';
 
 const CLIENT_NAME = 'Portal Desktop';
 
@@ -17,9 +18,16 @@ export interface MainWindowOptions {
 
 export function createMainWindow(options: MainWindowOptions) {
   const acrylic = process.platform === 'win32' && Number(os.release().split('.')[2]) >= 22621;
+  const windowIcon = (dark = true) => path.join(
+    app.isPackaged ? process.resourcesPath : app.getAppPath(),
+    app.isPackaged ? 'branding' : 'resources/branding',
+    process.platform === 'win32'
+      ? dark ? 'logo-white.png' : 'logo.png'
+      : process.platform === 'darwin' ? 'app-mac.png' : 'app.png',
+  );
   const window = new BrowserWindow({
     width: 1280, height: 860, minWidth: 920, minHeight: 640, title: CLIENT_NAME,
-    icon: path.join(app.isPackaged ? process.resourcesPath : app.getAppPath(), app.isPackaged ? 'branding/app.png' : 'resources/branding/app.png'),
+    icon: windowIcon(),
     backgroundColor: process.platform === 'darwin' || acrylic ? '#00000000' : nativeTheme.shouldUseDarkColors ? '#212121' : '#ffffff',
     ...(process.platform === 'darwin' ? { vibrancy: 'sidebar' as const, visualEffectState: 'active' as const } : {}),
     ...(acrylic ? { backgroundMaterial: 'acrylic' as const } : {}),
@@ -31,7 +39,16 @@ export function createMainWindow(options: MainWindowOptions) {
       nodeIntegration: false, nodeIntegrationInSubFrames: false, webSecurity: true,
     },
   });
-  if (process.platform === 'win32') window.setMenuBarVisibility(false);
+  if (process.platform === 'win32') {
+    window.setMenuBarVisibility(false);
+    // Running taskbar buttons use the window icon, separately from the tray.
+    const stopWatching = watchSystemTheme(dark => {
+      if (!window.isDestroyed()) window.setIcon(windowIcon(dark));
+    });
+    // WM_SETTINGCHANGE also arrives when only the shell theme changes.
+    window.hookWindowMessage(0x001a, refreshSystemTheme);
+    window.once('closed', stopWatching);
+  }
   window.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown' || input.key !== 'F12' || input.isAutoRepeat) return;
     event.preventDefault();

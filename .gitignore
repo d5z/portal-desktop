@@ -6,6 +6,7 @@ desktop/generated/
 resources/heart-portal*
 !resources/HEART-PORTAL-LICENSE
 .DS_Store
+/logo-kit/
 *.log
 test-results/
 .env*
