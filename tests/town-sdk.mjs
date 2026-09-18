@@ -88,7 +88,9 @@ try {
   const chatInput = page.frameLocator('#chat-frame').locator('#input');
   const home = async () => {
     if (await page.locator('#place-sheet').evaluate(el => el.open)) await page.locator('#back-to-chat').click();
-    await page.locator('#options-trigger').click();
+    const trigger = page.locator('#options-trigger');
+    if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click();
+    await page.waitForFunction(() => document.querySelector('#options-trigger')?.getAttribute('aria-expanded') === 'true');
     await page.locator('[data-view="town"]').click();
     await page.locator('.service-card').first().waitFor();
   };
@@ -110,6 +112,9 @@ try {
   await page.locator('#options-trigger').dispatchEvent('click');
   await page.locator('#options-trigger').dispatchEvent('click');
   await page.locator('#options-trigger').dispatchEvent('click');
+  // Rapid clicks can batch into a closed state; select the target from the settled menu.
+  if (await page.locator('#options-trigger').getAttribute('aria-expanded') !== 'true') await page.locator('#options-trigger').click();
+  await page.waitForFunction(() => document.querySelector('#options-trigger')?.getAttribute('aria-expanded') === 'true');
   await page.locator('#client-settings-button').click();
   await page.locator('#client-settings-dialog[open]').waitFor();
   await page.locator('#settings-tab-appearance').click();
