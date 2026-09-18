@@ -506,7 +506,7 @@ function KitDetail({ town, data }: { town: TownModel; data: Data }) {
       }) && <section className="grove-seeds"><h3>关联经验种子</h3>{data.seed_summaries.map((raw, index) => {
         const seed = record(raw), id = str(seed.id);
         return /^[a-zA-Z0-9_-]{1,160}$/.test(id) && str(seed.domain) !== "grove-feedback"
-          ? <button key={id || index} className="secondary" onClick={() => town.navigate("seeds", id)}>{str(seed.name, str(seed.domain, "经验种子"))} →</button> : null;
+          ? <button key={id || index} className="secondary" onClick={() => town.openSeedFromCatalog(id)}>{str(seed.name, str(seed.domain, "经验种子"))} →</button> : null;
       })}</section>}
       {app ? null : <>
       {Boolean(manifest.command) && (

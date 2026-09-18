@@ -156,6 +156,7 @@ export function Town({ model }: { model: TownModel }) {
             </button>
           </div>
         </div>
+        <div className="town-meta-row">
         <div className="town-live-row">
           <span
             id="town-live-status"
@@ -184,13 +185,12 @@ export function Town({ model }: { model: TownModel }) {
             有新内容 · 更新
           </button>
         </div>
-        <div
-          id="town-status"
-          className="list-status"
-          role="status"
-          aria-live="polite"
-        >
-          {town.status}
+        <div className="town-status-row">
+          <div id="town-status" className="list-status" role="status" aria-live="polite">
+            {town.status}
+          </div>
+        </div>
+        {town.view === "kits" && town.tab === "grove" && <button className="secondary grove-help-button" onClick={() => void town.run(() => town.api.openTownLink("/grove"))}>Grove Help ↗</button>}
         </div>
         <div
           id="town-body"

@@ -540,6 +540,14 @@ export class TownModel extends Store {
       this.navigate("seeds");
     }
   }
+  openSeedFromCatalog(id: string) {
+    if (!/^[a-zA-Z0-9_-]{1,160}$/.test(id)) return;
+    this.returnView = this.view;
+    this.forwardView = "";
+    this.historyNavigation = true;
+    this.navigate("seeds");
+    void this.loadDetail({ kind: "seed", id });
+  }
   returnToSource() {
     const view = this.returnView;
     if (!view) return;

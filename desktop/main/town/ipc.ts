@@ -103,7 +103,7 @@ export function registerTownIpc(options: TownIpcOptions) {
   }));
   handle('beings:town-token', (token: string) => exclusive(async () => { cancelPairing(); await townCredentials.save(token); options.clearWarning(); townLive.restart(); }));
   handle('beings:town-open', async (route: string) => {
-    if (typeof route !== 'string' || !/^\/(?:api\/(?:[a-z]+\/help|grove\/[a-zA-Z0-9_-]+\/download)|(?:embers|scrolls|seeds)\/[a-zA-Z0-9_-]{1,160})?$/.test(route)) throw new Error('不支持的 Town 链接。');
+    if (typeof route !== 'string' || !/^\/(?:grove|api\/(?:[a-z]+\/help|grove\/[a-zA-Z0-9_-]+\/download)|(?:embers|scrolls|seeds)\/[a-zA-Z0-9_-]{1,160})?$/.test(route)) throw new Error('不支持的 Town 链接。');
     options.open(TOWN_ORIGIN + route);
   });
   return () => { cancelPairing(); };

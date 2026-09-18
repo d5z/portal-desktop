@@ -201,12 +201,12 @@ html[data-theme=dark] .mention-tag,html[data-theme=dark] .mentions-me .social-av
 /* Catalog panes share the space left inside the sheet, including short windows. */
 #place-sheet #town-view.paginated-view{overflow:hidden}
 #place-sheet .paginated-view .town-content{height:100%;min-height:0;width:100%;display:flex;flex-direction:column;padding-bottom:18px}
-#place-sheet .paginated-view .town-toolbar,#place-sheet .paginated-view .town-live-row,#place-sheet .paginated-view .list-status{flex-shrink:0}
+#place-sheet .paginated-view .town-toolbar,#place-sheet .paginated-view .town-live-row,#place-sheet .paginated-view .list-status,#place-sheet .paginated-view .town-status-row{flex-shrink:0}
 #place-sheet .paginated-view #town-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain}
 #place-sheet .paginated-view #town-pagination{flex-shrink:0;gap:16px;margin-top:12px}
 #place-sheet .paginated-view #town-pagination:empty{display:none}
 #place-sheet #town-view:is(.kit-catalog,.seed-catalog){overflow:hidden}
-#place-sheet :is(.kit-catalog,.seed-catalog) #town-body{flex:1;min-height:0;display:flex;overflow:auto}
+#place-sheet :is(.kit-catalog,.seed-catalog) #town-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto}
 #place-sheet :is(.kit-catalog,.seed-catalog) .catalog-split{flex:1;min-width:0;min-height:0;align-items:stretch;grid-template-columns:minmax(200px,.8fr) minmax(0,1.4fr)}
 #place-sheet :is(.kit-catalog,.seed-catalog) .catalog-list,#place-sheet :is(.kit-catalog,.seed-catalog) .catalog-detail{min-width:0;min-height:0;max-height:none;overscroll-behavior:contain;scrollbar-gutter:stable}
 #place-sheet :is(.kit-catalog,.seed-catalog) .catalog-list{padding:12px 12px 12px 0}
@@ -216,12 +216,12 @@ html[data-theme=dark] .mention-tag,html[data-theme=dark] .mentions-me .social-av
 #place-sheet :is(.kit-catalog,.seed-catalog) .detail-placeholder{min-height:0;height:100%;padding:24px;text-align:center;line-height:1.8}
 #place-sheet :is(.kit-catalog,.seed-catalog) .loading-block,#place-sheet :is(.kit-catalog,.seed-catalog) .empty-state{min-height:0;width:100%;margin:auto}
 .kit-detail{overflow-wrap:anywhere}
-.grove-growth{font-size:11px;color:var(--secondary);line-height:1.6;width:100%}.grove-progress{height:5px;background:var(--hover);border-radius:6px;overflow:hidden;margin:5px 0}.grove-progress>span{display:block;height:100%;background:var(--green);border-radius:6px}.grove-stats{margin:12px 0 18px}.grove-seeds{margin:18px 0}.grove-seeds .secondary{margin:4px 8px 4px 0}
+.grove-growth{font-size:11px;color:var(--secondary);line-height:1.6;width:100%}.grove-progress{height:5px;background:var(--hover);border-radius:6px;overflow:hidden;margin:5px 0}.grove-progress>span{display:block;height:100%;background:var(--green);border-radius:6px}.grove-stats{margin:12px 0 18px}.grove-seeds{margin:18px 0}.grove-seeds .secondary{margin:4px 8px 4px 0}.town-meta-row{display:flex;align-items:center;gap:16px;min-height:40px}.town-meta-row .town-live-row,.town-meta-row .town-status-row{flex:0 1 auto;min-width:0}.town-status-row{display:flex;align-items:center}.town-status-row .list-status{white-space:nowrap}.grove-help-button{margin-left:auto;flex:0 0 auto}
 .kit-summary .reading-title{margin-bottom:6px}
 .kit-summary .card-meta{font-size:11px;line-height:1.8;margin-bottom:16px}
 .kit-description{font-size:13px;line-height:1.85;color:var(--secondary);margin-bottom:20px}
 .kit-actions{display:flex;align-items:center;flex-wrap:wrap;gap:10px}
-.kit-actions>button{display:inline-flex;align-items:center;justify-content:center;min-height:36px;padding:8px 14px;border-radius:8px;font-size:12px;line-height:18px}
+.kit-actions>button{display:inline-flex;align-items:center;justify-content:center;height:36px;min-height:36px;box-sizing:border-box;padding:8px 14px;border-radius:8px;font-size:12px;line-height:18px}
 .kit-actions>.secondary{padding-block:7px}
 .kit-actions>.danger-action{color:#b34b47}
 .kit-detail>.field-help{font-size:11px;line-height:1.8;color:var(--muted);margin:10px 0 0}
@@ -397,8 +397,8 @@ body[data-view=chat].has-topic .scene-ribbon{display:flex!important;min-height:0
 .place-sheet-heading{display:flex;flex-direction:column;gap:14px;min-width:0;padding:22px 28px 12px;flex-shrink:0;border-bottom:1px solid var(--line)}
 .place-sheet-title-row{display:flex;align-items:center;justify-content:space-between;gap:16px;width:100%;min-width:0}
 #place-sheet #view-title{display:block;font:600 26px/1.4 Georgia,'Songti SC',serif;letter-spacing:0;margin:0;overflow-wrap:anywhere}
-.place-switcher{position:relative;display:flex;align-items:center;gap:4px;width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;padding:3px 0;scrollbar-width:thin}
-.place-switcher button{flex-shrink:0;padding:6px 12px;border-radius:7px;font-size:12px;line-height:18px;color:var(--secondary);white-space:nowrap}
+.place-switcher{position:relative;display:flex;align-items:center;flex-wrap:nowrap;gap:2px;width:100%;min-width:0;overflow-x:auto;overscroll-behavior-x:contain;padding:3px 0;scrollbar-width:thin}
+.place-switcher button{flex-shrink:0;padding:5px 8px;border-radius:7px;font-size:12px;line-height:18px;color:var(--secondary);white-space:nowrap}
 .place-switcher button[aria-current=page]{background:var(--selected);color:var(--text);font-weight:600}
 .place-switcher button:focus-visible{outline-offset:-2px}
 #place-sheet .town-content{padding:20px 28px 28px}

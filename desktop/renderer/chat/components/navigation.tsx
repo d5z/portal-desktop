@@ -69,6 +69,16 @@ const places = [
       </>
     ),
   },
+  {
+    view: "kits" as PlaceView,
+    label: "工具库",
+    icon: (
+      <>
+        <rect x="4" y="4" width="16" height="16" rx="2" />
+        <path d="M8 8h8M8 12h8M8 16h5" />
+      </>
+    ),
+  },
 ];
 export function ChatPlaces({
   send,
