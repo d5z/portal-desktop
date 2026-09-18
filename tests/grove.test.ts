@@ -1,3 +1,4 @@
+import { TownClient, townRoute } from '../desktop/main/town/client';
 import { describe, expect, it } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
@@ -49,4 +50,26 @@ describe('Grove catalog presentation', () => {
     const untrusted = renderToStaticMarkup(createElement(CatalogDetail, { town: town({ ...app, repo_url: 'https://github.com.evil.test/example/app' }) }));
     expect(untrusted).not.toContain('查看 App 仓库');
   });
+});
+
+it('reads public Grove comments without credentials and rejects invalid identifiers', async () => {
+  expect(townRoute({ kind: 'kit-comments', id: 'kit-1' })).toEqual({ route: '/api/grove/kit-1/comments', private: false });
+  expect(() => townRoute({ kind: 'kit-comments', id: '../token' })).toThrow();
+  let headers: Headers | undefined;
+  const client = new TownClient(() => 'private-token', async (_url, init) => {
+    headers = new Headers(init?.headers);
+    return Response.json({ comments: [], count: 0 });
+  });
+  expect((await client.query({ kind: 'kit-comments', id: 'kit-1' })).ok).toBe(true);
+  expect(headers?.has('Authorization')).toBe(false);
+});
+it('places usage feedback before discussion and shows server evidence statistics', () => {
+  const data = { id: 'kit-1', kind: 'kit', name: 'hand', seed_badge: 'backed',
+    success_count: 19, failure_count: 1, success_rate: 0.95, feedback_count: 1,
+    seeds: [{ id: 'feedback-1', domain: 'grove-feedback', brief_excerpt: '冷启动需要等待', display_name: '读者' }] };
+  const html = renderToStaticMarkup(createElement(CatalogDetail, { town: town(data) }));
+  expect(html).toContain('有经验背书');
+  expect(html).toContain('95.0%');
+  expect(html).toContain('冷启动需要等待');
+  expect(html.indexOf('使用者反馈')).toBeLessThan(html.indexOf('补充讨论'));
 });

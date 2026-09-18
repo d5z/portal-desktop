@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import { TownModel, record, str, list, date, type Data } from "../models/town";
 import { sceneExcerpt } from "../../shared/models/scene";
 import { Markdown } from "../../shared/components/markdown";
@@ -157,7 +157,7 @@ export function Catalog({ town, data }: { town: TownModel; data: Data }) {
   const kit = town.tab === "grove",
     book = town.view === "embers";
   const entries = list(data, kit ? "kits" : "scrolls").filter((entry) =>
-    (!kit || !town.groveKind || entry.kind === town.groveKind) &&
+    (!kit || !town.groveKind || (entry.kind || "kit") === town.groveKind) &&
     town.matches(
       entry.name,
       entry.title,
@@ -195,10 +195,7 @@ export function Catalog({ town, data }: { town: TownModel; data: Data }) {
             {kit ? (
               <>
                 <p>{str(entry.description)}</p>
-                <span className="mini-tag">{groveKind(entry)} · {groveStage(entry)}</span>
-                <GroveMaturity data={entry} />
-                <span className="card-meta">🤝 {groveCount(entry.adopter_count)} beings 在用 · ⚡ {groveCount(entry.total_calls)} 次使用{entry.community_verified === true ? " · ⭐ 社区验证" : ""}</span>
-                {entry.kind !== "app" && town.installedKit(str(entry.name)) && <InstalledKitStatus kit={town.installedKit(str(entry.name))!} />}
+                <span className="grove-tag-row"><span className="mini-tag">{groveStage(entry)}</span></span>
               </>
             ) : book ? (
               <span className="mini-tag">公开故事</span>
@@ -425,6 +422,36 @@ function Tools({ tools }: { tools: Data[] }) {
     </>
   );
 }
+function GroveDiscussion({ town, id }: { town: TownModel; id: string }) {
+  const [comments, setComments] = useState<Data[]>([]);
+  const [status, setStatus] = useState("正在读取讨论…");
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setComments([]); setStatus("正在读取讨论…");
+    void town.api.town({ kind: "kit-comments", id }).then(result => {
+      if (!active) return;
+      if (!result.ok) throw new Error(result.message);
+      setComments(list(result.data, "comments")); setStatus("");
+    }).catch(() => { if (active) setStatus("讨论读取失败"); });
+    return () => { active = false; };
+  }, [town, id, retry]);
+  return <section className="grove-seeds"><h3>补充讨论</h3>
+    {status ? <p className="card-meta">{status}{status === "讨论读取失败" && <button className="text-button" onClick={() => setRetry(retry + 1)}>重试</button>}</p>
+      : !comments.length ? <p className="card-meta">暂无讨论</p> : comments.map((item, index) => <article key={str(item.id, String(index))}>
+        <p className="card-meta">{groveAuthor(item)} · {date(item.created_at)}</p>
+        <Markdown content={str(item.content)} />
+      </article>)}
+  </section>;
+}
+function GroveEvidence({ data }: { data: Data }) {
+  const badge = { backed: "有经验背书", self_attested: "自证经验" }[str(data.seed_badge)];
+  return <>{badge && <span className="mini-tag">{badge}</span>}
+    {data.kind === "app" ? <p className="card-meta">类型：{str(data.capability, "未标注")} · 作者自验 {groveCount(data.owner_usage)} 次</p>
+      : typeof data.success_rate === "number" && <p className="card-meta">作者使用样本 {groveCount(data.success_count) + groveCount(data.failure_count)} 次 · 成功率 {(data.success_rate * 100).toFixed(1)}%</p>}
+    {groveCount(data.feedback_count) > 0 && <span className="card-meta">{groveCount(data.feedback_count)} 位使用者反馈</span>}
+  </>;
+}
 function KitDetail({ town, data }: { town: TownModel; data: Data }) {
   const manifest = record(data.manifest),
     tools = Array.isArray(manifest.tools) ? manifest.tools.map(record) : [],
@@ -453,10 +480,12 @@ function KitDetail({ town, data }: { town: TownModel; data: Data }) {
           {groveKind(data)} · {groveAuthor(data)} · v{str(data.version)}
           {!app && ` · ${tools.length} 个声明工具`}
         </p>
-        <span className="mini-tag">{groveStage(data)}</span>
-        {installed && <InstalledKitStatus kit={installed} />}
+        <div className="grove-tag-row">
+          <span className="mini-tag">{groveStage(data)}</span>
+          {installed && <InstalledKitStatus kit={installed} />}
+        </div>
         <p className="kit-description">{str(data.description)}</p>
-        <GroveMaturity data={data} />
+        <GroveMaturity data={data} /><GroveEvidence data={data} />
         <p className="card-meta grove-stats">🤝 {groveCount(data.adopter_count)} beings 在用 · ⚡ {groveCount(data.total_calls)} 次使用 · 📦 {groveCount(data.install_count)} 次安装{data.community_verified === true ? " · ⭐ 社区验证" : ""}{str(data.updated_at) ? ` · 更新于 ${date(data.updated_at)}` : ""}</p>
       </div>
       <div className="kit-actions">
@@ -502,6 +531,15 @@ function KitDetail({ town, data }: { town: TownModel; data: Data }) {
           在客户端完成下载、解压、依赖安装和工具检查。需要的凭据将在安装时填写。
         </p>
       )}
+      {Array.isArray(data.seeds) && data.seeds.map(record).filter(seed => seed.domain === "grove-feedback").length > 0 && <section className="grove-seeds">
+        <h3>使用者反馈</h3>
+        {data.seeds.map(record).filter(seed => seed.domain === "grove-feedback").map(seed => <article key={str(seed.id)}>
+          <p className="card-meta">{groveAuthor(seed)} · {date(seed.updated_at || seed.created_at)}</p>
+          <Markdown content={str(seed.brief_excerpt, str(seed.brief))} />
+          <button className="text-button" onClick={() => town.openSeedFromCatalog(str(seed.id))}>查看完整反馈 →</button>
+        </article>)}
+      </section>}
+      <GroveDiscussion key={str(data.id)} town={town} id={str(data.id)} />
       {Array.isArray(data.seed_summaries) && data.seed_summaries.some(raw => {
         const seed = record(raw); return /^[a-zA-Z0-9_-]{1,160}$/.test(str(seed.id)) && str(seed.domain) !== "grove-feedback";
       }) && <section className="grove-seeds"><h3>关联经验种子</h3>{data.seed_summaries.map((raw, index) => {
