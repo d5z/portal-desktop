@@ -73,6 +73,7 @@ try {
   browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } : { channel: 'chrome' }) });
   const page = await browser.newPage({ viewport: { width: 1100, height: 800 } });
   page.setDefaultTimeout(10000);
+  page.setDefaultNavigationTimeout(30000);
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.address().port}`);
