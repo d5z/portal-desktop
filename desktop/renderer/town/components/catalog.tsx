@@ -157,6 +157,7 @@ export function Catalog({ town, data }: { town: TownModel; data: Data }) {
   const kit = town.tab === "grove",
     book = town.view === "embers";
   const entries = list(data, kit ? "kits" : "scrolls").filter((entry) =>
+    (!kit || !town.groveKind || entry.kind === town.groveKind) &&
     town.matches(
       entry.name,
       entry.title,

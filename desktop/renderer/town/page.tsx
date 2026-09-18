@@ -36,7 +36,7 @@ export function Town({ model }: { model: TownModel }) {
     <section
       id="town-view"
       ref={root}
-      className={`view${social ? " social-view" : ""}${paginated ? " paginated-view" : ""}${town.view === "embers" ? " bookshelf-view" : ""}${town.view === "kits" && town.tab === "grove" && !town.directId ? " kit-catalog" : ""}${town.view === "seeds" && !town.directId ? " seed-catalog" : ""}`}
+      className={`view${social ? " social-view" : ""}${paginated ? " paginated-view" : ""}${town.view === "embers" ? " bookshelf-view" : ""}${["scrolls", "embers"].includes(town.view) && !town.directId ? " reading-catalog" : ""}${town.view === "kits" && town.tab === "grove" && !town.directId ? " kit-catalog" : ""}${town.view === "seeds" && !town.directId ? " seed-catalog" : ""}`}
       hidden={!definition}
     >
       <div className="town-content">
@@ -93,6 +93,9 @@ export function Town({ model }: { model: TownModel }) {
               </option>
             ))}
           </select>
+          {town.view === "kits" && town.tab === "grove" && <div className="segmented grove-kind-filter" role="tablist" aria-label="Grove 类型">
+            {([["", "全部"], ["kit", "Kits"], ["app", "Apps"]] as const).map(([value, label]) => <button key={value} role="tab" aria-selected={town.groveKind === value} className={town.groveKind === value ? "selected" : ""} onClick={() => { town.groveKind = value; town.changed(); }}>{label}</button>)}
+          </div>}
           <select
             id="grove-status"
             aria-label="Grove 成长阶段"

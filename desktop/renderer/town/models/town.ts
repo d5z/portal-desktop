@@ -172,6 +172,7 @@ export class TownModel extends Store {
   search = "";
   scrollKind = "";
   groveStatus = "";
+  groveKind: "" | "kit" | "app" = "";
   seedFilters: SeedFilters = { q: "", domain: "", tag: "", kit: "", lifecycle: "" };
   data: Data | null = null;
   mentionNames: MentionNames = new Map();
