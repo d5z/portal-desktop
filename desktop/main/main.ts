@@ -484,7 +484,7 @@ async function ready() {
     const file = path.join(directory, 'appearance.json');
     await writeFile(file + '.tmp', JSON.stringify({ theme })); await rename(file + '.tmp', file);
     nativeTheme.themeSource = theme; appearance = theme;
-    if (process.platform !== 'darwin' && !(process.platform === 'win32' && Number(os.release().split('.')[2]) >= 22621)) window?.setBackgroundColor(theme === 'dark' ? '#212121' : '#ffffff');
+    if (!(process.platform === 'win32' && Number(os.release().split('.')[2]) >= 22621)) window?.setBackgroundColor(theme === 'dark' ? '#212121' : '#ffffff');
     return appearance;
   }));
   cancelTownPairing = registerTownIpc({

@@ -28,8 +28,7 @@ export function createMainWindow(options: MainWindowOptions) {
   const window = new BrowserWindow({
     width: 1280, height: 860, minWidth: 920, minHeight: 640, title: CLIENT_NAME,
     icon: windowIcon(),
-    backgroundColor: process.platform === 'darwin' || acrylic ? '#00000000' : nativeTheme.shouldUseDarkColors ? '#212121' : '#ffffff',
-    ...(process.platform === 'darwin' ? { vibrancy: 'sidebar' as const, visualEffectState: 'active' as const } : {}),
+    backgroundColor: acrylic ? '#00000000' : nativeTheme.shouldUseDarkColors ? '#212121' : '#ffffff',
     ...(acrylic ? { backgroundMaterial: 'acrylic' as const } : {}),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     autoHideMenuBar: process.platform === 'win32',

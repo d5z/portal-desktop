@@ -39,7 +39,7 @@
   border-radius: 12px; background: var(--bg); color: var(--text); font-size: 12px;
 }
 @media(prefers-reduced-motion:reduce) { .chat-context-menu button { transition: none; } }
-html,body{margin:0;background:transparent;color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+html,body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
 body{display:flex;height:100vh;overflow:hidden;-webkit-font-smoothing:antialiased}
 button,input{font:inherit}button{cursor:pointer;color:inherit;border:0;background:none;transition:background .15s,color .15s}
 button:hover:not(:disabled){background:var(--hover)}button:active:not(:disabled){background:var(--pressed)}
