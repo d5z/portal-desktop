@@ -1,5 +1,5 @@
 import { expect, it, vi } from 'vitest';
-import { copyFile, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import { spawn, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
@@ -24,14 +24,22 @@ it('matches Being identity across token rotation and ignores unrelated or unprov
     for (const directory of paths) await mkdir(directory);
     await writeFile(path.join(paths[0], '.portal-connection.url'), 'https://example.org/fixture/?token=old');
     await writeFile(path.join(paths[1], '.portal-connection.url'), 'https://example.org/other/?token=old');
+    const alias = paths[0] + path.sep + '..' + path.sep + 'old';
     const run: Command = vi.fn(async (file, args) => {
       expect(file).toBe('powershell.exe');
-      expect(Buffer.from(args.at(-1)!, 'base64').toString('utf16le')).toContain("$operation='inventory'");
-      return JSON.stringify(paths.map(root => ({ root })));
+      const source = Buffer.from(args.at(-1)!, 'base64').toString('utf16le');
+      if (source.includes("$operation='inventory'")) return JSON.stringify([...paths.map(root => ({ root })), { root: alias }]);
+      expect(source).toContain("$operation='stop'");
+      expect(source).toContain(ps(alias));
+      expect(source).toContain(ps(paths[0]));
+      return '';
     });
     const found = await new WindowsForcePortal(run).conflicts(connection);
     expect(found).toHaveLength(1);
-    expect(found[0].root).toBe(paths[0]);
+    expect(found[0].root).toBe(process.platform === 'win32' ? await realpath(paths[0]) : paths[0]);
+    expect(found[0].roots).toContain(paths[0]);
+    expect(found[0].roots).toContain(alias);
+    await new WindowsForcePortal(run).stop(found[0]);
   } finally { await cleanup(root); }
 });
 
@@ -66,7 +74,8 @@ while ($true) {
     }
     const recovery = new WindowsForcePortal();
     const targets = await recovery.conflicts(connection);
-    expect(targets.map(item => item.root)).toEqual([roots[0]]);
+    expect(targets.map(item => item.root)).toEqual([await realpath(roots[0])]);
+    expect(targets[0].roots).toContain(roots[0]);
     expect(await recovery.stop(targets[0])).toContain('force-stopped');
     expect(() => process.kill(pids[0], 0)).toThrow();
     expect(() => process.kill(children[0].pid!, 0)).toThrow();

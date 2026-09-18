@@ -1,4 +1,4 @@
-# Inputs ($operation, $targetRoot) come from the main process, never renderer data.
+# Inputs ($operation, $targetRoots) come from the main process, never renderer data.
 $sid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
 function Test-Owner($item) {
   try { return (Invoke-CimMethod -InputObject $item -MethodName GetOwnerSid).Sid -eq $sid }
@@ -72,17 +72,17 @@ if ($operation -eq 'inventory') {
   )
   ConvertTo-Json -InputObject $entries -Compress
 } elseif ($operation -eq 'stop') {
-  if (-not [IO.Path]::IsPathRooted($targetRoot)) { throw 'Invalid Portal runtime path' }
+  if (-not $targetRoots -or @($targetRoots | Where-Object { -not [IO.Path]::IsPathRooted($_) }).Count) { throw 'Invalid Portal runtime path' }
   # Disable relaunch before terminating a guardian or engine. Never unregister or
   # remove its files, so configuration and crash evidence remain available.
-  foreach ($entry in @(Get-OwnedTasks | Where-Object { $_.root -eq $targetRoot })) {
+  foreach ($entry in @(Get-OwnedTasks | Where-Object { $_.root -in $targetRoots })) {
     Disable-ScheduledTask -TaskName $entry.task.TaskName -TaskPath $entry.task.TaskPath | Out-Null
     Stop-ScheduledTask -TaskName $entry.task.TaskName -TaskPath $entry.task.TaskPath
   }
   $deadline = [DateTime]::UtcNow.AddSeconds(15)
   $quiet = $null
   do {
-    $entries = @(Get-OwnedProcesses | Where-Object { $_.root -eq $targetRoot } | Sort-Object { -[int]$_.guardian })
+    $entries = @(Get-OwnedProcesses | Where-Object { $_.root -in $targetRoots } | Sort-Object { -[int]$_.guardian })
     foreach ($entry in $entries) {
       $item = $entry.item
       $live = Get-CimInstance Win32_Process -Filter "ProcessId=$($item.ProcessId)"
