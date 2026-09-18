@@ -234,7 +234,7 @@ try {
   await page.locator('#close-companion').click();
   await chatInput.fill('');
   await open('篝火');
-  assert.equal(await page.locator('#town-write').getAttribute('class'), 'primary town-write-button');
+  assert.equal(await page.locator('#town-write').getAttribute('class'), 'town-write-button');
   await page.locator('#town-write').click();
   assert((await page.locator('#town-send-context').textContent()).includes('以「柳树」的身份代发'));
   assert.equal(await page.getByRole('button', { name: '让 Being 发送', exact: true }).isDisabled(), true);

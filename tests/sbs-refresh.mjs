@@ -93,8 +93,8 @@ const server = createServer(async (request, response) => {
   response.end(`<!doctype html><html lang="zh-CN"><meta charset="utf-8"><style>${css}body{display:block;background:var(--bg)}#chat-frame{height:650px}</style><body data-view="chat"><div id="root"></div><script src="/fixture.js"></script></body></html>`);
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
-const until = async predicate => {
-  const end = Date.now() + 10000;
+const until = async (predicate, timeout = 10000) => {
+  const end = Date.now() + timeout;
   while (!await predicate()) { assert.ok(Date.now() < end, 'fixture request arrived'); await new Promise(resolve => setTimeout(resolve, 10)); }
 };
 let browser;
@@ -117,7 +117,16 @@ try {
   const frame = () => page.frames().find(frame => frame.url().startsWith(origin + '/loom'));
   const request = () => page.evaluate(() => window.sbsApp.post({ type: 'beings:sbs-request' }));
   await page.goto(origin);
-  await until(() => reads.length > 0);
+  // Hosted Windows runners can take longer to mount the generated chat frame
+  // after navigation; wait for its initial config request before checking SBS.
+  try { await until(() => reads.length > 0, 30000); }
+  catch (error) {
+    const frameState = await page.evaluate(() => {
+      const doc = document.querySelector('#chat-frame')?.contentDocument;
+      return { inputReady: Boolean(doc?.querySelector('#input')), alert: doc?.querySelector('[role="alert"]')?.textContent };
+    }).catch(() => undefined);
+    throw new Error(`Initial Loom config request missing: ${JSON.stringify({ frames: page.frames().map(frame => frame.url()), frameState, errors, external })}`, { cause: error });
+  }
   assert.equal(await button.isDisabled(), true);
   assert.equal(await button.getAttribute('aria-pressed'), null, 'Initial default is not confirmed state');
   assert.equal(await page.evaluate(() => window.sbsStates.length), 0);
