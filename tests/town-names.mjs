@@ -135,7 +135,8 @@ try {
   await trigger.waitFor();
   assert.equal(await trigger.getAttribute('aria-expanded'), 'true');
   const row = page.locator('#chat-places-menu button');
-  assert.equal(await row.count(), 6);
+  assert.deepEqual(await row.evaluateAll(items => items.map(item => item.dataset.place)),
+    ['bonfire', 'firesides', 'mail', 'seeds', 'embers', 'scrolls', 'kits']);
   assert.equal(await row.evaluateAll(items => new Set(items.map(item => Math.round(item.getBoundingClientRect().y))).size), 1);
   await page.locator('#input').fill('保留我的草稿');
   await trigger.click();
@@ -149,13 +150,18 @@ try {
   await page.keyboard.press('ArrowRight');
   assert.equal(await page.locator('[data-place="firesides"]').evaluate(el => el === document.activeElement), true);
   await page.keyboard.press('End');
-  assert.equal(await page.locator('[data-place="scrolls"]').evaluate(el => el === document.activeElement), true);
+  assert.equal(await page.locator('[data-place="kits"]').evaluate(el => el === document.activeElement), true);
+  await page.keyboard.press('Enter');
+  assert.deepEqual(await page.evaluate(() => window.fixturePlaces), [{ type: 'beings:open-place', view: 'kits' }]);
   await page.keyboard.press('Escape');
   assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
   assert.equal(await trigger.evaluate(el => el === document.activeElement), true);
   await trigger.press('Enter');
   await page.locator('[data-place="mail"]').click();
-  assert.deepEqual(await page.evaluate(() => window.fixturePlaces), [{ type: 'beings:open-place', view: 'mail' }]);
+  assert.deepEqual(await page.evaluate(() => window.fixturePlaces), [
+    { type: 'beings:open-place', view: 'kits' },
+    { type: 'beings:open-place', view: 'mail' },
+  ]);
   assert.equal(await page.locator('#input').inputValue(), '保留我的草稿');
   assert.equal(await trigger.getAttribute('aria-expanded'), 'true');
   await page.screenshot({ path: 'test-results/chat-places-expanded.png' });
@@ -168,6 +174,8 @@ try {
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   await page.locator('[data-place="scrolls"]').click();
   assert.equal(await page.evaluate(() => window.fixturePlaces.at(-1).view), 'scrolls');
+  await page.locator('[data-place="kits"]').click();
+  assert.deepEqual(await page.evaluate(() => window.fixturePlaces.at(-1)), { type: 'beings:open-place', view: 'kits' });
   await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
   await page.screenshot({ path: 'test-results/chat-places-narrow-dark.png' });
   assert.deepEqual(errors, []);

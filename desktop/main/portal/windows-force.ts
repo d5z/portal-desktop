@@ -17,12 +17,18 @@ export class WindowsForcePortal {
   async conflicts(connection: Connection): Promise<PortalConflict[]> {
     const entries: { root: string; task?: string; execute?: string; arguments?: string }[] = JSON.parse(
       await this.execute("$operation='inventory'; " + script));
-    const groups = new Map<string, typeof entries>();
+    const groups = new Map<string, (typeof entries[number] & { discoveredRoot: string })[]>();
     for (const entry of entries) {
-      const root = await realpath(entry.root).catch(() => undefined);
+      // The recovery script only runs on Windows, where resolving junctions
+      // is part of validating the process root. On other hosts, preserve the
+      // lexical path because macOS maps /var to /private/var during realpath().
+      let root: string | undefined;
+      try {
+        root = process.platform === 'win32' ? await realpath(entry.root) : path.resolve(entry.root);
+      } catch { continue; }
       if (!root) continue;
       const key = root.toLowerCase();
-      groups.set(key, [...(groups.get(key) || []), { ...entry, root }]);
+      groups.set(key, [...(groups.get(key) || []), { ...entry, root, discoveredRoot: entry.root }]);
     }
     const targets: PortalConflict[] = [];
     for (const group of groups.values()) {
@@ -46,12 +52,16 @@ export class WindowsForcePortal {
         if (portalIdentity(parseConnection(link)) !== portalIdentity(connection)) continue;
       } catch { continue; } // Missing ownership evidence is never permission to kill.
       const registrations = group.filter(entry => entry.task).sort((a, b) => a.task!.localeCompare(b.task!));
+      // Win32_Process and Task Scheduler may report 8.3 and long paths for
+      // the same directory. The stop script must recognize both spellings.
+      const roots = [...new Set(group.flatMap(entry => [entry.root, entry.discoveredRoot]))];
       targets.push({ id: createHash('sha256').update(JSON.stringify([root, portalIdentity(connection), registrations])).digest('hex'),
-        root, label: '旧 Portal（强制接管）', service: { root, label: 'force-recovery', file: '', existing: true } });
+        root, roots, label: '旧 Portal（强制接管）', service: { root, label: 'force-recovery', file: '', existing: true } });
     }
     return targets;
   }
   async stop(target: PortalConflict) {
-    return this.execute(`$operation='stop'; $targetRoot=${ps(target.root)}; ` + script);
+    const roots = target.roots || [target.root];
+    return this.execute(`$operation='stop'; $targetRoots=@(${roots.map(ps).join(',')}); ` + script);
   }
 }
