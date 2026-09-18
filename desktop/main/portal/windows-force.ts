@@ -19,7 +19,13 @@ export class WindowsForcePortal {
       await this.execute("$operation='inventory'; " + script));
     const groups = new Map<string, typeof entries>();
     for (const entry of entries) {
-      const root = await realpath(entry.root).catch(() => undefined);
+      // The recovery script only runs on Windows, where resolving junctions
+      // is part of validating the process root. On other hosts, preserve the
+      // lexical path because macOS maps /var to /private/var during realpath().
+      let root: string | undefined;
+      try {
+        root = process.platform === 'win32' ? await realpath(entry.root) : path.resolve(entry.root);
+      } catch { continue; }
       if (!root) continue;
       const key = root.toLowerCase();
       groups.set(key, [...(groups.get(key) || []), { ...entry, root }]);
