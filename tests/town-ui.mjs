@@ -95,7 +95,9 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.pa
     }
     if (['town', 'kits', 'portal'].includes(name)) {
       const options = page.locator('#conversation-options');
-      if ((await options.getAttribute('open')) === null) await options.locator('summary').click();
+      const trigger = options.locator('#options-trigger');
+      if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click();
+      await page.waitForFunction(() => document.querySelector('#options-trigger')?.getAttribute('aria-expanded') === 'true');
       if (name === 'portal') { await options.locator('#client-settings-button').click(); await page.locator('#client-settings-dialog [data-view="portal"]').click(); }
       else await options.locator(`[data-view="${name}"]`).click();
     } else {
@@ -230,7 +232,7 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.pa
   await page.locator('.kit-install-form').getByRole('button', { name: '安装到本机', exact: true }).click();
   await page.locator('.kit-detail').getByRole('button', { name: '已安装', exact: true }).waitFor({ timeout: 60000 });
   assert.equal(await page.getByRole('tab', { name: 'Grove 市集', exact: true }).getAttribute('aria-selected'), 'true');
-  assert.match(await page.locator('.catalog-item').filter({ hasText: 'downloaded-kit' }).textContent(), /已安装/);
+  assert.equal(await page.locator('.catalog-item').filter({ hasText: 'downloaded-kit' }).count(), 1);
   assert.equal(await page.locator('.kit-detail').getByRole('button', { name: '已安装', exact: true }).isDisabled(), true);
   const downloaded = JSON.parse(await readFile(path.join(dir, 'kits/downloaded-kit/manifest.json'), 'utf8'));
   assert.equal(downloaded.tools[0].name, 'downloaded_ping');
