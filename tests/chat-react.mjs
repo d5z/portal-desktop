@@ -13,6 +13,7 @@ let seq = 1;
 const history = [];
 const append = (role, content) => history.push({ seq: seq++, role, content, at: new Date().toISOString() });
 for (let i = 1; i <= 12; i++) { append('user', `历史问题 ${i}`); append('being', Array.from({ length: 6 }, (_, j) => `第 ${i} 轮回复，第 ${j + 1} 段。`).join('\n\n')); }
+history[0].at = '2024-01-02T03:04:05.000Z';
 append('being', '打开篝火，然后看 `seeds`。\n\n```javascript\nconst safe = "<script>never()</script>";\n```\n\n`https://example.com/manual`\n\n| 列一 | 列二 |\n| --- | --- |\n| 内容 | 内容 |\n\n[恶意链接](javascript:alert(1))\n\n<img src=x onerror=alert(1)>');
 history.at(-1).content += '\n\n' + markdownFence('markdown');
 history.at(-1).content += '\n\n```md\n## 第二个文档\n\n独立切换。\n```';
@@ -24,6 +25,11 @@ let active = null, heldResponse = null, rejectConfig = false, requireKey = false
 let markdownResponse = null;
 let rollbackSelfHosted = false;
 const event = (response, name, data) => response.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
+async function waitUntil(check, description) {
+  const deadline = Date.now() + 10000;
+  while (!check() && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 20));
+  assert.ok(check(), description);
+}
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, 'http://localhost');
   const json = (data, status = 200) => { response.writeHead(status, { 'Content-Type': 'application/json' }); response.end(JSON.stringify(data)); };
@@ -113,6 +119,11 @@ try {
   await page.keyboard.press('Control+f');
   await page.waitForFunction(() => window.received.some(item => item.type === 'beings:chat-search'));
   assert.equal(await frame.locator('#messages .message').count(), 25);
+  const messageFor = text => frame.getByText(text, { exact: true }).locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " message ")][1]');
+  const oldMessageTime = await messageFor('历史问题 1').locator('.meta').textContent();
+  const todayMessageTime = await messageFor('历史问题 2').locator('.meta').textContent();
+  assert.match(oldMessageTime, /2024年\d{2}月\d{2}日 \d{2}:\d{2}:\d{2}/, 'Messages from another day show year, month and day');
+  assert.doesNotMatch(todayMessageTime, /年\d{2}月\d{2}日/, 'Messages from today only show the time');
   assert.equal(await frame.locator('#messages img').count(), 0);
   assert.equal(await frame.locator('#messages a[href^="javascript:"]').count(), 0);
   assert.ok(await frame.locator('.hljs-keyword').count());
@@ -235,7 +246,9 @@ try {
   await frame.locator('#input').fill('hold'); await frame.locator('#send-btn').click(); await frame.locator('.run-activity.running .run-stop').waitFor();
   await frame.locator('#file-input').setInputFiles({ name: 'splice.txt', mimeType: 'text/plain', buffer: Buffer.from('splice attachment') });
   await frame.locator('#pending-files.active').waitFor(); await frame.locator('#input').fill('additional input'); await frame.locator('#send-btn').click();
-  await frame.getByText(/消息已送达/).waitFor(); assert.equal(requests.at(-1).attachments[0].data, Buffer.from('splice attachment').toString('base64'));
+  await waitUntil(() => requests.at(-1)?.message === 'additional input', 'The interrupting message reaches the server');
+  assert.equal(requests.at(-1).attachments[0].data, Buffer.from('splice attachment').toString('base64'));
+  assert.equal(await frame.getByText(/消息已送达/).count(), 0, 'Interrupting a reply does not add a system bubble to the conversation');
   await frame.locator('.run-activity.running .run-stop').click(); await frame.locator('.run-activity[data-outcome="stopped"]').waitFor(); assert.equal(stopCount, 1);
   await frame.locator('#input').fill('http-error'); await frame.locator('#send-btn').click(); await frame.getByText(/fixture request failed/).waitFor();
   assert.equal(await frame.locator('.run-activity.running').count(), 0);

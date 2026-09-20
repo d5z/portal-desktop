@@ -108,7 +108,7 @@ macOS 可识别配置目录、连接链接和已知启动脚本均匹配的原 H
 
 对话内容左缘提供刻度式快速索引：悬停或键盘聚焦预览该轮提问和回复，点击跳转，滚动时高亮当前位置，并可回到最新消息。索引直接从聊天 frame 的已加载消息生成，不再单独保存副本。左侧搜索接收限定长度的提问摘要，校验 frame source/origin 和当前 revision 后以纯文本渲染，展开/收起采用淡入与高度过渡，遵循系统减少动态效果设置。跳转复用聊天滚动控制器，保留草稿并暂停流式输出的自动跟随。
 
-聊天记录采用 `loom-local` a18812c 的 IndexedDB 思路，存储实现位于 `renderer/chat/services/history-cache.ts`。当前不按 Being 显示名或 `scene_id` 过滤、分组，当前连接历史接口返回的所有来源统一展示。数据库使用不含凭据的服务地址作为稳定标识，避免 frame revision、主题或显示名变化后丢失缓存；不同服务的 seq 不相互覆盖。`messages` 以服务端 seq 为主键，消息与 `meta.lastSeq` 在同一事务提交。缓存先加载最近 300 条，再通过 `after` 分页补增量；首次无缓存时读取最近 100 条，不回填此前的全部历史，也不因首屏渲染上限删除旧记录。live/replay 完成后从 history 取已确认消息入库，保留 local echo 去重。离线读取不依赖 `/api/status`。IndexedDB 在持久化的客户端 session/profile 内，未做应用层加密；存储失败退回网络，清除 profile 会移除缓存。草稿、附件二进制、未完成回复以及服务端历史缺失的思考/工具细节不作为聊天历史备份。
+聊天记录采用 `loom-local` b113faa（Loom 1.8.2）的 IndexedDB 思路，存储实现位于 `renderer/chat/services/history-cache.ts`。当前不按 Being 显示名或 `scene_id` 过滤、分组，当前连接历史接口返回的所有来源统一展示。数据库使用不含凭据的 Being 服务地址作为稳定且唯一的标识，避免同名 Being、frame revision、主题或显示名变化导致缓存串用或丢失；不同服务的 seq 不相互覆盖。`messages` 以服务端 seq 为主键，消息与 `meta.lastSeq` 在同一事务提交。缓存先加载最近 300 条，再通过 `after` 分页补增量；首次无缓存时读取最近 100 条，不回填此前的全部历史，也不因首屏渲染上限删除旧记录。live/replay 完成后从 history 取已确认消息入库，保留 local echo 去重。离线读取不依赖 `/api/status`。IndexedDB 在持久化的客户端 session/profile 内，未做应用层加密；存储失败退回网络，清除 profile 会移除缓存。草稿、附件二进制、未完成回复以及服务端历史缺失的思考/工具细节不作为聊天历史备份。Being 在进行中的回复里收到新消息时，界面保留用户消息与运行状态，但不再把“消息已送达”一类传输状态插入对话内容。
 
 已覆盖内置对话、本机 Portal、小镇内容客户端、Kit 清单/导入以及桌面打包。篝火/邮局/卷轴的真实数据仍取决于 Town 服务的认证授权。当前不扩展多会话或自建服务端能力，逐次工具审批尚未实现。macOS Developer ID 签发与 Portal 源仓一致，公证暂缓；检查更新和手动安装后的 Portal 配套升级见 UPDATING.md。后台登录自启已支持 macOS 和 Windows，Windows 需在目标系统进一步验证；Linux 暂仅支持临时运行。登录前启动及休眠时联网不在本功能范围内。
 

@@ -1,6 +1,6 @@
 # 构建、打包与交付
 
-本文对应 `package.json`、`scripts/build-portal.mjs`、`scripts/prepare-desktop.mjs` 和 `forge.config.ts`。桌面版本由 `package.json` 决定；根目录 `VERSION` 的 1.3.0 是原单文件 Loom 的版本，二者独立。
+本文对应 `package.json`、`scripts/build-portal.mjs`、`scripts/prepare-desktop.mjs` 和 `forge.config.ts`。桌面版本由 `package.json` 决定；根目录 `VERSION` 记录当前适配的 Loom 上游版本，二者独立。
 
 ## 支持范围与前置条件
 

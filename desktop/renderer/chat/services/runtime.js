@@ -746,15 +746,7 @@ export function createChatRuntime(state, options = {}) {
       if (gap > 300000) {
         hasTimeGap = true;
         const prev = new Date(prevMessageTime);
-        addTimeGap(
-          prev.toLocaleTimeString("en-US", {
-            hour12: false,
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit",
-          }),
-          scene,
-        );
+        addTimeGap(formatMessageTime(prev), scene);
       }
     }
     if (msgTime) lastMessageTime = msgTime;
@@ -832,25 +824,20 @@ export function createChatRuntime(state, options = {}) {
   }
 
   function formatTime() {
-    return new Date().toLocaleTimeString("en-US", {
-      hour12: false,
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
+    return formatMessageTime(new Date());
   }
   function formatHistoryTime(iso) {
-    try {
-      const d = new Date(iso);
-      return d.toLocaleTimeString("en-US", {
-        hour12: false,
-        hour: "2-digit",
-        minute: "2-digit",
-        second: "2-digit",
-      });
-    } catch {
-      return iso;
-    }
+    return formatMessageTime(new Date(iso), iso);
+  }
+  function formatMessageTime(date, fallback = "") {
+    if (!(date instanceof Date) || !Number.isFinite(date.getTime())) return fallback;
+    const pad = (value) => String(value).padStart(2, "0");
+    const time = `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
+    const today = new Date();
+    if (date.getFullYear() === today.getFullYear() &&
+        date.getMonth() === today.getMonth() &&
+        date.getDate() === today.getDate()) return time;
+    return `${date.getFullYear()}年${pad(date.getMonth() + 1)}月${pad(date.getDate())}日 ${time}`;
   }
   function formatSize(bytes) {
     return bytes < 1024
@@ -1809,7 +1796,9 @@ export function createChatRuntime(state, options = {}) {
       return;
     }
     if (res.status === 202) {
-      addMessage("system", "✅ 消息已送达，being 会在思考间隙看到");
+      // The Being interrupts its current round immediately. The local echo and
+      // activity state already communicate progress; an extra system bubble
+      // would become noise in the conversation transcript.
       startCatchUpWatcher();
       return;
     }
@@ -1922,22 +1911,15 @@ export function createChatRuntime(state, options = {}) {
     if (res.status === 202) {
       removeThinkingIndicator();
       tuiClear();
-      let spliced = false;
       try {
-        const data = await res.json();
-        spliced = !!data && data.spliced === true;
-      } catch (_) {
-        spliced = true;
-      }
-      if (spliced) {
-        addMessage("system", "消息已送达，being 正在思考中");
-        setStatus("thinking");
-        startCatchUpWatcher();
-      } else {
-        addMessage("system", "消息已送达");
-        setStatus("connected");
-      }
+        await res.json();
+      } catch (_) {}
+      // A 202 continues asynchronously. Keep that state out of the transcript;
+      // the local user message remains visible and history reconciliation will
+      // append the Being's interrupted-round reply when it is persisted.
+      setStatus("thinking");
       finalizeSendCleanup();
+      startCatchUpWatcher();
       return;
     }
 
