@@ -97,3 +97,96 @@ describe('desktop scene request scope', () => {
     expect(upstream).not.toHaveBeenCalled();
   });
 });
+
+describe('multiple sessions for one Being', () => {
+  it('binds external scene IDs, deduplicates, persists and only removes the local entry', async () => {
+    const { ChatSessions } = await import('../desktop/main/chat/scene');
+    const directory = await profile();
+    const original = await loadDesktopScene(directory, 'test', 'PC');
+    const sessions = new ChatSessions(directory, original);
+    await sessions.load();
+    await sessions.change('alice', 'bind', '共享会话', ' feishu-shared ');
+    expect(sessions.current('alice').scene_id).toBe('feishu-shared');
+    await sessions.change('alice', 'bind', '重复名称', 'feishu-shared');
+    expect(sessions.list('alice')).toHaveLength(2);
+    expect(sessions.current('alice').scene_meta.scene_label).toBe('共享会话');
+    expect(sessions.list('bob')).toEqual([original]);
+    const reopened = new ChatSessions(directory, original);
+    await reopened.load();
+    expect(reopened.current('alice').scene_id).toBe('feishu-shared');
+    for (const invalid of ['', 'a b', 'a\nb', 'x'.repeat(257)]) {
+      await expect(reopened.change('alice', 'bind', '无效', invalid)).rejects.toThrow('场景 ID');
+    }
+    await reopened.change('alice', 'delete', 'feishu-shared');
+    expect(reopened.list('alice')).toEqual([original]);
+    await reopened.change('alice', 'bind', '重新绑定', 'feishu-shared');
+    expect(reopened.current('alice').scene_id).toBe('feishu-shared');
+  });
+
+  it('migrates the existing room, persists multiple scenes and selections, and separates Beings', async () => {
+    const { ChatSessions } = await import('../desktop/main/chat/scene');
+    const directory = await profile();
+    const original = await loadDesktopScene(directory, 'test', 'PC');
+    const sessions = new ChatSessions(directory, original);
+    await sessions.load();
+    expect(sessions.current('alice')).toEqual(original);
+    await sessions.change('alice', 'create', '方案讨论');
+    const discussion = sessions.current('alice');
+    expect(discussion.scene_id).not.toBe(original.scene_id);
+    await sessions.change('alice', 'create', '日常聊天');
+    expect(sessions.list('alice')).toHaveLength(3);
+    expect(sessions.list('bob')).toEqual([original]);
+    await sessions.change('alice', 'select', discussion.scene_id);
+    await sessions.change('alice', 'rename', '技术方案');
+    const reopened = new ChatSessions(directory, original);
+    await reopened.load();
+    expect(reopened.current('alice')).toMatchObject({ scene_id: discussion.scene_id, scene_meta: { scene_label: '技术方案' } });
+    expect(reopened.list('alice')).toHaveLength(3);
+    await expect(reopened.change('alice', 'select', 'missing')).rejects.toThrow('不存在');
+    await expect(reopened.change('alice', 'create', '  ')).rejects.toThrow('名称');
+    await mkdir(path.join(directory, 'chat-sessions.json.tmp'));
+    await expect(reopened.change('alice', 'create', '保存失败')).rejects.toThrow();
+    expect(reopened.list('alice')).toHaveLength(3);
+  });
+
+  it('renames a targeted inactive scene, deletes durably and replaces the last scene', async () => {
+    const { ChatSessions } = await import('../desktop/main/chat/scene');
+    const directory = await profile();
+    const original = await loadDesktopScene(directory, 'test', 'PC');
+    const sessions = new ChatSessions(directory, original);
+    await sessions.load();
+    await sessions.change('alice', 'create', 'B');
+    const b = sessions.current('alice').scene_id;
+    await sessions.change('alice', 'rename', 'A renamed', original.scene_id);
+    expect(sessions.current('alice').scene_id).toBe(b);
+    expect(sessions.list('alice')[0].scene_meta.scene_label).toBe('A renamed');
+    await expect(sessions.change('alice', 'delete', 'missing')).rejects.toThrow('不存在');
+    await sessions.change('alice', 'delete', original.scene_id);
+    expect(sessions.current('alice').scene_id).toBe(b);
+    expect(sessions.list('bob')).toEqual([original]);
+    await sessions.change('alice', 'delete', b);
+    const fresh = sessions.current('alice');
+    expect(fresh.scene_id).not.toBe(b);
+    expect(fresh.scene_id).not.toBe(original.scene_id);
+    const reopened = new ChatSessions(directory, original);
+    await reopened.load();
+    expect(reopened.list('alice')).toEqual([fresh]);
+    await mkdir(path.join(directory, 'chat-sessions.json.tmp'));
+    await expect(reopened.change('alice', 'delete', fresh.scene_id)).rejects.toThrow();
+    expect(reopened.current('alice')).toEqual(fresh);
+  });
+
+  it('rejects sends from the previously selected scene and snapshots identity before reading the body', async () => {
+    const connection = parseConnection('https://fixture.test/alice/?token=fixture');
+    let scene = { scene_id: 'desktop-a', scene_meta: { client: 'test', scene_label: 'A' } };
+    const upstream = vi.fn(async (_url: unknown, init?: RequestInit) => Response.json(JSON.parse(String(init?.body))));
+    const proxy = new ChatProxy(() => connection, upstream, () => scene);
+    scene = { ...scene, scene_id: 'desktop-b' };
+    const stale = await proxy.handle(new Request('beings://chat/api/chat/stream', { method: 'POST', headers: { 'X-Portal-Scene-Id': 'desktop-a' }, body: '{"message":"old"}' }));
+    expect(stale.status).toBe(409);
+    expect(upstream).not.toHaveBeenCalled();
+    const sending = proxy.handle(new Request('beings://chat/api/chat/stream', { method: 'POST', headers: { 'X-Portal-Scene-Id': 'desktop-b' }, body: '{"message":"new","scene_id":"spoofed"}' }));
+    scene = { ...scene, scene_id: 'desktop-c' };
+    expect(await (await sending).json()).toMatchObject({ message: 'new', scene_id: 'desktop-b' });
+  });
+});

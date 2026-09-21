@@ -1248,3 +1248,23 @@ button.llm-custom-link, button.step2-back { border: 0; cursor: pointer; }
   #settings-panel .settings-body { padding: 20px; }
   #settings-panel .parameter-hint { max-width: 55%; text-align: right; }
 }
+
+/* Copy and timestamp share a row so hover never shifts or covers metadata. */
+.message-time-actions{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.message-copy{position:relative;display:inline-flex;align-items:center;justify-content:center;flex-shrink:0;width:20px;height:20px;padding:4px;border:0;border-radius:4px;background:transparent;color:inherit;cursor:pointer;opacity:0;pointer-events:none}
+.message-copy svg{width:12px;height:12px}
+.message:hover .message-copy,.message:focus-within .message-copy{opacity:1;pointer-events:auto}
+.message-copy:hover{background:var(--selected, var(--hover-overlay))}
+.message-copy-status{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+.message-copy:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+@media(hover:none){.message-copy{opacity:1;pointer-events:auto}}
+.message .meta{display:flex;align-items:center;flex-wrap:wrap;gap:4px}
+.message .meta.time-only{display:flex}
+
+.all-scenes-notice{grid-column:1 / -1;grid-row:1;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:12px;height:46px;min-width:0;color:var(--text-muted);font-size:12px;line-height:1.5}
+.all-scenes-notice span{min-width:0;display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;overflow:hidden}
+#input-row.read-only #input{opacity:0;pointer-events:none}
+.all-scenes-notice button{flex-shrink:0;border:1px solid var(--border);border-radius:8px;padding:7px 12px;background:var(--bg-soft);color:var(--text);font:inherit;cursor:pointer}
+.all-scenes-notice button:hover{background:var(--hover-overlay)}
+#input:disabled{cursor:default;opacity:.6}
+@media(max-width:480px){.all-scenes-notice{align-items:flex-start;gap:8px}}

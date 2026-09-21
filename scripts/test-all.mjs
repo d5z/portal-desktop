@@ -66,8 +66,11 @@ try {
     await npm('package', ['run', 'package']);
   }
   await npm('chat-react', ['run', 'test:chat-react']);
+  await npm('chat-scroll', ['run', 'test:chat-scroll']);
   await npm('chat-context-menu', ['run', 'test:chat-context-menu']);
   await npm('chat-history', ['run', 'test:chat-history']);
+  await npm('chat-sessions', ['run', 'test:chat-sessions']);
+  await npm('client-context', ['run', 'test:client-context']);
   await npm('client-lifecycle', ['run', 'test:client-lifecycle']);
   await npm('portal-runtime', ['run', 'test:portal-e2e']);
   await npm('town-sdk', ['run', 'test:town-sdk']);

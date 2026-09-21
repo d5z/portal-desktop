@@ -1,3 +1,5 @@
+import { ClientCommandServer } from './chat/client-server';
+import { ClientContextReader } from './chat/client-context';
 import { app, clipboard, dialog, ipcMain, net, nativeImage, nativeTheme, Notification, protocol, safeStorage, shell, type BrowserWindow, type Tray } from 'electron';
 import { DesktopNotifications } from './app/notifications';
 import { repairDevelopmentShortcut, updateNotificationShortcutIcon, windowsAppId } from './app/windows-identity';
@@ -28,7 +30,7 @@ import { installerEvent, installerTarget, handleInstallerEvent } from './updates
 import { BackgroundPortal } from './portal/background';
 import { KitInstaller } from './kits/install';
 import { ChatProxy } from './chat/proxy';
-import { loadDesktopScene } from './chat/scene';
+import { loadDesktopScene, ChatSessions } from './chat/scene';
 import { verifyBeingConnection } from './chat/ready';
 import { redact } from './chat/connection';
 import type { ChatScene, NotificationTarget, SaveSettings } from '../shared/types';
@@ -210,12 +212,24 @@ async function ready() {
   if (!background.state.supported) store.settings.backgroundEnabled = false;
   let chatScene: ChatScene | undefined;
   let chatSceneNotice: string | undefined;
-  try { chatScene = await loadDesktopScene(directory, app.getVersion(), os.hostname()); }
+  let chatSessions: ChatSessions | undefined;
+  try {
+    chatScene = await loadDesktopScene(directory, app.getVersion(), os.hostname());
+    const sessions = new ChatSessions(directory, chatScene);
+    await sessions.load();
+    chatSessions = sessions;
+  }
   catch { chatSceneNotice = '桌面场景标识未能读取或保存，暂时无法发送消息。请检查客户端配置目录后重启。'; }
-  proxy = new ChatProxy(() => store.connection, net.fetch.bind(net) as typeof fetch, chatScene);
+  proxy = new ChatProxy(() => store.connection, net.fetch.bind(net) as typeof fetch, () => chatSessions?.current(store.connection?.endpoint) || chatScene);
   const assets = app.isPackaged ? path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}`) : path.resolve('desktop/generated');
   registerLocalProtocol(assets, proxy);
   configureLocalSession();
+  const clientContext = new ClientContextReader(shellURL());
+  const clientCommands = new ClientCommandServer(path.join(directory, '.portal-client.json'),
+    () => store.connection?.endpoint, request => clientContext.execute({ ...request, scenes: chatSessions?.list(request.endpoint) }));
+  try { await clientCommands.start(); }
+  catch (error) { startupNotice = errorLog.report('client-commands', error, '场景历史服务启动失败。'); }
+  app.once('will-quit', () => { clientContext.close(); void clientCommands.close().catch(error => errorLog.report('client-commands-close', error)); });
   let recoveryBlocked = false;
   const clientInstall = new ClientInstall(directory, background);
   const installIntent = await clientInstall.read();
@@ -404,7 +418,14 @@ async function ready() {
   handle('beings:install-update', installUpdate);
   handle('beings:cancel-update', () => { updateDownload?.abort(); });
   handle('beings:update-state', () => updates.state);
-  const snapshot = () => ({ settings: store.settings, portal: portal.state, background: background.state, chatScene, notice: [startupNotice && errorLog.report('startup-notice', startupNotice), chatSceneNotice].filter(Boolean).join('\n') || undefined });
+  const snapshot = () => ({ settings: store.settings, portal: portal.state, background: background.state, chatScene: chatSessions?.current(store.connection?.endpoint) || chatScene, chatSessions: chatSessions?.list(store.connection?.endpoint), notice: [startupNotice && errorLog.report('startup-notice', startupNotice), chatSceneNotice].filter(Boolean).join('\n') || undefined });
+  handle('beings:chat-session', (operation: string, value: string, endpoint: string, sceneId?: string) => exclusive(async () => {
+    if (!chatSessions || !store.connection) throw new Error('请先连接 Being，或检查会话目录。');
+    if (endpoint !== store.connection.endpoint) throw new Error('Being 连接已切换，请重试。');
+    if (!['create', 'bind', 'select', 'rename', 'delete'].includes(operation)) throw new Error('无效的会话操作。');
+    await chatSessions.change(endpoint, operation as 'create' | 'bind' | 'select' | 'rename' | 'delete', value, sceneId);
+    return snapshot();
+  }));
   const verifyConnection = async () => {
     await reusePreviousConfig();
     await verifyBeingConnection(store.connection, net.fetch.bind(net) as typeof fetch);

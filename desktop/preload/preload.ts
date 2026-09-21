@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import type { DesktopAPI, PortalState, TownLiveState } from '../shared/types';
 const api: DesktopAPI = {
   platform: process.platform,
+  changeChatSession: (operation, value, endpoint, sceneId) => ipcRenderer.invoke('beings:chat-session', operation, value, endpoint, sceneId),
   clientStartup: enabled => ipcRenderer.invoke('beings:client-startup', enabled),
   notifications: patch => ipcRenderer.invoke('beings:notifications', patch),
   testNotification: () => ipcRenderer.invoke('beings:notification-test'),

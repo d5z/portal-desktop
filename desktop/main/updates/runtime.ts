@@ -119,7 +119,7 @@ export class RuntimeUpdater {
     const root = path.join(this.background.runtimeDirectory, randomUUID());
     if (generatedConfig) config = path.join(root, 'portal.toml');
     const candidate: Service = { label: previous.label, file: previous.file, root, existing: false,
-      name: settings.portalName, environment: previous.environment, bundleId: bundle.id, configPath: config, generatedConfig: Boolean(generatedConfig), cwd: settings.workspace,
+      name: settings.portalName, environment: { ...previous.environment, HEART_PORTAL_CLIENT_FILE: path.join(this.directory, '.portal-client.json') }, bundleId: bundle.id, configPath: config, generatedConfig: Boolean(generatedConfig), cwd: settings.workspace,
       fingerprint: fingerprint({ ...settings, portalConfigPath: generatedConfig ? undefined : config }, connection) };
     await mkdir(root, { recursive: true, mode: 0o700 });
     try {
@@ -131,7 +131,7 @@ export class RuntimeUpdater {
       await copyFile(path.join(previous.root, this.platform === 'win32' ? 'connection.dpapi' : 'connection.url'), path.join(root, this.platform === 'win32' ? 'connection.dpapi' : 'connection.url'));
       const launchSettings = { ...settings, portalConfigPath: config };
       await atomic(path.join(root, this.platform === 'win32' ? 'run.ps1' : 'run.sh'), this.platform === 'win32'
-        ? '\ufeff' + windowsRunner(root, config, launchSettings, previous.environment) : unixRunner(root, config, launchSettings, previous.environment));
+        ? '\ufeff' + windowsRunner(root, config, launchSettings, candidate.environment) : unixRunner(root, config, launchSettings, candidate.environment));
       await atomic(path.join(root, 'runtime-bundle.json'), JSON.stringify(bundle));
       const transaction: Journal = { schema: 1, previous, candidate, enabled: wasEnabled,
         ...(this.platform === 'darwin' ? { previousPlist: await readFile(previous.file, 'utf8') } : {}) };

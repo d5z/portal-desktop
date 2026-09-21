@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, type RefObject } from "react";
 import type { AppModel } from "../models/app";
 import { validPlaceTarget } from "../../shared/lib/navigation";
+import { CHAT_SCENE_ACTIVITY_LABELS, type ChatSceneActivity } from "../../../shared/types";
 
 /** This is the only shell bridge into the separate, sandboxed Loom document. */
 export function useChatBridge(
@@ -44,6 +45,30 @@ export function useChatBridge(
       }
       if (message.revision !== new URL(target.src).searchParams.get("revision"))
         return;
+      if (message.type === "beings:session-create") {
+        if (app.chatHistoryScope !== "all" || !app.snapshot?.settings.hasToken || document.querySelector("dialog[open]")) return;
+        app.chatSessionCreateRequest++;
+        app.changed();
+        return;
+      }
+      if (message.type === "beings:scene-activity") {
+        const activity = message.activity;
+        if (!activity || typeof activity !== "object" || Array.isArray(activity)) return;
+        const entries = Object.entries(activity);
+        if (entries.length > 500 || !entries.every(([id, status]) => id.length > 0 && id.length <= 256 &&
+          typeof status === "string" && Object.hasOwn(CHAT_SCENE_ACTIVITY_LABELS, status))) return;
+        app.setChatSceneActivity(Object.fromEntries(entries) as Record<string, ChatSceneActivity>);
+        return;
+      }
+      if (message.type === 'beings:chat-copy' && typeof message.id === 'string' && message.id.length <= 64 &&
+          typeof message.text === 'string' && message.text.length <= 200000) {
+        const reply = (ok: boolean) => {
+          if (frame.current === target && new URL(target.src).searchParams.get('revision') === message.revision)
+            app.post({ type: 'beings:chat-edit-result', id: message.id, revision: message.revision, ok });
+        };
+        void app.api.copyText(message.text).then(() => reply(true), () => reply(false));
+        return;
+      }
       if (message.type === "beings:chat-edit" && typeof message.id === "string" && message.id.length <= 64 &&
           ["cut", "copy", "paste"].includes(message.command)) {
         const reply = (ok: boolean) => {

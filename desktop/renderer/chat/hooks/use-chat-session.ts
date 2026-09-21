@@ -17,6 +17,7 @@ export function useChatSession() {
     const bridge = createChatBridge(state);
     const runtime = createChatRuntime(state, {
       onSbs: bridge.onSbs,
+      onSceneActivity: activity => bridge.send({ type: "beings:scene-activity", activity }),
       onConnection: (value) =>
         bridge.send({ type: "beings:connection", state: value }),
       beforeSend: bridge.beforeSend,

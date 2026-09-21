@@ -45,6 +45,7 @@ export interface Run extends MessageScene {
   label: string;
   hint: string;
   arg: string;
+  waitingForReply?: boolean;
   outcome?: "stopped" | "error" | "done";
 }
 export type ChatItem =
@@ -83,7 +84,8 @@ export interface Soul {
 }
 export class ChatState extends Store {
   items: ChatItem[] = [];
-  currentScene = messageScene(Object.fromEntries(new URLSearchParams(location.search)));
+  sceneNames: Record<string, string> = {};
+  currentScene: MessageScene = { ...messageScene(Object.fromEntries(new URLSearchParams(location.search))), ...(new URLSearchParams(location.search).get("scene_strict") === "1" ? { strict: true } : {}) };
   activeScene: MessageScene = this.currentScene;
   historyScope: HistoryScope = this.currentScene.sceneId && new URLSearchParams(location.search).get("scene_scope") !== "all" ? "current" : "all";
   name = new URLSearchParams(location.search).get("name") || "being";
@@ -107,6 +109,7 @@ export class ChatState extends Store {
 }
 export interface ChatRuntime {
   start(): Promise<void>;
+  selectScene(scene: MessageScene): Promise<void>;
   dispose(): void;
   send(text: string, files?: Attachment[] | null): Promise<void>;
   stopCurrentTurn(): Promise<void>;
@@ -123,6 +126,7 @@ export interface ChatRuntime {
   request(path: string, init?: RequestInit): Promise<Response>;
 }
 export interface RuntimeOptions {
+  onSceneActivity?(activity: Record<string, import("../../../shared/types").ChatSceneActivity>): void;
   onSbs?(enabled: boolean): void;
   onConnection?(state: string): void;
   beforeSend?(text: string): Promise<((ok: boolean) => void) | undefined>;

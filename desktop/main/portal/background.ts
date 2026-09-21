@@ -56,7 +56,7 @@ const hash = (value: string) => createHash('sha256').update(value).digest('hex')
 export interface Service { label: string; file: string; root: string; existing: boolean; kind?: 'portable'; login?: boolean; name?: string; environmentPath?: string; environment?: Record<string, string>; fingerprint?: string; bundleId?: string; configPath?: string; generatedConfig?: boolean; cwd?: string; binary?: string }
 export function fingerprint(settings: Settings, connection: Connection) {
   return hash(JSON.stringify([connection.link, settings.portalBinary, settings.portalConfigPath, settings.portalName,
-    settings.workspace, settings.portalEnvironmentPath, settings.allowExec, settings.kitsEnabled, 'client-tools-v4-console-free']));
+    settings.workspace, settings.portalEnvironmentPath, settings.allowExec, settings.kitsEnabled, 'client-tools-v5-scene-context']));
 }
 export function launchAgent(label: string, root: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict>
@@ -322,6 +322,7 @@ if ([string]$t.State -eq 'Running' -and (Test-Path -LiteralPath $pidFile)) {
     let wasEnabled = false;
     let oldPlist: string | undefined;
     const service: Service = { label: this.label, root, existing: false, name: settings.portalName, fingerprint: signature,
+      environment: { HEART_PORTAL_CLIENT_FILE: path.join(this.directory, '.portal-client.json') },
       file: this.platform === 'darwin' ? path.join(this.home, 'Library/LaunchAgents', this.label + '.plist') : '' };
     try {
       const binary = path.join(root, this.platform === 'win32' ? 'heart-portal.exe' : 'heart-portal');
@@ -331,12 +332,12 @@ if ([string]$t.State -eq 'Running' -and (Test-Path -LiteralPath $pidFile)) {
       if (!settings.portalConfigPath) await atomic(config, portalConfig(settings));
       if (this.platform === 'darwin') {
         await atomic(path.join(root, 'connection.url'), connection.link);
-        await atomic(path.join(root, 'run.sh'), unixRunner(root, config, settings));
+        await atomic(path.join(root, 'run.sh'), unixRunner(root, config, settings, { HEART_PORTAL_CLIENT_FILE: path.join(this.directory, '.portal-client.json') }));
         oldPlist = await readFile(service.file, 'utf8').catch(() => undefined);
       } else {
         const encrypted = await this.powershell(`[Console]::In.ReadToEnd() | ConvertTo-SecureString -AsPlainText -Force | ConvertFrom-SecureString`, connection.link);
         await atomic(path.join(root, 'connection.dpapi'), encrypted.trim());
-        await atomic(path.join(root, 'run.ps1'), '\ufeff' + windowsRunner(root, config, settings));
+        await atomic(path.join(root, 'run.ps1'), '\ufeff' + windowsRunner(root, config, settings, { HEART_PORTAL_CLIENT_FILE: path.join(this.directory, '.portal-client.json') }));
       }
       if (previous) { wasEnabled = (await this.refresh()).enabled; await this.unload(previous); }
       registrationChanged = true;

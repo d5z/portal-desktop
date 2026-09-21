@@ -41,7 +41,12 @@ export type PortalPhase = 'running' | 'stopped' | 'starting' | 'connected' | 're
 export interface PortalState { phase: PortalPhase; pid?: number; managed?: boolean; runtimePath?: string; conflict?: boolean; message: string; logs: string[] }
 export interface BackgroundState { supported: boolean; installed: boolean; enabled: boolean; running: boolean; existing: boolean; label?: string; pid?: number; message: string }
 export interface ChatScene { scene_id: string; scene_meta: { client: string; scene_label: string } }
-export interface Snapshot { settings: Settings; portal: PortalState; background?: BackgroundState; chatScene?: ChatScene; notice?: string }
+export type ChatSceneActivity = 'thinking' | 'replying' | 'working' | 'waiting' | 'done' | 'error' | 'stopped';
+export const CHAT_SCENE_ACTIVITY_LABELS: Record<ChatSceneActivity, string> = {
+  thinking: '思考中', replying: '回复中', working: '执行中', waiting: '等待回复',
+  done: '已回复', error: '出错了', stopped: '已停止',
+};
+export interface Snapshot { settings: Settings; portal: PortalState; background?: BackgroundState; chatScene?: ChatScene; chatSessions?: ChatScene[]; notice?: string }
 export interface ClientStartup { supported: boolean; enabled: boolean; message: string }
 export interface NotificationPreferences { enabled: boolean; mail: boolean; firesides: boolean; bonfire: boolean }
 export interface NotificationSettings { preferences: NotificationPreferences; supported: boolean; message: string }
@@ -53,6 +58,7 @@ export type BrowserAction = 'back' | 'forward' | 'reload' | 'stop' | 'external' 
 export type ChatEditCommand = 'cut' | 'copy' | 'paste';
 export interface DesktopAPI {
   platform: string;
+  changeChatSession(operation: 'create' | 'bind' | 'select' | 'rename' | 'delete', value: string, endpoint: string, sceneId?: string): Promise<Snapshot>;
   clientStartup(enabled?: boolean): Promise<ClientStartup>;
   notifications(patch?: Partial<NotificationPreferences>): Promise<NotificationSettings>;
   testNotification(): Promise<void>;

@@ -1,3 +1,4 @@
+import type { SceneSummary } from "./client-commands";
 import { messageScene } from "../models/scenes";
 
 // Store all scenes together; changing the visible scope never changes the cache cursor.
@@ -96,6 +97,43 @@ export class HistoryCache {
       if (!messages.length) return null;
       return { messages: messages.reverse(), lastSeq: Math.max(lastSeq, ...messages.map(m => m.seq)) };
     } catch { return null; }
+  }
+
+  // Scan the complete cache, not the 300-message visible window. Exact scene
+  // equality deliberately excludes legacy/unaddressed messages from @context.
+  private async scan(visit: (message: HistoryMessage) => boolean): Promise<void> {
+    const db = await this.open();
+    if (!db || this.closed) throw new Error("Local history cache unavailable");
+    const tx = db.transaction("messages", "readonly");
+    const done = transactionDone(tx);
+    const request = tx.objectStore("messages").openCursor(null, "prev");
+    request.onsuccess = () => {
+      if (request.result && visit(request.result.value)) request.result.continue();
+    };
+    await done;
+  }
+
+  async context(sceneId: string, limit = 50): Promise<HistoryMessage[]> {
+    const messages: HistoryMessage[] = [];
+    await this.scan(message => {
+      if (message.scene_id === sceneId) messages.push(message);
+      return messages.length < Math.max(1, Math.min(limit, 50));
+    });
+    return messages.reverse();
+  }
+
+  async scenes(): Promise<SceneSummary[]> {
+    const scenes = new Map<string, SceneSummary>();
+    await this.scan(message => {
+      if (!message.scene_id) return true;
+      const scene = scenes.get(message.scene_id) || { sceneId: message.scene_id, messageCount: 0 };
+      scene.messageCount++;
+      if (!scene.label && message.scene_label) scene.label = message.scene_label;
+      if (message.at && (!scene.lastActive || message.at > scene.lastActive)) scene.lastActive = message.at;
+      scenes.set(scene.sceneId, scene);
+      return true;
+    });
+    return [...scenes.values()];
   }
 
   async write(messages: HistoryMessage[], cursor: number) {

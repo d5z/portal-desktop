@@ -23,6 +23,8 @@ export function EditContextMenu({ edit, onOpenChange, rootSelector = ".chat-root
 
   useEffect(() => {
     const open = (event: MouseEvent) => {
+      // A component-specific menu owns events it has already handled.
+      if (event.defaultPrevented) return;
       if (!(event.target instanceof HTMLElement) || !event.target.closest(rootSelector)) return;
       event.preventDefault();
       if (menu.current?.contains(event.target)) return;

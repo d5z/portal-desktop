@@ -36,6 +36,8 @@ it.skipIf(process.platform === 'win32')('installs an independent runtime with re
   expect((await stat(path.join(metadata.root, 'connection.url'))).mode & 0o777).toBe(0o600);
   expect(await readFile(metadata.file, 'utf8')).not.toContain(f.connection.token);
   expect(await readFile(path.join(metadata.root, 'run.sh'), 'utf8')).not.toContain(f.connection.token);
+  expect(await readFile(path.join(metadata.root, 'run.sh'), 'utf8')).toContain('HEART_PORTAL_CLIENT_FILE=');
+  expect(metadata.environment.HEART_PORTAL_CLIENT_FILE).toMatch(/\.portal-client\.json$/);
   expect(JSON.stringify(f.calls)).not.toContain(f.connection.token);
   const reopened = new BackgroundPortal(path.join(f.root, 'profile'), f.run, 'darwin', f.root);
   await reopened.discover(f.settings, f.connection); await reopened.enable(f.settings, f.connection);

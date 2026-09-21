@@ -16,8 +16,31 @@ function fixture() {
     } }));
   };
   const results = () => parent.postMessage.mock.calls.map(call => call[0]).filter(message => message.type === 'beings:scene-draft-result');
-  return { state, bridge, runtime, send, results };
+  return { state, bridge, runtime, send, results, parent };
 }
+it('copies complete Markdown through the desktop bridge and waits for a trusted acknowledgement', async () => {
+  const f = fixture();
+  const text = '**完整正文**\n\n1. 第一条\n2. 第二条';
+  const copied = f.bridge.copyText(text);
+  const request = f.parent.postMessage.mock.calls.map(call => call[0]).find(message => message.type === 'beings:chat-copy');
+  expect(request).toMatchObject({ text, revision: 'fixture' });
+  let completed = false;
+  void copied.then(() => { completed = true; });
+  f.send({ type: 'beings:chat-edit-result', id: request.id, revision: 'fixture', ok: true }, 'https://untrusted.example');
+  await Promise.resolve();
+  expect(completed).toBe(false);
+  f.send({ type: 'beings:chat-edit-result', id: request.id, revision: 'fixture', ok: true });
+  await expect(copied).resolves.toBeUndefined();
+  f.bridge.dispose();
+});
+it('reports clipboard failure instead of claiming success', async () => {
+  const f = fixture();
+  const copied = f.bridge.copyText('正文');
+  const request = f.parent.postMessage.mock.calls.map(call => call[0]).find(message => message.type === 'beings:chat-copy');
+  f.send({ type: 'beings:chat-edit-result', id: request.id, revision: 'fixture', ok: false });
+  await expect(copied).rejects.toThrow('Copy failed');
+  f.bridge.dispose();
+});
 it('places a log quotation in the existing draft and never sends a chat request', () => {
   const f = fixture();
   f.send();

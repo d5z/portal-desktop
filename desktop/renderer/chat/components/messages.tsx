@@ -36,10 +36,14 @@ export function ChatActivity({
   run,
   runtime,
   stopping,
+  sceneLabel,
+  canStop = true,
 }: {
   run: Run;
   runtime: ChatRuntime;
   stopping: boolean;
+  sceneLabel?: string;
+  canStop?: boolean;
 }) {
   const [open, setOpen] = useState(false),
     [now, setNow] = useState(Date.now);
@@ -75,6 +79,7 @@ export function ChatActivity({
           <span className="run-label" title={run.arg}>
             {run.label}
           </span>
+          {sceneLabel && <span className="message-scene" title={run.sceneId}>{sceneLabel}</span>}
           <span className="run-elapsed">
             {duration(
               Math.max(0, Math.floor(((run.end || now) - run.start) / 1000)),
@@ -93,7 +98,7 @@ export function ChatActivity({
           type="button"
           title="停止生成"
           aria-label="停止生成"
-          hidden={!!run.end}
+          hidden={!canStop || !!run.end || run.waitingForReply}
           disabled={stopping}
           onClick={(event) => {
             event.preventDefault();

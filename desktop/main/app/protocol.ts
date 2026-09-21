@@ -12,7 +12,7 @@ const MIME_TYPES: Record<string, string> = {
 };
 
 const CHAT_CONTENT_SECURITY_POLICY = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src https: data: blob:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-src 'none'";
-const CHAT_ASSETS = new Set(['loom.html', 'chat.js', 'highlight.css', 'chat.css']);
+const CHAT_ASSETS = new Set(['loom.html', 'chat.js', 'highlight.css', 'chat.css', 'client-context.html', 'client-context.js']);
 
 export function registerLocalProtocol(assets: string, proxy: ChatProxy) {
   protocol.handle('beings', async request => {

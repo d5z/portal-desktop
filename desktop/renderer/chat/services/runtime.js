@@ -1,3 +1,4 @@
+import { createSceneRuntime } from "./scene-runtime";
 import { HistoryCache } from "./history-cache";
 import { inCurrentScene, messageScene } from "../models/scenes";
 
@@ -7,6 +8,10 @@ import { inCurrentScene, messageScene } from "../models/scenes";
  * Each mounted chat owns one runtime; disposal aborts requests and releases all timers.
  */
 export function createChatRuntime(state, options = {}) {
+  return createSceneRuntime(state, options, createStreamRuntime);
+}
+
+function createStreamRuntime(state, options) {
   const lifetime = new AbortController();
   let disposed = false;
   const timeouts = new Set(),
@@ -90,6 +95,7 @@ export function createChatRuntime(state, options = {}) {
     const signal = init.signal
       ? AbortSignal.any([init.signal, lifetime.signal])
       : lifetime.signal;
+    const requestScene = new Headers(init.headers).get("X-Portal-Scene-Id") || state.currentScene.sceneId;
     const report =
       init.method === "POST" &&
       new URL(input, location.href).pathname === "/api/chat/stream"
@@ -100,6 +106,8 @@ export function createChatRuntime(state, options = {}) {
     if (location.protocol === "beings:" && init.method === "POST" && params.get("history_scope")) {
       const headers = new Headers(init.headers);
       headers.set("X-Portal-Being-Endpoint", params.get("history_scope"));
+      if (new URL(input, location.href).pathname === "/api/chat/stream" && requestScene)
+        headers.set("X-Portal-Scene-Id", requestScene);
       init = { ...init, headers };
     }
     try {
@@ -197,30 +205,11 @@ export function createChatRuntime(state, options = {}) {
       return null;
     }
   }
-  let messageCounter = 0,
-    turnCounter = 0,
-    currentRun = null;
+  let currentRun = null;
+  let pendingReply = null;
+  let replyRunSettled = false;
+  let replayTransportOnly = false;
   function setStreamScene(scene) {
-    if (state.activeScene.sceneId !== scene.sceneId && isStreaming) {
-      // A shared SSE connection may continue a reply addressed to another room.
-      // Finalize the old bubble and activity before accepting the new room's text.
-      if (renderTimer) { cancelAnimationFrame(renderTimer); renderTimer = null; }
-      if (!streamMessage && streamText) streamMessage = addMessage("being", streamText);
-      if (streamMessage) {
-        setMessageStreaming(streamMessage, false);
-        updateMessage(streamMessage, cleanContent(streamText));
-        noteLocalEcho("being", streamText);
-      }
-      streamMessage = null;
-      streamText = "";
-      if (currentRun && !currentRun.end) {
-        currentRun.end = Date.now();
-        currentRun.outcome = "done";
-        currentRun.label = "已结束";
-      }
-      currentRun = null;
-      actionLogClear();
-    }
     state.activeScene = {
       ...scene,
       sceneLabel: scene.sceneLabel || (scene.sceneId === state.currentScene.sceneId ? state.currentScene.sceneLabel : undefined),
@@ -249,12 +238,14 @@ export function createChatRuntime(state, options = {}) {
     }
   }
   function updateRun(finished = false) {
+    if (replayTransportOnly && !pendingReply) return;
+    if (replyRunSettled) return;
     if (!currentRun || currentRun.end) {
-      if (!isStreaming) return;
+      if ((!isStreaming && !pendingReply) || finished) return;
       currentRun = {
         ...state.activeScene,
         kind: "run",
-        id: `run-${++messageCounter}`,
+        id: `run-${options.nextId()}`,
         entries: [],
         start: Date.now(),
         label: "思考中",
@@ -267,10 +258,11 @@ export function createChatRuntime(state, options = {}) {
     moveRun();
     if (actionLog.length || !run.entries.length || isStreaming)
       run.entries = actionLog.map((entry) => ({ ...entry }));
-    const waiting = !isStreaming && Boolean(pendingRecovery);
+    const waiting = Boolean(pendingReply?.waiting) || (!isStreaming && Boolean(pendingRecovery || pendingReply));
     const lastTool = [...run.entries]
       .reverse()
       .find((entry) => entry.type === "tool" && !entry.done);
+    run.waitingForReply = !!pendingReply && waiting;
     run.arg = tuiCurrentArg;
     run.hint = tuiHintText;
     if (finished || (!isStreaming && !waiting)) {
@@ -290,7 +282,7 @@ export function createChatRuntime(state, options = {}) {
       run.hint = "";
     } else {
       run.label = waiting
-        ? "正在恢复连接"
+        ? pendingReply ? pendingReply.label : "正在恢复连接"
         : livePhase === "tool" && lastTool
           ? `正在运行 ${lastTool.name || "工具"}`
           : livePhase === "text"
@@ -311,7 +303,7 @@ export function createChatRuntime(state, options = {}) {
   // ---- Connection state machine (P1-4) ----
   // 替换原来的 `connected` 布尔 + 散落的 setStatus 调用。
   // 'connecting' | 'online' | 'degraded' | 'reconnecting' | 'offline'
-  let connState = "connecting";
+  let connState = state.connection || "connecting";
   let streamStatus = "connected"; // 由 setStatus 维护的"流状态"：connected / thinking / error
   let healthTimer = null;
   let healthBackoff = 0;
@@ -343,7 +335,7 @@ export function createChatRuntime(state, options = {}) {
   let activeStreamPollTimer = null;
 
   // ---- Live stream progress (P1-2) ----
-  // liveSeq == 已消费的非-meta SSE 事件数 == 服务端 ActiveStream.seq（meta 不进缓冲）
+  // liveSeq counts replayed events, including continuation meta but excluding initial transport meta.
   let liveSeq = 0;
   let streamWatchdogAborted = false;
   let userStoppedStream = false;
@@ -367,7 +359,7 @@ export function createChatRuntime(state, options = {}) {
   // The dot already carries the connection state (colour); SBS rides on top of it
   // as liveliness — breathing when the being's own heartbeat runs, dim and still
   // when it only wakes for you. applyDotClass publishes both layers together.
-  let sbsEnabled = true;
+  let sbsEnabled = state.sbsEnabled;
   let sbsTransition = ""; // '' | 'waking' | 'sleeping'
   let sbsTransitionTimer = null;
   let sbsToggling = false;
@@ -375,6 +367,7 @@ export function createChatRuntime(state, options = {}) {
   let sbsLoading = null;
 
   function applyDotClass() {
+    if (options.historyOwner?.()) sbsEnabled = state.sbsEnabled;
     state.sbsEnabled = sbsEnabled;
     state.dotClass = [
       effectiveDotClass(),
@@ -432,6 +425,8 @@ export function createChatRuntime(state, options = {}) {
   }
 
   function loadSbsState() {
+    const owner = options.historyOwner?.();
+    if (owner) return owner.loadSbsState();
     // Initial loading and the desktop refresh can ask together. Share that read,
     // and never let an older response undo a newer confirmed config change.
     if (sbsLoading) return sbsLoading;
@@ -700,7 +695,7 @@ export function createChatRuntime(state, options = {}) {
 
   function tuiDone() {
     actionLogFinalizePending();
-    updateRun(!isStreaming);
+    updateRun(!isStreaming && !pendingReply);
     clearInterval(tuiElapsedTimer);
     tuiElapsedTimer = null;
     clearTimeout(tuiTimer);
@@ -760,8 +755,8 @@ export function createChatRuntime(state, options = {}) {
     const message = {
       ...scene,
       kind: "message",
-      id: `message-${++messageCounter}`,
-      turnId: role === "user" ? `turn-${++turnCounter}` : undefined,
+      id: `message-${options.nextId()}`,
+      turnId: role === "user" ? `turn-${options.nextId()}` : undefined,
       role,
       text,
       streaming,
@@ -779,7 +774,7 @@ export function createChatRuntime(state, options = {}) {
     state.items.push({
       ...scene,
       kind: "separator",
-      id: `gap-${++messageCounter}`,
+      id: `gap-${options.nextId()}`,
       text: `— ${text} —`,
     });
     changed();
@@ -805,7 +800,7 @@ export function createChatRuntime(state, options = {}) {
     state.items.push({
       ...scene,
       kind: "separator",
-      id: `marker-${++messageCounter}`,
+      id: `marker-${options.nextId()}`,
       marker: true,
       text: `· ${breathMarkerLabel(text)} · ${timestamp || formatTime()} ·`,
     });
@@ -1069,8 +1064,12 @@ export function createChatRuntime(state, options = {}) {
   }
 
   function addNetworkFailureMessage(text, files) {
-    const message = addMessage("system", "⚠ 网络连接失败，请检查网络后重试");
+    const scene = { ...state.activeScene };
+    const message = addMessage("system", "⚠ 网络连接失败，请检查网络后重试", false, undefined, undefined, scene);
     message.retry = () => {
+      if (state.currentScene.sceneId !== scene.sceneId) {
+        message.text = "请切换回这条消息所属的会话后重试。"; changed(); return;
+      }
       removeMessage(message);
       return send(text, files?.length ? files : null, { isManualRetry: true });
     };
@@ -1148,7 +1147,9 @@ export function createChatRuntime(state, options = {}) {
 
   function markProgress(type, data) {
     if (!PROGRESS_EVENTS.has(type)) return;
+    if (type !== "message_stop" && type !== "error") replayTransportOnly = false;
     lastProgressTime = Date.now();
+    if (type !== "message_stop" && type !== "error") replyRunSettled = false;
     clearTuiHint();
     if (type === "tool_use") {
       livePhase = "tool";
@@ -1321,7 +1322,7 @@ export function createChatRuntime(state, options = {}) {
     lastSendFailed = false;
     updateSendButton();
     scheduleFlushQueue();
-    return added;
+    return recovered;
   }
 
   // 非 SSE 上下文（重连后、replay 轮询中）复用的决策表
@@ -1377,11 +1378,13 @@ export function createChatRuntime(state, options = {}) {
   // 返回 { outcome: 'done' | 'switch_to_replay' | 'aborted' | 'server_error', streamId, localSeq }
   // 异常（AbortError / TypeError / 其它）向上抛给调用方统一处理。
   async function consumeChatStream(res, msg, filesToSend) {
+    routedStreaming = false;
     let streamTimeoutId = null;
     let watchdogAborted = false;
     streamWatchdogAborted = false;
     userStoppedStream = false;
     let sawServerError = false;
+    let sawSceneEvent = false;
     let cutoverRequest = null; // probe 判定 progressing/finished → 热切换到 replay
     let historyRecoveryRequested = false; // probe 判定 gone/superseded → 回落历史对账
     externalCutover = null; // 新流开始，清掉上一条流可能残留的交接意图
@@ -1501,15 +1504,18 @@ export function createChatRuntime(state, options = {}) {
           if (!line.startsWith("data: ")) continue;
           try {
             const data = JSON.parse(line.slice(6));
-            if (eventType !== "usage" && eventType !== "error" && Object.hasOwn(data, "scene_id")) setStreamScene(messageScene(data));
 
-            // meta 不写服务端 replay 缓冲（http.rs:1950 直接 tx.send），
-            // 其余每个事件恰好占一个 seq → "收到的非 meta 事件数" == "消费到的服务端 seq"。
-            // 这个 1:1 性质是 probeStream 判定 progressing 的基石。
-            if (eventType && eventType !== "meta") {
+            // Initial transport meta is not persisted, but scene continuation
+            // meta is a sequenced replay event (observed on the deployed Heart).
+            if (eventType && (eventType !== "meta" || data.continuation === true)) {
               liveSeq++;
-              markProgress(eventType, data);
+              if (PROGRESS_EVENTS.has(eventType)) lastProgressTime = Date.now();
             }
+
+            if (myEpoch !== writerEpoch) continue;
+            if (options.routeEvent?.(eventType, data)) continue;
+            markProgress(eventType, data);
+            if (["content_block_delta", "thinking", "reasoning", "tool_use", "tool_result", "message_stop", "error"].includes(eventType)) sawSceneEvent = true;
 
             if (eventType === "meta") {
               if (data.stream_id) {
@@ -1523,6 +1529,7 @@ export function createChatRuntime(state, options = {}) {
               const text = data.delta?.text || "";
               if (!text) continue;
               if (myEpoch !== writerEpoch) continue; // F2: 已被 poller 接管，静默丢弃
+              if (pendingReply) pendingReply.waiting = false;
               removeThinkingIndicator();
               tuiClear();
               streamText += text;
@@ -1633,6 +1640,7 @@ export function createChatRuntime(state, options = {}) {
                 else removeMessage(streamMessage);
               }
               noteLocalEcho("being", streamText);
+              settleReplyBoundary();
               streamMessage = null;
               streamText = "";
               if (data.session_id) sessionId = data.session_id;
@@ -1646,6 +1654,8 @@ export function createChatRuntime(state, options = {}) {
             if (eventType === "error") {
               if (myEpoch !== writerEpoch) continue; // F2: poller 会从缓冲里拿到同一条 error
               sawServerError = true;
+              pendingReply = null;
+              stopCatchUpWatcher();
               removeThinkingIndicator();
               addMessage("system", "⚠ " + (data.message || "unknown error"));
               isStreaming = false;
@@ -1697,10 +1707,12 @@ export function createChatRuntime(state, options = {}) {
       // 走到这里我可能已经被 cutover 接管了（abort 和"字节流刚好读完"赛跑，
       // reader 有可能不抛 AbortError 就正常结束）。这种情况下收尾归新写者管，
       // 绝不能让 finalizeSendCleanup 把 isStreaming 打回 false —— 那会顺手杀掉 poller。
+      if (myEpoch === writerEpoch && pendingReplyArrived()) finishPendingReply();
       const staleWriter = myEpoch !== writerEpoch;
       if (staleWriter) externalCutover = null;
       return {
         outcome: sawServerError ? "server_error" : "done",
+        empty: !sawSceneEvent,
         handled: staleWriter,
         streamId: currentStreamId || lastStreamId,
         localSeq: liveSeq,
@@ -1767,6 +1779,7 @@ export function createChatRuntime(state, options = {}) {
   // ——浏览器 fetch 内部队列填满后会施加 TCP 背压，把服务端的 SSE 转发任务
   // 阻塞在 tx.send().await 上，连 /api/stream/active 的 replay 缓冲都会停止推进。
   async function spliceSend(text, files = pendingFiles) {
+    const replyBaseline = new Set(state.items);
     const spliceMsg = (text || "").trim();
     if (!spliceMsg && !files.length) return;
     addMessage("user", spliceMsg || `[${files.length} file(s)]`);
@@ -1799,6 +1812,8 @@ export function createChatRuntime(state, options = {}) {
       // The Being interrupts its current round immediately. The local echo and
       // activity state already communicate progress; an extra system bubble
       // would become noise in the conversation transcript.
+      pendingReply = { baseline: replyBaseline, label: "已排队，等待回复" };
+      updateSendButton();
       startCatchUpWatcher();
       return;
     }
@@ -1811,7 +1826,7 @@ export function createChatRuntime(state, options = {}) {
       showThinkingIndicator();
       isStreaming = true;
       updateSendButton();
-      await driveChatStream(res, spliceMsg, []);
+      await driveChatStream(res, spliceMsg, [], replyBaseline);
       return;
     }
     // 非 200/202：主动排空 body，别让连接挂着
@@ -1845,6 +1860,8 @@ export function createChatRuntime(state, options = {}) {
       await spliceSend(text, filesOverride || [...pendingFiles]);
       return;
     }
+    const replyBaseline = new Set(state.items);
+    const sendingScene = { ...state.currentScene };
     userStoppedStream = false;
     const { isManualRetry = false } = sendOptions;
     const msg = (text || "").trim();
@@ -1853,6 +1870,9 @@ export function createChatRuntime(state, options = {}) {
       ? filesOverride
       : [...pendingFiles];
     if (!msg && !filesToSend.length) return;
+    replyRunSettled = false;
+    pendingReply = { baseline: replyBaseline, label: "等待回复", waiting: false };
+    replayTransportOnly = false;
     setStreamScene(state.currentScene);
 
     if (!isManualRetry) {
@@ -1887,7 +1907,7 @@ export function createChatRuntime(state, options = {}) {
         () => {
           return {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: { "Content-Type": "application/json", ...(sendingScene.sceneId ? { "X-Portal-Scene-Id": sendingScene.sceneId } : {}) },
             body: JSON.stringify(body),
             signal: sendController.signal,
           };
@@ -1909,21 +1929,19 @@ export function createChatRuntime(state, options = {}) {
     setStatus("thinking");
 
     if (res.status === 202) {
+      try { await res.json(); } catch (_) {}
+      // Accepted is not completed: release the POST reader, retain this scene's run.
+      pendingReply = { baseline: replyBaseline, label: "已排队，等待回复" };
       removeThinkingIndicator();
       tuiClear();
-      try {
-        await res.json();
-      } catch (_) {}
-      // A 202 continues asynchronously. Keep that state out of the transcript;
-      // the local user message remains visible and history reconciliation will
-      // append the Being's interrupted-round reply when it is persisted.
-      setStatus("thinking");
       finalizeSendCleanup();
       startCatchUpWatcher();
       return;
     }
 
     if (!res.ok) {
+      pendingReply = null;
+      stopCatchUpWatcher();
       const err = await res.text();
       addMessage("system", "⚠ " + err);
       setStatus("error");
@@ -1933,15 +1951,21 @@ export function createChatRuntime(state, options = {}) {
       return;
     }
 
-    await driveChatStream(res, msg, filesToSend);
+    await driveChatStream(res, msg, filesToSend, replyBaseline);
   }
 
   // 读取循环 + 统一的异常处理 + 统一的收尾。
   // send() 和 spliceSend() 都走这里，保证 isStreaming / 队列 / 按钮在任何路径上都能复位。
-  async function driveChatStream(res, msg, filesToSend) {
+  async function driveChatStream(res, msg, filesToSend, replyBaseline = new Set(state.items)) {
     let handedOff = false;
     try {
       const result = await consumeChatStream(res, msg, filesToSend);
+      if (result.outcome === "done" && result.empty && !result.handled) {
+        // EOF without any scene response is not evidence that the request completed.
+        pendingReply = { baseline: replyBaseline, label: "等待回复" };
+        removeThinkingIndicator();
+        startCatchUpWatcher();
+      }
       if (result.outcome === "switch_to_replay") {
         // watchdog probe 判定服务端仍在推进：SSE 管道死了但 breath 活着。
         // 保留 streamMessage / streamText，从 localSeq 处热切换到 replay 通道。
@@ -1960,7 +1984,10 @@ export function createChatRuntime(state, options = {}) {
         cancelAnimationFrame(renderTimer);
         renderTimer = null;
       }
-      if (!handedOff) finalizeSendCleanup();
+      if (!handedOff) {
+        options.finishRoutes?.();
+        finalizeSendCleanup();
+      }
     }
   }
 
@@ -1980,6 +2007,8 @@ export function createChatRuntime(state, options = {}) {
   // 断线恢复路径靠 pendingRecovery 让 finalizeSendCleanup 跳过队列 flush，
   // 而不是靠"不收尾"——isStreaming 卡在 true 是这次修复要根除的东西。
   function handleStreamError(e, msg, filesToSend) {
+    pendingReply = null;
+    stopCatchUpWatcher();
     clearFetchRetryStatus();
     removeThinkingIndicator();
     if (e.name === "AbortError") {
@@ -2058,6 +2087,7 @@ export function createChatRuntime(state, options = {}) {
       if (wasDown || restarted) {
         // 恢复动作自己出错不代表连接不健康——别让它把状态又打回 reconnecting
         try {
+          await options.recoverScenes?.({ restarted });
           await onReconnected({ restarted });
         } catch (err) {
           console.warn("onReconnected failed:", err);
@@ -2125,7 +2155,7 @@ export function createChatRuntime(state, options = {}) {
       return;
     }
 
-    if (!isStreaming && !activeStreamPollTimer) await checkActiveStream();
+    if (!options.historyOwner?.() && !isStreaming && !activeStreamPollTimer) await checkActiveStream();
     if (!isStreaming) await reconcileHistory();
   }
 
@@ -2214,6 +2244,8 @@ export function createChatRuntime(state, options = {}) {
   async function stopCurrentTurn() {
     if (!isStreaming) return;
     userStoppedStream = true;
+    pendingReply = null;
+    stopCatchUpWatcher();
     pendingRecovery = null;
     clearTuiHint();
     state.stopping = true;
@@ -2263,6 +2295,7 @@ export function createChatRuntime(state, options = {}) {
   // /api/history 的 HistoryMessage 是带 seq 的（http.rs:419-425），有 seq 就能增量对账。
   let lastHistorySeq = 0;
   let lastReconcileSawBeing = false;
+  let lastHistoryReplyScenes = [];
   let reconcileInFlight = null;
   const cacheEndpoint = location.protocol === "beings:"
     ? params.get("history_scope") || ""
@@ -2287,10 +2320,12 @@ export function createChatRuntime(state, options = {}) {
   function normalizeEcho(text) {
     return (cleanContent(text || "") || "").replace(/\s+/g, " ").trim();
   }
-  function noteLocalEcho(role, text) {
+  function noteLocalEcho(role, text, scene = state.activeScene) {
+    const owner = options.historyOwner?.();
+    if (owner) return owner.noteLocalEcho(role, text, scene);
     const t = normalizeEcho(text);
     if (!t) return;
-    const message = [...state.items].reverse().find(item => item.kind === "message" && item.role === role && normalizeEcho(item.text) === t);
+    const message = [...state.items].reverse().find(item => item.kind === "message" && item.role === role && item.sceneId === scene.sceneId && normalizeEcho(item.text) === t);
     localEchoes.push({ role, text: t, message });
     if (localEchoes.length > 40) localEchoes.shift();
   }
@@ -2344,7 +2379,7 @@ export function createChatRuntime(state, options = {}) {
         } else {
           state.items.push({
             kind: "separator",
-            id: `gap-${++messageCounter}`,
+            id: `gap-${options.nextId()}`,
             text: "· · ·",
           });
           changed();
@@ -2358,6 +2393,13 @@ export function createChatRuntime(state, options = {}) {
 
   // 返回新追加的消息条数。full=true 才清屏（首次加载 / 服务端重启）。
   function reconcileHistory(opts = {}) {
+    // Ordinary refreshes must retain pending runs even before the first history seq.
+    opts = { ...opts, preserve: opts.preserve ?? !opts.full };
+    const owner = options.historyOwner?.();
+    if (owner) return owner.reconcileHistory({ ...opts, preserve: true }).then(added => {
+      lastReconcileSawBeing = owner.lastHistoryReplyIn(state.currentScene);
+      return added;
+    });
     if (reconcileInFlight) return reconcileInFlight;
     reconcileInFlight = reconcileHistoryOnce(opts).finally(() => {
       reconcileInFlight = null;
@@ -2366,6 +2408,8 @@ export function createChatRuntime(state, options = {}) {
   }
 
   async function refreshHistory() {
+    const owner = options.historyOwner?.();
+    if (owner) return owner.refreshHistory();
     // Wait for older reads instead of reusing them, so a later call still
     // observes the latest shared cursor. Scope changes filter locally and
     // must not go through this path.
@@ -2396,6 +2440,7 @@ export function createChatRuntime(state, options = {}) {
 
   async function reconcileHistoryOnce({ full = false, preserve = false } = {}) {
     lastReconcileSawBeing = false;
+    lastHistoryReplyScenes = [];
     try {
       let hydrated = false;
       if (!preserve && (full || lastHistorySeq === 0)) {
@@ -2427,6 +2472,7 @@ export function createChatRuntime(state, options = {}) {
         resetMessages();
         localEchoes = [];
         toCache = msgs;
+        lastHistoryReplyScenes = msgs.filter(m => !isHistoryMarker(m) && m.role !== "user").map(messageScene);
         await renderHistoryBatched(toCache);
         added = toCache.length;
         lastReconcileSawBeing = toCache.some(
@@ -2444,9 +2490,12 @@ export function createChatRuntime(state, options = {}) {
           }
           const role = m.role === "user" ? "user" : "being";
           const scene = messageScene(m);
-          if (consumeLocalEcho(role, m.content, scene)) continue; // 本地已经渲染过了
+          if (consumeLocalEcho(role, m.content, scene) || (role === "being" && options.isLiveScene?.(scene))) continue; // 本地已经渲染过了
           addMessage(role, m.content, false, formatHistoryTime(m.at), m.at, scene);
-          if (role === "being" && inCurrentScene(scene, state.currentScene)) lastReconcileSawBeing = true;
+          if (role === "being") {
+            lastHistoryReplyScenes.push(scene);
+            if (inCurrentScene(scene, state.currentScene)) lastReconcileSawBeing = true;
+          }
           added++;
         }
         if (added) changed();
@@ -2470,6 +2519,8 @@ export function createChatRuntime(state, options = {}) {
   // Reconcile persisted local echoes and retain simultaneous messages from other scenes.
   let cursorSyncInFlight = null;
   function syncHistoryCursor() {
+    const owner = options.historyOwner?.();
+    if (owner) return owner.syncHistoryCursor();
     // Serialize metadata/reply syncs: a second stop must still fetch history
     // after an earlier in-flight metadata request completes.
     const pending = (cursorSyncInFlight || Promise.resolve()).then(syncHistoryCursorOnce);
@@ -2498,7 +2549,7 @@ export function createChatRuntime(state, options = {}) {
             const role = m.role === "user" ? "user" : "being";
             // Current-room replies are already drawn by live/replay, including
             // continuations that older servers persist as a single combined row.
-            if (!consumeLocalEcho(role, m.content, scene) && !inCurrentScene(scene, state.activeScene)) {
+            if (!consumeLocalEcho(role, m.content, scene) && !options.isLiveScene?.(scene)) {
               addMessage(role, m.content, false, formatHistoryTime(m.at), m.at, scene);
             }
           }
@@ -2521,19 +2572,50 @@ export function createChatRuntime(state, options = {}) {
       catchUpTimer = null;
     }
   }
+  function settleReplyBoundary() {
+    if (!pendingReply) return;
+    if (pendingReplyArrived()) { finishPendingReply(); return; }
+    // Heart can end a breath during a scene switch without emitting a reply.
+    // Keep the submitted request unresolved instead of showing a success check.
+    pendingReply.waiting = true;
+    pendingReply.label = "本轮未返回正文，等待回复";
+    startCatchUpWatcher();
+    updateSendButton();
+  }
+  function finishPendingReply(failed = false) {
+    if (!pendingReply) return;
+    pendingReply = null;
+    stopCatchUpWatcher();
+    actionLogFinalizePending();
+    if (currentRun && !currentRun.end) {
+      currentRun.entries = actionLog.map(entry => ({ ...entry }));
+      currentRun.end = Date.now();
+      currentRun.waitingForReply = false;
+      currentRun.outcome = failed ? "error" : "done";
+      currentRun.label = failed ? "等待回复超时" : "已回复";
+      currentRun.hint = failed ? "暂未收到该会话的回复，可刷新历史查看；未自动重发消息。" : "";
+    }
+    replyRunSettled = true;
+    changed();
+  }
+  function pendingReplyArrived() {
+    return pendingReply && state.items.some(item => item.kind === "message" && item.role === "being"
+      && item.sceneId === state.currentScene.sceneId && !item.streaming && !pendingReply.baseline.has(item));
+  }
   function startCatchUpWatcher() {
     stopCatchUpWatcher();
-    const startedAt = Date.now();
-    const deadline = startedAt + CATCH_UP_ABSOLUTE_MAX_MS;
+    const deadline = Date.now() + CATCH_UP_ABSOLUTE_MAX_MS;
     let delay = CATCH_UP_INITIAL_MS;
     const tick = async () => {
       catchUpTimer = null;
-      if (isStreaming) return;
-      await reconcileHistory();
-      if (lastReconcileSawBeing) return;
-      if (isStreaming || catchUpTimer || Date.now() >= deadline) return;
+      if (!pendingReply) return;
+      if (!isStreaming || pendingReply.waiting) await reconcileHistory({ preserve: true });
+      if (pendingReplyArrived()) { finishPendingReply(); return; }
+      if (!pendingReply || catchUpTimer) return;
+      if (Date.now() >= deadline) { finishPendingReply(true); return; }
+      // A live stream may belong to an earlier turn; keep watching queued work.
       delay = Math.min(delay * 2, CATCH_UP_MAX_INTERVAL_MS);
-      catchUpTimer = setTimeout(tick, delay);
+      catchUpTimer = setTimeout(tick, Math.min(delay, Math.max(0, deadline - Date.now())));
     };
     catchUpTimer = setTimeout(tick, delay);
     checkActiveStream({ autonomousOnly: true });
@@ -2571,7 +2653,7 @@ export function createChatRuntime(state, options = {}) {
     const finish = async () => {
       if (!release()) return;
       await reconcileHistory();
-      if (lastReconcileSawBeing) stopCatchUpWatcher();
+      if (pendingReplyArrived()) finishPendingReply();
     };
     const poll = async () => {
       watch.timer = null;
@@ -2616,6 +2698,7 @@ export function createChatRuntime(state, options = {}) {
   }
 
   async function checkActiveStream({ autonomousOnly = false } = {}) {
+    const epoch = writerEpoch;
     try {
       const res =
         (await takePrefetch("active")) ||
@@ -2625,7 +2708,11 @@ export function createChatRuntime(state, options = {}) {
         }));
       if (!res || res.status === 204 || !res.ok) return;
       const data = await res.json();
+      // A local send or another recovery may have taken ownership while the
+      // discovery request was in flight. Do not replace that newer transport.
+      if (disposed || epoch !== writerEpoch) return;
       if (data.origin && data.origin !== "human") {
+        if (Object.hasOwn(data, "scene_id") && messageScene(data).sceneId !== state.currentScene.sceneId) return;
         if (isStreaming) return;
         if (data.finished) {
           reconcileHistory();
@@ -2642,9 +2729,14 @@ export function createChatRuntime(state, options = {}) {
   }
 
   function replayStream(data) {
+    if (options.routeReplay?.(data)) return;
+    if (isStreaming && currentStreamId === data.stream_id) return;
     // If the stream already finished, its content is in history — skip replay to avoid duplicates
     if (data.finished) return;
-    setStreamScene(messageScene(data));
+    // This runtime may only own the replay transport. Event scene IDs, not
+    // the selected desktop scene, determine which runtime has actual work.
+    replayTransportOnly = true;
+    if (Object.hasOwn(data, "scene_id")) setStreamScene(messageScene(data));
 
     if (activeStreamPollTimer) {
       clearTimeout(activeStreamPollTimer);
@@ -2665,33 +2757,7 @@ export function createChatRuntime(state, options = {}) {
     updateSendButton();
 
     const events = Array.isArray(data.events) ? data.events : [];
-    for (const item of events) {
-      const eventData = item.data || {};
-      if (item.event !== "usage" && item.event !== "error" && Object.hasOwn(eventData, "scene_id")) setStreamScene(messageScene(eventData));
-      switch (item.event) {
-        case "content_block_delta":
-          streamText += eventData.delta?.text || "";
-          break;
-        case "message_stop": {
-          // F3: 缓冲里可能有多个 message_stop（yield 续写）。每个都要落成独立气泡，
-          // 否则追赶渲染会把两次回复和中间那条用户消息的顺序搅在一起。
-          const replied = cleanContent(streamText);
-          if (replied) {
-            addMessage("being", replied, false);
-            noteLocalEcho("being", replied);
-          }
-          streamText = "";
-          break;
-        }
-        case "thinking":
-        case "reasoning":
-          setStatus("thinking");
-          break;
-        case "tool_use":
-          toolCount++;
-          break;
-      }
-    }
+    for (const item of events) processReplayEvent(item.event, item.data || {});
 
     if (data.finished) {
       // 先渲染已累积的文字，再 finalize
@@ -2702,7 +2768,7 @@ export function createChatRuntime(state, options = {}) {
     }
 
     const visibleText = cleanContent(streamText);
-    if (visibleText) streamMessage = addMessage("being", visibleText, true);
+    if (visibleText && !streamMessage) streamMessage = addMessage("being", visibleText, true);
 
     setStatus("thinking");
     if (toolCount > 0) {
@@ -2853,12 +2919,13 @@ export function createChatRuntime(state, options = {}) {
   }
 
   function processReplayEvent(eventType, eventData) {
-    if (eventType !== "usage" && eventType !== "error" && Object.hasOwn(eventData, "scene_id")) setStreamScene(messageScene(eventData));
+    if (options.routeEvent?.(eventType, eventData)) return;
     markProgress(eventType, eventData);
     switch (eventType) {
       case "content_block_delta": {
         const text = eventData.delta?.text || "";
         if (!text) break;
+        if (pendingReply) pendingReply.waiting = false;
         removeThinkingIndicator();
         tuiClear();
         streamText += text;
@@ -2947,6 +3014,9 @@ export function createChatRuntime(state, options = {}) {
         finalizeReplayReply();
         break;
       case "error":
+        pendingReply = null;
+        stopCatchUpWatcher();
+        finalizePartialBubble();
         if (activeStreamPollTimer) clearTimeout(activeStreamPollTimer);
         activeStreamPollTimer = null;
         isStreaming = false;
@@ -2972,6 +3042,7 @@ export function createChatRuntime(state, options = {}) {
       renderTimer = null;
     }
     solidifyReplayBubble();
+    settleReplyBoundary();
     noteLocalEcho("being", streamText);
     streamMessage = null;
     streamText = "";
@@ -2992,12 +3063,14 @@ export function createChatRuntime(state, options = {}) {
   }
 
   function finalizeReplayStream() {
+    options.finishRoutes?.();
     noteLocalEcho("being", streamText);
     if (activeStreamPollTimer) clearTimeout(activeStreamPollTimer);
     activeStreamPollTimer = null;
 
     // 先把 streamText 固化为正式消息（如果还没渲染）
     solidifyReplayBubble();
+    settleReplyBoundary();
 
     isStreaming = false;
     if (currentStreamId) lastStreamId = currentStreamId;
@@ -3017,6 +3090,7 @@ export function createChatRuntime(state, options = {}) {
     scheduleFlushQueue();
   }
 
+  let routedStreaming = false;
   let started = false;
   async function start() {
     if (started || disposed) return;
@@ -3079,6 +3153,51 @@ export function createChatRuntime(state, options = {}) {
   }
   return {
     start,
+    waitForPendingFiles,
+    noteLocalEcho,
+    reconcileHistory,
+    syncHistoryCursor,
+    lastHistoryReplyIn: scene => lastHistoryReplyScenes.some(reply => inCurrentScene(reply, scene)),
+    sceneActivity: () => {
+      if (replayTransportOnly && !pendingReply) return null;
+      if (pendingReply && (pendingReply.waiting || !isStreaming)) return "waiting";
+      if (isStreaming && !replyRunSettled)
+        return livePhase === "tool" ? "working" : livePhase === "text" ? "replying" : "thinking";
+      if (currentRun?.end) {
+        if (currentRun.outcome === "error") return "error";
+        if (currentRun.outcome === "stopped") return "stopped";
+        // A bare reasoning/stop boundary does not establish that a reply arrived.
+        return currentRun.label === "已回复" ? "done" : null;
+      }
+      return null;
+    },
+    hasStream: id => isStreaming && currentStreamId === id,
+    recoverConnection: onReconnected,
+    syncConnection: next => { connState = next; applyDotClass(); },
+    ownsLiveScene: scene => isStreaming && !pendingReply?.waiting && inCurrentScene(scene, state.activeScene),
+    acceptReplay: replayStream,
+    acceptSceneEvent: (type, data) => {
+      if (type === "meta" || type === "usage") return;
+      // A boundary is not the start of another run. Shared streams may replay
+      // stops for idle scenes; opening a run here creates a phantom "已结束 0 秒".
+      if (!isStreaming && PROGRESS_EVENTS.has(type) && type !== "message_stop" && type !== "error") {
+        routedStreaming = true;
+        isStreaming = true;
+        updateSendButton();
+      }
+      if (type === "message_stop" && data.session_id) sessionId = data.session_id;
+      processReplayEvent(type, data);
+      if (routedStreaming && (type === "message_stop" || type === "error")) {
+        routedStreaming = false;
+        isStreaming = false;
+        updateSendButton();
+      }
+    },
+    finishRoutedStream: () => {
+      if (!routedStreaming) return;
+      routedStreaming = false;
+      finalizeReplayStream();
+    },
     dispose,
     send,
     stopCurrentTurn,

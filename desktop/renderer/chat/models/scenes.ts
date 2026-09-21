@@ -3,6 +3,7 @@ import type { ChatItem } from "./chat";
 export interface MessageScene {
   sceneId?: string;
   sceneLabel?: string;
+  strict?: boolean;
 }
 export type HistoryScope = "current" | "all";
 
@@ -18,8 +19,10 @@ export function messageScene(value: unknown): MessageScene {
   } : {};
 }
 
-export function sceneName(scene: MessageScene, current: MessageScene): string {
-  return scene.sceneLabel || (scene.sceneId && scene.sceneId === current.sceneId ? current.sceneLabel || "当前场景" : scene.sceneId) || "未标记场景";
+export function sceneName(scene: MessageScene, current: MessageScene, names: Record<string, string> = {}): string {
+  const localName = scene.sceneId && Object.hasOwn(names, scene.sceneId) ? names[scene.sceneId] : undefined;
+  return localName || (scene.sceneId && scene.sceneId === current.sceneId ? current.sceneLabel : undefined) ||
+    scene.sceneLabel || scene.sceneId || "未标记场景";
 }
 
 export function sceneItems(items: ChatItem[], scope: HistoryScope, current: MessageScene): ChatItem[] {
@@ -28,7 +31,7 @@ export function sceneItems(items: ChatItem[], scope: HistoryScope, current: Mess
     : items;
 }
 
-// Loom treats unaddressed legacy messages and autonomous breaths as shared history.
+// Legacy Loom keeps shared history; managed sessions use strict scene boundaries.
 export function inCurrentScene(scene: MessageScene, current: MessageScene): boolean {
-  return !current.sceneId || !scene.sceneId || scene.sceneId === current.sceneId;
+  return !current.sceneId || (!scene.sceneId && !current.strict) || scene.sceneId === current.sceneId;
 }

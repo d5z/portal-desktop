@@ -6,7 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { chromium } from 'playwright';
 
-const assets = new Map(await Promise.all(['loom.html', 'chat.js', 'chat.css', 'highlight.css'].map(async file => ['/' + file, await readFile('desktop/generated/' + file)])));
+const assets = new Map(await Promise.all(['loom.html', 'chat.js', 'chat.css', 'highlight.css', 'client-context.html', 'client-context.js'].map(async file => ['/' + file, await readFile('desktop/generated/' + file)])));
 const profile = await mkdtemp(path.join(os.tmpdir(), 'portal-chat-history-'));
 let history = [], seq = 0, offline = false;
 const queries = [], sent = [];
@@ -148,6 +148,24 @@ try {
   history = history.slice(-5); await open();
   assert.equal(await page.locator('#messages .message').count(), 300);
   assert.equal((await cached()).messages.length, 352);
+  // The client reader shares IDB but does not require a mounted chat UI.
+  const reader = await context.newPage();
+  await reader.goto(origin + '/client-context.html');
+  const run = (verb, args = '', sceneId) => reader.evaluate(
+    ([endpoint, verb, args, sceneId]) => window.clientCommand(endpoint, verb, args, sceneId),
+    [origin, verb, args, sceneId]);
+  const crossScene = await run('context', 'town-mail');
+  assert.equal((crossScene.match(/\] (user|being):/g) || []).length, 50);
+  assert.ok(crossScene.indexOf('离线期间 153') < crossScene.indexOf('离线期间 249'));
+  assert.ok(!crossScene.includes('离线期间 250'));
+  assert.equal(await run('context', '', 'town-mail'), crossScene);
+  // This scene is older than the visible 300-message window.
+  assert.match(await run('context', 'another-client'), /已持久化的流式回复/);
+  const scenes = await run('scenes');
+  assert.match(scenes, /town-mail — 小镇私信.*messages: 159/);
+  assert.match(scenes, /another-client.*messages: 1/);
+  assert.match(await reader.evaluate(endpoint => window.clientCommand(endpoint, 'scenes', ''), origin + '/other-being'), /No locally cached scenes/);
+  await reader.close();
   await clearCache(); await open();
   assert.equal(await page.locator('#messages .message').count(), 5);
   await waitCache(5);

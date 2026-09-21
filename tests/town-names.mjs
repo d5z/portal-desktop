@@ -25,14 +25,14 @@ const { outputFiles } = await build({
       { id: 'unaddressable', sender_being_id: 'unaddressable_internal', recipient_town_id: 't_Willow', content: '只有内部 ID 不猜收件地址', created_at: '2026-09-14T06:00:00Z' },
     ];
     window.fixtureWrites = [];
-    const model = new TownModel({ townAuth: async () => ({ configured: true, pairedBeingId: 't_Willow', display: '柳树 (t_Willow)', suggestedBeingId: 'other-loom-being' }), sendTown: async (input) => {
+    const model = new TownModel({ copyText: async text => { window.fixtureCopied = text; }, townAuth: async () => ({ configured: true, pairedBeingId: 't_Willow', display: '柳树 (t_Willow)', suggestedBeingId: 'other-loom-being' }), sendTown: async (input) => {
       window.fixtureWrites.push(input);
       return { ok: true, data: {}, fetchedAt: new Date().toISOString() };
     } }, console.error, () => {}, new SceneStore(), () => {}, () => {});
     model.view = 'mail'; model.tab = 'all'; model.me = 't_Willow';
     const mentionView = location.pathname.startsWith('/mentions/') ? location.pathname.split('/').at(-1) : '';
     const feed = mentionView ? [
-      { id: 'mentions', seq: 1, town_id: 't_RiverA', speaker_name: '河流', sender_town_id: 't_RiverA', sender_display: '河流', recipient_town_id: 't_Willow',
+      { id: 'mentions', seq: 1, created_at: '2026-09-18T13:33:00Z', town_id: 't_RiverA', speaker_name: '河流', sender_town_id: 't_RiverA', sender_display: '河流', recipient_town_id: 't_Willow',
         content: '正文 @t_RiverA 和 **@t_RiverB**，未知 @t_Unknown。\\n\\n代码：\u0060@t_RiverA\u0060\\n\\n[@t_RiverB](https://example.com/@t_RiverB)' },
       { id: 'other', seq: 2, town_id: 't_RiverB', speaker_name: '河流', sender_town_id: 't_RiverB', sender_display: '河流', content: '同名的另一个 Being' },
     ] : messages;
@@ -129,6 +129,20 @@ try {
     assert.equal(await body.locator('code').textContent(), '@t_RiverA');
     assert.equal(await body.locator('a').getAttribute('href'), 'https://example.com/@t_RiverB');
     assert.match(await page.evaluate(() => window.fixtureMessages[0].content), /@t_RiverA 和 \*\*@t_RiverB\*\*/);
+    const card = body.locator('xpath=ancestor::article');
+    const copy = card.getByRole('button', { name: '复制正文', exact: true });
+    await page.mouse.move(0, 0);
+    assert.equal(await copy.evaluate(el => getComputedStyle(el).opacity), '0');
+    await card.hover();
+    assert.equal(await copy.evaluate(el => getComputedStyle(el).opacity), '1');
+    assert.equal(await card.evaluate(el => {
+      const icon = el.querySelector('.message-copy').getBoundingClientRect();
+      const time = el.querySelector('time').getBoundingClientRect();
+      return icon.right <= time.left && Math.abs((icon.top + icon.bottom) - (time.top + time.bottom)) < 2;
+    }), true, 'Copy stays to the left of the timestamp, centered without overlap');
+    await copy.click();
+    await card.getByRole('button', { name: '已复制', exact: true }).waitFor();
+    assert.equal(await page.evaluate(() => window.fixtureCopied), await page.evaluate(() => window.fixtureMessages[0].content));
     await page.screenshot({ path: `test-results/town-mentions-${view}.png` });
   }
   await page.goto(`http://127.0.0.1:${server.address().port}/places`);

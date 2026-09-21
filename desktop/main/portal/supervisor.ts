@@ -92,7 +92,7 @@ export class PortalSupervisor extends EventEmitter {
       cwd: settings.workspace,
       shell: false, windowsHide: true, detached: process.platform !== 'win32',
       stdio: ['ignore', 'pipe', 'pipe'],
-      env: { ...(process.platform === 'win32' ? windowsEnvironment(...inherited) : Object.assign({}, ...inherited)), PORTAL_CONNECT_LINK: connection.link, HEART_PORTAL_SUPERVISED: '1', HEART_PORTAL_CLIENT_MANAGED: '1', HEART_PORTAL_STATUS_FILE: statusPath, HEART_PORTAL_STATUS_NONCE: nonce,
+      env: { ...(process.platform === 'win32' ? windowsEnvironment(...inherited) : Object.assign({}, ...inherited)), HEART_PORTAL_CLIENT_FILE: path.join(this.directory, '.portal-client.json'), PORTAL_CONNECT_LINK: connection.link, HEART_PORTAL_SUPERVISED: '1', HEART_PORTAL_CLIENT_MANAGED: '1', HEART_PORTAL_STATUS_FILE: statusPath, HEART_PORTAL_STATUS_NONCE: nonce,
         HEART_PORTAL_READY_FILE: path.join(root, '.portal-ready.json'), HEART_PORTAL_READY_NONCE: nonce,
         RUST_LOG: 'info', NO_COLOR: '1' },
     });

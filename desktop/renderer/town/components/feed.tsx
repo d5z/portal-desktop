@@ -14,6 +14,7 @@ import { sceneExcerpt } from "../../shared/models/scene";
 import { Markdown, markdownText } from "../../shared/components/markdown";
 import { collectMentionNames, mentionText, type MentionNames } from '../models/mentions';
 import { MentionText } from './mention-text';
+import { CopyMessage } from '../../shared/components/copy-message';
 export function TownFeed({
   town,
   data,
@@ -336,18 +337,21 @@ function Message({
           {mail && m.recipient && !m.received && (
             <span className="social-recipient" title={m.recipientId}>→ {feedDisplayName(m.recipient, m.recipientId)}</span>
           )}
-          <time
-            dateTime={validTime ? new Date(m.time).toISOString() : undefined}
-          >
-            {validTime
-              ? new Date(m.time).toLocaleString("zh-CN", {
-                  month: "2-digit",
-                  day: "2-digit",
-                  hour: "2-digit",
-                  minute: "2-digit",
-                })
-              : m.rawDate}
-          </time>
+          <span className="message-time-actions">
+            <CopyMessage text={m.content} copy={text => town.api.copyText(text)} />
+            <time
+              dateTime={validTime ? new Date(m.time).toISOString() : undefined}
+            >
+              {validTime
+                ? new Date(m.time).toLocaleString("zh-CN", {
+                    month: "2-digit",
+                    day: "2-digit",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })
+                : m.rawDate}
+            </time>
+          </span>
         </div>
         {m.entry.reply_to != null && (
           <details className={`feed-reply-preview${replyTarget ? " has-full-reply" : ""}`}>

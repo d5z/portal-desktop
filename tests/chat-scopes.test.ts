@@ -61,6 +61,353 @@ describe("scene history refresh", () => {
     } finally { stream.close(); await sending; runtime.dispose(); }
   });
 
+  it("switches sessions without cancelling a stream, preserves drafts and filters strictly", async () => {
+    let stream!: ReadableStreamDefaultController<Uint8Array>;
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      const path = new URL(input).pathname;
+      if (path === "/api/history") return Response.json({ messages: [] });
+      if (path === "/api/stream/active") return new Response(null, { status: 204 });
+      if (path === "/health") return new Response("OK fixture");
+      if (path === "/api/chat/stream") return new Response(new ReadableStream({ start(controller) {
+        stream = controller;
+        stream.enqueue(new TextEncoder().encode('event: content_block_delta\ndata: {"scene_id":"desktop-test","delta":{"text":"A 回复"}}\n\n'));
+      } }));
+      return Response.json({ sbs_enabled: false });
+    }));
+    const state = new ChatState(), runtime = createChatRuntime(state);
+    await runtime.start();
+    const sending = runtime.send("A 输入");
+    await vi.advanceTimersByTimeAsync(20);
+    state.draft = "A 草稿";
+    await runtime.selectScene({ sceneId: "desktop-b", sceneLabel: "B", strict: true });
+    expect(state.draft).toBe("");
+    expect(state.streaming).toBe(true);
+    expect(sceneItems(state.items, "current", state.currentScene)).toEqual([]);
+    state.draft = "B 草稿";
+    await runtime.selectScene({ ...current, strict: true });
+    expect(state.draft).toBe("A 草稿");
+    stream.enqueue(new TextEncoder().encode('event: content_block_delta\ndata: {"scene_id":"desktop-test","delta":{"text":"继续"}}\n\n'));
+    await vi.advanceTimersByTimeAsync(20);
+    expect(state.items.some(item => item.kind === "message" && item.text === "A 回复继续")).toBe(true);
+    await runtime.selectScene({ sceneId: "desktop-b", strict: true });
+    expect(state.draft).toBe("B 草稿");
+    expect(inCurrentScene({}, state.currentScene)).toBe(false);
+    stream.close(); await sending; runtime.dispose();
+  });
+
+  it("keeps A consuming SSE after a B send returns a separate 200 stream", async () => {
+    const streams: ReadableStreamDefaultController<Uint8Array>[] = [];
+    const signals: AbortSignal[] = [];
+    const emit = (index: number, scene: string, text: string) => streams[index].enqueue(new TextEncoder().encode(
+      `event: content_block_delta\ndata: ${JSON.stringify({ scene_id: scene, delta: { text } })}\n\n`));
+    vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
+      const route = new URL(input).pathname;
+      if (route === "/api/history") return Response.json({ messages: [] });
+      if (route === "/api/stream/active") return new Response(null, { status: 204 });
+      if (route === "/health") return new Response("OK fixture");
+      if (route === "/api/chat/stream") {
+        signals.push(init!.signal!);
+        return new Response(new ReadableStream({ start(controller) { streams.push(controller); } }));
+      }
+      return Response.json({ sbs_enabled: false });
+    }));
+    const state = new ChatState(), runtime = createChatRuntime(state);
+    await runtime.start();
+    const a = runtime.send("A 输入");
+    await vi.advanceTimersByTimeAsync(20);
+    emit(0, "desktop-test", "A 开始");
+    await vi.advanceTimersByTimeAsync(20);
+    await runtime.selectScene({ sceneId: "desktop-b", strict: true });
+    const b = runtime.send("B 输入");
+    await vi.advanceTimersByTimeAsync(20);
+    emit(1, "desktop-b", "B 开始");
+    emit(0, "desktop-test", " A 继续");
+    await vi.advanceTimersByTimeAsync(20);
+    try {
+      expect(signals.every(signal => !signal.aborted)).toBe(true);
+      const messages = () => state.items.filter((item): item is Extract<ChatItem, { kind: "message" }> => item.kind === "message" && item.role === "being");
+      expect(messages().find(item => item.sceneId === "desktop-test")?.text).toBe("A 开始 A 继续");
+      expect(messages().find(item => item.sceneId === "desktop-b")?.text).toBe("B 开始");
+      streams[1].close(); await b;
+      emit(0, "desktop-test", " A 完成");
+      await vi.advanceTimersByTimeAsync(20);
+      expect(messages().find(item => item.sceneId === "desktop-test")?.text).toBe("A 开始 A 继续 A 完成");
+    } finally {
+      for (const stream of streams) { try { stream.close(); } catch {} }
+      await Promise.all([a, b]); runtime.dispose();
+    }
+  });
+
+  it("does not create a desktop run just for polling another scene's active stream", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      const path = new URL(input).pathname;
+      if (path === "/api/history") return Response.json({ messages: [] });
+      if (path === "/health") return new Response("OK fixture");
+      if (path === "/api/stream/active") return Response.json({
+        stream_id: "feishu-active", origin: "human", finished: false,
+        events: [
+          { seq: 1, event: "reasoning", data: { scene_id: "feishu-weiguo_being", text: "thinking" } },
+          { seq: 2, event: "tool_use", data: { scene_id: "feishu-weiguo_being", name: "portal_exec", input: {} } },
+        ],
+      });
+      return Response.json({ sbs_enabled: false });
+    }));
+    const state = new ChatState(), runtime = createChatRuntime(state);
+    try {
+      await runtime.start();
+      await vi.advanceTimersByTimeAsync(1100);
+      const runs = state.items.filter(i => i.kind === "run");
+      expect(runs).toHaveLength(1);
+      expect(runs[0].sceneId).toBe("feishu-weiguo_being");
+    } finally { runtime.dispose(); }
+  });
+
+  it("routes interleaved text, tools and errors before updating scene state", async () => {
+    let stream!: ReadableStreamDefaultController<Uint8Array>;
+    const emit = (type: string, scene: string, data: object = {}) => stream.enqueue(new TextEncoder().encode(
+      `event: ${type}\ndata: ${JSON.stringify({ scene_id: scene, ...data })}\n\n`));
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      const path = new URL(input).pathname;
+      if (path === "/api/history") return Response.json({ messages: [] });
+      if (path === "/api/stream/active") return new Response(null, { status: 204 });
+      if (path === "/health") return new Response("OK fixture");
+      if (path === "/api/chat/stream") return new Response(new ReadableStream({ start(c) { stream = c; } }));
+      return Response.json({ sbs_enabled: false });
+    }));
+    const state = new ChatState(), runtime = createChatRuntime(state);
+    await runtime.start();
+    const sending = runtime.send("A 输入");
+    await vi.advanceTimersByTimeAsync(20);
+    try {
+      emit("content_block_delta", "desktop-test", { delta: { text: "A1" } });
+      emit("tool_use", "desktop-b", { name: "portal_exec", input: { command: "B tool" } });
+      emit("content_block_delta", "desktop-b", { delta: { text: "B1" } });
+      emit("tool_result", "desktop-b", { name: "portal_exec", content: "B result" });
+      emit("error", "desktop-b", { message: "B failed" });
+      emit("content_block_delta", "desktop-test", { delta: { text: "A2" } });
+      await vi.advanceTimersByTimeAsync(20);
+      expect(state.items.filter((i): i is Extract<ChatItem, { kind: "message" }> => i.kind === "message" && i.role === "being").map(i => [i.sceneId, i.text]))
+        .toEqual([["desktop-test", "A1A2"], ["desktop-b", "B1"]]);
+      expect(state.items.find(i => i.kind === "message" && i.role === "system")).toMatchObject({ sceneId: "desktop-b", text: "⚠ B failed" });
+      const bRun = state.items.find(i => i.kind === "run" && i.sceneId === "desktop-b");
+      expect(bRun).toMatchObject({ entries: [expect.objectContaining({ name: "portal_exec", done: true })] });
+      expect(state.items.filter(i => i.kind === "run" && i.sceneId === "desktop-test").every(i => i.kind === "run" && i.entries.every(e => e.name !== "portal_exec"))).toBe(true);
+      emit("message_stop", "desktop-test");
+    } finally { stream.close(); await sending; runtime.dispose(); }
+  });
+
+  it("routes tagged reasoning to C and ignores repeated stops without creating empty runs", async () => {
+    let stream!: ReadableStreamDefaultController<Uint8Array>;
+    const c = "desktop-ab7ce9b8-0aac-4980-be1b-fd722e20b040";
+    const emit = (event: string, data: object) => stream.enqueue(new TextEncoder().encode(
+      `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      const path = new URL(input).pathname;
+      if (path === "/api/history") return Response.json({ messages: [] });
+      if (path === "/api/stream/active") return new Response(null, { status: 204 });
+      if (path === "/health") return new Response("OK fixture");
+      if (path === "/api/chat/stream") return new Response(new ReadableStream({ start(controller) { stream = controller; } }));
+      return Response.json({ sbs_enabled: false });
+    }));
+    const state = new ChatState(), runtime = createChatRuntime(state);
+    await runtime.start();
+    const sending = runtime.send("A input");
+    await vi.advanceTimersByTimeAsync(20);
+    try {
+      await runtime.selectScene({ sceneId: "desktop-b", strict: true });
+      emit("reasoning", { scene_id: c, text: "Ben" });
+      await vi.advanceTimersByTimeAsync(220);
+      const runs = () => state.items.filter((i): i is Extract<ChatItem, {kind:"run"}> => i.kind === "run" && i.sceneId === c);
+      expect(runs()).toHaveLength(1);
+      expect(runs()[0].entries).toEqual([expect.objectContaining({ text: "Ben" })]);
+      expect(sceneItems(state.items, "current", state.currentScene)).toEqual([]);
+      await runtime.selectScene({ sceneId: c, strict: true });
+      expect(sceneItems(state.items, "current", state.currentScene)).toContain(runs()[0]);
+      emit("message_stop", { scene_id: c });
+      await vi.advanceTimersByTimeAsync(20);
+      emit("message_stop", { scene_id: c });
+      emit("message_stop", { scene_id: "desktop-b" });
+      await vi.advanceTimersByTimeAsync(20);
+      expect(runs()).toHaveLength(1);
+      expect(state.items.filter(i => i.kind === "run" && i.sceneId === "desktop-b")).toHaveLength(0);
+    } finally { stream.close(); await sending; runtime.dispose(); }
+  });
+
+  it("stops only the selected scene's transport and stream id", async () => {
+    const streams: ReadableStreamDefaultController<Uint8Array>[] = [];
+    const signals: AbortSignal[] = [];
+    const stops: unknown[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
+      const path = new URL(input).pathname;
+      if (path === "/api/history") return Response.json({ messages: [] });
+      if (path === "/api/stream/active") return new Response(null, { status: 204 });
+      if (path === "/health") return new Response("OK fixture");
+      if (path === "/api/stop") { stops.push(JSON.parse(init!.body as string)); return Response.json({ ok: true }); }
+      if (path === "/api/chat/stream") return new Response(new ReadableStream({ start(c) {
+        const index = streams.length;
+        streams.push(c); signals.push(init!.signal!);
+        init!.signal!.addEventListener("abort", () => c.error(new DOMException("Aborted", "AbortError")));
+        c.enqueue(new TextEncoder().encode(`event: meta\ndata: ${JSON.stringify({ stream_id: index ? "stream-b" : "stream-a", scene_id: index ? "desktop-b" : "desktop-test" })}\n\n`));
+      } }));
+      return Response.json({ sbs_enabled: false });
+    }));
+    const state = new ChatState(), runtime = createChatRuntime(state);
+    await runtime.start();
+    const a = runtime.send("A 输入");
+    await vi.advanceTimersByTimeAsync(20);
+    await runtime.selectScene({ sceneId: "desktop-b", strict: true });
+    const b = runtime.send("B 输入");
+    await vi.advanceTimersByTimeAsync(20);
+    try {
+      await runtime.stopCurrentTurn(); await b;
+      expect(stops).toEqual([{ stream_id: "stream-b" }]);
+      expect(signals.map(s => s.aborted)).toEqual([false, true]);
+      streams[0].enqueue(new TextEncoder().encode('event: content_block_delta\ndata: {"scene_id":"desktop-test","delta":{"text":"A 仍继续"}}\n\n'));
+      await vi.advanceTimersByTimeAsync(20);
+      expect(state.items.some(i => i.kind === "message" && i.text === "A 仍继续")).toBe(true);
+    } finally { streams[0].close(); await a; runtime.dispose(); }
+  });
+
+  it("keeps B and C queued until their own replies arrive while A streams", async () => {
+    let stream!: ReadableStreamDefaultController<Uint8Array>;
+    let sends = 0;
+    const history: object[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      const path = new URL(input).pathname;
+      if (path === "/api/history") return Response.json({ messages: history });
+      if (path === "/api/stream/active") return new Response(null, { status: 204 });
+      if (path === "/health") return new Response("OK fixture");
+      if (path === "/api/chat/stream") {
+        if (++sends >= 2) return Response.json({ queued: true }, { status: 202 });
+        return new Response(new ReadableStream({ start(c) { stream = c; } }));
+      }
+      return Response.json({ sbs_enabled: false });
+    }));
+    const state = new ChatState(), runtime = createChatRuntime(state);
+    await runtime.start();
+    const a = runtime.send("A 输入");
+    await vi.advanceTimersByTimeAsync(20);
+    stream.enqueue(new TextEncoder().encode('event: content_block_delta\ndata: {"scene_id":"desktop-test","delta":{"text":"A1"}}\n\n'));
+    await vi.advanceTimersByTimeAsync(20);
+    await runtime.selectScene({ sceneId: "desktop-b", strict: true });
+    await runtime.send("B 输入");
+    await runtime.selectScene({ sceneId: "desktop-c", strict: true });
+    await runtime.send("C 输入");
+    try {
+      const runs = () => state.items.filter(i => i.kind === "run");
+      expect(runs().filter(i => i.sceneId === "desktop-b")).toHaveLength(1);
+      expect(runs().find(i => i.sceneId === "desktop-b")).toMatchObject({ label: "已排队，等待回复" });
+      expect(runs().find(i => i.sceneId === "desktop-c")).toMatchObject({ label: "已排队，等待回复" });
+      expect(runs().some(i => i.end || i.outcome === "done")).toBe(false);
+      history.push({ seq: 1, role: "user", content: "A 输入", scene_id: "desktop-test" },
+        { seq: 2, role: "user", content: "B 输入", scene_id: "desktop-b" },
+        { seq: 3, role: "being", content: "B 排队回复", scene_id: "desktop-b" });
+      await vi.advanceTimersByTimeAsync(2100);
+      stream.enqueue(new TextEncoder().encode('event: content_block_delta\ndata: {"scene_id":"desktop-test","delta":{"text":"A2"}}\n\n'));
+      await vi.advanceTimersByTimeAsync(20);
+      const messages = state.items.filter(i => i.kind === "message");
+      expect(messages.filter(i => i.text === "B 排队回复")).toHaveLength(1);
+      expect(runs().find(i => i.sceneId === "desktop-b")).toMatchObject({ outcome: "done" });
+      expect(runs().find(i => i.sceneId === "desktop-c")).toMatchObject({ label: "已排队，等待回复" });
+      expect(runs().find(i => i.sceneId === "desktop-c")?.end).toBeUndefined();
+      expect(messages.filter(i => i.text === "B 输入")).toHaveLength(1);
+      expect(messages.find(i => i.text === "A1A2")).toMatchObject({ streaming: true, sceneId: "desktop-test" });
+    } finally { stream.close(); await a; runtime.dispose(); }
+  });
+
+  it("keeps an accepted A request pending when Heart emits an empty stop then switches to B", async () => {
+    let stream!: ReadableStreamDefaultController<Uint8Array>;
+    const emit = (event: string, scene: string, data: object = {}) => stream.enqueue(new TextEncoder().encode(
+      `event: ${event}\ndata: ${JSON.stringify({scene_id:scene,...data})}\n\n`));
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      const path = new URL(input).pathname;
+      if (path === "/api/history") return Response.json({ messages: [] });
+      if (path === "/api/stream/active") return new Response(null, { status: 204 });
+      if (path === "/health") return new Response("OK fixture");
+      if (path === "/api/chat/stream") return new Response(new ReadableStream({start(c) {stream=c;}}));
+      return Response.json({sbs_enabled:false});
+    }));
+    const state = new ChatState(), runtime = createChatRuntime(state);
+    await runtime.start(); const sending = runtime.send("A request");
+    await vi.advanceTimersByTimeAsync(20);
+    try {
+      emit("reasoning","desktop-test",{text:"progress"});
+      emit("message_stop","desktop-test");
+      emit("content_block_delta","desktop-b",{delta:{text:"B response"}});
+      emit("message_stop","desktop-b");
+      await vi.advanceTimersByTimeAsync(2000);
+      const runs = state.items.filter((i): i is Extract<ChatItem, {kind:"run"}> => i.kind==="run" && i.sceneId==="desktop-test");
+      expect(runs).toHaveLength(1);
+      expect(runs[0]).toMatchObject({label:"本轮未返回正文，等待回复",waitingForReply:true});
+      expect(runs[0].end).toBeUndefined();
+      emit("content_block_delta","desktop-test",{delta:{text:"A response"}});
+      emit("message_stop","desktop-test");
+      await vi.advanceTimersByTimeAsync(20);
+    } finally {stream.close(); await sending; runtime.dispose();}
+    expect(state.items.filter((i): i is Extract<ChatItem, {kind:"run"}> => i.kind==="run" && i.sceneId==="desktop-test")).toHaveLength(1);
+    expect(state.items.find(i=>i.kind==="message" && i.text==="A response")).toMatchObject({sceneId:"desktop-test",streaming:false});
+  });
+
+  it("counts scene continuation meta in the recovery replay cursor", async () => {
+    let stream!: ReadableStreamDefaultController<Uint8Array>;
+    let recovering = false;
+    const cursors: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname === "/api/history") return Response.json({messages:[]});
+      if (url.pathname === "/health") return new Response("OK fixture");
+      if (url.pathname === "/api/stream/active") {
+        if (!recovering) return new Response(null,{status:204});
+        if (url.searchParams.has("after")) cursors.push(url.searchParams.get("after")!);
+        return Response.json({stream_id:"shared-r2",next_seq:9,finished:url.searchParams.has("after"),events:[]});
+      }
+      if (url.pathname === "/api/chat/stream") return new Response(new ReadableStream({start(c){stream=c;}}));
+      return Response.json({sbs_enabled:false});
+    }));
+    const state = new ChatState(), runtime = createChatRuntime(state);
+    await runtime.start(); const sending = runtime.send("A cursor test");
+    await vi.advanceTimersByTimeAsync(20);
+    try {
+      const events = [
+        ["meta",{stream_id:"shared-r2",scene_id:"desktop-test"}],
+        ["reasoning",{scene_id:"desktop-test",text:"working"}],
+        ["message_stop",{scene_id:"desktop-test"}],
+        ["meta",{continuation:true,scene_id:"desktop-b"}],
+        ["reasoning",{scene_id:"desktop-b",text:"working"}],
+        ["message_stop",{scene_id:"desktop-b"}],
+        ["meta",{continuation:true,scene_id:"desktop-c"}],
+        ["content_block_delta",{scene_id:"desktop-c",delta:{text:"C"}}],
+      ];
+      for (const [event,data] of events) stream.enqueue(new TextEncoder().encode(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`));
+      await vi.advanceTimersByTimeAsync(20);
+      recovering = true; stream.error(new TypeError("connection lost")); await sending;
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(cursors[0]).toBe("7");
+    } finally {runtime.dispose();}
+  });
+
+  it("does not call an empty SSE response completed and reports a waiting timeout", async () => {
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      const path = new URL(input).pathname;
+      if (path === "/api/history") return Response.json({ messages: [] });
+      if (path === "/api/stream/active") return new Response(null, { status: 204 });
+      if (path === "/health") return new Response("OK fixture");
+      if (path === "/api/chat/stream") return new Response("");
+      return Response.json({ sbs_enabled: false });
+    }));
+    const state = new ChatState(), runtime = createChatRuntime(state);
+    try {
+      await runtime.start(); await runtime.send("空流测试");
+      const runs = state.items.filter(i => i.kind === "run");
+      expect(runs).toHaveLength(1);
+      expect(runs[0]).toMatchObject({ label: "等待回复", waitingForReply: true });
+      expect(runs[0].end).toBeUndefined();
+      await vi.advanceTimersByTimeAsync(300_100);
+      expect(runs[0]).toMatchObject({ label: "等待回复超时", outcome: "error" });
+      expect(state.items.filter(i => i.kind === "run")).toHaveLength(1);
+    } finally { runtime.dispose(); }
+  });
+
   it("starts a fresh read after initialization and every queued switch, using the latest cursor", async () => {
     const history = [{ seq: 1, role: "user", content: "初始记录", scene_id: "desktop-test" }];
     const reads: { after: number; finish(): void }[] = [];

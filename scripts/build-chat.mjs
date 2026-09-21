@@ -50,3 +50,12 @@ await writeFile(
   notices.join("\n\n---\n\n"),
 );
 console.log("Built React chat assets in desktop/generated.");
+await build({
+  entryPoints: ["desktop/renderer/chat/client-context.ts"], bundle: true,
+  format: "iife", platform: "browser", minify: true,
+  outfile: path.join(output, "client-context.js"),
+});
+await writeFile(path.join(output, "client-context.html"), '<!doctype html><meta charset="utf-8"><script src="client-context.js"></script>');
+
+// Match the chat iframe's top-level site so Chromium uses the same storage key.
+await writeFile(path.join(output, "client-context-host.html"), '<!doctype html><meta charset="utf-8"><iframe src="beings://chat/client-context.html"></iframe>');

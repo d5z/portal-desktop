@@ -39,6 +39,7 @@ describe('Portal supervision', () => {
     else expect(call[2].env.PATH).toBe('/custom/bin:/usr/bin');
     expect(call[2].env.TOOL_FIXTURE_SETTING).toBe('preserved');
     expect(call[2].env.HEART_PORTAL_SUPERVISED).toBe('1');
+    expect(call[2].env.HEART_PORTAL_CLIENT_FILE).toBe(path.join(f.dir, '.portal-client.json'));
     expect(await readFile(config, 'utf8')).toBe(source);
     await expect(readFile(path.join(f.dir, 'desktop-portal.toml'))).rejects.toThrow();
     f.children[0].emit('exit', 0); await f.portal.stop();

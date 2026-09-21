@@ -12,6 +12,7 @@ import { ChatState, type ChatRuntime, type ChatPanel } from "./models/chat";
 import { inCurrentScene, sceneItems, sceneName, type HistoryScope } from "./models/scenes";
 import { useModel } from "../shared/hooks/use-model";
 import { Markdown } from "../shared/components/markdown";
+import { CopyMessage } from '../shared/components/copy-message';
 import { TemperatureGlow, ChatActivity } from "./components/messages";
 import { ChatSettings } from "./components/settings";
 import { ChatInfoPanels } from "./components/panels";
@@ -64,6 +65,7 @@ function ChatView({
 }) {
   useModel(state);
   const visibleItems = sceneItems(state.items, state.historyScope, state.currentScene);
+  const allScenesReadOnly = !!state.currentScene.strict && state.historyScope === "all";
   const currentSceneName = sceneName(state.currentScene, state.currentScene);
   const showActivity = state.historyScope === "all" || inCurrentScene(state.activeScene, state.currentScene);
   const messages = useRef<HTMLDivElement>(null),
@@ -187,7 +189,7 @@ function ChatView({
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, max) + "px";
     el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
-  }, [state.draft, viewport.height]);
+  }, [state.draft, viewport.height, allScenesReadOnly]);
   useLayoutEffect(() => {
     if (messages.current && scrollLock.current)
       messages.current.scrollTop = messages.current.scrollHeight;
@@ -370,10 +372,13 @@ function ChatView({
         <div
           id="messages"
           ref={messages}
+          onWheel={(event) => {
+            if (event.deltaY < 0) scrollLock.current = false;
+          }}
           onScroll={() => {
             const el = messages.current!;
             scrollLock.current =
-              el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+              el.scrollHeight - el.scrollTop - el.clientHeight <= 1;
             setSelection(null);
           }}
         >
@@ -397,6 +402,8 @@ function ChatView({
                 run={item}
                 runtime={runtime}
                 stopping={state.stopping}
+                canStop={!allScenesReadOnly && item.sceneId === state.currentScene.sceneId}
+                sceneLabel={state.historyScope === "all" ? sceneName(item, state.currentScene, state.sceneNames) : undefined}
               />
             ) : (
               <div
@@ -409,10 +416,12 @@ function ChatView({
                 className={`message ${item.role}${item.consecutive ? " consecutive" : ""}${highlighted === item.id ? " index-target" : ""}`}
               >
                 <div className={`meta${item.consecutive ? " time-only" : ""}`}>
-                  {item.consecutive
-                    ? item.timestamp
-                    : `${item.label} · ${item.timestamp}`}
-                  {state.historyScope === "all" && <span className="message-scene" title={item.sceneId || "这条历史消息未提供场景标记"}>{sceneName(item, state.currentScene)}</span>}
+                  {!item.consecutive && <span>{item.label} · </span>}
+                  <span className="message-time-actions">
+                    <CopyMessage text={item.text} copy={bridge.copyText} />
+                    <time>{item.timestamp}</time>
+                  </span>
+                  {state.historyScope === "all" && <span className="message-scene" title={item.sceneId || "这条历史消息未提供场景标记"}>{sceneName(item, state.currentScene, state.sceneNames)}</span>}
                 </div>
                 <Markdown
                   content={item.text}
@@ -420,7 +429,7 @@ function ChatView({
                   chat
                   onPlace={item.role === "system" ? undefined : openPlace}
                 />
-                {item.retry && (
+                {item.retry && !allScenesReadOnly && (
                   <button
                     className="retry-btn"
                     type="button"
@@ -453,7 +462,7 @@ function ChatView({
         <div id="input-area">
           <div
             id="pending-files"
-            className={state.files.length ? "active" : ""}
+            className={!allScenesReadOnly && state.files.length ? "active" : ""}
           >
             {state.files.map((file, i) => (
               <div className="pending-file" key={`${file.name}-${i}`}>
@@ -483,15 +492,21 @@ function ChatView({
               </div>
             ))}
           </div>
-          <div id="input-row">
+          <div id="input-row" className={allScenesReadOnly ? "read-only" : ""}>
+          {allScenesReadOnly && <div className="all-scenes-notice">
+            <span>全部场景仅供查看。请选择左侧会话，或新建会话开始对话。</span>
+            <button type="button" onClick={() => bridge.send({ type: "beings:session-create" })}>新建会话</button>
+          </div>}
+
             <textarea
               ref={composer}
               id="input"
               rows={1}
               className={state.queued ? "queued" : ""}
-              placeholder="说点什么…"
+              placeholder={allScenesReadOnly ? "" : "说点什么…"}
+              disabled={allScenesReadOnly}
               aria-label="message input"
-              value={state.draft}
+              value={allScenesReadOnly ? "" : state.draft}
               onChange={(event) => {
                 state.draft = event.target.value;
                 state.changed();
@@ -522,6 +537,7 @@ function ChatView({
               type="button"
               title="添加附件"
               aria-label="添加附件"
+              disabled={allScenesReadOnly}
               onClick={() => fileInput.current?.click()}
             >
               ＋
@@ -535,6 +551,7 @@ function ChatView({
               type="button"
               title="send"
               aria-label="send message"
+              disabled={allScenesReadOnly}
               onClick={() => {
                 void runtime.send(state.draft);
                 composer.current?.focus();

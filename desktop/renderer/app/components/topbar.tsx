@@ -140,7 +140,13 @@ export function Topbar({ model }: { model: AppModel }) {
   return (
     <header className="topbar">
       <ChatSceneIndicator
+        createRequest={app.chatSessionCreateRequest}
+        visible={app.view === "chat"}
+        onReveal={() => app.navigate("chat")}
         scene={app.snapshot?.chatScene}
+        sessions={app.snapshot?.chatSessions}
+        activity={app.chatSceneActivity}
+        onSession={(operation, value, sceneId) => app.changeChatSession(operation, value, sceneId)}
         connected={hasToken}
         scope={app.chatHistoryScope}
         scopeReady={hasToken && !app.chatLoading && app.chatHistoryScopeKnown}

@@ -26,10 +26,11 @@ export function upstreamRequest(request: Request, connection: Connection) {
 
 export class ChatProxy {
   private requests = new Set<AbortController>();
-  constructor(private getConnection: () => Connection | null, private fetchUpstream: typeof fetch, private scene?: ChatScene) {}
+  constructor(private getConnection: () => Connection | null, private fetchUpstream: typeof fetch, private scene?: ChatScene | (() => ChatScene | undefined)) {}
   abortAll() { for (const controller of this.requests) controller.abort(); this.requests.clear(); }
   async handle(request: Request): Promise<Response> {
     const connection = this.getConnection();
+    const scene = typeof this.scene === "function" ? this.scene() : this.scene;
     if (!connection) return Response.json({ error: '请先连接 Being。' }, { status: 401 });
     const expectedEndpoint = request.headers.get('X-Portal-Being-Endpoint');
     if (expectedEndpoint && expectedEndpoint !== connection.endpoint)
@@ -38,9 +39,12 @@ export class ChatProxy {
     try { upstream = upstreamRequest(request, connection); }
     catch { return new Response('Not found', { status: 404 }); }
     const isChatSend = request.method === 'POST' && new URL(request.url).pathname === '/api/chat/stream';
-    if (isChatSend && !this.scene) {
+    if (isChatSend && !scene) {
       return Response.json({ error: '客户端场景不可用，暂时无法发送消息。请检查启动提示并重启客户端。' }, { status: 409 });
     }
+    const expectedScene = request.headers.get('X-Portal-Scene-Id');
+    if (isChatSend && expectedScene && expectedScene !== scene?.scene_id)
+      return Response.json({ error: '会话已切换，请在原会话中重试。' }, { status: 409 });
     const controller = new AbortController();
     this.requests.add(controller);
     const abort = () => controller.abort();
@@ -63,7 +67,7 @@ export class ChatProxy {
         // The main process owns send identity, regardless of the visible history
         // scope or any scene fields supplied by the renderer, splices or retries.
         // Scene protocol fields never become part of the user's message text.
-        body = JSON.stringify({ ...message, ...this.scene });
+        body = JSON.stringify({ ...message, ...scene });
         upstream.headers.set('content-type', 'application/json');
       }
       const response = await this.fetchUpstream(upstream.url, {
