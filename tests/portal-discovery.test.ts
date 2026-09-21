@@ -40,7 +40,7 @@ it.skipIf(process.platform !== 'darwin')('finds old client guardians even betwee
   expect(other.root).not.toBe(found[0].root);
 });
 
-it('identifies owned Windows desktop tasks using their runner and protected Being connection', async () => {
+it.each(['powershell.exe', 'portal-background-v1.exe'])('identifies owned Windows desktop tasks launched by %s', async launcherName => {
   const home = await realpath(await mkdtemp(path.join(os.tmpdir(), 'portal-win-discovery-'))); roots.push(home);
   const root = path.join(home, 'old'); await mkdir(root);
   await writeFile(path.join(root, 'run.ps1'), 'fixture');
@@ -52,7 +52,7 @@ it('identifies owned Windows desktop tasks using their runner and protected Bein
   const scripts: string[] = [];
   const run: Command = async (_file, args) => {
     const script = Buffer.from(args.at(-1)!, 'base64').toString('utf16le'); scripts.push(script);
-    if (script.includes('@(Get-ScheduledTask)')) return JSON.stringify([{ label: 'town.beings.desktop.portal.aa', execute: 'powershell.exe', arguments: `-NoProfile -File "${root}/run.ps1"` }]);
+    if (script.includes('@(Get-ScheduledTask)')) return JSON.stringify([{ label: 'town.beings.desktop.portal.aa', execute: launcherName === 'powershell.exe' ? launcherName : path.join(root, launcherName), arguments: `-NoProfile -File "${root}/run.ps1"` }]);
     if (script.includes('ConvertTo-SecureString')) return 'https://example.org/fixture/?token=previous-token';
     if (script.includes('GetOwnerSid')) return JSON.stringify([{ pid: 1234, binary }]);
     throw new Error('Config file not found: status');

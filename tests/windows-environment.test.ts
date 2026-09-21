@@ -32,7 +32,7 @@ it('quotes the exact legacy binary and passes status as an argument with plain e
   const run = vi.fn(async () => '{}');
   await portableCommand("E:\\old user's Portal\\heart-portal.exe", 'status', 'win32', run);
   const script = Buffer.from((run.mock.calls[0] as unknown as [string, string[]])[1].at(-1)!, 'base64').toString('utf16le');
-  expect(script).toContain("& 'E:\\old user''s Portal\\heart-portal.exe' status;");
+  expect(script).toContain("& 'E:\\old user''s Portal\\heart-portal.exe' status | Write-Output;");
   expect(script).toContain('[Console]::Error.WriteLine');
   expect(script).not.toContain("throw 'Portal lifecycle command failed'");
 });

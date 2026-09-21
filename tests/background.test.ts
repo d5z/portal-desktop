@@ -130,8 +130,8 @@ it('registers Windows login supervision with DPAPI stdin and disables the task a
   expect(inputs.filter(Boolean)).toEqual([f.connection.link]);
   expect(scripts.join('\n')).not.toContain(f.connection.token);
   expect(scripts.join('\n')).toContain('-AtLogOn');
-  expect(scripts.join('\n')).toContain("Join-Path $PSHOME 'powershell.exe'");
-  expect(scripts.join('\n')).toContain('New-ScheduledTaskAction -Execute $powershell');
+  expect(scripts.join('\n')).toContain('portal-background-v1.exe');
+  expect(scripts.join('\n')).not.toContain('New-ScheduledTaskAction -Execute $powershell');
   expect(scripts.join('\n')).toContain('-RestartCount 5');
   const metadata = JSON.parse(await readFile(path.join(f.root, 'windows-profile/portal-service.json'), 'utf8'));
   expect(await readFile(path.join(metadata.root, 'connection.dpapi'), 'utf8')).toBe('encrypted-dpapi-value');

@@ -48,7 +48,7 @@ catch { [Console]::Error.WriteLine($_.Exception.Message); exit 1 }
 }
 export async function portableCommand(binary: string, action: 'stop' | 'status' | 'start', platform = process.platform, run: Command = command) {
   if (platform !== 'win32') return run(binary, action === 'start' ? [] : [action]);
-  const script = windowsPowerShellScript(`& ${ps(binary)} ${action === 'start' ? '' : action}; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }`);
+  const script = windowsPowerShellScript(`& ${ps(binary)} ${action === 'start' ? '' : action} | Write-Output; if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }`);
   return run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(script, 'utf16le').toString('base64')]);
 }
 const xml = (value: string) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&apos;');
@@ -56,7 +56,7 @@ const hash = (value: string) => createHash('sha256').update(value).digest('hex')
 export interface Service { label: string; file: string; root: string; existing: boolean; kind?: 'portable'; login?: boolean; name?: string; environmentPath?: string; environment?: Record<string, string>; fingerprint?: string; bundleId?: string; configPath?: string; generatedConfig?: boolean; cwd?: string; binary?: string }
 export function fingerprint(settings: Settings, connection: Connection) {
   return hash(JSON.stringify([connection.link, settings.portalBinary, settings.portalConfigPath, settings.portalName,
-    settings.workspace, settings.portalEnvironmentPath, settings.allowExec, settings.kitsEnabled, 'client-tools-v3']));
+    settings.workspace, settings.portalEnvironmentPath, settings.allowExec, settings.kitsEnabled, 'client-tools-v4-console-free']));
 }
 export function launchAgent(label: string, root: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict>
@@ -211,6 +211,7 @@ async function tail(file: string) {
 export class BackgroundPortal {
   private service: Service | null = null;
   private connection: Connection | null = null;
+  private launcherSource?: string;
   state: BackgroundState;
   readonly label: string;
   get runtimeDirectory() { return path.join(this.directory, 'portal-service'); }
@@ -223,8 +224,9 @@ export class BackgroundPortal {
   private powershell(script: string, input?: string) {
     return this.run('powershell.exe', ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-EncodedCommand', Buffer.from(windowsPowerShellScript(script), 'utf16le').toString('base64')], input);
   }
-  async discover(_settings: Settings, connection: Connection | null) {
+  async discover(settings: Settings, connection: Connection | null) {
     this.connection = connection;
+    this.launcherSource = settings.portalBinary;
     try { this.service = JSON.parse(await readFile(path.join(this.directory, 'portal-service.json'), 'utf8')); }
     catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
     // Old adoption records are configuration sources, never runtime ownership.
@@ -303,6 +305,7 @@ if ([string]$t.State -eq 'Running' -and (Test-Path -LiteralPath $pidFile)) {
       message: !this.state.enabled ? this.state.message : this.state.running ? state.message : '后台 Portal 当前未运行；尚未确认自动恢复', logs };
   }
   async enable(settings: Settings, connection: Connection) {
+    this.launcherSource = settings.portalBinary;
     if (!this.state.supported) throw new Error(this.state.message);
     this.connection = connection;
     const signature = fingerprint(settings, connection);
@@ -363,11 +366,15 @@ if ([string]$t.State -eq 'Running' -and (Test-Path -LiteralPath $pidFile)) {
     }
   }
   async registerWindows(service: Service) {
-    const args = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -WindowStyle Hidden -File ' + windowsArgument(path.join(service.root, 'run.ps1'));
+    const launcher = path.join(service.root, 'portal-background-v1.exe');
+    try { await access(launcher); }
+    catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error;
+      await this.run(this.launcherSource || path.join(service.root, 'heart-portal.exe'), ['--export-windows-launcher', launcher]);
+    }
+    const args = '-File ' + windowsArgument(path.join(service.root, 'run.ps1'));
     await this.powershell(`$user=[System.Security.Principal.WindowsIdentity]::GetCurrent().Name;
-$powershell=Join-Path $PSHOME 'powershell.exe';
-if (-not (Test-Path -LiteralPath $powershell -PathType Leaf)) { throw 'Windows PowerShell executable is unavailable' };
-$a=New-ScheduledTaskAction -Execute $powershell -Argument ${ps(args)};
+$a=New-ScheduledTaskAction -Execute ${ps(launcher)} -Argument ${ps(args)};
 ${service.login === false ? '' : '$t=New-ScheduledTaskTrigger -AtLogOn -User $user;'}
 $p=New-ScheduledTaskPrincipal -UserId $user -LogonType Interactive -RunLevel Limited;
 $s=New-ScheduledTaskSettingsSet -RestartCount 5 -RestartInterval (New-TimeSpan -Minutes 1) -ExecutionTimeLimit ([TimeSpan]::Zero) -MultipleInstances IgnoreNew -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable;
@@ -394,8 +401,12 @@ Register-ScheduledTask -TaskName ${ps(service.label)} -Action $a ${service.login
         await this.run('/bin/launchctl', ['kickstart', `${this.domain}/${service.label}`]);
       }
     } else {
-      const status = await this.powershell(`$t=Find-PortalTask ${ps(service.label)}; if ($t) { [string]$t.State } else { 'Missing' }`);
-      if (status.trim() === 'Missing') {
+      const result = await this.powershell(`$t=Find-PortalTask ${ps(service.label)};
+if (-not $t) { 'Missing' }
+elseif ($t.Actions[0].Execute -ne ${ps(path.join(service.root, 'portal-background-v1.exe'))}) { 'Legacy:' + [string]$t.State }
+else { [string]$t.State }`);
+      const status = result.trim().replace(/^Legacy:/, '');
+      if (status === 'Missing' || result.trim().startsWith('Legacy:')) {
         if (service.existing) throw new Error('原 Portal 计划任务已不存在，请先恢复原服务或迁入客户端管理。');
         // Recreate only the client's saved runtime when explicitly loading it.
         // A read-only status query never creates a task or enables login startup.

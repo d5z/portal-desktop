@@ -161,9 +161,10 @@ export class ExternalPortalObserver {
       const tasks = output.trim() ? JSON.parse(output) : [];
       for (const task of Array.isArray(tasks) ? tasks : [tasks]) {
         try {
-          if (path.win32.basename(task.execute).toLowerCase() !== 'powershell.exe') continue;
+          if (!['powershell.exe', 'portal-background-v1.exe'].includes(path.win32.basename(task.execute).toLowerCase())) continue;
           const file = /-File\s+"([^"]+)"\s*$/i.exec(task.arguments)?.[1];
           if (!file || path.win32.basename(file) !== 'run.ps1') continue;
+          if (path.win32.basename(task.execute).toLowerCase() === 'portal-background-v1.exe' && path.win32.dirname(task.execute).toLowerCase() !== path.win32.dirname(file).toLowerCase()) continue;
           const root = await realpath(path.dirname(file));
           if (root === excluded) continue;
           const credential = path.join(root, 'connection.dpapi');

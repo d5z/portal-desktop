@@ -9,7 +9,7 @@ function Get-GuardianRoot([string]$exe, [string]$arguments) {
   if ($exe.IndexOfAny([IO.Path]::GetInvalidPathChars()) -ge 0) { return }
   $name = [IO.Path]::GetFileName($exe)
   $script = $null
-  if ($name -in @('powershell.exe', 'pwsh.exe')) {
+  if ($name -in @('powershell.exe', 'pwsh.exe', 'portal-background-v1.exe')) {
     if ($arguments -match '(?i)(?:^|\s)-File\s+(?:"([^"]+)"|([^\s"]+))') {
       $script = if ($Matches[1]) { $Matches[1] } else { $Matches[2] }
     }
@@ -19,6 +19,7 @@ function Get-GuardianRoot([string]$exe, [string]$arguments) {
   if (-not $script -or $script.IndexOfAny([IO.Path]::GetInvalidPathChars()) -ge 0 -or -not [IO.Path]::IsPathRooted($script)) { return }
   $leaf = [IO.Path]::GetFileName($script)
   $parent = [IO.Path]::GetDirectoryName($script)
+  if ($name -eq 'portal-background-v1.exe' -and [IO.Path]::GetDirectoryName($exe) -ne $parent) { return }
   if ($leaf -eq 'run.ps1') { $root = $parent }
   elseif ($leaf -in @('portal-supervisor.ps1', 'portal-supervisor-bootstrap.ps1', 'portal-supervisor-hidden.vbs') -and [IO.Path]::GetFileName($parent) -eq 'scripts') {
     $root = [IO.Path]::GetDirectoryName($parent)
@@ -55,7 +56,7 @@ function Get-OwnedTasks {
   }
 }
 function Get-OwnedProcesses {
-  foreach ($item in @(Get-CimInstance Win32_Process -Filter "Name LIKE 'heart-portal%.exe' OR Name='powershell.exe' OR Name='pwsh.exe' OR Name='wscript.exe' OR Name='cscript.exe'")) {
+  foreach ($item in @(Get-CimInstance Win32_Process -Filter "Name LIKE 'heart-portal%.exe' OR Name='portal-background-v1.exe' OR Name='powershell.exe' OR Name='pwsh.exe' OR Name='wscript.exe' OR Name='cscript.exe'")) {
     if ($item.ProcessId -eq $PID -or -not $item.ExecutablePath) { continue }
     $root = Get-GuardianRoot $item.ExecutablePath $item.CommandLine
     $guardian = [bool]$root

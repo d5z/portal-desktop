@@ -53,7 +53,7 @@ it.skipIf(process.env.PORTAL_DESKTOP_NATIVE_UPGRADE_TESTS !== '1' || process.pla
   const root = await mkdtemp(path.join(os.tmpdir(), 'town-windows-registration-'));
   const background = new BackgroundPortal(path.join(root, 'profile'));
   try {
-    await background.enable({ endpoint: '', being: '', hasToken: true, portalName: 'fixture', portalBinary: process.execPath,
+    await background.enable({ endpoint: '', being: '', hasToken: true, portalName: 'fixture', portalBinary: path.resolve('resources/heart-portal.exe'),
       workspace: root, autoStart: false, backgroundEnabled: true, allowExec: false, kitsEnabled: false },
     parseConnection('http://127.0.0.1:1/fixture/?token=registration-fixture'));
     expect(background.state.installed).toBe(true);
@@ -62,6 +62,12 @@ it.skipIf(process.env.PORTAL_DESKTOP_NATIVE_UPGRADE_TESTS !== '1' || process.pla
     expect(encrypted).not.toContain('registration-fixture');
     expect(encrypted.length).toBeGreaterThan(40);
     const saved = background.installedService!;
+    // Preserve the current process while updating a prior PowerShell action.
+    const quote = (value: string) => "'" + value.replaceAll("'", "''") + "'";
+    const ps = (script: string) => command('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(windowsPowerShellScript(script), 'utf16le').toString('base64')]);
+    await ps(`$a=New-ScheduledTaskAction -Execute (Join-Path $PSHOME 'powershell.exe') -Argument ${quote('-NoProfile -WindowStyle Hidden -File "' + path.join(saved.root, 'run.ps1') + '"')}; Set-ScheduledTask -TaskName '${background.label}' -Action $a | Out-Null`);
+    await background.load(saved);
+    expect((await ps(`(Get-ScheduledTask -TaskName '${background.label}').Actions[0].Execute`)).trim()).toBe(path.join(saved.root, 'portal-background-v1.exe'));
     await background.disable();
     const unregister = windowsPowerShellScript(`Unregister-ScheduledTask -TaskName '${background.label}' -Confirm:$false`);
     await command('powershell.exe', ['-NoProfile', '-NonInteractive', '-EncodedCommand', Buffer.from(unregister, 'utf16le').toString('base64')]);
@@ -69,7 +75,7 @@ it.skipIf(process.env.PORTAL_DESKTOP_NATIVE_UPGRADE_TESTS !== '1' || process.pla
     // Reopening and explicitly starting must repair only the missing task,
     // preserving the runtime, configuration and DPAPI credential bytes.
     const reopened = new BackgroundPortal(path.join(root, 'profile'));
-    await reopened.discover({ endpoint: '', being: '', hasToken: true, portalName: 'fixture', portalBinary: process.execPath,
+    await reopened.discover({ endpoint: '', being: '', hasToken: true, portalName: 'fixture', portalBinary: path.resolve('resources/heart-portal.exe'),
       workspace: root, autoStart: false, backgroundEnabled: true, allowExec: false, kitsEnabled: false }, null);
     await reopened.load(saved);
     expect((await reopened.refresh()).enabled).toBe(true);
