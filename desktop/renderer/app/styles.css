@@ -297,6 +297,7 @@ body:not([data-view=chat]):not([data-view=portal]) #view-title{display:none}
 .object-actions{justify-content:space-between;margin-top:8px;padding-top:14px}
 .together-limit{font-size:10px;color:var(--muted);line-height:1.8;margin-top:20px}
 .feed-controls{position:relative}
+.feed-controls>.feed-summary{flex:1;min-width:0;padding:0;line-height:1.6}
 .feed-options{position:relative;margin-left:auto}
 .feed-options>summary,.seed-filter-menu>summary{display:flex;align-items:center;gap:7px;list-style:none;font-size:12px;color:var(--secondary);cursor:pointer;padding:7px 10px;border-radius:9px}
 .feed-options>summary::-webkit-details-marker,.seed-filter-menu>summary::-webkit-details-marker{display:none}
