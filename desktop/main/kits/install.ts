@@ -120,7 +120,7 @@ export class KitInstaller {
       const source = await unpackKit(data, path.join(root, 'unpacked'));
       const file = path.join(source, 'manifest.json');
       if ((await stat(file)).size > 1024 * 1024) throw new Error('Kit manifest 超过 1 MB。');
-      const manifest = JSON.parse(await readFile(file, 'utf8'));
+      const manifest = JSON.parse((await readFile(file, 'utf8')).replace(/^\uFEFF/, ''));
       if (manifest.name !== details.data.name || manifest.version !== details.data.version) throw new Error('下载包名称或版本与 Grove 清单不一致，请刷新后重试。');
       // Grove can enrich provision metadata without rewriting the stored archive.
       const catalogManifest = details.data.manifest as any;
@@ -130,6 +130,8 @@ export class KitInstaller {
       manifest.tools = (manifest.tools || []).map((t: any) => ({ ...t, description: t.description || '', params: t.params || t.inputSchema || { type: 'object', properties: {} } }));
       await writeFile(file, JSON.stringify(manifest));
       const kit = await readKit(source); if (!kit.compatible) throw new Error('此 Kit 不支持当前系统。');
+      // Normalize the platform command before dependency setup and final write.
+      manifest.command = kit.command;
       if (await exists(path.join(directory, kit.name))) throw new Error('同名 Kit 已安装，当前安装不会覆盖已有配置。');
       const environment = (manifest.provision?.env || []).map((v: any) => {
         if (!v || typeof v.name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(v.name) || /^(PATH|HOME|USERPROFILE|NODE_OPTIONS|LD_PRELOAD|DYLD_.*|ELECTRON_.*|PORTAL_.*)$/i.test(v.name)) throw new Error('Kit 声明了不支持的环境变量。');

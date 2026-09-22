@@ -18,16 +18,21 @@ export async function kitLocation(settings: Settings, home = os.homedir()) {
 export async function readKit(directory: string, platform: string = process.platform): Promise<LocalKit> {
   const file = path.join(directory, 'manifest.json');
   if ((await stat(file)).size > 1024 * 1024) throw new Error('manifest.json 超过 1 MB。');
-  const manifest = JSON.parse(await readFile(file, 'utf8'));
+  const manifest = JSON.parse((await readFile(file, 'utf8')).replace(/^\uFEFF/, ''));
   if (typeof manifest.name !== 'string' || !/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/.test(manifest.name)) throw new Error('Kit 名称必须由字母、数字、横线或下划线组成。');
-  if (typeof manifest.version !== 'string' || !manifest.version || !Array.isArray(manifest.command) || !manifest.command.length || !manifest.command.every((v: unknown) => typeof v === 'string' && !v.includes('\0'))) throw new Error('manifest.json 缺少 version 或 Portal 所需的 command 数组。');
+  const command = Array.isArray(manifest.command)
+    ? manifest.command
+    : manifest.command && typeof manifest.command === 'object'
+      ? (process.platform === 'win32' ? manifest.command.windows : manifest.command.posix) || []
+      : [];
+  if (typeof manifest.version !== 'string' || !manifest.version || !command.length || !command.every((v: unknown) => typeof v === 'string' && !v.includes('\0'))) throw new Error('manifest.json 缺少 version 或 Portal 所需的 command 数组。');
   if (!Array.isArray(manifest.tools) || manifest.tools.length > 1000 || !manifest.tools.every((v: any) => v && typeof v.name === 'string' && typeof v.description === 'string')) throw new Error('manifest.json 的 tools 格式不符合 Portal 要求。');
   if (manifest.platform !== undefined && (!Array.isArray(manifest.platform) || !manifest.platform.every((v: unknown) => typeof v === 'string'))) throw new Error('platform 必须是字符串数组。');
   const normalizePlatform = (value: string) => value.toLowerCase().replace(/^macos$/, 'darwin').replace(/^win32$/, 'windows');
   const current = normalizePlatform(platform);
   const platforms = manifest.platform?.map(normalizePlatform);
   return { name: manifest.name, version: manifest.version, description: String(manifest.description || ''),
-    directory, command: manifest.command, tools: manifest.tools.map((v: any) => ({ name: v.name, description: v.description, params: v.params })),
+    directory, command, tools: manifest.tools.map((v: any) => ({ name: v.name, description: v.description, params: v.params })),
     compatible: !platforms || platforms.includes(current), eager: manifest.eager === true };
 }
 export async function localKits(settings: Settings, home?: string): Promise<KitLibrary> {
