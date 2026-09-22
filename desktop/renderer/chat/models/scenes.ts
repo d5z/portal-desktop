@@ -3,6 +3,7 @@ import type { ChatItem } from "./chat";
 export interface MessageScene {
   sceneId?: string;
   sceneLabel?: string;
+  legacySceneId?: string;
   strict?: boolean;
 }
 export type HistoryScope = "current" | "all";
@@ -33,5 +34,6 @@ export function sceneItems(items: ChatItem[], scope: HistoryScope, current: Mess
 
 // Legacy Loom keeps shared history; managed sessions use strict scene boundaries.
 export function inCurrentScene(scene: MessageScene, current: MessageScene): boolean {
-  return !current.sceneId || (!scene.sceneId && !current.strict) || scene.sceneId === current.sceneId;
+  return !current.sceneId || (!scene.sceneId && !current.strict) || scene.sceneId === current.sceneId ||
+    (!current.strict && !!current.legacySceneId && scene.sceneId === current.legacySceneId);
 }

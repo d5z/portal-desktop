@@ -60,6 +60,14 @@ const api: DesktopAPI = {
   openTownLink: route => ipcRenderer.invoke('beings:town-open', route),
   snapshot: () => ipcRenderer.invoke('beings:snapshot'),
   save: input => ipcRenderer.invoke('beings:save', input),
+  beingModelConfig: patch => ipcRenderer.invoke("beings:model-config", patch),
+  sceneTasks: () => ipcRenderer.invoke('beings:scene-tasks'),
+  onSceneTasks: callback => {
+    const listener = (_event: unknown, snapshot: import('../shared/types').SceneTaskSnapshot) => callback(snapshot);
+    ipcRenderer.on('beings:scene-tasks', listener);
+    return () => ipcRenderer.removeListener('beings:scene-tasks', listener);
+  },
+  subagentConfig: () => ipcRenderer.invoke('beings:subagent-config'),
   choose: kind => ipcRenderer.invoke('beings:choose', kind),
   startPortal: () => ipcRenderer.invoke('beings:portal-start'),
   restartPortal: () => ipcRenderer.invoke('beings:portal-restart'),

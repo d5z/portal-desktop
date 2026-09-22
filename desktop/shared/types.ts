@@ -25,7 +25,10 @@ export interface Settings {
   portalConfigPath?: string;
   portalEnvironmentPath?: string;
 }
+export interface SubagentSetup { enabled?: boolean; base_url?: string; api?: string; provider: string; model: string; api_key: string; thinking: string }
 export interface SaveSettings {
+  subagentEnabled?: boolean;
+  subagentSetup?: SubagentSetup;
   connectionLink?: string;
   workspace: string;
   portalBinary: string;
@@ -41,11 +44,13 @@ export type PortalPhase = 'running' | 'stopped' | 'starting' | 'connected' | 're
 export interface PortalState { phase: PortalPhase; pid?: number; managed?: boolean; runtimePath?: string; conflict?: boolean; message: string; logs: string[] }
 export interface BackgroundState { supported: boolean; installed: boolean; enabled: boolean; running: boolean; existing: boolean; label?: string; pid?: number; message: string }
 export interface ChatScene { scene_id: string; scene_meta: { client: string; scene_label: string } }
-export type ChatSceneActivity = 'thinking' | 'replying' | 'working' | 'waiting' | 'done' | 'error' | 'stopped';
+export type ChatSceneActivity = 'queued' | 'thinking' | 'replying' | 'working' | 'waiting' | 'done' | 'error' | 'stopped';
 export const CHAT_SCENE_ACTIVITY_LABELS: Record<ChatSceneActivity, string> = {
-  thinking: '思考中', replying: '回复中', working: '执行中', waiting: '等待回复',
+  queued: '排队中', thinking: '思考中', replying: '回复中', working: '执行中', waiting: '等待回复',
   done: '已回复', error: '出错了', stopped: '已停止',
 };
+export interface SceneTask { id: string; sceneId: string; status: "queued" | "running" | "done" | "failed" | "cancelled" | "interrupted" | "budget_exhausted" | "timeout"; createdAt: number; endedAt?: number; error?: string }
+export interface SceneTaskSnapshot { endpoint: string; tasks: SceneTask[]; subagentReady?: boolean }
 export interface Snapshot { settings: Settings; portal: PortalState; background?: BackgroundState; chatScene?: ChatScene; chatSessions?: ChatScene[]; notice?: string }
 export interface ClientStartup { supported: boolean; enabled: boolean; message: string }
 export interface NotificationPreferences { enabled: boolean; mail: boolean; firesides: boolean; bonfire: boolean }
@@ -100,6 +105,10 @@ export interface DesktopAPI {
   openTownLink(route: string): Promise<void>;
   snapshot(): Promise<Snapshot>;
   save(input: SaveSettings): Promise<Snapshot>;
+  beingModelConfig(patch?: Record<string, string | number | boolean>): Promise<Record<string, unknown>>;
+  sceneTasks(): Promise<SceneTaskSnapshot>;
+  onSceneTasks(callback: (snapshot: SceneTaskSnapshot) => void): () => void;
+  subagentConfig(): Promise<Omit<SubagentSetup, 'api_key'>>;
   connectionDefaults(input: Pick<SaveSettings, 'connectionLink'>): Promise<{ portalName: string; source?: string }>;
   choose(kind: 'workspace'): Promise<string | null>;
   startPortal(): Promise<PortalState>;
@@ -119,7 +128,7 @@ declare global { interface Window { beings: DesktopAPI } }
 export type TownKind = 'home' | 'bonfire' | 'firesides' | 'fireside' | 'fireside-members' | 'inbox' | 'sent' | 'embers' | 'scrolls' | 'my-scrolls' | 'grove' | 'kit-comments' | 'kit' | 'ember' | 'scroll' | 'seeds' | 'seed' | 'seed-lineage' | 'seed-absorbs';
 export interface SeedFilters { q: string; domain: string; tag: string; kit: string; lifecycle: string }
 export interface TownQuery { kind: TownKind; offset?: number; id?: string; scrollKind?: string; groveStatus?: string; q?: string; domain?: string; tag?: string; kit?: string; lifecycle?: string }
-export type TownResult = { ok: true; data: Record<string, unknown>; fetchedAt: string; warnings?: string[] } | { ok: false; code: 'auth' | 'forbidden' | 'not-found' | 'http' | 'network'; message: string };
+export type TownResult = { ok: true; data: Record<string, unknown>; fetchedAt: string; warnings?: string[] } | { ok: false; code: 'auth' | 'forbidden' | 'not-found' | 'http' | 'timeout' | 'format' | 'too-large' | 'network'; message: string };
 export type TownChannel = 'bonfire' | 'mail' | 'firesides';
 export interface TownLiveState {
   phase: 'unpaired' | 'connecting' | 'connected' | 'reconnecting' | 'auth-error';

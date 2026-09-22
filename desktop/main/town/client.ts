@@ -91,7 +91,7 @@ export class TownCredentials {
 }
 
 export class TownClient {
-  constructor(private getToken: () => string, private fetcher: typeof fetch = fetch, private origin = TOWN_ORIGIN, private getBeingId: () => string = () => '') {}
+  constructor(private getToken: () => string, private fetcher: typeof fetch = fetch, private origin = TOWN_ORIGIN, private getBeingId: () => string = () => '', private reportRequest?: (event: { route: string; durationMs: number; status?: number; bytes?: number; failure: string }) => void) {}
   async pair(input: { beingId: string; code: string }, signal?: AbortSignal): Promise<{ token: string; beingId: string; display?: string }> {
     if (!input || typeof input.beingId !== 'string' || typeof input.code !== 'string') throw new Error('请输入 Being 名和配对码。');
     const beingId = normalizeTownIdentity(input.beingId), code = input.code.trim().toUpperCase();
@@ -159,33 +159,57 @@ export class TownClient {
     if (route.private && token) {
       headers.Authorization = `Bearer ${token}`;
     }
+    const started = Date.now();
+    let status: number | undefined;
     try {
       const response = await this.fetcher(url.href, {
         headers, method: 'GET', credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(20000),
       });
+      status = response.status;
       if (!response.ok) {
+        this.reportRequest?.({ route: route.route, durationMs: Date.now() - started, status, failure: `http-${status}` });
         return await townError(response, token);
       }
       const data = query.kind === 'fireside-members'
         ? await readTownMembersJson(response)
         : await readTownJson(response);
       return { ok: true, data, fetchedAt: new Date().toISOString() };
-    } catch { return { ok: false, code: 'network', message: '未能读取 Town。请检查网络后重试；服务器需返回有效的 JSON。' }; }
+    } catch (error) {
+      const failure = error instanceof TownReadError ? error.kind : isTimeout(error) ? 'timeout' : 'network';
+      this.reportRequest?.({ route: route.route, durationMs: Date.now() - started, ...(status === undefined ? {} : { status }), ...(error instanceof TownReadError && error.bytes === undefined ? {} : { bytes: error instanceof TownReadError ? error.bytes : undefined }), failure });
+      const message = failure === 'timeout'
+        ? '读取 Town 超时（20 秒），请稍后重试。'
+        : failure === 'too-large'
+          ? 'Town 返回的消息过大，客户端已停止读取。请减少返回条数或联系服务端限制响应大小。'
+          : failure === 'format'
+            ? 'Town 返回的数据格式不正确，请稍后重试。'
+            : '未能读取 Town。请检查网络后重试。';
+      return { ok: false, code: failure, message };
+    }
   }
 }
 
+class TownReadError extends Error {
+  constructor(readonly kind: 'format' | 'too-large', readonly bytes?: number) { super(kind); this.name = 'TownReadError'; }
+}
+function isTimeout(error: unknown) {
+  return Boolean(error && typeof error === 'object' && 'name' in error &&
+    ((error as { name?: unknown }).name === 'TimeoutError' || (error as { name?: unknown }).name === 'AbortError'));
+}
+
 async function readTownJsonValue(response: Response): Promise<unknown> {
-  if (!response.headers.get('content-type')?.includes('application/json')) { await response.body?.cancel(); throw new Error('format'); }
+  if (!response.headers.get('content-type')?.includes('application/json')) { await response.body?.cancel(); throw new TownReadError('format'); }
   const reader = response.body?.getReader();
-  if (!reader) throw new Error('empty');
+  if (!reader) throw new TownReadError('format');
   const chunks: Uint8Array[] = []; let bytes = 0;
   while (true) {
     const { done, value } = await reader.read(); if (done) break;
     bytes += value.byteLength;
-    if (bytes > 4 * 1024 * 1024) { await reader.cancel(); throw new Error('size'); }
+    if (bytes > 4 * 1024 * 1024) { await reader.cancel(); throw new TownReadError('too-large', bytes); }
     chunks.push(value);
   }
-  return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown;
+  try { return JSON.parse(Buffer.concat(chunks).toString('utf8')) as unknown; }
+  catch { throw new TownReadError('format', bytes); }
 }
 
 async function readTownJson(response: Response): Promise<Record<string, unknown>> {

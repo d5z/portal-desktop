@@ -233,3 +233,28 @@ Heart / Being 调用 portal_exec(command="@context scene-id")
 ### 跨客户端同步现状
 
 未启用周期性的空闲历史同步或活动流发现。启动、切换会话、重新获得焦点及连接恢复时沿用现有同步；已发现活动流的 replay 恢复机制保持不变。因此持续停留在窗口中时，其他客户端发起的新对话不保证自动出现。全局事件订阅接口仍需确认。
+
+### Heart 调度约定与 Desktop 提示（2026-09-22）
+
+根据 Heart 对接反馈，同一 Being 同时只有一个 breath；多场景输入通过 splice 入队，在工具边界触发 yield。Being 自主决定恢复原任务、处理新输入或委派 subagent。Desktop 的场景状态和 HTTP reader 不代表多个意识，也不能将 202、yield 或空的结束事件解释为任务完成。
+
+Desktop 仅在 subagent 本地就绪检测通过时附加委派上下文（Portal 已连接、配置启用且模型存在、执行器可用、最近结束任务无已知失败；未知状态不宣称可用）。在实际发送时检查本机已提交且仍处于 thinking/replying/working/waiting 的其他场景，将场景 ID、名称、状态及最近提交请求的前 240 个字符（压缩空白）附在用户原文之后，最多 8 个场景。该段明确标记为「Desktop 场景调度提示」，随原始消息持久化，界面将其折叠在对应轮次的思考详情中；摘要仅是背景，委派仍由 Being 决定。闲置、已完成、仅通过外部事件发现的场景和未发送草稿不会加入提示。普通发送和在流中追加输入都使用此逻辑。未增加空闲轮询或自动 subagent 调用。
+
+提示明确当前 Portal 已开启 subagent，三个会话中的任务独立、可能互不相关，摘要仅供调度。默认调度倾向已调整为：A 由主意识继续推进；新来的 B/C 若适合独立后台执行，优先评估委派本次新输入，再恢复 A。这是一条上下文建议，是否委派以及任务依赖的处理顺序仍由 Being 决定。提示要求委派携带新输入的 scene_id，后台结果回到 Being 后串行整理，并在各自 scene_id 输出，不能把 B/C 答案合并进 A 或当前会话。已有 subagent 的任务 ID 与状态也随提示提供，避免重复委派。
+
+自动化协议回归覆盖 A 的工具执行、B 返回 202、A 空 stop/yield、B 回复以及 A 后续结果在原 SSE 上返回。真实 Being 是否委派仍需实机联调，自动化测试不代表已验证模型的委派决策。
+
+### Desktop 初始化中的 subagent 配置
+
+「连接与设置」的 subagent 配置入口复用现有模型设置组件。模型设置页区分 Heart 与 subagent：Heart 仍读写 `/api/llm/config`；subagent 读取本机配置的公开模型字段，密钥不回传。初始化时选择提供商、模型 ID、API Key 和思考强度，仅暂存在连接表单，返回后随连接保存；可取消本次配置。Being 模型与 subagent 在同一个右侧面板内切换，容器不重新打开，两套编辑草稿分别保留。尚未连接 Being 时仍可切换类别，Being 模型页提示先完成连接；subagent 可先配置。连接后可从模型设置页切换到 subagent，独立修改配置。
+
+保存时先验证 Being 连接，再通过 Portal 的 `subagent-setup` 命令复用 `portal_subagent_setup` 安装与配置能力，成功后自动重启 Portal，无需手动重启 Desktop。需要本机 npm；安装失败可重试。配置成功不代表模型 API 凭据已经通过在线验证。subagent 仅展示支持的服务商，不沿用 Heart 的服务商密钥、自部署地址、温度或回滚参数。
+
+配置 JSON 通过 stdin 传入，密钥不进入命令行或 Desktop 普通设置。Portal 将模型配置写入本机 TOML（权限 0600），后续启动沿用该文件；API Key 留空保留已有配置或使用运行环境。初始化不自动启动任务，是否委派仍由 Being 决定。
+
+
+### subagent 模型列表与复用 Being 模型
+
+subagent 页读取 Being 提供的模型预设，按已支持的接口协议生成可选模型；点击预设自动填入模型 ID。"使用 Being 当前模型"带入支持的当前公开模型 ID、接口地址和协议，确认密钥后保存。若 Being 使用自部署模型（`self-hosted`），该按钮禁用并提示为 subagent 单独选模型；自部署预设也不进入 subagent 列表，避免从列表绕过此限制。两类模型继续复用同一右侧设置面板和选择流程。它是配置复制，不是持续跟随 Being 模型变化。仅保存在 Being 服务端的密钥不会复制到本机；同一接口已有本机密钥可沿用，换服务商或地址时不继承旧密钥。
+
+自定义配置保存为 `[subagent.model] provider="portal-custom"`，包含 `base_url` 与 `api`。Portal 在独立 pi agent 目录的 `models.json` 中维护 `portal-custom` 条目，保留其他条目，密钥以环境变量传递。兼容固定版本 pi 0.65.2 的[自定义模型配置协议](https://github.com/badlogic/pi-mono/blob/v0.65.2/packages/coding-agent/docs/models.md)。已通过该版本 pi 对本地模拟 OpenAI Chat Completions 服务的调用验证；未代替用户验证真实模型服务的凭据或兼容性。

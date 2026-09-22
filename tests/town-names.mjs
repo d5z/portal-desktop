@@ -10,6 +10,7 @@ const { outputFiles } = await build({
     import React from 'react';
     import { createRoot } from 'react-dom/client';
     import { TownFeed } from './desktop/renderer/town/components/feed';
+    import { Town } from './desktop/renderer/town/page';
     import { TownComposer } from './desktop/renderer/town/components/composer';
     import { TownAuth } from './desktop/renderer/town/components/auth';
     import { TownModel } from './desktop/renderer/town/models/town';
@@ -37,11 +38,31 @@ const { outputFiles } = await build({
       { id: 'other', seq: 2, town_id: 't_RiverB', speaker_name: '河流', sender_town_id: 't_RiverB', sender_display: '河流', content: '同名的另一个 Being' },
     ] : messages;
     if (mentionView) model.view = mentionView;
+    if (location.pathname.startsWith('/lazy/')) {
+      model.view = location.pathname.split('/').at(-1);
+      feed.splice(0, feed.length, ...Array.from({ length: 100 }, (_, index) => ({
+        id: String(index + 1), seq: index + 1, sender_display: '河流', sender_town_id: 't_RiverA',
+        town_id: 't_RiverA', speaker_name: '河流', recipient_town_id: 't_Willow',
+        created_at: '2026-09-18T13:33:00Z',
+        content: '# 长消息 ' + index + '\\n\\n' + '**完整内容** @t_RiverA\\n\\n'.repeat(40),
+        ...(index ? { reply_to: model.view === 'mail' ? '1' : 1, reply_to_preview: '引用摘要' } : {}),
+      })));
+    }
     model.mentionNames = collectMentionNames(feed);
     window.fixtureMessages = feed;
     model.live = { phase: 'connected', beingId: 't_Willow', display: '柳树', generation: 1, revision: 1, sync: 1, versions: { bonfire: 0, mail: 0, firesides: 0 }, message: 'fixture' };
-    model.load = async () => {};
-    if (location.pathname === '/places') {
+    if (!location.pathname.startsWith('/refresh/')) model.load = async () => {};
+    if (location.pathname.startsWith('/refresh/')) {
+      window.fixtureModel = model;
+      window.fixturePending = [];
+      model.tabs.mail = 'inbox';
+      model.api.town = query => {
+        if (query.kind === 'fireside-members') return Promise.resolve({ ok: true, data: { members: [] } });
+        return new Promise(resolve => window.fixturePending.push({ query, resolve }));
+      };
+      model.show(location.pathname.split('/').at(-1));
+      createRoot(document.getElementById('root')).render(<Town model={model} />);
+    } else if (location.pathname === '/places') {
       window.fixturePlaces = [];
       function PlacesFixture() {
         const [channels, setChannels] = React.useState([]);
@@ -145,6 +166,90 @@ try {
     assert.equal(await page.evaluate(() => window.fixtureCopied), await page.evaluate(() => window.fixtureMessages[0].content));
     await page.screenshot({ path: `test-results/town-mentions-${view}.png` });
   }
+  for (const view of ['bonfire', 'firesides', 'mail']) {
+    await page.goto(`http://127.0.0.1:${server.address().port}/lazy/${view}`);
+    await page.locator('#town-message-99').waitFor();
+    assert.equal(await page.locator('.social-message').count(), 100);
+    assert.equal(await page.locator('.social-body').count(), 0, 'Collapsed bodies and replies are not mounted');
+    const card = page.locator('#town-message-1');
+    assert.match(await card.locator('.social-preview').innerText(), /完整内容.*@河流/);
+    await card.hover();
+    await card.getByRole('button', { name: '复制正文', exact: true }).click();
+    assert.equal(await page.evaluate(() => window.fixtureCopied), await page.evaluate(() => window.fixtureMessages[1].content));
+    const summary = card.locator('.social-expand > summary');
+    await summary.focus();
+    await summary.press('Enter');
+    await card.locator('.social-expand .social-body h1').waitFor();
+    assert.equal(await card.locator('.social-expand .social-body strong').count(), 40);
+    await card.getByRole('button', { name: '收起全文', exact: true }).click();
+    await page.waitForFunction(() => document.querySelectorAll('.social-body').length === 0);
+    assert.equal(await summary.evaluate(el => el === document.activeElement), true);
+    await summary.press('Enter');
+    await card.locator('.social-expand .social-body').waitFor();
+    await card.getByRole('button', { name: '收起全文', exact: true }).click();
+    await page.waitForFunction(() => document.querySelectorAll('.social-body').length === 0);
+    await card.locator('.feed-reply-preview > summary').click();
+    await card.locator('.feed-reply-full .social-body h1').waitFor();
+    assert.equal(await card.locator('.feed-reply-full h1').innerText(), '长消息 0');
+    await card.getByRole('button', { name: '跳转原文', exact: true }).click();
+    await page.waitForFunction(() => document.activeElement?.id === 'town-message-0');
+    await card.locator('.feed-reply-preview > summary').click();
+    await page.waitForFunction(() => document.querySelectorAll('.social-body').length === 0);
+  }
+  for (const view of ['bonfire', 'firesides', 'mail']) {
+    await page.goto(`http://127.0.0.1:${server.address().port}/refresh/${view}`);
+    const resolveNext = async (mode = 'same') => {
+      if (view === 'firesides') {
+        await page.waitForFunction(() => window.fixturePending.some(p => p.query.kind === 'firesides'));
+        await page.evaluate(() => {
+          const i = window.fixturePending.findIndex(p => p.query.kind === 'firesides');
+          window.fixturePending.splice(i, 1)[0].resolve({ ok: true, data: { owned: [{ id: 10, name: '测试围炉' }], joined: [] }, fetchedAt: new Date().toISOString() });
+        });
+      }
+      await page.waitForFunction(() => window.fixturePending.some(p => ['bonfire', 'fireside', 'inbox'].includes(p.query.kind)));
+      await page.evaluate(mode => {
+        const i = window.fixturePending.findIndex(p => ['bonfire', 'fireside', 'inbox'].includes(p.query.kind));
+        window.fixtureSnapshot ||= [{ id: '1', seq: 1, sender_display: '河流', sender_town_id: 't_RiverA', town_id: 't_RiverA', speaker_name: '河流', content: '# 保留展开状态\n\n' + '**长内容**\n\n'.repeat(60) },
+          { id: '2', seq: 2, sender_display: '河流', content: '旧消息' }];
+        if (mode === 'updated') window.fixtureSnapshot = [window.fixtureSnapshot[0],
+          { ...window.fixtureSnapshot[1], content: '已修改的消息' }, { id: '3', seq: 3, content: '新增消息' }];
+        window.fixturePending.splice(i, 1)[0].resolve(mode === 'error' ? { ok: false, code: 'network', message: '测试超时' }
+          : { ok: true, data: { messages: structuredClone(window.fixtureSnapshot) }, fetchedAt: new Date().toISOString() });
+      }, mode);
+    };
+    await resolveNext();
+    const card = page.locator('#town-message-0');
+    await card.locator('.social-expand > summary').click();
+    await card.locator('.social-body h1').waitFor();
+    await page.evaluate(() => {
+      window.originalCard = document.querySelector('#town-message-0');
+      window.originalHeading = window.originalCard.querySelector('h1');
+    });
+    for (const mode of ['same', 'updated', 'error']) {
+      await page.locator('#town-refresh').click();
+      assert.equal(await page.locator('#town-body > #town-refresh-indicator').innerText(), '正在刷新…');
+      assert.equal(await page.locator('#town-refresh-indicator .startup-spinner').isVisible(), true);
+      assert.equal(await card.locator('.social-expand').getAttribute('open'), '');
+      if (mode === 'same') await page.screenshot({ path: `test-results/town-refresh-${view}.png` });
+      await resolveNext(mode);
+      await page.waitForFunction(() => !document.querySelector('#town-refresh-indicator'));
+      assert.equal(await page.evaluate(() => document.querySelector('#town-message-0') === window.originalCard && window.originalCard.querySelector('h1') === window.originalHeading), true);
+      if (mode === 'updated') {
+        assert.equal(await page.locator('.social-message').count(), 3);
+        assert.equal(await page.getByText('已修改的消息', { exact: true }).count(), 1);
+        assert.equal(await page.getByText('新增消息', { exact: true }).count(), 1);
+      }
+      if (mode === 'error') assert.match(await page.locator('#town-status').innerText(), /刷新失败，仍显示上次内容/);
+    }
+    await page.evaluate(() => window.fixtureModel.show('chat'));
+    assert.equal(await page.locator('#town-view').isVisible(), false);
+    await page.evaluate(view => window.fixtureModel.show(view), view);
+    assert.equal(await page.locator('#town-body > #town-refresh-indicator').innerText(), '正在刷新…');
+    assert.equal(await page.locator('#town-refresh-indicator .startup-spinner').isVisible(), true);
+    assert.equal(await page.evaluate(() => document.querySelector('#town-message-0') === window.originalCard && window.originalCard.querySelector('h1') === window.originalHeading), true);
+    await resolveNext();
+    await page.waitForFunction(() => !document.querySelector('#town-refresh-indicator'));
+  }
   await page.goto(`http://127.0.0.1:${server.address().port}/places`);
   const trigger = page.locator('#chat-places-trigger');
   await trigger.waitFor();
@@ -194,7 +299,7 @@ try {
   await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
   await page.screenshot({ path: 'test-results/chat-places-narrow-dark.png' });
   assert.deepEqual(errors, []);
-  console.log('PASS: DM names, exact and legacy reply recipients, unaddressable legacy mail, saved pairing display and confirmed sender; horizontal town shortcuts, toggle, keyboard, activity badges, narrow layout, reduced motion and draft preservation.');
+  console.log('PASS: DM names and recipients; lazy bodies/replies in 100-message feeds; incremental refresh and reopen preserve DOM/expansion across Bonfire/Fireside/mail, visible body spinner and refresh failures; horizontal town shortcuts, keyboard, narrow layout, reduced motion and draft preservation.');
 } finally {
   await browser?.close();
   await new Promise(resolve => server.close(resolve));

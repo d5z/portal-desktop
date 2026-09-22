@@ -108,6 +108,11 @@ export function createChatBridge(state: ChatState) {
       const data = event.data;
       if (!data || typeof data !== "object") return;
       switch (data.type) {
+        case 'beings:scene-tasks':
+          if (data.revision !== revision || data.endpoint !== new URLSearchParams(location.search).get('history_scope') || !Array.isArray(data.tasks) || data.tasks.length > 200) return;
+          if (!data.tasks.every((t: any) => t && typeof t.id === 'string' && typeof t.sceneId === 'string' && Number.isFinite(t.createdAt) && ['queued','running','done','failed','cancelled','interrupted','budget_exhausted','timeout'].includes(t.status))) return;
+          runtime.updateSceneTasks(data.tasks, data.subagentReady === true);
+          return;
         case "beings:chat-edit-result":
           if (data.revision === revision && typeof data.id === "string") edits.get(data.id)?.(data.ok === true);
           return;
@@ -162,6 +167,7 @@ export function createChatBridge(state: ChatState) {
             );
           return;
         case "beings:chat-action":
+          if (data.action === "model" && embedded && location.protocol === "beings:") { send({ type: "beings:model-settings" }); return; }
           if (["model", "being", "privacy"].includes(data.action))
             ui.panel(data.action, data.returnToSettings === true);
           else if (data.action === "close") ui.panel(null);
@@ -217,6 +223,7 @@ export function createChatBridge(state: ChatState) {
     window.addEventListener("message", receive);
     removeListener = () => window.removeEventListener("message", receive);
     void refreshSbs();
+    send({ type: 'beings:scene-tasks-request' });
   }
   return {
     send,

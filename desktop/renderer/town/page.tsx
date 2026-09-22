@@ -30,6 +30,7 @@ export function Town({ model }: { model: TownModel }) {
       !town.directId &&
       (["embers", "scrolls", "seeds"].includes(town.view) ||
         (town.view === "kits" && town.tab === "grove")),
+    refreshing = Boolean((town.loading || town.detailLoading) && (town.data || town.ringData || town.library || town.detail)),
     root = useRef<HTMLElement>(null);
   useLayoutEffect(() => { if (root.current) root.current.scrollTop = 0; }, [town.view, town.directId]);
   return (
@@ -37,7 +38,7 @@ export function Town({ model }: { model: TownModel }) {
       id="town-view"
       ref={root}
       className={`view${social ? " social-view" : ""}${paginated ? " paginated-view" : ""}${town.view === "embers" ? " bookshelf-view" : ""}${["scrolls", "embers"].includes(town.view) && !town.directId ? " reading-catalog" : ""}${town.view === "kits" && town.tab === "grove" && !town.directId ? " kit-catalog" : ""}${town.view === "seeds" && !town.directId ? " seed-catalog" : ""}`}
-      hidden={!definition}
+      hidden={!town.visible || !definition}
     >
       <div className="town-content">
         <div className="town-heading" hidden>
@@ -190,7 +191,7 @@ export function Town({ model }: { model: TownModel }) {
         </div>
         <div className="town-status-row">
           <div id="town-status" className="list-status" role="status" aria-live="polite">
-            {town.status}
+            {town.refreshError || town.status}
           </div>
         </div>
         {town.view === "kits" && town.tab === "grove" && <button className="secondary grove-help-button" onClick={() => void town.run(() => town.api.openTownLink("/grove"))}>Grove Help ↗</button>}
@@ -204,6 +205,12 @@ export function Town({ model }: { model: TownModel }) {
           }
           aria-busy={town.loading ? true : undefined}
         >
+          {refreshing && <div id="town-refresh-indicator" className="town-refresh-indicator" role="status" aria-live="polite">
+            <span className="town-refresh-label">
+              <span className="startup-spinner" aria-hidden="true" />
+              正在刷新…
+            </span>
+          </div>}
           {definition && <TownBody town={town} />}
         </div>
         <div id="town-pagination" className="pagination">
@@ -239,7 +246,7 @@ function TownBody({ town }: { town: TownModel }) {
         )}
       </div>
     );
-  if (town.loading && !town.data && !town.ringData)
+  if (town.loading && !town.data && !town.ringData && !town.library && !town.detail)
     return <div className="loading-block">正在读取…</div>;
   if (town.directId)
     return town.view === "firesides" ? (
@@ -392,7 +399,7 @@ function FiresideThread({ town, room }: { town: TownModel; room?: Data }) {
         </div>
       </>
     );
-  if (town.detailError)
+  if (town.detailError && !data)
     return <>{heading}<DetailError town={town} /></>;
   if (!data) return heading;
   return (

@@ -26,7 +26,11 @@ const { outputFiles } = await build({ stdin: { resolveDir: process.cwd(), loader
   import { SceneStore } from './desktop/renderer/shared/models/scene';
   const scenes = new SceneStore();
   const town = new TownModel({
-    town: async query => (await fetch('/query', { method: 'POST', body: JSON.stringify(query) })).json(),
+    town: async query => {
+      const result = await (await fetch('/query', { method: 'POST', body: JSON.stringify(query) })).json();
+      if (window.holdRefresh) await new Promise(resolve => { window.pendingRefresh = resolve; });
+      return window.failRefresh ? { ok: false, code: 'network', message: '测试超时' } : result;
+    },
     townAuth: async () => ({ configured: false }),
     copyText: async value => { window.copiedSeedLink = value; },
     openTownLink: async value => { window.openedSeedLink = value; },
@@ -60,7 +64,8 @@ const server = createServer(async (request, response) => {
     else if (query.kind === 'firesides') data = { owned: [{ id: '1', name: '测试围炉' }], joined: [] };
     else if (query.kind === 'fireside') data = { messages: [{ seq: 1, sender: '柳树', content: '围炉的新消息', created_at: '2026-09-14T00:00:00Z' }] };
     else if (['inbox', 'sent'].includes(query.kind)) data = { messages: [] };
-    else if (query.kind === 'embers') data = { scrolls: [], total: 0 };
+    else if (query.kind === 'embers') data = { scrolls: [{ id: 'book-1', title: '测试书籍', display_name: '河流' }], total: 1 };
+    else if (query.kind === 'ember') data = { id: 'book-1', title: '测试书籍', content: '书籍正文', display_name: '河流' };
     else if (query.kind === 'grove') data = { kits: [], total: 0 };
     else if (query.kind === 'scrolls') data = { scrolls: [{ id: 'scroll-1', title: '卷轴排版参考', display_name: '河流', kind: 'note', visibility: 'public', lifecycle: 'verified' }], total: 1 };
     else if (query.kind === 'scroll') data = { id: 'scroll-1', title: '卷轴排版参考', display_name: '河流', content: '卷轴正文', kind: 'note', visibility: 'public', lifecycle: 'verified', updated_at: '2026-09-14T00:00:00Z' };
@@ -83,6 +88,30 @@ try {
   const page = await browser.newPage({ viewport: { width: 1180, height: 900 } });
   page.setDefaultTimeout(10000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));
+  const verifyRefresh = async (selectors, label) => {
+    for (const failure of [false, true]) {
+      await page.evaluate(({ selectors, failure }) => {
+        window.refreshNodes = selectors.map(selector => document.querySelector(selector));
+        window.holdRefresh = true;
+        window.failRefresh = failure;
+        window.pendingRefresh = undefined;
+      }, { selectors, failure });
+      await page.locator('#town-refresh').click();
+      await page.waitForFunction(() => Boolean(window.pendingRefresh));
+      assert.equal(await page.locator('#town-body > #town-refresh-indicator .startup-spinner').isVisible(), true);
+      assert.equal(await page.evaluate(selectors => selectors.every((selector, index) => document.querySelector(selector) === window.refreshNodes[index]), selectors), true);
+      if (await page.locator('#town-pagination button').count())
+        assert.equal(await page.locator('#town-pagination button').evaluateAll(buttons => buttons.every(button => button.disabled)), true);
+      await mkdir('test-results', { recursive: true });
+      if (!failure) await page.screenshot({ path: `test-results/${label}-refresh.png` });
+      await page.evaluate(() => { window.holdRefresh = false; window.pendingRefresh(); });
+      await page.waitForFunction(() => !window.seedTown.loading && !window.seedTown.detailLoading);
+      assert.equal(await page.locator('#town-refresh-indicator').count(), 0);
+      assert.equal(await page.evaluate(selectors => selectors.every((selector, index) => document.querySelector(selector) === window.refreshNodes[index]), selectors), true);
+      if (failure) assert.match(await page.locator('#town-status').innerText(), /刷新失败，仍显示上次内容/);
+      await page.evaluate(() => { window.failRefresh = false; });
+    }
+  };
   await page.goto(`http://127.0.0.1:${server.address().port}`);
   await page.locator('.service-card').filter({ has: page.getByRole('heading', { name: '种子花园 · Seed Garden', exact: true }) }).getByRole('button', { name: '打开', exact: true }).click();
   await page.getByText('26 颗种子', { exact: true }).waitFor();
@@ -96,6 +125,7 @@ try {
   assert.equal(queries.at(-1).q, 'Portal'); assert.equal(queries.at(-1).offset, 0);
   await page.locator('.catalog-item').click();
   await page.locator('.seed-detail .reading-title').getByText('Portal 连接排障', { exact: true }).waitFor();
+  await verifyRefresh(['.catalog-item', '.seed-detail .reading-title', '.seed-detail .reading-text'], 'seed-garden');
   assert.equal(await page.evaluate(() => window.seedPwned), undefined);
   assert.doesNotMatch(await page.locator('.seed-detail').innerText(), /t_PrivateId/);
   assert.equal(queries.some(query => query.kind === 'seed-lineage'), false);
@@ -161,15 +191,20 @@ try {
   // A slower response must not replace the feature selected afterwards.
   const slowRead = page.waitForResponse(response => response.url().endsWith('/query') && response.request().postDataJSON().kind === 'bonfire');
   await nav.getByRole('button', { name: '篝火', exact: true }).click();
-  await page.getByText('正在读取…', { exact: true }).waitFor();
+  await page.locator('#town-refresh-indicator .startup-spinner').waitFor();
+  assert.equal(await page.getByText('篝火内容 · 第 3 次读取', { exact: true }).count(), 1);
   await switchTo('私信', '私信', 'inbox');
   await slowRead;
   assert.equal(await page.locator('#view-title').innerText(), '私信');
   assert.equal(await page.getByText('篝火内容 · 第 4 次读取', { exact: true }).count(), 0);
   await switchTo('书架', '书架', 'embers');
+  await page.locator('.catalog-item').click();
+  await page.locator('.catalog-detail .reading-title').getByText('测试书籍', { exact: true }).waitFor();
+  await verifyRefresh(['.catalog-item', '.catalog-detail .reading-title', '.reading-fragment .reading-text'], 'embers');
   await switchTo('卷轴', '卷轴', 'scrolls');
   await page.locator('.catalog-item').click();
   await page.locator('.catalog-detail .reading-title').getByText('卷轴排版参考', { exact: true }).waitFor();
+  await verifyRefresh(['.catalog-item', '.catalog-detail .reading-title', '.reading-fragment .reading-text'], 'scrolls');
   const scrollActions = await actionLayout();
   assert.equal(scrollActions[0].height, seedActions[0].height, 'Seed uses the same link controls as Scrolls');
   assert.equal(scrollActions[1].x - scrollActions[0].right, seedActions[1].x - seedActions[0].right);
@@ -182,6 +217,7 @@ try {
   assert.equal(await nav.locator('[aria-current="page"]').evaluate(el => parseFloat(getComputedStyle(el).fontSize)), 12);
   await page.evaluate(() => window.seedTown.show('seeds', 'seed-0'));
   await page.locator('.direct-reading .reading-title').waitFor();
+  await verifyRefresh(['.direct-reading .reading-title', '.reading-fragment .reading-text'], 'seed-direct');
   await page.setViewportSize({ width: 420, height: 800 });
   await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
   assert.equal(await page.locator('#place-sheet').evaluate(el => el.scrollWidth <= el.clientWidth), true);

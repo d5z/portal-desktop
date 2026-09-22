@@ -19,9 +19,13 @@ const providerNames: Record<string, string> = {
   deepseek: "DeepSeek",
   kimi: "Kimi",
   google: "Google",
+  gemini: "Google Gemini",
+  groq: "Groq",
+  xai: "xAI",
   glm: "智谱",
   openrouter: "OpenRouter",
   "self-hosted": "自部署",
+  "portal-custom": "自定义接口",
 };
 const thinkingOptions = [
   ["off", "关闭"],
@@ -36,6 +40,7 @@ interface ModelDraft {
   provider: string;
   baseUrl: string;
   apiKey: string;
+  api?: string;
 }
 
 export function ChatSettings({
@@ -44,14 +49,31 @@ export function ChatSettings({
   open,
   close,
   back,
+  target = "Heart",
+  onTarget,
+  staged = false,
+  contentOnly = false,
+  onBusy,
+  copyPreset,
+  catalogHint,
 }: {
   state: ChatState;
-  runtime: ChatRuntime;
+  runtime: Pick<ChatRuntime, "loadLlmConfig" | "applyConfigChange">;
   open: boolean;
   close: () => void;
   back?: () => void;
+  target?: "Heart" | "subagent";
+  onTarget?: (target: "Heart" | "subagent") => void;
+  staged?: boolean;
+  contentOnly?: boolean;
+  onBusy?: (busy: boolean) => void;
+  copyPreset?: Preset;
+  catalogHint?: string;
 }) {
   useModel(state);
+  const subagent = target === "subagent";
+  const fieldId = (name: string) => contentOnly ? `${target}-${name}` : name;
+  const [thinking, setThinking] = useState("medium");
   const [draft, setDraft] = useState<ModelDraft | null>(null);
   const [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
@@ -76,11 +98,11 @@ export function ChatSettings({
   const presets = Array.isArray(state.config.presets)
     ? state.config.presets
     : [];
-  const current = presets.find(
+  const current = state.config.model ? presets.find(
     (p) =>
       p.model === state.config.model &&
       (!state.config.provider || p.provider === state.config.provider),
-  );
+  ) : undefined;
   const provider = state.config.provider || current?.provider;
   const search = query.trim().toLocaleLowerCase();
   const groups = new Map<string, Preset[]>();
@@ -98,18 +120,22 @@ export function ChatSettings({
     ]);
   }
   const disabled = busy || state.configLoading;
+  useEffect(() => { onBusy?.(busy); }, [busy, onBusy]);
+  const Root = contentOnly ? "section" : "aside";
   function select(preset: Preset) {
     if (disabled) return;
-    if (preset.provider === "self-hosted") {
+    if (preset.provider === "self-hosted" && !subagent) {
       void selectSelfHosted(preset);
       return;
     }
     setError("");
+    setThinking(state.config.thinking || "medium");
     setDraft({
       preset,
       model: preset.model,
-      provider: preset.provider,
-      baseUrl: baseUrls[preset.provider] || "",
+      provider: subagent && preset.base_url ? "portal-custom" : preset.provider,
+      baseUrl: preset.base_url || baseUrls[preset.provider] || "",
+      api: preset.api || "openai-completions",
       apiKey: "",
       route: "official",
     });
@@ -140,8 +166,8 @@ export function ChatSettings({
         ? `${draft.preset.provider}/${draft.preset.model}`
         : draft.model
     ).trim();
-    if (!model) {
-      setError("请填写模型名称。");
+    if (!model || (subagent && !draft.provider)) {
+      setError(subagent ? "请选择服务商并填写模型名称。" : "请填写模型名称。");
       return;
     }
     setBusy(true);
@@ -150,7 +176,9 @@ export function ChatSettings({
       const result = await runtime.applyConfigChange({
         model,
         ...(draft.provider.trim() ? { provider: draft.provider.trim() } : {}),
-        ...(draft.baseUrl.trim() ? { base_url: draft.baseUrl.trim() } : {}),
+        ...((!subagent || draft.provider === "portal-custom") && draft.baseUrl.trim() ? { base_url: draft.baseUrl.trim() } : {}),
+        ...(subagent && draft.provider === "portal-custom" ? { api: draft.api || "openai-completions" } : {}),
+        ...(subagent ? { thinking } : {}),
         ...(draft.apiKey.trim() ? { api_key: draft.apiKey.trim() } : {}),
       });
       if (result?.needs_key) {
@@ -172,26 +200,26 @@ export function ChatSettings({
     }
   }
   return (
-    <aside
-      id="settings-panel"
-      className={`side-panel${open ? " active" : ""}`}
+    <Root
+      id={contentOnly ? undefined : "settings-panel"}
+      className={contentOnly ? "model-settings-content" : `side-panel${open ? " active" : ""}`}
       inert={!open}
       aria-hidden={!open}
       aria-label="模型设置"
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.stopPropagation();
-          close();
+          if (!disabled) close();
         }
       }}
     >
-      <div className="settings-header panel-header">
+      {!contentOnly && <div className="settings-header panel-header">
         <div className="settings-heading-copy">
           <div className="settings-title-line">
-            <h2 id="settings-title">模型设置</h2>
-            <NavigationControls back={back} />
+            <h2 id={fieldId("settings-title")} >模型设置</h2>
+            <NavigationControls back={disabled ? undefined : back} />
           </div>
-          <p>选择当前 Being 使用的模型</p>
+          <p>{subagent ? (staged ? "选择 subagent 模型，随连接一起安装与配置" : "配置本机 subagent 使用的模型") : "选择当前 Being 使用的模型"}</p>
         </div>
         <button
           ref={closeButton}
@@ -199,20 +227,33 @@ export function ChatSettings({
           type="button"
           aria-label="关闭模型设置"
           onClick={close}
+          disabled={disabled}
         >
           ✕
         </button>
       </div>
+      }
       <div className="settings-body" aria-busy={disabled}>
-        <div id="llm-step1" hidden={!!draft}>
+        {onTarget && <div className="toggle-group model-targets" role="group" aria-label="模型配置对象">
+          {(["Heart", "subagent"] as const).map(value => <button key={value} type="button" className={target === value ? "active" : ""} aria-pressed={target === value} disabled={disabled || (staged && value === "Heart")} title={staged && value === "Heart" ? "完成连接后可配置 Being 模型" : undefined} onClick={() => { if (value !== target) onTarget(value); }}>{value === "Heart" ? "Being 模型" : value}</button>)}
+        </div>}
+        {subagent && state.config.enabled === false && <div className="subagent-disabled-notice" role="status">
+          <strong>subagent 尚未启用</strong>
+          <p>可先配置模型。请在连接设置中打开「启用 subagent」并保存，启用后 Being 才能委派后台任务。</p>
+        </div>}
+        <div id={fieldId("llm-step1")}  hidden={!!draft}>
+          {subagent && <div className="subagent-copy-being">
+            <button type="button" className="btn-apply" disabled={disabled || !copyPreset} onClick={() => { if (copyPreset) select(copyPreset); }}>使用 Being 当前模型</button>
+            {catalogHint && <p className="hint">{catalogHint}</p>}
+          </div>}
           <section
-            id="llm-current"
-            className="llm-current"
+            id={fieldId("llm-current")}
+            className={`llm-current${subagent && state.config.enabled === false ? " is-disabled" : ""}`}
             aria-label="当前模型"
           >
             <div className="current-model-caption">
               <span className="model-indicator" />
-              当前使用
+              {subagent && state.config.enabled === false ? "未启用" : staged ? "待保存配置" : "当前使用"}
             </div>
             <h3 className="model-name">
               {current?.label ||
@@ -226,14 +267,15 @@ export function ChatSettings({
                 {state.config.model}
               </div>
             )}
+            {subagent && state.config.model && <button type="button" className="llm-custom-link" disabled={disabled} onClick={() => select({ id: "__custom", provider: state.config.provider || "", model: state.config.model || "", base_url: state.config.base_url, api: state.config.api, label: "编辑 subagent 模型" })}>编辑配置</button>}
           </section>
 
           <section
             className="model-catalog"
-            aria-labelledby="model-catalog-title"
+            aria-labelledby={fieldId("model-catalog-title")}
           >
             <div className="settings-section-heading">
-              <h3 id="model-catalog-title">切换模型</h3>
+              <h3 id={fieldId("model-catalog-title")} >切换模型</h3>
               <button
                 className="llm-custom-link"
                 type="button"
@@ -271,7 +313,7 @@ export function ChatSettings({
                 onChange={(event) => setQuery(event.target.value)}
               />
             </div>
-            <div id="llm-preset-list" className="llm-list">
+            <div id={fieldId("llm-preset-list")}  className="llm-list">
               {[...groups].sort(([a], [b]) => a === b ? 0 : a === "self-hosted" ? -1 : b === "self-hosted" ? 1 : 0).map(([name, items]) => (
                 <div className="provider-group" key={name}>
                   <div className="provider-group-label">
@@ -290,7 +332,7 @@ export function ChatSettings({
                           {preset.label}
                         </span>
                         <span className="model-option-detail">
-                          {preset.provider === "self-hosted"
+                          {subagent ? "选择此模型" : preset.provider === "self-hosted"
                             ? "无需密钥 · 点击切换"
                             : preset.has_key === false
                             ? "需配置密钥"
@@ -314,7 +356,7 @@ export function ChatSettings({
             </div>
           </section>
 
-          <details className="model-parameters">
+          {!subagent && <details className="model-parameters">
             <summary>
               <span>生成参数</span>
               <span className="parameter-summary">
@@ -342,7 +384,7 @@ export function ChatSettings({
               </div>
               <div
                 className="toggle-group"
-                id="cfg-thinking"
+                id={fieldId("cfg-thinking")}
                 role="group"
                 aria-label="思考强度"
               >
@@ -367,15 +409,15 @@ export function ChatSettings({
             </div>
             <div className="model-parameter">
               <div className="parameter-heading">
-                <label htmlFor="cfg-temperature">回答随机性</label>
-                <output id="cfg-temperature-val" htmlFor="cfg-temperature">
+                <label htmlFor={fieldId("cfg-temperature")} >回答随机性</label>
+                <output id={fieldId("cfg-temperature-val")}  htmlFor={fieldId("cfg-temperature")} >
                   {temperature.toFixed(1)}
                 </output>
               </div>
               <div className="slider-row">
                 <input
                   type="range"
-                  id="cfg-temperature"
+                  id={fieldId("cfg-temperature")}
                   min="0"
                   max="1"
                   step="0.1"
@@ -411,21 +453,21 @@ export function ChatSettings({
                 <span>更多变化</span>
               </div>
             </div>
-          </details>
-          <button
+          </details>}
+          {!subagent && <button
             className="btn-rollback"
             type="button"
             disabled={disabled}
             onClick={() => void patch({ rollback: "true" })}
           >
             <span aria-hidden="true">↶</span> 恢复上次可用配置
-          </button>
+          </button>}
         </div>
 
         {draft && (
           <div
-            id="llm-step2"
-            aria-labelledby="step2-title"
+            id={fieldId("llm-step2")}
+            aria-labelledby={fieldId("step2-title")}
             onKeyDown={(event) => {
               if (
                 event.key === "Enter" &&
@@ -450,23 +492,23 @@ export function ChatSettings({
               ← 返回模型列表
             </button>
             <div className="model-form-heading">
-              <h3 id="step2-title">{draft.preset.label}</h3>
+              <h3 id={fieldId("step2-title")} >{draft.preset.label}</h3>
               <p>
-                {custom
+                {subagent ? "模型与接口已带入。需要认证时请填写密钥；仅同一接口的本机已有密钥可留空沿用。" : custom
                   ? "填写模型名称及服务商的连接信息。"
                   : "确认连接方式后，应用到当前 Being。"}
               </p>
             </div>
             <div
               className="settings-section"
-              id="s2-model-section"
-              hidden={!custom}
+              id={fieldId("s2-model-section")}
+              hidden={!custom && !subagent}
             >
-              <label className="field-label" htmlFor="s2-model">
+              <label className="field-label" htmlFor={fieldId("s2-model")} >
                 模型名称
               </label>
               <input
-                id="s2-model"
+                id={fieldId("s2-model")}
                 className="field-input"
                 placeholder="服务商提供的模型 ID"
                 value={draft.model}
@@ -477,13 +519,13 @@ export function ChatSettings({
             </div>
             <div
               className="settings-section"
-              id="s2-route-section"
-              hidden={custom}
+              id={fieldId("s2-route-section")}
+              hidden={custom || subagent}
             >
               <span className="field-label">连接方式</span>
               <div
                 className="toggle-group"
-                id="s2-route"
+                id={fieldId("s2-route")}
                 role="group"
                 aria-label="连接方式"
               >
@@ -516,11 +558,14 @@ export function ChatSettings({
               </div>
             </div>
             <div className="settings-section">
-              <label className="field-label" htmlFor="s2-provider">
+              <label className="field-label" htmlFor={fieldId("s2-provider")} >
                 服务商
               </label>
-              <input
-                id="s2-provider"
+              {subagent ? <select id={fieldId("s2-provider")}  className="field-input" value={draft.provider} disabled={disabled} onChange={event => update({ provider: event.target.value, apiKey: "" })}>
+                <option value="" disabled>选择服务商</option>
+                {["anthropic", "openai", "openrouter", "gemini", "groq", "xai", "portal-custom"].map(value => <option key={value} value={value}>{value === "portal-custom" ? "自定义接口" : providerNames[value] || value}</option>)}
+              </select> : <input
+                id={fieldId("s2-provider")}
                 className="field-input"
                 placeholder="例如 openai-responses"
                 readOnly={!custom}
@@ -528,17 +573,17 @@ export function ChatSettings({
                 disabled={disabled}
                 onChange={(event) => update({ provider: event.target.value })}
                 autoComplete="off"
-              />
+              />}
             </div>
-            <div className="settings-section">
-              <label className="field-label" htmlFor="s2-base-url">
+            <div className="settings-section" hidden={subagent && draft.provider !== "portal-custom"}>
+              <label className="field-label" htmlFor={fieldId("s2-base-url")} >
                 接口地址
               </label>
               <input
-                id="s2-base-url"
+                id={fieldId("s2-base-url")}
                 className="field-input"
                 placeholder="https://…"
-                readOnly={!custom}
+                readOnly={!custom && !subagent}
                 value={draft.baseUrl}
                 disabled={disabled}
                 onChange={(event) => update({ baseUrl: event.target.value })}
@@ -547,12 +592,12 @@ export function ChatSettings({
               />
             </div>
             <div className="settings-section">
-              <label className="field-label" htmlFor="s2-api-key">
+              <label className="field-label" htmlFor={fieldId("s2-api-key")} >
                 API 密钥
               </label>
               <input
                 ref={keyInput}
-                id="s2-api-key"
+                id={fieldId("s2-api-key")}
                 className="field-input"
                 type="password"
                 autoComplete="off"
@@ -561,8 +606,8 @@ export function ChatSettings({
                 disabled={disabled}
                 onChange={(event) => update({ apiKey: event.target.value })}
               />
-              <p id="s2-key-hint" className="hint">
-                {custom || draft.route === "openrouter"
+              <p id={fieldId("s2-key-hint")}  className="hint">
+                {subagent ? "Being 服务端密钥不会自动复制。同一接口的本机已有密钥可留空沿用；无认证接口可不填。" : custom || draft.route === "openrouter"
                   ? "填写服务商提供的密钥；已有密钥时可留空。"
                   : draft.preset.has_key === false
                     ? "此服务商尚未配置密钥，请填写后应用。"
@@ -571,25 +616,38 @@ export function ChatSettings({
                       : "如需更新密钥，可在此填写。"}
               </p>
             </div>
+            {subagent && draft.provider === 'portal-custom' && <div className="settings-section">
+              <label className="field-label" htmlFor={fieldId('s2-api')}>接口协议</label>
+              <select id={fieldId('s2-api')} className="field-input" value={draft.api} disabled={disabled} onChange={event => update({ api: event.target.value })}>
+                {['openai-completions', 'openai-responses', 'anthropic-messages', 'google-generative-ai'].map(value => <option key={value} value={value}>{value}</option>)}
+              </select>
+            </div>}
+            {subagent && <div className="settings-section">
+              <label className="field-label" htmlFor={fieldId("subagent-thinking")} >思考强度</label>
+              <select id={fieldId("subagent-thinking")}  className="field-input" value={thinking} disabled={disabled} onChange={event => setThinking(event.target.value)}>
+                {["off", "minimal", "low", "medium", "high", "xhigh", "max"].map(value => <option key={value} value={value}>{value}</option>)}
+              </select>
+              <p className="hint">{staged ? "返回后点击保存、连接并启动，才会安装并保存配置。" : "保存后自动重启 Portal，无需重启 Desktop；运行中的任务可能中断。"}安装需要本机 npm。</p>
+            </div>}
             {error && (
-              <div id="s2-error" className="step2-error" role="alert">
+              <div id={fieldId("s2-error")}  className="step2-error" role="alert">
                 {error}
               </div>
             )}
             <button
-              id="s2-apply"
+              id={fieldId("s2-apply")}
               type="button"
               className="btn-apply"
               disabled={disabled}
               onClick={() => void apply()}
             >
-              {busy ? "正在应用…" : "保存并使用"}
+              {busy ? "正在应用…" : subagent && staged ? "使用此配置并返回" : "保存并使用"}
             </button>
           </div>
         )}
         {state.configStatus && !draft && (
           <div
-            id="cfg-status"
+            id={fieldId("cfg-status")}
             className={state.configStatusClass}
             role="status"
           >
@@ -597,6 +655,6 @@ export function ChatSettings({
           </div>
         )}
       </div>
-    </aside>
+    </Root>
   );
 }

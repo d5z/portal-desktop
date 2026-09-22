@@ -331,6 +331,16 @@ export function ConnectionSettings({ model }: { model: AppModel }) {
   const app = useModel(model);
   const form = app.form;
   const imported = Boolean(form?.portalConfigPath);
+  const [subagentEnabled, setSubagentEnabled] = useState<boolean>();
+  useEffect(() => {
+    if (!app.settingsOpen) return;
+    let active = true;
+    setSubagentEnabled(undefined);
+    void app.api.subagentConfig().then(config => {
+      if (active) setSubagentEnabled(config.enabled !== false);
+    }).catch(() => { if (active) { app.formError = '无法读取 subagent 开关状态'; app.changed(); } });
+    return () => { active = false; };
+  }, [app, app.settingsOpen]);
   return (
     <Dialog
       open={app.settingsOpen}
@@ -493,6 +503,23 @@ export function ConnectionSettings({ model }: { model: AppModel }) {
                 }
               />
             </label>
+            <div className="subagent-switch-row">
+              <label htmlFor="subagent-enabled-input">
+                <strong>启用 subagent</strong>
+                <small>允许 Being 在场景内委派子任务，关闭后保留模型配置</small>
+                {form?.subagentSetup && <small>{form.subagentSetup.provider} / {form.subagentSetup.model} · 随连接保存</small>}
+              </label>
+              <div className="subagent-switch-actions">
+                <button type="button"
+                  disabled={app.saving || !(form?.subagentEnabled ?? subagentEnabled ?? false)}
+                  onClick={() => app.openSubagentSettings(true)}>配置 ›</button>
+                <input id="subagent-enabled-input" type="checkbox" role="switch"
+                  checked={form?.subagentEnabled ?? subagentEnabled ?? false}
+                  disabled={app.saving || subagentEnabled === undefined}
+                  onChange={event => app.editForm('subagentEnabled', event.target.checked)} />
+              </div>
+              {form?.subagentSetup && <button type="button" className="subagent-skip" disabled={app.saving || !(form?.subagentEnabled ?? subagentEnabled ?? false)} onClick={() => app.editForm("subagentSetup", undefined)}>取消本次 subagent 配置</button>}
+            </div>
           </div>
           <p className="form-error" id="settings-error" role="alert">
             {app.formError}
@@ -506,7 +533,7 @@ export function ConnectionSettings({ model }: { model: AppModel }) {
             type="submit"
             disabled={app.saving}
           >
-            保存、连接并启动
+            {app.saving ? (form?.subagentSetup ? "正在连接、安装并配置…" : "正在连接…") : "保存、连接并启动"}
           </button>
         </div>
       </form>

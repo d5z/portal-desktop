@@ -94,7 +94,7 @@ export function SeedDetail({ town, direct = false }: { town: TownModel; direct?:
   const id = str(town.detail?.query.id);
   useEffect(() => { if (ref.current) ref.current.scrollTop = 0; }, [id]);
   return <div ref={ref} className={`${direct ? "direct-reading" : "catalog-detail"} seed-detail`}>
-    {town.detailLoading && <p className="empty-inline">正在读取种子…</p>}
+    {town.detailLoading && !seed && <p className="empty-inline">正在读取种子…</p>}
     {!seed && !town.detailLoading && !town.detailError && <div className="detail-placeholder">选一颗种子，看看它从哪里长出来。</div>}
     {seed && <>
       <h2 className="reading-title">{str(seed.name, str(seed.domain, "经验种子"))}</h2>

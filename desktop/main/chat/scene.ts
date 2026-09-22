@@ -39,12 +39,12 @@ export class ChatSessions {
   async load() {
     try {
       const saved = JSON.parse(await readFile(path.join(this.directory, 'chat-sessions.json'), 'utf8'));
-      if (saved.version !== 1 || !saved.groups || typeof saved.groups !== 'object' || Array.isArray(saved.groups)) throw new Error('会话目录无效');
+      if (saved.version !== 1 || !saved.groups || typeof saved.groups !== 'object' || Array.isArray(saved.groups)) throw new Error('场景目录无效');
       for (const group of Object.values(saved.groups) as SessionGroup[]) {
         if (!group || !Array.isArray(group.scenes) || !group.scenes.length || group.scenes.some(scene =>
           !validSceneId(scene?.scene_id) ||
           typeof scene.scene_meta?.scene_label !== 'string' || !scene.scene_meta.scene_label.trim() || scene.scene_meta.scene_label.length > 128) ||
-          new Set(group.scenes.map(scene => scene.scene_id)).size !== group.scenes.length || !group.scenes.some(scene => scene.scene_id === group.active)) throw new Error('会话目录无效');
+          new Set(group.scenes.map(scene => scene.scene_id)).size !== group.scenes.length || !group.scenes.some(scene => scene.scene_id === group.active)) throw new Error('场景目录无效');
       }
       this.groups = saved.groups;
     } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') throw error; }
@@ -59,36 +59,36 @@ export class ChatSessions {
   }
   async change(endpoint: string, operation: 'create' | 'bind' | 'select' | 'rename' | 'delete', value: string, sceneId?: string) {
     if (!endpoint) throw new Error('请先连接 Being。');
-    if (typeof value !== 'string') throw new Error('无效的会话参数。');
+    if (typeof value !== 'string') throw new Error('无效的场景参数。');
     let scenes = this.list(endpoint);
     let active = this.current(endpoint).scene_id;
     if (operation === 'select') {
-      if (!scenes.some(scene => scene.scene_id === value)) throw new Error('会话不存在。');
+      if (!scenes.some(scene => scene.scene_id === value)) throw new Error('场景不存在。');
       active = value;
     } else if (operation === 'delete') {
       const index = scenes.findIndex(scene => scene.scene_id === value);
-      if (index < 0) throw new Error('会话不存在。');
+      if (index < 0) throw new Error('场景不存在。');
       scenes.splice(index, 1);
-      if (!scenes.length) scenes.push({ scene_id: `desktop-${randomUUID()}`, scene_meta: { ...this.fallback.scene_meta, scene_label: '新会话' } });
+      if (!scenes.length) scenes.push({ scene_id: `desktop-${randomUUID()}`, scene_meta: { ...this.fallback.scene_meta, scene_label: '新场景' } });
       if (active === value) active = scenes[Math.min(index, scenes.length - 1)].scene_id;
     } else {
       const label = value.trim();
-      if (!label || label.length > 128 || /[\r\n\u0000-\u001f]/.test(label)) throw new Error('会话名称需为 1–128 个字符。');
+      if (!label || label.length > 128 || /[\r\n\u0000-\u001f]/.test(label)) throw new Error('场景名称需为 1–128 个字符。');
       if (operation === 'bind') {
         const id = typeof sceneId === 'string' ? sceneId.trim() : '';
         if (!validSceneId(id)) throw new Error('场景 ID 需为 1–256 个非空白 ASCII 字符。');
         if (!scenes.some(scene => scene.scene_id === id)) {
-          if (scenes.length >= 500) throw new Error('当前 Being 的会话数量已达上限。');
+          if (scenes.length >= 500) throw new Error('当前 Being 的场景数量已达上限。');
           scenes.push({ scene_id: id, scene_meta: { ...this.fallback.scene_meta, scene_label: label } });
         }
         active = id;
       } else if (operation === 'create') {
-        if (scenes.length >= 500) throw new Error('当前 Being 的会话数量已达上限。');
+        if (scenes.length >= 500) throw new Error('当前 Being 的场景数量已达上限。');
         active = `desktop-${randomUUID()}`;
         scenes.push({ scene_id: active, scene_meta: { ...this.fallback.scene_meta, scene_label: label } });
       } else {
         const current = scenes.find(scene => scene.scene_id === (sceneId || active));
-        if (!current) throw new Error('会话不存在。');
+        if (!current) throw new Error('场景不存在。');
         current.scene_meta = { ...current.scene_meta, scene_label: label };
       }
     }

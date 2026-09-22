@@ -77,42 +77,42 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
     <>
       <div className="chat-scene-control">
         <button ref={trigger} id="chat-scene-indicator" className="chat-scene-indicator" type="button"
-          aria-label={`${expanded && visible ? "收起" : "展开"}会话列表`} aria-controls="chat-session-panel" aria-expanded={expanded && visible}
+          aria-label={`${expanded && visible ? "收起" : "展开"}场景列表`} aria-controls="chat-session-panel" aria-expanded={expanded && visible}
           title={scope === "all" ? "全部场景" : label} onClick={() => expanded && visible ? collapse() : reveal()}>
           <svg className="chat-scene-icon" viewBox="0 0 20 20" aria-hidden="true">
             <rect x="2.5" y="3.5" width="15" height="13" rx="2" /><path d="M8 3.5v13" />
           </svg>
-          <span className="chat-scene-label">{scope === "all" ? "全部场景" : scene ? label : "会话"}</span>
+          <span className="chat-scene-label">{scope === "all" ? "全部场景" : scene ? label : "场景"}</span>
         </button>
       </div>
-      {visible && expanded && <aside id="chat-session-panel" className="chat-session-panel" aria-label="会话列表"
+      {visible && expanded && <aside id="chat-session-panel" className="chat-session-panel" aria-label="场景列表"
         onKeyDown={event => { if (event.key === "Escape" && !editing && !open && !deleting && !menu) { event.preventDefault(); collapse(); } }}>
         <div className="chat-session-panel-heading">
-          <h2>会话 <span>{sessions.length}</span></h2>
+          <h2>场景 <span>{sessions.length}</span></h2>
           <div className="chat-session-heading-actions">
-            <button className="icon-button" type="button" aria-label="会话详情" title="会话详情" disabled={!scene || scope === "all"} onClick={() => setOpen(true)}>
+            <button className="icon-button" type="button" aria-label="场景详情" title="场景详情" disabled={!scene || scope === "all"} onClick={() => setOpen(true)}>
               <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="M10 9v5M10 6v1" /></svg>
             </button>
-            <button className="close" type="button" aria-label="关闭会话列表" title="关闭会话列表" onClick={collapse} />
+            <button className="close" type="button" aria-label="关闭场景列表" title="关闭场景列表" onClick={collapse} />
           </div>
         </div>
         <div className="chat-session-actions">
         <button id="new-chat-session" className="chat-session-new" type="button" disabled={!connected || busy || !sessions.length} onClick={() => edit("create")}>
-          <span aria-hidden="true">＋</span> 新建会话
+          <span aria-hidden="true">＋</span> 新建场景
         </button>
         <button className="chat-session-bind" type="button" aria-label="绑定已有场景" title="绑定场景" disabled={!connected || busy || !sessions.length} onClick={() => edit("bind")}>
           <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 12 4-4M7 13l-1 1a3 3 0 0 1-4-4l3-3a3 3 0 0 1 4 0m2 6a3 3 0 0 0 4 0l3-3a3 3 0 0 0-4-4l-1 1" transform="translate(0 -1)" /></svg>
         </button>
         </div>
         <p className="chat-session-caption">当前 Being 的对话</p>
-        <nav className="chat-session-list" aria-label="切换会话">
+        <nav className="chat-session-list" aria-label="切换场景">
           <button type="button" className="chat-session-all" aria-label="全部场景" aria-current={scope === "all" ? "true" : undefined}
             disabled={!scopeReady} onClick={() => select("all")}>
             <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="2" width="6" height="6" rx="1" /><rect x="12" y="2" width="6" height="6" rx="1" /><rect x="2" y="12" width="6" height="6" rx="1" /><rect x="12" y="12" width="6" height="6" rx="1" /></svg>
             <span>全部场景</span>
           </button>
           {sessions.map(session => <button key={session.scene_id} data-scene-id={session.scene_id} type="button"
-            aria-label={`切换到会话：${session.scene_meta.scene_label}`} aria-current={scope === "current" && scene?.scene_id === session.scene_id ? "true" : undefined}
+            aria-label={`切换到场景：${session.scene_meta.scene_label}`} aria-current={scope === "current" && scene?.scene_id === session.scene_id ? "true" : undefined}
             onContextMenu={event => {
               if (busy || !connected) return;
               event.preventDefault();
@@ -130,12 +130,12 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
               {CHAT_SCENE_ACTIVITY_LABELS[activity[session.scene_id]]}
             </span> : scope === "current" && scene?.scene_id === session.scene_id && <span className="chat-session-current" aria-hidden="true">•</span>}
           </button>)}
-          {!sessions.length && <p className="chat-session-caption">连接 Being 后创建会话</p>}
+          {!sessions.length && <p className="chat-session-caption">连接 Being 后创建场景</p>}
         </nav>
         {error && !editing && !deleting && <p role="alert" className="chat-session-error">{error}</p>}
 
       </aside>}
-      {menu && createPortal(<div ref={menuRef} className="chat-session-context-menu" role="menu" aria-label="会话操作"
+      {menu && createPortal(<div ref={menuRef} className="chat-session-context-menu" role="menu" aria-label="场景操作"
         style={{ left: menu.x, top: menu.y }} onContextMenu={event => { event.preventDefault(); event.stopPropagation(); }}
         onKeyDown={event => {
           const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button"));
@@ -149,12 +149,12 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
           }
         }}>
         <button role="menuitem" type="button" onClick={() => edit("rename", menu.scene)}>重命名</button>
-        <button role="menuitem" type="button" className="danger" onClick={() => { setDeleting(menu.scene); setError(""); setMenu(undefined); }}>删除会话</button>
+        <button role="menuitem" type="button" className="danger" onClick={() => { setDeleting(menu.scene); setError(""); setMenu(undefined); }}>删除场景</button>
       </div>, document.body)}
       <Dialog id="chat-session-delete" className="utility-dialog" open={!!deleting} busy={busy}
         aria-labelledby="chat-session-delete-title" onClose={() => setDeleting(undefined)} dismissOnBackdrop>
-        <div className="dialog-heading"><h2 id="chat-session-delete-title">删除会话？</h2></div>
-        <p className="utility-subtitle">确定从本机会话列表中删除「{deleting?.scene_meta.scene_label}」？历史记录会保留，仍可在「全部场景」查看。</p>
+        <div className="dialog-heading"><h2 id="chat-session-delete-title">删除场景？</h2></div>
+        <p className="utility-subtitle">确定从本机场景列表中删除「{deleting?.scene_meta.scene_label}」？历史记录会保留，仍可在「全部场景」查看。</p>
         {error && <p role="alert" className="chat-session-error">{error}</p>}
         <div className="files-footer">
           <button autoFocus type="button" disabled={busy} onClick={() => setDeleting(undefined)}>取消</button>
@@ -165,14 +165,14 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
         aria-labelledby="chat-session-title" onClose={() => setEditing(null)} dismissOnBackdrop>
         <form onSubmit={event => { event.preventDefault(); if (editing && !busy) void change(editing, name, editing === "bind" ? bindingId : target?.scene_id); }}>
           <div className="dialog-heading">
-            <h2 id="chat-session-title">{editing === "bind" ? "绑定已有场景" : editing === "create" ? "新建会话" : "重命名会话"}</h2>
-            <button className="close" type="button" aria-label="关闭会话编辑" disabled={busy} onClick={() => setEditing(null)} />
+            <h2 id="chat-session-title">{editing === "bind" ? "绑定已有场景" : editing === "create" ? "新建场景" : "重命名场景"}</h2>
+            <button className="close" type="button" aria-label="关闭场景编辑" disabled={busy} onClick={() => setEditing(null)} />
           </div>
-          <p className="utility-subtitle">{editing === "bind" ? "填入同一 Being 在其他客户端的场景 ID，即可继续该场景的对话。" : editing === "create" ? "与同一个 Being 开始一个独立的对话场景。" : "修改名称不会改变会话的历史记录。"}</p>
+          <p className="utility-subtitle">{editing === "bind" ? "填入同一 Being 在其他客户端的场景 ID，即可继续该场景的对话。" : editing === "create" ? "与同一个 Being 开始一个独立的对话场景。" : "修改名称不会改变场景的历史记录。"}</p>
           {editing === "bind" && <label className="chat-session-field">场景 ID
             <input value={bindingId} maxLength={256} placeholder="粘贴其他客户端的场景 ID" disabled={busy} onChange={event => setBindingId(event.target.value)} />
           </label>}
-          <label className="chat-session-field">会话名称
+          <label className="chat-session-field">场景名称
             <input autoFocus value={name} maxLength={128} placeholder="例如：方案讨论" disabled={busy} onChange={event => setName(event.target.value)} />
           </label>
           {editing === "bind" && <p className="chat-session-hint">名称仅在本机显示；已绑定的场景将直接打开。</p>}

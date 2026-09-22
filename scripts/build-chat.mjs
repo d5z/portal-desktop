@@ -29,10 +29,9 @@ await copyFile(
   "node_modules/highlight.js/styles/github-dark.min.css",
   path.join(output, "highlight.css"),
 );
-await copyFile(
-  "desktop/renderer/chat/styles.css",
-  path.join(output, "chat.css"),
-);
+await writeFile(path.join(output, "chat.css"),
+  await readFile("desktop/renderer/chat/styles.css", "utf8") + "\n" +
+  await readFile("desktop/renderer/shared/model-settings.css", "utf8"));
 const notices = [];
 for (const [name, file] of [
   ["marked", "LICENSE.md"],

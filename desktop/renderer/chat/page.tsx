@@ -1,3 +1,5 @@
+import { ScheduledMessage } from './components/scheduling';
+import { splitSchedulingHint, withScheduling } from './models/scheduling';
 import {
   Component,
   useCallback,
@@ -64,7 +66,7 @@ function ChatView({
   bridge: ChatBridge;
 }) {
   useModel(state);
-  const visibleItems = sceneItems(state.items, state.historyScope, state.currentScene);
+  const visibleItems = sceneItems(withScheduling(state.items, state.sceneTasks), state.historyScope, state.currentScene);
   const allScenesReadOnly = !!state.currentScene.strict && state.historyScope === "all";
   const currentSceneName = sceneName(state.currentScene, state.currentScene);
   const showActivity = state.historyScope === "all" || inCurrentScene(state.activeScene, state.currentScene);
@@ -347,7 +349,7 @@ function ChatView({
             id="settings-btn"
             className="btn-icon"
             type="button"
-            onClick={() => setPanel("model")}
+            onClick={() => parent !== window && location.protocol === "beings:" ? bridge.send({ type: "beings:model-settings" }) : setPanel("model")}
             aria-label="模型设置"
           >
             ⚙
@@ -416,19 +418,24 @@ function ChatView({
                 className={`message ${item.role}${item.consecutive ? " consecutive" : ""}${highlighted === item.id ? " index-target" : ""}`}
               >
                 <div className={`meta${item.consecutive ? " time-only" : ""}`}>
+                  {item.role === "user" && <CopyMessage text={splitSchedulingHint(item.text).text} copy={bridge.copyText} />}
                   {!item.consecutive && <span>{item.label} · </span>}
                   <span className="message-time-actions">
-                    <CopyMessage text={item.text} copy={bridge.copyText} />
                     <time>{item.timestamp}</time>
+                    {item.role !== "user" && <CopyMessage text={splitSchedulingHint(item.text).text} copy={bridge.copyText} />}
                   </span>
                   {state.historyScope === "all" && <span className="message-scene" title={item.sceneId || "这条历史消息未提供场景标记"}>{sceneName(item, state.currentScene, state.sceneNames)}</span>}
                 </div>
-                <Markdown
-                  content={item.text}
-                  className={`content${item.streaming ? " stream-cursor" : ""}`}
+                <ScheduledMessage
+                  text={item.text}
+                  streaming={item.streaming}
                   chat
                   onPlace={item.role === "system" ? undefined : openPlace}
                 />
+                {item.queued && <div className="local-queue-status" role="status">
+                  {item.queueNotice || "排队中 · 等待其他场景完成，尚未发送"}
+                  <button type="button" onClick={() => item.cancelQueued?.()}>取消排队</button>
+                </div>}
                 {item.retry && !allScenesReadOnly && (
                   <button
                     className="retry-btn"
@@ -494,8 +501,8 @@ function ChatView({
           </div>
           <div id="input-row" className={allScenesReadOnly ? "read-only" : ""}>
           {allScenesReadOnly && <div className="all-scenes-notice">
-            <span>全部场景仅供查看。请选择左侧会话，或新建会话开始对话。</span>
-            <button type="button" onClick={() => bridge.send({ type: "beings:session-create" })}>新建会话</button>
+            <span>全部场景仅供查看。请选择左侧场景，或新建场景开始对话。</span>
+            <button type="button" onClick={() => bridge.send({ type: "beings:session-create" })}>新建场景</button>
           </div>}
 
             <textarea

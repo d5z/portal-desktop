@@ -26,7 +26,9 @@ export function collectMentionNames(entries: Entry[], previous: MentionNames = n
     }
     remember(entry.reply_to_town_id || entry.reply_to_sender, entry.reply_to_display || entry.reply_to_sender_display);
   }
-  return names;
+  return names.size === previous.size && [...names].every(([id, value]) =>
+    previous.get(id)?.name === value.name && previous.get(id)?.at === value.at)
+    ? previous : names;
 }
 
 export function mentionParts(text: string, names: MentionNames): { text: string; id?: string }[] {

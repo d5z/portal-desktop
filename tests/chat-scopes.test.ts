@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatState, type ChatItem } from "../desktop/renderer/chat/models/chat";
 import { inCurrentScene, messageScene, sceneItems, sceneName } from "../desktop/renderer/chat/models/scenes";
+import { withScheduling } from "../desktop/renderer/chat/models/scheduling";
 import { createChatRuntime } from "../desktop/renderer/chat/services/runtime";
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
@@ -17,6 +18,153 @@ describe("scene history refresh", () => {
     vi.stubGlobal("cancelAnimationFrame", clearTimeout);
   });
 
+  it("adds scheduling context for B while A runs and routes a shared breath back to both scenes", async () => {
+    const requests: { message: string }[] = [];
+    let stream!: ReadableStreamDefaultController<Uint8Array>;
+    const emit = (event: string, scene_id: string, data: object = {}) => stream.enqueue(new TextEncoder().encode(
+      `event: ${event}\ndata: ${JSON.stringify({ scene_id, ...data })}\n\n`));
+    vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
+      const path = new URL(input).pathname;
+      if (path === "/api/history") return Response.json({ messages: [] });
+      if (path === "/api/stream/active") return new Response(null, { status: 204 });
+      if (path === "/health") return new Response("OK fixture");
+      if (path === "/api/chat/stream") {
+        requests.push(JSON.parse(String(init?.body)));
+        return requests.length === 1
+          ? new Response(new ReadableStream({ start(c) { stream = c; } }))
+          : Response.json({ queued: true }, { status: 202 });
+      }
+      return Response.json({ sbs_enabled: false });
+    }));
+    const state = new ChatState(), runtime = createChatRuntime(state);
+    state.subagentReady = true;
+    await runtime.start();
+    await runtime.selectScene({ sceneId: "desktop-idle", sceneLabel: "闲置场景", strict: true });
+    await runtime.selectScene({ sceneId: "desktop-test", sceneLabel: "测试A", strict: true });
+    const sending = runtime.send("A 查找资料并整理报告");
+    await vi.advanceTimersByTimeAsync(20);
+    try {
+      emit("tool_use", "desktop-test", { name: "portal_exec", input: { command: "research" } });
+      await vi.advanceTimersByTimeAsync(20);
+      state.draft = "不应发送的草稿";
+      await runtime.selectScene({ sceneId: "desktop-b", sceneLabel: "测试B", strict: true });
+      await runtime.send("B 解释方案");
+      expect(requests[0].message).toBe("A 查找资料并整理报告");
+      expect(requests[1].message).toContain("B 解释方案\n\n[Desktop 场景调度提示]");
+      expect(requests[1].message).toContain('"scene_id":"desktop-test"');
+      expect(requests[1].message).toContain("A 查找资料并整理报告");
+      expect(requests[1].message).not.toContain("desktop-idle");
+      expect(requests[1].message).not.toContain("不应发送的草稿");
+      // A yields without a reply; B completes, then A's delegated result returns.
+      emit("message_stop", "desktop-test");
+      emit("reasoning", "desktop-b", { text: "B 正在分析方案" });
+      emit("tool_use", "desktop-b", { name: "portal_exec", input: { command: "B verify" } });
+      emit("tool_result", "desktop-b", { content: "B 验证完成" });
+      emit("content_block_delta", "desktop-b", { delta: { text: "B 结果" } });
+      emit("message_stop", "desktop-b");
+      emit("reasoning", "desktop-test", { text: "A 正在整理后台结果" });
+      emit("tool_result", "desktop-test", { name: "portal_subagent_spawn", content: "A 后台结果" });
+      emit("content_block_delta", "desktop-test", { delta: { text: "A 结果" } });
+      emit("message_stop", "desktop-test");
+      await vi.advanceTimersByTimeAsync(20);
+      expect(state.items.flatMap(i => i.kind === "message" && i.role === "being" ? [[i.sceneId, i.text]] : []))
+        .toEqual([["desktop-b", "B 结果"], ["desktop-test", "A 结果"]]);
+      expect(state.currentScene.sceneId).toBe("desktop-b");
+      const process = (sceneId: string) => JSON.stringify(state.items.filter(i => i.kind === "run" && i.sceneId === sceneId));
+      expect(process("desktop-test")).toContain("A 正在整理后台结果");
+      expect(process("desktop-test")).not.toContain("B 正在分析方案");
+      expect(process("desktop-b")).toContain("B 正在分析方案");
+      expect(process("desktop-b")).not.toContain("A 正在整理后台结果");
+      await runtime.send("B 新问题");
+      expect(requests[2].message).toBe("B 新问题");
+    } finally { stream.close(); await sending; runtime.dispose(); }
+  });
+
+  it.each([false, true])("keeps independent A/B/C tasks scoped with immediate C=%s", async immediateC => {
+    const requests: {message:string}[]=[];
+    let stream!: ReadableStreamDefaultController<Uint8Array>;
+    const emit=(event:string,scene_id:string,data:object={})=>stream.enqueue(new TextEncoder().encode(
+      `event: ${event}\ndata: ${JSON.stringify({scene_id,...data})}\n\n`));
+    vi.stubGlobal("fetch",vi.fn(async(input:string,init?:RequestInit)=>{
+      const route=new URL(input).pathname;
+      if(route==="/api/history") return Response.json({messages:[]});
+      if(route==="/api/stream/active") return new Response(null,{status:204});
+      if(route==="/health") return new Response("OK fixture");
+      if(route==="/api/chat/stream") {
+        requests.push(JSON.parse(String(init?.body)));
+        return requests.length===1 ? new Response(new ReadableStream({start(c){stream=c;}}))
+          : Response.json({queued:true},{status:202});
+      }
+      return Response.json({sbs_enabled:false});
+    }));
+    const state=new ChatState(), runtime=createChatRuntime(state);
+    state.subagentReady = true;
+    await runtime.start(); const sending=runtime.send("A 主意识长任务");
+    await vi.advanceTimersByTimeAsync(20);
+    try {
+      emit("tool_use","desktop-test",{name:"portal_exec",input:{command:"A work"}});
+      await vi.advanceTimersByTimeAsync(20);
+      await runtime.selectScene({sceneId:"desktop-b",strict:true}); await runtime.send("B 独立任务");
+      const delegateB=()=>{
+        emit("message_stop","desktop-test");
+        emit("tool_use","desktop-b",{name:"portal_subagent_spawn",input:{scene_id:"desktop-b",brief:"B 独立任务"}});
+        emit("tool_result","desktop-b",{name:"portal_subagent_spawn",content:"B 已委派"});
+        runtime.updateSceneTasks([{id:"sub-b",sceneId:"desktop-b",status:"running",createdAt:Date.now()}]);
+        emit("message_stop","desktop-b");
+      };
+      if(!immediateC) {delegateB();await vi.advanceTimersByTimeAsync(20);}
+      await runtime.selectScene({sceneId:"desktop-c",strict:true}); await runtime.send("C 独立任务");
+      for(const request of requests.slice(1)) {
+        expect(request.message).toContain("当前 Portal 已开启 subagent");
+        expect(request.message).toContain("各会话是独立任务，可能互不相关");
+        expect(request.message).toContain("优先评估将本次新输入委派给 subagent");
+        expect(request.message).toContain("随后恢复已有任务");
+        expect(request.message).toContain("委派本次输入时使用当前输入的 scene_id");
+        expect(request.message).not.toContain("可以考虑将适合后台执行的已有任务交给 subagent");
+      }
+      expect(requests[2].message).toContain("B 独立任务");
+      if(immediateC) {
+        expect(requests[2].message).not.toContain('"task_id":"sub-b"');
+        delegateB();
+      } else expect(requests[2].message).toContain('"task_id":"sub-b"');
+      expect(requests[2].message).toContain('scene_id="desktop-c"');
+      emit("tool_use","desktop-c",{name:"portal_subagent_spawn",input:{scene_id:"desktop-c",brief:"C 独立任务"}});
+      emit("tool_result","desktop-c",{name:"portal_subagent_spawn",content:"C 已委派"});
+      emit("message_stop","desktop-c");
+      runtime.updateSceneTasks([
+        {id:"sub-b",sceneId:"desktop-b",status:"done",createdAt:Date.now(),endedAt:Date.now()},
+        {id:"sub-c",sceneId:"desktop-c",status:"done",createdAt:Date.now(),endedAt:Date.now()},
+      ]);
+      await vi.advanceTimersByTimeAsync(20);
+      // The Being serially resumes A, then handles C and B callbacks on one SSE.
+      for(const [scene,text] of [["desktop-test","A"],["desktop-c","C"],["desktop-b","B"]]) {
+        emit("meta",scene,{continuation:true});
+        emit("reasoning",scene,{text:text+" 整理结果"});
+        emit("content_block_delta",scene,{delta:{text:text+" 最终答案"}});
+        emit("message_stop",scene);
+      }
+      await vi.advanceTimersByTimeAsync(20);
+      expect(state.items.flatMap(i=>i.kind==="message" && i.role==="being" ? [[i.sceneId,i.text]]:[]))
+        .toEqual([["desktop-test","A 最终答案"],["desktop-c","C 最终答案"],["desktop-b","B 最终答案"]]);
+      for(const [scene,text] of [["desktop-test","A"],["desktop-b","B"],["desktop-c","C"]]) {
+        const entries=JSON.stringify(state.items.filter(i=>i.kind==="run" && i.sceneId===scene));
+        expect(entries).toContain(text+" 整理结果");
+        for(const other of ["A","B","C"].filter(x=>x!==text)) expect(entries).not.toContain(other+" 整理结果");
+      }
+      const presented=withScheduling(state.items,state.sceneTasks);
+      for(const scene of ["desktop-test","desktop-b","desktop-c"]) {
+        const runs=presented.filter(i=>i.kind==="run" && i.sceneId===scene);
+        expect(runs).toHaveLength(1);
+        expect(runs[0]).toMatchObject({outcome:"done"});
+        if(scene!=="desktop-test") {
+          expect(runs[0].kind==="run" && runs[0].entries.some(e=>e.name==="portal_subagent_spawn")).toBe(true);
+          expect(runs[0].kind==="run" && runs[0].scheduling?.tasks).toEqual([expect.objectContaining({sceneId:scene,status:"done"})]);
+        }
+      }
+      expect(state.currentScene.sceneId).toBe("desktop-c");
+    } finally {stream.close();await sending;runtime.dispose();}
+  });
+
   it("refreshes empty history without replacing a live reply, and retries failed reads", async () => {
     let history: { seq: number; role: string; content: string; scene_id: string }[] = [];
     let failHistory = false;
@@ -31,6 +179,7 @@ describe("scene history refresh", () => {
       return Response.json({ sbs_enabled: false });
     }));
     const state = new ChatState(), runtime = createChatRuntime(state);
+    state.subagentReady = true;
     await runtime.start();
     const sending = runtime.send("本地输入");
     await vi.advanceTimersByTimeAsync(20);
@@ -75,6 +224,7 @@ describe("scene history refresh", () => {
       return Response.json({ sbs_enabled: false });
     }));
     const state = new ChatState(), runtime = createChatRuntime(state);
+    state.subagentReady = true;
     await runtime.start();
     const sending = runtime.send("A 输入");
     await vi.advanceTimersByTimeAsync(20);
@@ -112,6 +262,7 @@ describe("scene history refresh", () => {
       return Response.json({ sbs_enabled: false });
     }));
     const state = new ChatState(), runtime = createChatRuntime(state);
+    state.subagentReady = true;
     await runtime.start();
     const a = runtime.send("A 输入");
     await vi.advanceTimersByTimeAsync(20);
@@ -153,6 +304,7 @@ describe("scene history refresh", () => {
       return Response.json({ sbs_enabled: false });
     }));
     const state = new ChatState(), runtime = createChatRuntime(state);
+    state.subagentReady = true;
     try {
       await runtime.start();
       await vi.advanceTimersByTimeAsync(1100);
@@ -175,6 +327,7 @@ describe("scene history refresh", () => {
       return Response.json({ sbs_enabled: false });
     }));
     const state = new ChatState(), runtime = createChatRuntime(state);
+    state.subagentReady = true;
     await runtime.start();
     const sending = runtime.send("A 输入");
     await vi.advanceTimersByTimeAsync(20);
@@ -210,6 +363,7 @@ describe("scene history refresh", () => {
       return Response.json({ sbs_enabled: false });
     }));
     const state = new ChatState(), runtime = createChatRuntime(state);
+    state.subagentReady = true;
     await runtime.start();
     const sending = runtime.send("A input");
     await vi.advanceTimersByTimeAsync(20);
@@ -252,6 +406,7 @@ describe("scene history refresh", () => {
       return Response.json({ sbs_enabled: false });
     }));
     const state = new ChatState(), runtime = createChatRuntime(state);
+    state.subagentReady = true;
     await runtime.start();
     const a = runtime.send("A 输入");
     await vi.advanceTimersByTimeAsync(20);
@@ -284,6 +439,7 @@ describe("scene history refresh", () => {
       return Response.json({ sbs_enabled: false });
     }));
     const state = new ChatState(), runtime = createChatRuntime(state);
+    state.subagentReady = true;
     await runtime.start();
     const a = runtime.send("A 输入");
     await vi.advanceTimersByTimeAsync(20);
@@ -328,6 +484,7 @@ describe("scene history refresh", () => {
       return Response.json({sbs_enabled:false});
     }));
     const state = new ChatState(), runtime = createChatRuntime(state);
+    state.subagentReady = true;
     await runtime.start(); const sending = runtime.send("A request");
     await vi.advanceTimersByTimeAsync(20);
     try {
@@ -365,6 +522,7 @@ describe("scene history refresh", () => {
       return Response.json({sbs_enabled:false});
     }));
     const state = new ChatState(), runtime = createChatRuntime(state);
+    state.subagentReady = true;
     await runtime.start(); const sending = runtime.send("A cursor test");
     await vi.advanceTimersByTimeAsync(20);
     try {
@@ -396,6 +554,7 @@ describe("scene history refresh", () => {
       return Response.json({ sbs_enabled: false });
     }));
     const state = new ChatState(), runtime = createChatRuntime(state);
+    state.subagentReady = true;
     try {
       await runtime.start(); await runtime.send("空流测试");
       const runs = state.items.filter(i => i.kind === "run");
@@ -423,6 +582,7 @@ describe("scene history refresh", () => {
       return Response.json({ sbs_enabled: false });
     }));
     const state = new ChatState(), runtime = createChatRuntime(state);
+    state.subagentReady = true;
     try {
       const starting = runtime.start();
       const firstSwitch = runtime.refreshHistory();
@@ -516,6 +676,7 @@ describe("chat scene scopes", () => {
       return Response.json({ sbs_enabled: false });
     }));
     const state = new ChatState(), runtime = createChatRuntime(state);
+    state.subagentReady = true;
     try {
       const starting = runtime.start();
       await vi.advanceTimersByTimeAsync(50); await starting;
@@ -570,6 +731,7 @@ describe("chat scene scopes", () => {
       return Response.json({ sbs_enabled: false });
     }));
     const state = new ChatState(), runtime = createChatRuntime(state);
+    state.subagentReady = true;
     try {
       await runtime.start();
       expect(state.items.filter(item => item.kind === "message").map(item => [item.text, item.sceneId])).toEqual([

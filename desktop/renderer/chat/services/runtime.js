@@ -761,6 +761,7 @@ function createStreamRuntime(state, options) {
       text,
       streaming,
       timestamp: ts,
+      createdAt: msgTime || undefined,
       label,
       consecutive,
     };
@@ -1068,7 +1069,7 @@ function createStreamRuntime(state, options) {
     const message = addMessage("system", "⚠ 网络连接失败，请检查网络后重试", false, undefined, undefined, scene);
     message.retry = () => {
       if (state.currentScene.sceneId !== scene.sceneId) {
-        message.text = "请切换回这条消息所属的会话后重试。"; changed(); return;
+        message.text = "请切换回这条消息所属的场景后重试。"; changed(); return;
       }
       removeMessage(message);
       return send(text, files?.length ? files : null, { isManualRetry: true });
@@ -1147,15 +1148,36 @@ function createStreamRuntime(state, options) {
 
   function markProgress(type, data) {
     if (!PROGRESS_EVENTS.has(type)) return;
-    if (type !== "message_stop" && type !== "error") replayTransportOnly = false;
+    const active = type !== "message_stop" && type !== "error";
+    if (active) {
+      // Empty deltas and transport boundaries do not resume processing.
+      if (type === "content_block_delta" && !data?.delta?.text) return;
+      if ((type === "thinking" || type === "reasoning") &&
+          !(data?.text || data?.delta?.text || (typeof data?.delta === "string" && data.delta))) return;
+      replayTransportOnly = false;
+      if (currentRun?.end) {
+        // The previous segment remains in the transcript. The new segment must
+        // not inherit its tool entries, failure state, or elapsed time.
+        actionLog = [];
+        currentRun = null;
+        userStoppedStream = false;
+        tuiCurrentState = "思考中";
+        tuiCurrentArg = "";
+      }
+      replyRunSettled = false;
+      if (pendingReply?.waiting) {
+        pendingReply.waiting = false;
+        pendingReply.label = "等待处理中";
+        stopCatchUpWatcher();
+      }
+    }
     lastProgressTime = Date.now();
-    if (type !== "message_stop" && type !== "error") replyRunSettled = false;
     clearTuiHint();
     if (type === "tool_use") {
       livePhase = "tool";
       livePendingTool = (data && data.name) || "tool";
     } else if (type === "tool_result") {
-      livePhase = "text";
+      livePhase = "reasoning";
       livePendingTool = null;
     } else if (type === "content_block_delta") livePhase = "text";
     else if (type === "thinking" || type === "reasoning")
@@ -1778,10 +1800,24 @@ function createStreamRuntime(state, options) {
   // 服务端会起一条新 breath 并回 200 + 真 SSE 流。那种情况下**绝不能**把 body 扔着不管
   // ——浏览器 fetch 内部队列填满后会施加 TCP 背压，把服务端的 SSE 转发任务
   // 阻塞在 tx.send().await 上，连 /api/stream/active 的 replay 缓冲都会停止推进。
+  function browserScenePayload(scene = state.currentScene) {
+    // Desktop's trusted proxy supplies its persisted scene and client version.
+    if (location.protocol === "beings:") return {};
+    // loom-local b113faa: display names are not identities. Older servers may
+    // only return a name; retain that fallback and explicit browser room IDs.
+    const identity = [state.soul.being_id, state.soul.id, beingName]
+      .find(value => typeof value === "string" && value.length > 0);
+    return {
+      scene_id: scene.sceneId || (identity ? `loom-${identity}` : null),
+      scene_meta: { client: "loom/1.8.2", scene_label: scene.sceneLabel || "Loom" },
+    };
+  }
+
   async function spliceSend(text, files = pendingFiles) {
     const replyBaseline = new Set(state.items);
-    const spliceMsg = (text || "").trim();
+    let spliceMsg = (text || "").trim();
     if (!spliceMsg && !files.length) return;
+    spliceMsg = options.prepareMessage?.(spliceMsg || `[${files.length} file(s)]`) ?? spliceMsg;
     addMessage("user", spliceMsg || `[${files.length} file(s)]`);
     noteLocalEcho("user", spliceMsg);
     clearComposer();
@@ -1793,6 +1829,7 @@ function createStreamRuntime(state, options) {
         body: JSON.stringify({
           message: spliceMsg || `[Sent ${files.length} file(s)]`,
           session_id: sessionId,
+          ...browserScenePayload(),
           ...(files.length
             ? {
                 attachments: files.map((f) => ({
@@ -1809,9 +1846,8 @@ function createStreamRuntime(state, options) {
       return;
     }
     if (res.status === 202) {
-      // The Being interrupts its current round immediately. The local echo and
-      // activity state already communicate progress; an extra system bubble
-      // would become noise in the conversation transcript.
+      // Heart accepted this input for splice/yield. The Being decides whether
+      // to resume, switch scene or delegate; 202 is not task completion.
       pendingReply = { baseline: replyBaseline, label: "已排队，等待回复" };
       updateSendButton();
       startCatchUpWatcher();
@@ -1864,19 +1900,20 @@ function createStreamRuntime(state, options) {
     const sendingScene = { ...state.currentScene };
     userStoppedStream = false;
     const { isManualRetry = false } = sendOptions;
-    const msg = (text || "").trim();
+    let msg = (text || "").trim();
     const fromQueue = Array.isArray(filesOverride) && !isManualRetry;
     const filesToSend = Array.isArray(filesOverride)
       ? filesOverride
       : [...pendingFiles];
     if (!msg && !filesToSend.length) return;
+    if (!isManualRetry) msg = options.prepareMessage?.(msg || `[${filesToSend.length} file(s)]`) ?? msg;
     replyRunSettled = false;
     pendingReply = { baseline: replyBaseline, label: "等待回复", waiting: false };
     replayTransportOnly = false;
     setStreamScene(state.currentScene);
 
     if (!isManualRetry) {
-      addMessage("user", msg || `[${filesToSend.length} file(s)]`);
+      if (!sendOptions.queuedMessage) addMessage("user", msg || `[${filesToSend.length} file(s)]`);
       noteLocalEcho("user", msg || `[${filesToSend.length} file(s)]`);
       if (!fromQueue) clearComposer();
     }
@@ -1888,7 +1925,7 @@ function createStreamRuntime(state, options) {
     stopAutonomousWatch();
     updateSendButton();
 
-    const body = { message: msg || `[Sent ${filesToSend.length} file(s)]` };
+    const body = { message: msg || `[Sent ${filesToSend.length} file(s)]`, ...browserScenePayload(sendingScene) };
     if (sessionId) body.session_id = sessionId;
     if (filesToSend.length) {
       body.attachments = filesToSend.map((f) => ({
@@ -2279,7 +2316,7 @@ function createStreamRuntime(state, options) {
 
   // ---- History ----
   function resetMessages() {
-    state.items = [];
+    state.items = state.items.filter(item => item.queued);
     currentRun = null;
     state.thinking = false;
     lastRole = null;
@@ -2578,7 +2615,7 @@ function createStreamRuntime(state, options) {
     // Heart can end a breath during a scene switch without emitting a reply.
     // Keep the submitted request unresolved instead of showing a success check.
     pendingReply.waiting = true;
-    pendingReply.label = "本轮未返回正文，等待回复";
+    pendingReply.label = "等待处理中";
     startCatchUpWatcher();
     updateSendButton();
   }
@@ -2593,7 +2630,7 @@ function createStreamRuntime(state, options) {
       currentRun.waitingForReply = false;
       currentRun.outcome = failed ? "error" : "done";
       currentRun.label = failed ? "等待回复超时" : "已回复";
-      currentRun.hint = failed ? "暂未收到该会话的回复，可刷新历史查看；未自动重发消息。" : "";
+      currentRun.hint = failed ? "等待处理超时，可刷新查看最新结果。" : "";
     }
     replyRunSettled = true;
     changed();
@@ -3118,6 +3155,12 @@ function createStreamRuntime(state, options) {
           born: data.created || data.born || "—",
           status: data.status || "connected",
         };
+        if (location.protocol !== "beings:" && !isStreaming) {
+          options.resolveDefaultScene?.({
+            ...messageScene(browserScenePayload()),
+            legacySceneId: `loom-${beingName}`,
+          });
+        }
         changed();
       } catch {
         /* The health monitor owns connectivity errors. */
@@ -3154,10 +3197,21 @@ function createStreamRuntime(state, options) {
   return {
     start,
     waitForPendingFiles,
+    isBusy: () => isStreaming || !!pendingReply || !!pendingRecovery || preparingSend,
+    stageQueuedSend(text, filesOverride = null) {
+      const msg = (text || "").trim();
+      const files = Array.isArray(filesOverride) ? [...filesOverride] : [...pendingFiles];
+      if (!msg && !files.length) return null;
+      const message = addMessage("user", msg || `[发送了 ${files.length} 个文件: ${files.map(f => f.name).join(", ")}]`);
+      message.queued = true;
+      if (!Array.isArray(filesOverride)) clearComposer();
+      return { text: msg, files, message };
+    },
     noteLocalEcho,
     reconcileHistory,
     syncHistoryCursor,
     lastHistoryReplyIn: scene => lastHistoryReplyScenes.some(reply => inCurrentScene(reply, scene)),
+    replyCompletedAt: () => currentRun?.label === "已回复" ? currentRun.end || 0 : 0,
     sceneActivity: () => {
       if (replayTransportOnly && !pendingReply) return null;
       if (pendingReply && (pendingReply.waiting || !isStreaming)) return "waiting";

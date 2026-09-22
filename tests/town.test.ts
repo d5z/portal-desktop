@@ -34,7 +34,7 @@ describe('Town reads', () => {
     const client = new TownClient(() => '', fetcher);
     expect(await client.query({ kind: 'bonfire' })).toMatchObject({ ok: false, code: 'auth' });
     expect(await client.query({ kind: 'inbox' })).toMatchObject({ ok: false, code: 'network' });
-    expect(await client.query({ kind: 'scrolls' })).toMatchObject({ ok: false, code: 'network' });
+    expect(await client.query({ kind: 'scrolls' })).toMatchObject({ ok: false, code: 'format' });
     expect(await client.query({ kind: 'home' })).toMatchObject({ ok: false, code: 'http' });
   });
   it('bounds body size and cancels an oversized stream', async () => {
@@ -42,6 +42,13 @@ describe('Town reads', () => {
     const response = new Response(new ReadableStream({ pull(controller) { controller.enqueue(new Uint8Array(5 * 1024 * 1024)); }, cancel() { cancelled = true; } }), { headers: { 'content-type': 'application/json' } });
     const client = new TownClient(() => '', async () => response);
     expect(await client.query({ kind: 'home' })).toMatchObject({ ok: false }); expect(cancelled).toBe(true);
+  });
+  it('classifies timeouts and reports request metrics without exposing credentials', async () => {
+    const events: unknown[] = [];
+    const client = new TownClient(() => 'secret-token', async () => { throw Object.assign(new Error('deadline'), { name: 'TimeoutError' }); }, 'https://beings.town', () => '', event => events.push(event));
+    expect(await client.query({ kind: 'inbox' })).toMatchObject({ ok: false, code: 'timeout' });
+    expect(events[0]).toMatchObject({ route: '/api/messages?with=received', failure: 'timeout' });
+    expect(JSON.stringify(events)).not.toContain('secret-token');
   });
   it('persists encrypted Town credentials independently and can clear them', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'town-test-'));

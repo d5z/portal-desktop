@@ -41,6 +41,7 @@ try {
     const {contextBridge, ipcRenderer} = require('electron');
     contextBridge.exposeInMainWorld('beings', {
       platform: process.platform, snapshot: () => ipcRenderer.invoke('snapshot'),
+      sceneTasks: () => Promise.resolve({endpoint:'https://fixture.test/being',tasks:[],subagentReady:true}),
       changeChatSession: (operation,value,endpoint,sceneId) => ipcRenderer.invoke('session',operation,value,endpoint,sceneId),
     });
   ` }, bundle: true, platform: 'node', external: ['electron'], outfile: path.join(directory, 'preload.cjs') });
@@ -279,6 +280,39 @@ try {
   await page.reload();
   await page.getByRole('button',{name:'切换到会话：跨客户端场景'}).waitFor();
   assert.equal((await page.evaluate(() => window.beings.snapshot())).chatScene.scene_id,'feishu-shared');
+  // Scheduling is inspectable process metadata, never inline conversation prose.
+  const wire = '独立问题\n\n[Desktop 场景调度提示]\n当前输入属于 scene_id="feishu-shared"。本客户端其他场景尚在处理或等待回复：\n[{"scene_id":"background-a"}]\n[/Desktop 场景调度提示]';
+  await chat.locator('#input').fill(wire);
+  await chat.locator('#send-btn').click();
+  await chat.locator('.run-activity .scene-scheduling').waitFor({state:'attached'});
+  const visibleQuestion = chat.locator('.message.user').filter({hasText:'独立问题'});
+  assert.equal(await visibleQuestion.locator('.content').innerText(), '独立问题');
+  assert.equal(await visibleQuestion.locator('.scene-scheduling').count(), 0);
+  const schedulingRun = chat.locator('.run-activity').filter({has:chat.locator('.scene-scheduling pre')});
+  assert.equal(await schedulingRun.getAttribute('open'), null);
+  await schedulingRun.locator('summary').click();
+  assert.match(await schedulingRun.locator('.scene-scheduling pre').innerText(), /background-a/);
+  const pushTasks = async status => page.evaluate(async status => {
+    const frame = document.querySelector('iframe');
+    const snapshot = await window.beings.snapshot();
+    frame.contentWindow.postMessage({type:'beings:scene-tasks', revision:new URL(frame.src).searchParams.get('revision'), endpoint:snapshot.settings.endpoint,
+      subagentReady:true, tasks:[{id:'sub-fixture',sceneId:'feishu-shared',status,createdAt:Date.now()+1000,endedAt:status==='done'?Date.now()+2000:undefined,error:status==='failed'?'模型鉴权失败，请检查 subagent 密钥':undefined}]},'beings://chat');
+  },status);
+  await pushTasks('running');
+  await page.getByRole('button',{name:'切换到会话：跨客户端场景'}).getByText('执行中').waitFor();
+  if (await schedulingRun.getAttribute('open') === null) await schedulingRun.locator('summary').click();
+  await chat.locator('.scene-task-list').getByText('后台执行中',{exact:true}).waitFor();
+  await page.screenshot({animations:'disabled',path:'test-results/scene-scheduling-running.png'});
+  await pushTasks('done');
+  await schedulingRun.getByText('后台已完成，尚未收到回复',{exact:true}).waitFor();
+  assert.equal((await schedulingRun.getAttribute('class')).includes('running'),false);
+  assert.equal(await schedulingRun.locator('.run-elapsed').isVisible(),false);
+  await page.screenshot({animations:'disabled',path:'test-results/scene-scheduling-awaiting-reply.png'});
+  await pushTasks('failed');
+  await chat.locator('.scene-task-error').waitFor({state:'attached'});
+  if (await schedulingRun.getAttribute('open') === null) await schedulingRun.locator('summary').click();
+  await chat.locator('.scene-task-list').getByText('模型鉴权失败，请检查 subagent 密钥',{exact:true}).waitFor();
+  await page.screenshot({animations:'disabled',path:'test-results/scene-scheduling-failed.png'});
   assert.deepEqual(errors,[]);
   console.log('PASS: same Being, create/switch/rename sessions through the actual UI, isolated history, per-session drafts, send identity, persistent left panel, collapse/reopen, concurrent scene SSE, context-menu rename, confirmed deletion, last-scene replacement and reload.');
 } finally { await application?.close(); await rm(directory,{recursive:true,force:true}); }

@@ -22,7 +22,7 @@ const server = createServer(async (request, response) => {
       const after = url.searchParams.get('after'); queries.push(after);
       return json({ messages: after === null ? history.slice(-100) : history.filter(m => m.seq > Number(after)).slice(0, 100) });
     }
-    if (url.pathname === '/api/status') return json({ being_name: 'Willow' });
+    if (url.pathname === '/api/status') return json({ being_id: 'willow-id', being_name: 'Willow' });
     if (url.pathname === '/api/stream/active') { response.writeHead(204); response.end(); return; }
     if (url.pathname === '/api/llm/config') return json({ sbs_enabled: false });
     if (url.pathname === '/health') { response.end('OK fixture'); return; }
@@ -96,7 +96,8 @@ try {
   await page.locator('#input').fill('本地记录验证'); await page.locator('#send-btn').click();
   await page.getByText('已持久化的流式回复', { exact: true }).waitFor();
   const initial = await waitCache(102);
-  assert.equal(sent[0].scene_id, undefined, 'This standalone browser fixture bypasses the desktop proxy that adds room metadata');
+  assert.equal(sent[0].scene_id, 'loom-willow-id', 'Standalone browsers use the Being identity rather than its display name');
+  assert.deepEqual(sent[0].scene_meta, { client: 'loom/1.8.2', scene_label: 'Loom' });
   assert.equal(JSON.stringify(initial).includes('must-not-be-cached'), false);
   assert.equal(JSON.stringify(initial).includes('not-history-fields'), false);
   assert.ok(initial.messages.some(m => m.scene_id === 'town-mail'));

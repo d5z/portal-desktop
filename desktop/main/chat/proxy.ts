@@ -26,11 +26,11 @@ export function upstreamRequest(request: Request, connection: Connection) {
 
 export class ChatProxy {
   private requests = new Set<AbortController>();
-  constructor(private getConnection: () => Connection | null, private fetchUpstream: typeof fetch, private scene?: ChatScene | (() => ChatScene | undefined)) {}
+  constructor(private getConnection: () => Connection | null, private fetchUpstream: typeof fetch, private scene?: ChatScene | (() => ChatScene | undefined), private resolveScene?: (id: string) => ChatScene | undefined) {}
   abortAll() { for (const controller of this.requests) controller.abort(); this.requests.clear(); }
   async handle(request: Request): Promise<Response> {
     const connection = this.getConnection();
-    const scene = typeof this.scene === "function" ? this.scene() : this.scene;
+    let scene = typeof this.scene === "function" ? this.scene() : this.scene;
     if (!connection) return Response.json({ error: '请先连接 Being。' }, { status: 401 });
     const expectedEndpoint = request.headers.get('X-Portal-Being-Endpoint');
     if (expectedEndpoint && expectedEndpoint !== connection.endpoint)
@@ -43,8 +43,9 @@ export class ChatProxy {
       return Response.json({ error: '客户端场景不可用，暂时无法发送消息。请检查启动提示并重启客户端。' }, { status: 409 });
     }
     const expectedScene = request.headers.get('X-Portal-Scene-Id');
+    if (isChatSend && expectedScene && expectedScene !== scene?.scene_id) scene = this.resolveScene?.(expectedScene);
     if (isChatSend && expectedScene && expectedScene !== scene?.scene_id)
-      return Response.json({ error: '会话已切换，请在原会话中重试。' }, { status: 409 });
+      return Response.json({ error: '场景已切换，请在原场景中重试。' }, { status: 409 });
     const controller = new AbortController();
     this.requests.add(controller);
     const abort = () => controller.abort();

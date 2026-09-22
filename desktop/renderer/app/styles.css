@@ -1,3 +1,4 @@
+@import "../shared/model-settings.css";
 :root {
   color-scheme: light;
   --bg: #fff; --sidebar: rgba(245,245,244,.35); --surface: #f7f7f6;
@@ -317,6 +318,9 @@ body:not([data-view=chat]):not([data-view=portal]) #view-title{display:none}
 #place-sheet .social-view .town-toolbar{flex-wrap:nowrap;justify-content:flex-start}
 #place-sheet .social-view #town-search{flex:1 1 auto;width:auto;min-width:160px;max-width:none;margin-left:0}
 #place-sheet .social-view #town-body{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.town-refresh-indicator{position:sticky;top:0;height:0;z-index:7;display:flex;justify-content:center;pointer-events:none}
+.town-refresh-label{display:flex;align-items:center;gap:9px;flex-shrink:0;align-self:flex-start;margin-top:8px;padding:9px 15px;border:1px solid var(--line);border-radius:22px;background:var(--bg);color:var(--text);font-size:13px;font-weight:500;box-shadow:0 3px 14px #00000018}
+.town-refresh-label .startup-spinner{width:16px;height:16px;flex-shrink:0;border-top-color:currentColor}
 #place-sheet .social-view #town-body.fireside-body{overflow:hidden;scrollbar-gutter:auto}
 #place-sheet .fireside-body .fireside-layout{height:100%;min-height:0;align-items:stretch;overflow:hidden}
 #place-sheet .fireside-body .fireside-rooms{position:static;display:flex;flex-direction:column;min-height:0;overflow:hidden}
@@ -606,3 +610,11 @@ body[data-view=chat].has-topic .scene-ribbon{display:flex!important;min-height:0
 .chat-session-actions{display:flex;align-items:stretch;gap:0;flex-shrink:0;border:1px solid var(--line);border-radius:9px;background:var(--surface)}
 .chat-session-actions .chat-session-new{flex:1;min-width:0;width:auto;height:40px;border:0;border-radius:8px 0 0 8px;background:transparent}
 .chat-session-bind{display:flex;align-items:center;justify-content:center;flex:0 0 40px;width:40px;height:40px;padding:0;border:0;border-radius:0 8px 8px 0;background:transparent;color:var(--secondary)}
+
+
+
+.switch-list .subagent-switch-row{display:flex;align-items:center;flex-wrap:wrap;gap:8px 20px;padding:11px 0}
+.switch-list .subagent-switch-row>label{display:flex;flex-direction:column;align-items:flex-start;flex:1;min-width:0;gap:4px;padding:0}
+.subagent-switch-actions{display:flex;align-items:center;gap:16px;flex-shrink:0}
+.subagent-switch-actions button:disabled{opacity:.4;cursor:default}
+.subagent-switch-row>.subagent-skip{flex-basis:100%;text-align:left}

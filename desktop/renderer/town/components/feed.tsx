@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   feedMessages,
   feedDisplayName,
@@ -15,6 +15,8 @@ import { Markdown, markdownText } from "../../shared/components/markdown";
 import { collectMentionNames, mentionText, type MentionNames } from '../models/mentions';
 import { MentionText } from './mention-text';
 import { CopyMessage } from '../../shared/components/copy-message';
+const messageKey = (message: FeedMessage) => str(message.entry.id || message.entry.seq ||
+  `${message.authorId}:${message.rawDate}:${message.index}`);
 export function TownFeed({
   town,
   data,
@@ -34,10 +36,34 @@ export function TownFeed({
     town.view === "mail"
       ? (town.tab as "all" | "inbox" | "sent")
       : undefined;
-  const messages = useMemo(
-    () => feedMessages(list(data, "messages"), { me, mail }),
-    [data, me, mail],
-  );
+  const normalized = useMemo(() => new WeakMap<Data, FeedMessage>(), [me, mail]);
+  const messages = useMemo(() => list(data, 'messages').map((entry, index) => {
+    let message = normalized.get(entry);
+    if (!message || message.index !== index) {
+      message = { ...feedMessages([entry], { me, mail })[0], index };
+      normalized.set(entry, message);
+    }
+    return message;
+  }), [data, me, mail, normalized]);
+  const onSelect = useCallback((message: FeedMessage) => {
+    const id = messageKey(message);
+    setSelected(id);
+    town.choose({
+      id: 'message:' + id, title: `${message.author} 的发言`,
+      author: message.authorId || message.author,
+      revision: str(message.entry.revised_at || message.rawDate),
+      excerpt: sceneExcerpt(message.content),
+      private: Boolean(town.view === 'firesides' || mail),
+    });
+  }, [town, mail]);
+  const onJumpReply = useCallback((message: FeedMessage, domId: string) => {
+    setSelected(messageKey(message));
+    requestAnimationFrame(() => {
+      const node = document.getElementById(domId);
+      node?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      node?.focus({ preventScroll: true });
+    });
+  }, []);
   const messageLocations = useMemo(() => {
     const locations = new Map<string, { message: FeedMessage; domId: string }>();
     for (const message of messages) {
@@ -76,13 +102,14 @@ export function TownFeed({
     limit = town.view === "firesides" ? 50 : 100;
   const serialized = JSON.stringify({ ...effective, search: town.search });
   useEffect(() => {
+    if (!town.visible) return;
     town.feedFilters[filterKey] = JSON.parse(serialized);
     town.scenes.update({
       count: filtered.length,
       filters: { tab: town.tab, ...JSON.parse(serialized) },
       scope: `${filtered.length} 条符合筛选 · 最近 ${limit} 条内筛选；未确认阅读`,
     });
-  }, [town, filterKey, serialized, filtered.length, limit, town.tab]);
+  }, [town, town.visible, filterKey, serialized, filtered.length, limit, town.tab]);
   useEffect(() => {
     const outside = (event: Event) => {
       if (more.current && !more.current.contains(event.target as Node))
@@ -186,11 +213,7 @@ export function TownFeed({
       >{`${filtered.length} / ${messages.length} 条 · 最近 ${limit} 条内筛选${me ? "" : " · 配对后可识别 @我和我的发言"}`}</div>
       <div className="social-messages">
         {filtered.map((message) => {
-          const id = str(
-            message.entry.id ||
-              message.entry.seq ||
-              `${message.authorId}:${message.rawDate}:${message.index}`,
-          );
+          const id = messageKey(message);
           const location = messageLocations.get(str(mail ? message.entry.id : message.entry.seq));
           const replyTarget = messageLocations.get(str(message.entry.reply_to));
           return (
@@ -199,31 +222,11 @@ export function TownFeed({
               {...{ message, town, mail, mentionNames }}
               domId={location?.domId || `town-message-${message.index}`}
               replyTarget={replyTarget?.message}
-              onJumpReply={replyTarget ? () => {
-                const targetId = str(
-                  replyTarget.message.entry.id ||
-                    replyTarget.message.entry.seq ||
-                    `${replyTarget.message.authorId}:${replyTarget.message.rawDate}:${replyTarget.message.index}`,
-                );
-                setSelected(targetId);
-                requestAnimationFrame(() => {
-                  const node = document.getElementById(replyTarget.domId);
-                  node?.scrollIntoView({ behavior: "smooth", block: "center" });
-                  node?.focus({ preventScroll: true });
-                });
-              } : undefined}
+              replyDomId={replyTarget?.domId}
+              onJumpReply={onJumpReply}
               selected={selected === id}
-              onSelect={() => {
-                setSelected(id);
-                town.choose({
-                  id: "message:" + id,
-                  title: `${message.author} 的发言`,
-                  author: message.authorId || message.author,
-                  revision: str(message.entry.revised_at || message.rawDate),
-                  excerpt: sceneExcerpt(message.content),
-                  private: Boolean(town.view === "firesides" || mail),
-                });
-              }}
+              onSelect={onSelect}
+              canReply={town.live?.phase === 'connected'}
             />
           );
         })}
@@ -251,13 +254,15 @@ export function TownFeed({
     </div>
   );
 }
-function Message({
+const Message = memo(function Message({
   message: m,
   town,
   mail,
   mentionNames,
   domId,
   replyTarget,
+  replyDomId,
+  canReply,
   onJumpReply,
   selected,
   onSelect,
@@ -268,12 +273,21 @@ function Message({
   mentionNames: MentionNames;
   domId: string;
   replyTarget?: FeedMessage;
-  onJumpReply?: () => void;
+  replyDomId?: string;
+  canReply: boolean;
+  onJumpReply: (message: FeedMessage, domId: string) => void;
   selected: boolean;
-  onSelect: () => void;
+  onSelect: (message: FeedMessage) => void;
 }) {
   const expanded = useRef<HTMLDetailsElement>(null),
     preview = useRef<HTMLElement>(null);
+  const [expandedOpen, setExpandedOpen] = useState(false);
+  const [replyOpen, setReplyOpen] = useState(false);
+  const collapsible = m.content.length > 480 || m.content.split("\n").length > 8;
+  const renderText = useCallback(
+    (text: string) => <MentionText text={text} names={mentionNames} />,
+    [mentionNames],
+  );
   const via = str(m.entry.via),
     validTime = Number.isFinite(m.time),
     replyId = Number(m.entry.seq),
@@ -299,15 +313,15 @@ function Message({
   };
   const snippet = useMemo(
     () =>
-      markdownText(m.content, text => mentionText(text, mentionNames))
+      collapsible ? markdownText(m.content, text => mentionText(text, mentionNames))
         .replace(/\s+/g, " ")
         .trim()
-        .slice(0, 240),
-    [m.content, mentionNames],
+        .slice(0, 240) : "",
+    [collapsible, m.content, mentionNames],
   );
   const body = (
     <Markdown className="reading-text social-body" content={m.content}
-      renderText={text => <MentionText text={text} names={mentionNames} />} />
+      renderText={renderText} />
   );
   return (
     <article
@@ -354,7 +368,10 @@ function Message({
           </span>
         </div>
         {m.entry.reply_to != null && (
-          <details className={`feed-reply-preview${replyTarget ? " has-full-reply" : ""}`}>
+          <details
+            className={`feed-reply-preview${replyTarget ? " has-full-reply" : ""}`}
+            onToggle={event => setReplyOpen(event.currentTarget.open)}
+          >
             <summary>
               <span className="feed-reply-copy">
                 <strong>回复 {replyTarget ? feedDisplayName(replyTarget.author, replyTarget.authorId) : replyAuthor}</strong>
@@ -367,36 +384,41 @@ function Message({
               </span>
               <span className="feed-reply-toggle" aria-hidden="true" />
             </summary>
-            <div className="feed-reply-full">
+            {replyOpen && <div className="feed-reply-full">
               {replyTarget ? (
                 <Markdown
                   className="reading-text social-body"
                   content={replyTarget.content}
-                  renderText={text => <MentionText text={text} names={mentionNames} />}
+                  renderText={renderText}
                 />
               ) : (
                 <p>原消息不在当前加载范围内，以上为 Town 返回的引用预览。</p>
               )}
-              {onJumpReply && (
-                <button className="text-button" type="button" onClick={onJumpReply}>
+              {replyTarget && replyDomId && (
+                <button className="text-button" type="button" onClick={() => onJumpReply(replyTarget, replyDomId)}>
                   跳转原文
                 </button>
               )}
-            </div>
+            </div>}
           </details>
         )}
-        {m.content.length > 480 || m.content.split("\n").length > 8 ? (
-          <details className="social-expand" ref={expanded}>
+        {collapsible ? (
+          <details
+            className="social-expand"
+            ref={expanded}
+            onToggle={event => setExpandedOpen(event.currentTarget.open)}
+          >
             <summary ref={preview}>
               <span className="social-preview">{snippet}</span>
               <span className="expand-label">展开全文</span>
             </summary>
-            {body}
+            {expandedOpen && body}
             <button
               className="text-button"
               type="button"
               onClick={() => {
                 if (expanded.current) expanded.current.open = false;
+                setExpandedOpen(false);
                 preview.current?.focus();
               }}
             >
@@ -411,7 +433,7 @@ function Message({
             ? labels[state] || state
             : m.entry.revised_at ? '已编辑' : ''}
           {(town.view === "firesides" || town.view === "bonfire" || mail) &&
-            town.live?.phase === "connected" &&
+            canReply &&
             reply && (
               <button
                 className="scene-select"
@@ -421,11 +443,11 @@ function Message({
                 回复
               </button>
             )}
-          <button className="scene-select" type="button" onClick={onSelect}>
+          <button className="scene-select" type="button" onClick={() => onSelect(m)}>
             一起看
           </button>
         </div>
       </div>
     </article>
   );
-}
+});

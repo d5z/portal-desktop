@@ -1,3 +1,6 @@
+import { subagentReady } from './portal/subagent-ready';
+import { SceneTaskObserver } from './portal/subagent-tasks';
+import { setupSubagent, validateSubagentSetup, readSubagentConfig, setSubagentEnabled } from './portal/subagent-setup';
 import { ClientCommandServer } from './chat/client-server';
 import { ClientContextReader } from './chat/client-context';
 import { app, clipboard, dialog, ipcMain, net, nativeImage, nativeTheme, Notification, protocol, safeStorage, shell, type BrowserWindow, type Tray } from 'electron';
@@ -199,7 +202,9 @@ async function ready() {
     if (state.phase === 'auth-error' || state.phase === 'unpaired') { notifications.clear(); pendingNotification = undefined; }
     if (window && !window.webContents.isDestroyed()) window.webContents.send('beings:town-live', state);
   }, net.fetch.bind(net) as typeof fetch, TOWN_ORIGIN, () => townCredentials.display, target => notifications.receive(target));
-  const town = new TownClient(() => townCredentials.token, net.fetch.bind(net) as typeof fetch, TOWN_ORIGIN, () => townLive.state.beingId || '');
+  const town = new TownClient(() => townCredentials.token, net.fetch.bind(net) as typeof fetch, TOWN_ORIGIN, () => townLive.state.beingId || '', event => {
+    errorLog.report('town-request', new Error(JSON.stringify(event)));
+  });
   townLive.restart();
   kitInstaller = new KitInstaller(directory, net.fetch.bind(net) as typeof fetch);
   portal = new PortalSupervisor(directory);
@@ -220,7 +225,7 @@ async function ready() {
     chatSessions = sessions;
   }
   catch { chatSceneNotice = '桌面场景标识未能读取或保存，暂时无法发送消息。请检查客户端配置目录后重启。'; }
-  proxy = new ChatProxy(() => store.connection, net.fetch.bind(net) as typeof fetch, () => chatSessions?.current(store.connection?.endpoint) || chatScene);
+  proxy = new ChatProxy(() => store.connection, net.fetch.bind(net) as typeof fetch, () => chatSessions?.current(store.connection?.endpoint) || chatScene, id => chatSessions?.list(store.connection?.endpoint).find(scene => scene.scene_id === id));
   const assets = app.isPackaged ? path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}`) : path.resolve('desktop/generated');
   registerLocalProtocol(assets, proxy);
   configureLocalSession();
@@ -420,9 +425,9 @@ async function ready() {
   handle('beings:update-state', () => updates.state);
   const snapshot = () => ({ settings: store.settings, portal: portal.state, background: background.state, chatScene: chatSessions?.current(store.connection?.endpoint) || chatScene, chatSessions: chatSessions?.list(store.connection?.endpoint), notice: [startupNotice && errorLog.report('startup-notice', startupNotice), chatSceneNotice].filter(Boolean).join('\n') || undefined });
   handle('beings:chat-session', (operation: string, value: string, endpoint: string, sceneId?: string) => exclusive(async () => {
-    if (!chatSessions || !store.connection) throw new Error('请先连接 Being，或检查会话目录。');
+    if (!chatSessions || !store.connection) throw new Error('请先连接 Being，或检查场景目录。');
     if (endpoint !== store.connection.endpoint) throw new Error('Being 连接已切换，请重试。');
-    if (!['create', 'bind', 'select', 'rename', 'delete'].includes(operation)) throw new Error('无效的会话操作。');
+    if (!['create', 'bind', 'select', 'rename', 'delete'].includes(operation)) throw new Error('无效的场景操作。');
     await chatSessions.change(endpoint, operation as 'create' | 'bind' | 'select' | 'rename' | 'delete', value, sceneId);
     return snapshot();
   }));
@@ -516,7 +521,37 @@ async function ready() {
     open: url => browser?.open(url),
   });
   registerKitsIpc({ handle, exclusive, window: () => window, store, kitInstaller });
+  handle('beings:model-config', async (patch?: Record<string, unknown>) => {
+    if (patch !== undefined && (!patch || Array.isArray(patch) || typeof patch !== 'object' ||
+      Object.entries(patch).some(([key, value]) => !['model', 'provider', 'base_url', 'api_key', 'thinking', 'temperature', 'rollback'].includes(key) || !['string', 'number', 'boolean'].includes(typeof value)) || JSON.stringify(patch).length > 16384))
+      throw new Error('无效的模型配置。');
+    const response = await proxy.handle(new Request('beings://chat/api/llm/config', {
+      method: patch === undefined ? 'GET' : 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      ...(patch === undefined ? {} : { body: JSON.stringify(patch) }),
+    }));
+    const data = await response.json();
+    if (!response.ok && !data.needs_key) throw new Error(data.error || '无法读取或保存 Being 模型配置。');
+    return data;
+  });
+  const taskSnapshot = async (tasks: import('../shared/types').SceneTask[]) => {
+    const endpoint = store.connection?.endpoint || '';
+    const settings = store.settings, phase = portal.state.phase, pid = portal.state.pid;
+    const ready = await subagentReady(directory, settings, portal.state, tasks);
+    return { endpoint, tasks, subagentReady: ready && endpoint === store.connection?.endpoint &&
+      settings.portalConfigPath === store.settings.portalConfigPath && phase === portal.state.phase && pid === portal.state.pid };
+  };
+  const sceneTasks = new SceneTaskObserver(tasks => {
+    void taskSnapshot(tasks).then(snapshot => {
+      if (snapshot.endpoint === store.connection?.endpoint && window && !window.isDestroyed()) window.webContents.send('beings:scene-tasks', snapshot);
+    });
+  }, () => new Set((chatSessions?.list(store.connection?.endpoint) || []).map(scene => scene.scene_id)));
+  app.once('will-quit', () => sceneTasks.close());
+  handle('beings:scene-tasks', async () => taskSnapshot(await sceneTasks.configure(store.settings.portalConfigPath)));
+  handle('beings:subagent-config', () => readSubagentConfig(directory, store.settings));
   handle('beings:save', (input: SaveSettings) => exclusive(async () => {
+    if (input.subagentEnabled !== undefined && typeof input.subagentEnabled !== 'boolean') throw new Error('无效的 subagent 开关状态');
+    if (input.subagentSetup) validateSubagentSetup(input.subagentSetup);
     cancelTownPairing?.();
     const previous = { ...store.settings }; const previousConnection = store.connection;
     await store.save(input);
@@ -526,6 +561,18 @@ async function ready() {
         // Discovery may import an old configuration during takeover. The switches
         // explicitly saved in this operation must take precedence over that file.
         store.settings = { ...store.settings, allowExec: input.allowExec, kitsEnabled: input.kitsEnabled };
+        if (input.subagentSetup) {
+          await portal.stop();
+          if (background.state.enabled) await background.disable();
+          const configPath = await setupSubagent(directory, store.settings, input.subagentSetup);
+          await store.save({ ...store.settings, portalConfigPath: configPath });
+        }
+        if (input.subagentEnabled !== undefined) {
+          await portal.stop();
+          if (background.state.enabled) await background.disable();
+          const configPath = await setSubagentEnabled(directory, store.settings, input.subagentEnabled);
+          await store.save({ ...store.settings, portalConfigPath: configPath });
+        }
         await startClientPortal(replacing, true);
       });
       await publishCurrentPortal();

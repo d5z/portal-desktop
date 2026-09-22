@@ -18,6 +18,19 @@ export function useChatBridge(
     };
   }, [app, frame]);
   useEffect(() => {
+    let disposed = false;
+    const forward = (snapshot: import('../../../shared/types').SceneTaskSnapshot) => {
+      if (!disposed && snapshot.endpoint === app.snapshot?.settings.endpoint) app.post({ type: 'beings:scene-tasks', ...snapshot,
+        revision: new URL(frame.current?.src || 'https://invalid').searchParams.get('revision') });
+    };
+    const refresh = () => { void app.api.sceneTasks?.().then(forward).catch(() => {}); };
+    const stop = app.api.onSceneTasks?.(forward);
+    const target = frame.current;
+    target?.addEventListener('load', refresh);
+    refresh();
+    return () => { disposed = true; stop?.(); target?.removeEventListener('load', refresh); };
+  }, [app, frame, app.snapshot?.settings.endpoint, app.snapshot?.settings.portalConfigPath, app.snapshot?.portal.phase, app.snapshot?.portal.pid, app.chatSource, app.snapshot?.chatSessions?.map(scene => scene.scene_id).join('|')]);
+  useEffect(() => {
     const receive = (event: MessageEvent) => {
       const target = frame.current;
       if (
@@ -45,6 +58,13 @@ export function useChatBridge(
       }
       if (message.revision !== new URL(target.src).searchParams.get("revision"))
         return;
+      if (message.type === 'beings:scene-tasks-request') {
+        void app.api.sceneTasks?.().then(snapshot => {
+          if (snapshot.endpoint === app.snapshot?.settings.endpoint && frame.current === target && new URL(target.src).searchParams.get('revision') === message.revision)
+            app.post({ type: 'beings:scene-tasks', ...snapshot, revision: message.revision });
+        }).catch(() => {});
+        return;
+      }
       if (message.type === "beings:session-create") {
         if (app.chatHistoryScope !== "all" || !app.snapshot?.settings.hasToken || document.querySelector("dialog[open]")) return;
         app.chatSessionCreateRequest++;
@@ -92,6 +112,14 @@ export function useChatBridge(
         !document.querySelector("dialog[open]")
       ) {
         void app.openClientSettings();
+        return;
+      }
+      if (message.type === "beings:model-settings") {
+        app.openModelSettings();
+        return;
+      }
+      if (message.type === "beings:subagent-settings") {
+        app.openSubagentSettings();
         return;
       }
       if (message.type === "beings:chat-search") {

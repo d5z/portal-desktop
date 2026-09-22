@@ -41,6 +41,23 @@ export class AppModel extends Store {
   sbsKnown = false;
   toastMessage = "";
   settingsOpen = false;
+  subagentSettingsOpen = false;
+  subagentFromConnection = false;
+  modelSettingsTarget: "Heart" | "subagent" = "Heart";
+  openSubagentSettings(fromConnection = false) {
+    this.modelSettingsTarget = "subagent";
+    this.subagentFromConnection = fromConnection;
+    if (fromConnection) this.settingsOpen = false;
+    else this.post({ type: "beings:chat-action", action: "close" });
+    this.subagentSettingsOpen = true;
+    this.changed();
+  }
+  closeSubagentSettings = () => {
+    this.subagentSettingsOpen = false;
+    if (!this.subagentFromConnection) this.dismissSettingsRoute();
+    if (this.subagentFromConnection) this.settingsOpen = true;
+    this.changed();
+  };
   clientSettingsOpen = false;
   settingsRoute: SettingsRoute = "";
   settingsForwardRoute: SettingsRoute = "";
@@ -346,7 +363,10 @@ export class AppModel extends Store {
   openModelSettings() {
     this.beginSettingsRoute("model");
     this.navigate("chat");
-    this.post({ type: "beings:chat-action", action: "model", returnToSettings: true });
+    this.subagentFromConnection = false;
+    this.modelSettingsTarget = "Heart";
+    this.subagentSettingsOpen = true;
+    this.changed();
   }
   openPortalSettings() {
     this.beginSettingsRoute("portal");
@@ -371,9 +391,10 @@ export class AppModel extends Store {
       this.settingsOpen = false;
       ++this.defaultsRevision;
       clearTimeout(this.defaultsTimer);
-      if (this.form) this.form.connectionLink = "";
+      if (this.form) { this.form.connectionLink = ""; this.form.subagentSetup = undefined; }
     }
     this.diagnosticsOpen = false;
+    this.subagentSettingsOpen = false;
     if (route === "model")
       this.post({ type: "beings:chat-action", action: "close" });
     if (this.view !== "chat") this.navigate("chat");
@@ -584,7 +605,7 @@ export class AppModel extends Store {
     this.settingsForwardRoute = "";
     ++this.defaultsRevision;
     clearTimeout(this.defaultsTimer);
-    if (this.form) this.form.connectionLink = "";
+    if (this.form) { this.form.connectionLink = ""; this.form.subagentSetup = undefined; }
     this.changed();
   }
   editForm<K extends keyof SaveSettings>(key: K, value: SaveSettings[K]) {
@@ -629,8 +650,14 @@ export class AppModel extends Store {
     this.changed();
     try {
       if (!this.nameEdited) await this.fillDefaults();
+      const expectedSubagent = this.form.subagentEnabled;
       const next = await this.api.save({ ...this.form });
       this.applySnapshot(next, true);
+      if (expectedSubagent !== undefined) {
+        const persisted = await this.api.subagentConfig();
+        if ((persisted.enabled !== false) !== expectedSubagent)
+          throw new Error('subagent 开关未写入配置，请完全退出并重新打开客户端后重试。');
+      }
       this.closeSettings();
       this.navigate("chat");
     } catch (error) {

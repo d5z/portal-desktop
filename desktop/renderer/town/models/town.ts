@@ -2,6 +2,7 @@ import { Store, errorText } from "../../shared/models/store";
 import { type SceneStore, type SceneResource } from "../../shared/models/scene";
 import type { FeedFilters, FeedReply } from "./feed";
 import { collectMentionNames, type MentionNames } from './mentions';
+import { cacheTownData, shareTownData } from './cache';
 import { townDisplayName } from '../../../shared/town-identity';
 import type {
   DesktopAPI,
@@ -165,6 +166,7 @@ type SendTarget = {
   reply?: FeedReply;
 };
 export class TownModel extends Store {
+  visible = true;
   view = "";
   tab = "";
   tabs: Record<string, string> = {};
@@ -242,6 +244,11 @@ export class TownModel extends Store {
   private reconciling = false;
   private historyNavigation = false;
   private drafts = new Map<string, { content: string; recipient: string }>();
+  private feedCache = new Map<string, { data: Data; status: string }>();
+  private roomCache = new Map<string, { data: Data; members?: Data[] }>();
+  private dataKey = '';
+  private pageKey = '';
+  refreshError = '';
   constructor(
     readonly api: DesktopAPI,
     readonly toast: (error: unknown) => void,
@@ -277,6 +284,8 @@ export class TownModel extends Store {
       this.installedRequest++;
       this.authRequest++;
       this.drafts.clear();
+      this.feedCache.clear();
+      this.roomCache.clear();
       this.content = "";
       this.token = "";
       this.pairCode = "";
@@ -285,7 +294,7 @@ export class TownModel extends Store {
     };
   }
   channel(): TownChannel | undefined {
-    return ["bonfire", "mail", "firesides"].includes(this.view)
+    return this.visible && ["bonfire", "mail", "firesides"].includes(this.view)
       ? (this.view as TownChannel)
       : undefined;
   }
@@ -314,6 +323,11 @@ export class TownModel extends Store {
     this.changed();
   }
   private resetIdentity() {
+    this.feedCache.clear();
+    this.roomCache.clear();
+    this.dataKey = '';
+    this.pageKey = '';
+    this.refreshError = '';
     ++this.identityRequest;
     this.pairedIdentity = undefined;
     this.mentionNames = new Map();
@@ -491,19 +505,26 @@ export class TownModel extends Store {
       this.forwardView = "";
     }
     this.historyNavigation = false;
-    this.view = view;
     this.request++;
     this.detailRequest++;
+    this.loading = false;
+    this.detailLoading = false;
     this.memberLoading = false;
     this.installedRequest++;
-    this.directId = id;
     clearTimeout(this.reconcileTimer);
-    this.updateLive();
-    if (!definitions[view]) return;
+    this.visible = Boolean(definitions[view]);
+    if (!this.visible) {
+      this.updateLive();
+      return;
+    }
+    const samePage = this.view === view && this.directId === id;
+    this.view = view;
+    this.directId = id;
     this.tab = this.tabs[view] || definitions[view].tabs[0]?.[0] || view;
     this.offset = 0;
-    this.search = "";
+    if (!samePage) this.search = "";
     void this.load();
+    this.updateLive();
   }
   selectTab(tab: string) {
     this.tab = tab;
@@ -591,8 +612,13 @@ export class TownModel extends Store {
       this.api.town({ kind: "inbox" }),
       this.api.town({ kind: "sent" }),
     ]);
-    if (!inbox.ok) return inbox;
-    if (!sent.ok) return sent;
+    if (!inbox.ok && !sent.ok) return inbox;
+    if (!inbox.ok || !sent.ok) {
+      const usable = inbox.ok ? inbox : sent;
+      const failedLabel = inbox.ok ? "收件箱" : "已发送";
+      const failedMessage = inbox.ok ? (sent.ok ? "未知错误" : sent.message) : inbox.message;
+      return { ...usable, warnings: [`${failedLabel}加载失败：${failedMessage}`] };
+    }
     const messages = [
       ...list(inbox.data, "messages"),
       ...list(sent.data, "messages"),
@@ -616,13 +642,34 @@ export class TownModel extends Store {
     };
   }
   async load(refresh = false) {
-    if (!definitions[this.view]) return;
+    if (!this.visible || !definitions[this.view]) return;
     const generation = ++this.request;
     ++this.detailRequest;
     this.memberLoading = false;
     const liveAtStart = this.live,
       channel = this.channel(),
-      preserveFireside = refresh && this.view === "firesides" && Boolean(this.data || this.ringData);
+      key = channel && !this.directId ? `${this.view}:${this.tab}` : '';
+    const pageKey = JSON.stringify([this.view, this.directId, this.query()]);
+    const preservePage = !channel && this.pageKey === pageKey && Boolean(this.data || this.library || this.detail);
+    const selectedDetail = preservePage ? this.detail : undefined;
+    this.pageKey = pageKey;
+    if (key && this.dataKey !== key && !(refresh && !this.dataKey)) {
+      const cached = this.feedCache.get(key);
+      this.data = cached?.data || null;
+      this.status = cached?.status || '';
+    }
+    if (channel === 'firesides') {
+      const id = this.directId || this.selectedRing;
+      const cached = this.roomCache.get(id);
+      if (cached && this.ringData?.id !== id) {
+        this.ringData = { id, data: cached.data };
+        this.ringMembers = cached.members ? { id, members: cached.members } : null;
+      }
+    }
+    const preserveFeed = Boolean(channel && (key && this.data ||
+      channel === 'firesides' && this.ringData?.id === (this.directId || this.selectedRing)));
+    const preserveContent = preserveFeed || preservePage;
+    this.dataKey = key;
     this.scenes.update({
       sceneId: `town:https://beings.town:${this.view}:${this.tab}`,
       title: definitions[this.view].title,
@@ -632,21 +679,24 @@ export class TownModel extends Store {
       scope: "正在读取当前页",
       filters: { tab: this.tab, offset: String(this.offset), ...(this.view === "seeds" ? this.seedFilters : {}) },
     });
-    if (!preserveFireside) {
+    if (!preserveContent) {
       this.data = null;
-      this.library = null;
       this.ringData = null;
       this.ringMembers = null;
       this.memberError = "";
+    }
+    if (!preservePage) {
+      this.library = null;
       this.detail = undefined;
       this.localKit = undefined;
       this.selectedId = "";
-      this.detailLoading = false;
-      this.detailError = undefined;
     }
+    this.detailLoading = false;
+    this.detailError = undefined;
     this.error = undefined;
+    this.refreshError = '';
     this.loading = true;
-    this.status = "";
+    if (!preserveContent) this.status = "";
     if (this.view === "kits" && (this.tab !== "local" || this.directId))
       void this.refreshInstalledKits();
     this.changed();
@@ -672,13 +722,14 @@ export class TownModel extends Store {
                   ? "ember"
                   : this.view === "seeds" ? "seed" : "scroll",
             id,
-          });
+          }, false, true);
         return;
       }
       if (this.tab === "local") {
         const library = await this.api.localKits();
         if (generation !== this.request) return;
-        this.library = library;
+        if (JSON.stringify(this.library) !== JSON.stringify(library)) this.library = library;
+        if (this.localKit) this.localKit = library.kits.find(kit => kit.name === this.localKit?.name);
         ++this.installedRequest;
         this.installedLibrary = library;
         this.installedLoading = false;
@@ -699,15 +750,17 @@ export class TownModel extends Store {
             ? "Town 连接"
             : "配对 Being";
         if (!result.ok) {
-          this.fail(result.message, result.code === "auth");
+          if (preserveContent) this.keepAfterRefreshError(result.message);
+          else this.fail(result.message, result.code === "auth");
           return;
         }
-        this.data = result.data;
-        this.validateData();
+        this.validateData(result.data);
+        this.data = shareTownData(this.data, result.data);
         if (Array.isArray(result.data.messages)) this.mentionNames = collectMentionNames(list(result.data, 'messages'), this.mentionNames);
         if (channel !== "firesides" && this.tab !== "sent")
           this.acknowledge(channel, liveAtStart);
-        this.status = `来自 beings.town · ${date(result.fetchedAt)} 已刷新${this.view === "bonfire" ? " · 最近 100 条" : this.view === "mail" ? " · 最近 100 封" : ""}`;
+        this.status = `来自 beings.town · ${date(result.fetchedAt)} 已刷新${this.view === "bonfire" ? " · 最近 100 条" : this.view === "mail" ? " · 最近 100 封" : ""}${result.warnings?.length ? ` · ${result.warnings[0]}` : ""}`;
+        if (key) cacheTownData(this.feedCache, key, { data: this.data, status: this.status });
       }
       this.scenes.update({
         identity: this.library ? this.scenes.being : this.me,
@@ -727,11 +780,16 @@ export class TownModel extends Store {
           void this.loadFireside(
             this.selectedRing,
             str(entry.name, `围炉 #${this.selectedRing}`),
-            refresh,
+            true,
           );
       }
+      if (selectedDetail && this.detail === selectedDetail)
+        await this.loadDetail({ ...selectedDetail.query, offset: 0 }, false, true);
     } catch (error) {
-      if (generation === this.request) this.fail(errorText(error));
+      if (generation === this.request) {
+        if (preserveContent) this.keepAfterRefreshError(errorText(error));
+        else this.fail(errorText(error));
+      }
     } finally {
       if (generation === this.request) {
         this.loading = false;
@@ -739,16 +797,20 @@ export class TownModel extends Store {
       }
     }
   }
-  private validateData() {
-    if (!this.data) return;
+  private keepAfterRefreshError(message: string) {
+    this.refreshError = `刷新失败，仍显示上次内容：${message}`;
+    this.scenes.update({ status: 'ready', scope: this.refreshError });
+  }
+  private validateData(data = this.data) {
+    if (!data) return;
     if (this.view === "town") {
-      if (this.tab === "updates") list(this.data, "whats_new");
+      if (this.tab === "updates") list(data, "whats_new");
     } else if (this.channel() === "firesides") {
-      list(this.data, "owned");
-      list(this.data, "joined");
+      list(data, "owned");
+      list(data, "joined");
     } else
       list(
-        this.data,
+        data,
         this.channel() ? "messages" : this.tab === "grove" ? "kits" : this.view === "seeds" ? "seeds" : "scrolls",
       );
   }
@@ -794,9 +856,17 @@ export class TownModel extends Store {
   }
   async loadFireside(id: string, title: string, refresh = false) {
     const generation = ++this.detailRequest,
-      liveAtStart = this.live;
+      liveAtStart = this.live,
+      changingRoom = this.selectedRing !== id;
     this.selectedRing = id;
+    if (this.ringData?.id !== id) {
+      const cached = this.roomCache.get(id);
+      this.ringData = cached ? { id, data: cached.data } : null;
+      this.ringMembers = cached?.members ? { id, members: cached.members } : null;
+      this.memberError = '';
+    }
     this.ringTitle = title;
+    this.refreshError = '';
     this.detailLoading = true;
     this.detailError = undefined;
     this.memberLoading = false;
@@ -811,7 +881,7 @@ export class TownModel extends Store {
     });
     this.updateLive();
     try {
-      const loadMessages = refresh || this.ringData?.id !== id || this.firesideUnread(id);
+      const loadMessages = refresh || changingRoom || this.ringData?.id !== id || this.firesideUnread(id);
       const loadMembers = refresh || this.ringMembers?.id !== id;
       const messages = loadMessages
         ? this.api.town({ kind: "fireside", id })
@@ -822,6 +892,10 @@ export class TownModel extends Store {
       if (generation !== this.detailRequest) return;
       if (result) {
         if (!result.ok) {
+          if (this.ringData?.id === id) {
+            this.keepAfterRefreshError(result.message);
+            return;
+          }
           this.detailError = {
             message: result.message,
             auth: result.code === "auth",
@@ -832,12 +906,20 @@ export class TownModel extends Store {
         }
         list(result.data, "messages");
         this.mentionNames = collectMentionNames(list(result.data, 'messages'), this.mentionNames);
-        this.ringData = { id, data: result.data };
+        this.ringData = { id, data: shareTownData(this.ringData?.data, result.data) };
+        cacheTownData(this.roomCache, id, {
+          data: this.ringData.data,
+          members: this.ringMembers?.id === id ? this.ringMembers.members : undefined,
+        });
         this.acknowledge("firesides", liveAtStart, id);
       }
       this.scenes.update({ status: "ready" });
     } catch {
       if (generation === this.detailRequest) {
+        if (this.ringData?.id === id) {
+          this.keepAfterRefreshError('未能读取围炉消息。');
+          return;
+        }
         this.detailError = {
           message: "未能读取围炉消息。",
           retry: () => void this.loadFireside(id, title, true),
@@ -867,6 +949,8 @@ export class TownModel extends Store {
       else {
         const members = result.data.members.map(record);
         this.ringMembers = { id, members };
+        const cached = this.roomCache.get(id);
+        if (cached) cacheTownData(this.roomCache, id, { ...cached, members });
         this.mentionNames = collectMentionNames(members, this.mentionNames);
       }
     } catch {
@@ -878,12 +962,17 @@ export class TownModel extends Store {
       }
     }
   }
-  async loadDetail(query: TownQuery, append = false) {
+  async loadDetail(query: TownQuery, append = false, refresh = false) {
     const generation = ++this.detailRequest;
+    const previous = this.detail;
+    const preserve = previous?.query.kind === query.kind && previous?.query.id === query.id;
     this.selectedId = query.id || "";
     this.detailLoading = true;
     this.detailError = undefined;
-    if (!append) this.detail = undefined;
+    this.refreshError = '';
+    if (!append && !preserve) this.detail = undefined;
+    if (this.directId === query.id)
+      this.pageKey = JSON.stringify([this.view, this.directId, this.query()]);
     this.scenes.update({
       sceneId: `town:https://beings.town:${query.kind}:${query.id}`,
       status: "loading",
@@ -895,6 +984,10 @@ export class TownModel extends Store {
       const result = await this.api.town(query);
       if (generation !== this.detailRequest) return;
       if (!result.ok) {
+        if (preserve) {
+          this.keepAfterRefreshError(result.message);
+          return;
+        }
         this.detailError = {
           message: result.message,
           retry: () => void this.loadDetail(query, append),
@@ -903,6 +996,20 @@ export class TownModel extends Store {
         return;
       }
       if (query.kind === "seed" && typeof result.data.brief !== "string") throw new Error("种子详情格式不正确，请稍后重试。");
+      const fragments = [shareTownData(preserve && !append ? previous?.fragments[0] : undefined, { ...result.data, id: query.id })];
+      let lastQuery = query;
+      // Refresh every already-open fragment before swapping the document, so a
+      // long scroll neither goes blank nor loses the sections already loaded.
+      while (refresh && preserve && fragments.length < previous!.fragments.length && fragments.at(-1)?.has_more === true) {
+        const last = fragments.at(-1)!;
+        const offset = Number(last.offset || 0) + [...str(last.content)].length;
+        if (offset <= Number(lastQuery.offset || 0)) break;
+        lastQuery = { ...query, offset };
+        const next = await this.api.town(lastQuery);
+        if (generation !== this.detailRequest) return;
+        if (!next.ok) { this.keepAfterRefreshError(next.message); return; }
+        fragments.push(shareTownData(previous!.fragments[fragments.length], { ...next.data, id: query.id }));
+      }
       this.scenes.update({
         title: str(
           result.data.title,
@@ -912,14 +1019,15 @@ export class TownModel extends Store {
         scope: "已加载的详情片段；不代表已阅读",
       });
       this.detail = {
-        query,
+        query: lastQuery,
         fragments: [
           ...(append ? this.detail?.fragments || [] : []),
-          { ...result.data, id: query.id },
+          ...fragments,
         ],
       };
     } catch (error) {
       if (generation === this.detailRequest) {
+        if (preserve) { this.keepAfterRefreshError(errorText(error)); return; }
         this.detailError = {
           message: errorText(error),
           retry: () => void this.loadDetail(query, append),

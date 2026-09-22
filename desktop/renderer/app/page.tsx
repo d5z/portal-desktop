@@ -12,6 +12,7 @@ import { TownComposer } from "../town/components/composer";
 import { KitInstall } from "../town/components/kit-install";
 import { ChatSearch } from "./components/search";
 import { ConnectionSettings, ClientSettings } from "./components/settings";
+import { SubagentModelSettings } from "./components/subagent-model-settings";
 import { Diagnostics } from "./components/diagnostics";
 import { Dialog } from "../shared/components/dialog";
 import { EditContextMenu } from "../shared/components/context-menu";
@@ -172,6 +173,7 @@ export function App({ model }: { model: AppModel }) {
         onReturnToSettings={app.returnToClientSettings} onDismissSettingsRoute={app.dismissSettingsRoute} />
       <ClientSettings model={app} />
       <ConnectionSettings model={app} />
+      {app.subagentSettingsOpen && <SubagentModelSettings app={app} />}
       <KitInstall model={app.town} />
       <Toast message={app.toastMessage} />
       <EditContextMenu edit={app.api.editSelection} rootSelector="#client-main, dialog[open]"

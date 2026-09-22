@@ -1,3 +1,4 @@
+import { SceneScheduling } from './scheduling';
 import { useEffect, useMemo, useState } from "react";
 import type { ChatItem, Message, ChatRuntime, Run } from "../models/chat";
 const duration = (seconds: number) =>
@@ -15,6 +16,7 @@ const icons = {
     </>
   ),
   stop: <path d="M4 8h8" />,
+  wait: <><circle cx="8" cy="8" r="5.5" /><path d="M8 4.5V8l2 1.5" /></>,
   chevron: <path d="m6 4 4 4-4 4" />,
 };
 function Icon({ name }: { name: keyof typeof icons }) {
@@ -47,18 +49,20 @@ export function ChatActivity({
 }) {
   const [open, setOpen] = useState(false),
     [now, setNow] = useState(Date.now);
+  const passive = run.waitingForReply && !run.scheduling?.tasks.some(task => task.status === 'running' || task.status === 'queued');
   useEffect(() => {
     if (run.end) {
       setOpen(false);
       return;
     }
+    if (passive) return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [run.end]);
+  }, [run.end, passive]);
   const tools = run.entries.filter((entry) => entry.type === "tool");
   return (
     <details
-      className={`run-activity${run.end ? "" : " running"}`}
+      className={`run-activity${run.end || passive ? "" : " running"}`}
       data-outcome={run.outcome}
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
@@ -71,7 +75,7 @@ export function ChatActivity({
                 ? "stop"
                 : run.outcome === "error"
                   ? "error"
-                  : "check"
+                  : passive ? "wait" : "check"
             }
           />
         </span>
@@ -80,7 +84,7 @@ export function ChatActivity({
             {run.label}
           </span>
           {sceneLabel && <span className="message-scene" title={run.sceneId}>{sceneLabel}</span>}
-          <span className="run-elapsed">
+          <span className="run-elapsed" hidden={!!passive}>
             {duration(
               Math.max(0, Math.floor(((run.end || now) - run.start) / 1000)),
             )}
@@ -110,6 +114,7 @@ export function ChatActivity({
       <p className="run-hint" hidden={!run.hint}>
         {run.hint}
       </p>
+      {run.scheduling && <SceneScheduling {...run.scheduling} />}
       <div className="run-list">
         {run.entries.map((entry, i) => {
           const detail =
@@ -157,7 +162,7 @@ export function ChatActivity({
             </div>
           );
         })}
-        {!run.entries.length && (
+        {!run.entries.length && !run.scheduling && (
           <p className="run-empty">
             {run.end ? "本轮未返回额外的过程记录。" : "正在等待响应…"}
           </p>
