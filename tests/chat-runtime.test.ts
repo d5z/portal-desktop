@@ -198,6 +198,8 @@ describe("React chat runtime lifecycle", () => {
       // An ordinary completed request, then a retrying request held open for a splice.
       state.historyScope = initialScope;
       await runtime.send("第一条");
+      // send() resolves after dispatch; SSE completion updates session_id later.
+      await flush();
       state.historyScope = initialScope === "current" ? "all" : "current";
       await runtime.refreshHistory(); // Refreshing a different view never changes send identity.
       const sending = runtime.send("继续讨论");
@@ -207,6 +209,7 @@ describe("React chat runtime lifecycle", () => {
       expect(sent).toHaveLength(3);
       state.historyScope = initialScope;
       await runtime.send("再补充一点", [{ name: "notes.txt", type: "text/plain", size: 3, base64: "YWJj" }]);
+      await flush();
       expect(sent).toEqual([
         { message: "第一条", ...scene },
         { message: "继续讨论", session_id: "session-fixture", ...scene },
@@ -232,12 +235,20 @@ describe("React chat runtime lifecycle", () => {
     const state = new ChatState(), runtime = createChatRuntime(state);
     const files = [{ name: "notes.txt", type: "text/plain", size: 3, base64: "YWJj" }];
     state.draft = "暂存的消息";
-    state.files = files;
+    // Populate the composer through its runtime API, not a render-only field.
+    vi.stubGlobal('FileReader', class {
+      result = 'data:text/plain;base64,YWJj';
+      readyState = 2;
+      onload = () => {};
+      readAsDataURL() { this.onload(); }
+    });
+    runtime.handleFiles([new File(['abc'], 'notes.txt', { type: 'text/plain' })]);
+    await flush();
     try {
       await runtime.send(state.draft, files);
       expect(fetch).not.toHaveBeenCalled();
       expect(state.draft).toBe("暂存的消息");
-      expect(state.files).toBe(files);
+      expect(state.files).toEqual([expect.objectContaining(files[0])]);
       expect(state.items).toEqual([expect.objectContaining({ role: "system", text: expect.stringContaining("客户端场景不可用") })]);
       expect(state.streaming).toBe(false);
     } finally { runtime.dispose(); }

@@ -938,6 +938,18 @@ function createStreamRuntime(state, options) {
     while (pendingFileReads.size)
       await Promise.allSettled([...pendingFileReads]);
   }
+  async function prepareSend(filesOverride, snapshot = null) {
+    if (Array.isArray(filesOverride) || !pendingFileReads.size) return true;
+    const draftBeforeRead = snapshot?.draft ?? state.draft;
+    const filesBeforeRead = snapshot?.files ?? [...pendingFiles];
+    await waitForPendingFiles();
+    if (state.draft !== draftBeforeRead || pendingFiles.length !== filesBeforeRead.length ||
+        filesBeforeRead.some((file, index) => pendingFiles[index] !== file)) {
+      addMessage("system", "草稿或附件已变更，请确认后重新发送。");
+      return false;
+    }
+    return true;
+  }
   function renderPendingFiles() {
     state.files = [...pendingFiles];
     updateSendButton();
@@ -1873,20 +1885,13 @@ function createStreamRuntime(state, options) {
   async function send(text, filesOverride = null, sendOptions = {}) {
     if (disposed || preparingSend) return;
     if (!Array.isArray(filesOverride) && pendingFileReads.size) {
-      const draftBeforeRead = state.draft;
-      const filesBeforeRead = [...pendingFiles];
       preparingSend = true;
       try {
-        await waitForPendingFiles();
+        if (!await prepareSend(filesOverride)) return;
       } finally {
         preparingSend = false;
       }
       if (disposed) return;
-      if (state.draft !== draftBeforeRead || pendingFiles.length !== filesBeforeRead.length ||
-          filesBeforeRead.some((file, index) => pendingFiles[index] !== file)) {
-        addMessage("system", "草稿或附件已变更，请确认后重新发送。");
-        return;
-      }
     }
     if (location.protocol === "beings:" && !state.currentScene.sceneId) {
       addMessage("system", "客户端场景不可用，暂时无法发送消息。请检查启动提示并重启客户端。");
@@ -3197,6 +3202,8 @@ function createStreamRuntime(state, options) {
   return {
     start,
     waitForPendingFiles,
+    captureSendSnapshot: () => ({ draft: state.draft, files: [...pendingFiles] }),
+    prepareSend,
     isBusy: () => isStreaming || !!pendingReply || !!pendingRecovery || preparingSend,
     stageQueuedSend(text, filesOverride = null) {
       const msg = (text || "").trim();

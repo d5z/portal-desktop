@@ -37,7 +37,7 @@ it('keeps wire metadata intact but splits the terminal Desktop hint for display'
   expect(splitSchedulingHint(wire+'普通后文')).toEqual({text:wire+'普通后文',hint:''});
   expect(splitSchedulingHint('解释 [Desktop 场景调度提示]')).toEqual({text:'解释 [Desktop 场景调度提示]',hint:''});
 });
-it('background work stays active after a partial reply and participates in another scene hint',async()=>{
+it('background work stays active after a partial reply without changing another scene message',async()=>{
   const state:any={currentScene:{sceneId:'a',sceneLabel:'A'},draft:'',subagentReady:true,sceneTasks:[],sceneNames:{},changed:vi.fn()};
   const activity=vi.fn(); const messages:string[]=[];
   const runtime=createSceneRuntime(state,{onSceneActivity:activity},(_state:any,options:any)=>({
@@ -49,7 +49,7 @@ it('background work stays active after a partial reply and participates in anoth
   runtime.updateSceneTasks([{id:'t',sceneId:'a',createdAt,status:'running'}]);
   expect(activity.mock.lastCall?.[0].a).toBe('working');
   await runtime.selectScene({sceneId:'b',sceneLabel:'B'}); await runtime.send('B 新任务');
-  expect(messages[1]).toContain('A 长任务'); expect(messages[1]).toContain('"status":"working"');
+  expect(messages).toEqual(['A 长任务', 'B 新任务']);
   runtime.updateSceneTasks([{id:'t',sceneId:'a',createdAt,endedAt:createdAt+100,status:'done'}]);
   expect(activity.mock.lastCall?.[0].a).toBe('waiting');
   runtime.updateSceneTasks([{id:'t',sceneId:'a',createdAt,status:'failed'}]);
@@ -111,16 +111,15 @@ it('waits for every delegated result even when tasks finish out of creation orde
     ]);
     expect(activity.mock.lastCall?.[0].a).toBe('waiting');
     await runtime.selectScene({sceneId:'b'}); await runtime.send('B 新任务');
-    expect(messages[1]).toContain('"task_id":"slow"');
-    expect(messages[1]).toContain('"task_id":"fast"');
-    expect(messages[1]).toContain('"status":"done"');
+    expect(messages[1]).toBe('B 新任务');
+    expect(state.sceneTasks.map((task:any) => task.id)).toEqual(['slow', 'fast']);
     repliedAt=at+110;
     runtime.updateSceneTasks(state.sceneTasks);
     expect(activity.mock.lastCall?.[0].a).toBe('done');
   } finally {runtime.dispose();}
 });
 
-it('only hints when another independent scene is pending and subagent readiness is confirmed', async () => {
+it('keeps independent scene messages unchanged regardless of subagent readiness', async () => {
   const state:any={currentScene:{sceneId:'a'},draft:'',sceneTasks:[],changed:vi.fn()};
   const messages:string[]=[];
   const runtime=createSceneRuntime(state,{},(_state:any,options:any)=>({
@@ -133,9 +132,7 @@ it('only hints when another independent scene is pending and subagent readiness 
     expect(messages[1]).toBe('B unrelated task'); // Unknown must not mean healthy.
     runtime.updateSceneTasks([],true);
     await runtime.selectScene({sceneId:'c'}); await runtime.send('C unrelated task');
-    expect(messages[2]).toContain('当前 Portal 已开启 subagent');
-    expect(messages[2]).toContain('A unrelated task');
-    expect(messages[2]).toContain('B unrelated task');
+    expect(messages[2]).toBe('C unrelated task');
     runtime.updateSceneTasks([],false);
     await runtime.send('C follow-up');
     expect(messages[3]).toBe('C follow-up');
