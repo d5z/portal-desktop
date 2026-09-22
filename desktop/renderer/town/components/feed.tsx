@@ -140,9 +140,15 @@ export function TownFeed({
       </select>
     </label>
   );
+  const summary = (
+    <div className="feed-summary" role="status">
+      {`${filtered.length} / ${messages.length} 条 · 最近 ${limit} 条内筛选${me ? "" : " · 配对后可识别 @我和我的发言"}`}
+    </div>
+  );
   return (
     <div className="social-feed">
       <div className="feed-controls">
+        {mail && summary}
         {!mail && (
           <div className="feed-relations" aria-label="消息关系筛选">
             {[
@@ -207,10 +213,7 @@ export function TownFeed({
           </div>
         </details>
       </div>
-      <div
-        className="feed-summary"
-        role="status"
-      >{`${filtered.length} / ${messages.length} 条 · 最近 ${limit} 条内筛选${me ? "" : " · 配对后可识别 @我和我的发言"}`}</div>
+      {!mail && summary}
       <div className="social-messages">
         {filtered.map((message) => {
           const id = messageKey(message);
