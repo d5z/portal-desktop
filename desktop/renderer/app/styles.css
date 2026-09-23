@@ -619,3 +619,6 @@ body[data-view=chat].has-topic .scene-ribbon{display:flex!important;min-height:0
 .subagent-switch-actions{display:flex;align-items:center;gap:16px;flex-shrink:0}
 .subagent-switch-actions button:disabled{opacity:.4;cursor:default}
 .subagent-switch-row>.subagent-skip{flex-basis:100%;text-align:left}
+
+.chat-session-context-toggle{display:flex;align-items:center;gap:8px;padding:12px 8px 0;border-top:1px solid var(--line);font-size:11px;color:var(--secondary);cursor:pointer}
+.chat-session-context-toggle input{margin:0;accent-color:var(--accent)}

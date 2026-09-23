@@ -18,6 +18,39 @@ describe("scene history refresh", () => {
     vi.stubGlobal("cancelAnimationFrame", clearTimeout);
   });
 
+  it("sends into the selected scene while displaying all scene context", async () => {
+    vi.useRealTimers();
+    vi.stubGlobal("location", new URL("beings://chat/loom.html?scene_id=desktop-test&strict_scene=1"));
+    const requests: { scene_id: string; message: string }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
+      const route = new URL(input).pathname;
+      if (route === "/api/history") return Response.json({ messages: [
+        { seq: 1, role: "user", content: "其他场景上下文", scene_id: "other-scene" },
+      ] });
+      if (route === "/api/stream/active") return new Response(null, { status: 204 });
+      if (route === "/health") return new Response("OK fixture");
+      if (route === "/api/chat/stream") {
+        requests.push({ ...JSON.parse(String(init?.body)), scene_id: new Headers(init?.headers).get("X-Portal-Scene-Id") });
+        return new Response('event: done\ndata: {}\n\n', { headers: { "Content-Type": "text/event-stream" } });
+      }
+      return Response.json({ sbs_enabled: false });
+    }));
+    const state = new ChatState(), runtime = createChatRuntime(state);
+    state.subagentReady = true;
+    await runtime.start();
+    try {
+      await runtime.selectScene({ ...current, strict: true });
+      state.historyScope = "all";
+      state.draft = "继续当前场景";
+      expect(sceneItems(state.items, "all", state.currentScene).some(item => item.kind === "message" && item.text === "其他场景上下文")).toBe(true);
+      await runtime.send(state.draft);
+      await new Promise(resolve => setTimeout(resolve, 30));
+      expect(requests).toEqual([expect.objectContaining({ scene_id: current.sceneId, message: "继续当前场景" })]);
+      expect(state.currentScene.sceneId).toBe(current.sceneId);
+      expect(state.historyScope).toBe("all");
+    } finally { runtime.dispose(); }
+  });
+
   it("adds scheduling context for B while A runs and routes a shared breath back to both scenes", async () => {
     const requests: { message: string }[] = [];
     let stream!: ReadableStreamDefaultController<Uint8Array>;

@@ -106,14 +106,14 @@ try {
   assert.equal(initial.messages.some(m => m.scene_meta), false);
   // Switching views uses one all-scene cache/cursor and preserves the draft and reading position.
   await open('&name=Willow&scene_id=loom-Willow&scene_label=Loom');
-  assert.equal(await page.getByRole('button', { name: '当前场景', exact: true }).getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.getByRole('checkbox', { name: '显示全部场景上下文', exact: true }).isChecked(), false);
   assert.equal(await page.locator('#messages .message').count(), 67);
   assert.equal(await page.getByText('历史 3', { exact: true }).count(), 0);
   await page.locator('#input').fill('切换时保留草稿');
   await page.locator('#messages').evaluate(el => { el.scrollTop = 120; });
   await page.waitForFunction(() => document.querySelector('#messages').scrollTop === 120);
   const queryCount = queries.length;
-  await page.getByRole('button', { name: '全部场景', exact: true }).click();
+  await page.getByRole('checkbox', { name: '显示全部场景上下文', exact: true }).check();
   assert.equal(await page.locator('#messages .message').count(), 102);
   assert.equal(await page.getByText('历史 3', { exact: true }).count(), 1);
   assert.ok(await page.locator('.message-scene').getByText('town-mail', { exact: true }).count());
@@ -121,7 +121,7 @@ try {
   assert.match(await page.locator('.chat-scope-caption').textContent(), /发送到：Loom/);
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/chat-scenes-all.png' });
-  await page.getByRole('button', { name: '当前场景', exact: true }).click();
+  await page.getByRole('checkbox', { name: '显示全部场景上下文', exact: true }).uncheck();
   assert.equal(await page.locator('#messages .message').count(), 67);
   assert.equal(await page.locator('#messages').evaluate(el => el.scrollTop), 120);
   assert.equal(queries.length, queryCount, 'Scope changes do not reset or refetch the global history cursor');
