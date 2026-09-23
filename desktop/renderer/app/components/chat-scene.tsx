@@ -72,17 +72,16 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
   const label = scene?.scene_meta.scene_label || "场景标记不可用";
   const collapse = () => { setMenu(undefined); setExpanded(false); trigger.current?.focus(); };
   const reveal = () => { setExpanded(true); onReveal?.(); };
-  const select = (value: HistoryScope) => onScope(value);
   return (
     <>
       <div className="chat-scene-control">
         <button ref={trigger} id="chat-scene-indicator" className="chat-scene-indicator" type="button"
           aria-label={`${expanded && visible ? "收起" : "展开"}场景列表`} aria-controls="chat-session-panel" aria-expanded={expanded && visible}
-          title={scope === "all" ? "全部场景" : label} onClick={() => expanded && visible ? collapse() : reveal()}>
+          title={label} onClick={() => expanded && visible ? collapse() : reveal()}>
           <svg className="chat-scene-icon" viewBox="0 0 20 20" aria-hidden="true">
             <rect x="2.5" y="3.5" width="15" height="13" rx="2" /><path d="M8 3.5v13" />
           </svg>
-          <span className="chat-scene-label">{scope === "all" ? "全部场景" : scene ? label : "场景"}</span>
+          <span className="chat-scene-label">{scene ? label : "场景"}</span>
         </button>
       </div>
       {visible && expanded && <aside id="chat-session-panel" className="chat-session-panel" aria-label="场景列表"
@@ -90,7 +89,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
         <div className="chat-session-panel-heading">
           <h2>场景 <span>{sessions.length}</span></h2>
           <div className="chat-session-heading-actions">
-            <button className="icon-button" type="button" aria-label="场景详情" title="场景详情" disabled={!scene || scope === "all"} onClick={() => setOpen(true)}>
+            <button className="icon-button" type="button" aria-label="场景详情" title="场景详情" disabled={!scene} onClick={() => setOpen(true)}>
               <svg width="18" height="18" viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><circle cx="10" cy="10" r="7" /><path d="M10 9v5M10 6v1" /></svg>
             </button>
             <button className="close" type="button" aria-label="关闭场景列表" title="关闭场景列表" onClick={collapse} />
@@ -106,13 +105,8 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
         </div>
         <p className="chat-session-caption">当前 Being 的对话</p>
         <nav className="chat-session-list" aria-label="切换场景">
-          <button type="button" className="chat-session-all" aria-label="全部场景" aria-current={scope === "all" ? "true" : undefined}
-            disabled={!scopeReady} onClick={() => select("all")}>
-            <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="2" y="2" width="6" height="6" rx="1" /><rect x="12" y="2" width="6" height="6" rx="1" /><rect x="2" y="12" width="6" height="6" rx="1" /><rect x="12" y="12" width="6" height="6" rx="1" /></svg>
-            <span>全部场景</span>
-          </button>
           {sessions.map(session => <button key={session.scene_id} data-scene-id={session.scene_id} type="button"
-            aria-label={`切换到场景：${session.scene_meta.scene_label}`} aria-current={scope === "current" && scene?.scene_id === session.scene_id ? "true" : undefined}
+            aria-label={`切换到场景：${session.scene_meta.scene_label}`} aria-current={scene?.scene_id === session.scene_id ? "true" : undefined}
             onContextMenu={event => {
               if (busy || !connected) return;
               event.preventDefault();
@@ -128,10 +122,15 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
               title={CHAT_SCENE_ACTIVITY_LABELS[activity[session.scene_id]]}>
               <span className="chat-session-activity-icon" aria-hidden="true" />
               {CHAT_SCENE_ACTIVITY_LABELS[activity[session.scene_id]]}
-            </span> : scope === "current" && scene?.scene_id === session.scene_id && <span className="chat-session-current" aria-hidden="true">•</span>}
+            </span> : scene?.scene_id === session.scene_id && <span className="chat-session-current" aria-hidden="true">•</span>}
           </button>)}
           {!sessions.length && <p className="chat-session-caption">连接 Being 后创建场景</p>}
         </nav>
+        <label className="chat-session-context-toggle">
+          <input type="checkbox" checked={scope === "all"} disabled={!scopeReady || !scene}
+            onChange={event => onScope(event.target.checked ? "all" : "current")} />
+          <span>显示全部场景上下文</span>
+        </label>
         {error && !editing && !deleting && <p role="alert" className="chat-session-error">{error}</p>}
 
       </aside>}
@@ -154,7 +153,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
       <Dialog id="chat-session-delete" className="utility-dialog" open={!!deleting} busy={busy}
         aria-labelledby="chat-session-delete-title" onClose={() => setDeleting(undefined)} dismissOnBackdrop>
         <div className="dialog-heading"><h2 id="chat-session-delete-title">删除场景？</h2></div>
-        <p className="utility-subtitle">确定从本机场景列表中删除「{deleting?.scene_meta.scene_label}」？历史记录会保留，仍可在「全部场景」查看。</p>
+        <p className="utility-subtitle">确定从本机场景列表中删除「{deleting?.scene_meta.scene_label}」？历史记录会保留，仍可开启「显示全部场景上下文」查看。</p>
         {error && <p role="alert" className="chat-session-error">{error}</p>}
         <div className="files-footer">
           <button autoFocus type="button" disabled={busy} onClick={() => setDeleting(undefined)}>取消</button>

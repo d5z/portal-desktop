@@ -212,7 +212,6 @@ export function createSceneRuntime(state, options, createRuntime) {
       publish();
     },
     send(...args) {
-      if (state.currentScene.strict && state.historyScope === "all") return Promise.resolve();
       const target = selected;
       const sendSnapshot = !Array.isArray(args[1])
         ? (typeof target.runtime.captureSendSnapshot === 'function'
@@ -278,7 +277,6 @@ export function createSceneRuntime(state, options, createRuntime) {
   };
   for (const method of ["stopCurrentTurn", "handleFiles", "removePending"])
     runtime[method] = (...args) => {
-      if (state.currentScene.strict && state.historyScope === "all") return Promise.resolve();
       selected.local.files = state.files;
       return selected.runtime[method](...args);
     };

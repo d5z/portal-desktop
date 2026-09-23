@@ -67,7 +67,6 @@ function ChatView({
 }) {
   useModel(state);
   const visibleItems = sceneItems(withScheduling(state.items, state.sceneTasks), state.historyScope, state.currentScene);
-  const allScenesReadOnly = !!state.currentScene.strict && state.historyScope === "all";
   const currentSceneName = sceneName(state.currentScene, state.currentScene);
   const showActivity = state.historyScope === "all" || inCurrentScene(state.activeScene, state.currentScene);
   const messages = useRef<HTMLDivElement>(null),
@@ -191,7 +190,7 @@ function ChatView({
     el.style.height = "auto";
     el.style.height = Math.min(el.scrollHeight, max) + "px";
     el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
-  }, [state.draft, viewport.height, allScenesReadOnly]);
+  }, [state.draft, viewport.height]);
   useLayoutEffect(() => {
     if (messages.current && scrollLock.current)
       messages.current.scrollTop = messages.current.scrollHeight;
@@ -356,15 +355,11 @@ function ChatView({
           </button>
         </header>
         {parent === window && <div className="chat-history-scope">
-          <div className="chat-scope-switch" role="group" aria-label="对话场景范围">
-            <button type="button" aria-pressed={state.historyScope === "current"} disabled={!state.currentScene.sceneId}
-              title={state.currentScene.sceneId ? currentSceneName : "当前场景标识不可用"} onClick={() => changeScope("current")}>
-              当前场景
-            </button>
-            <button type="button" aria-pressed={state.historyScope === "all"} onClick={() => changeScope("all")}>
-              全部场景
-            </button>
-          </div>
+          <label className="chat-scope-switch">
+            <input type="checkbox" checked={state.historyScope === "all"} disabled={!state.currentScene.sceneId}
+              onChange={event => changeScope(event.target.checked ? "all" : "current")} />
+            显示全部场景上下文
+          </label>
           <span className="chat-scope-caption" title={state.currentScene.sceneId}>
             {state.currentScene.sceneId
               ? state.historyScope === "all" ? `发送到：${currentSceneName}` : currentSceneName
@@ -387,7 +382,7 @@ function ChatView({
           {!visibleItems.some(item => item.kind === "message") && !state.thinking && (
             <div className="chat-scope-empty">
               {state.historyScope === "current" ? "当前场景还没有对话。" : "暂无对话记录。"}
-              {state.historyScope === "current" && <button type="button" onClick={() => changeScope("all")}>查看全部场景对话</button>}
+              {state.historyScope === "current" && <button type="button" onClick={() => changeScope("all")}>显示全部场景上下文</button>}
             </div>
           )}
           {visibleItems.map((item) =>
@@ -404,7 +399,7 @@ function ChatView({
                 run={item}
                 runtime={runtime}
                 stopping={state.stopping}
-                canStop={!allScenesReadOnly && item.sceneId === state.currentScene.sceneId}
+                canStop={item.sceneId === state.currentScene.sceneId}
                 sceneLabel={state.historyScope === "all" ? sceneName(item, state.currentScene, state.sceneNames) : undefined}
               />
             ) : (
@@ -436,7 +431,7 @@ function ChatView({
                   {item.queueNotice || "排队中 · 等待其他场景完成，尚未发送"}
                   <button type="button" onClick={() => item.cancelQueued?.()}>取消排队</button>
                 </div>}
-                {item.retry && !allScenesReadOnly && (
+                {item.retry && (
                   <button
                     className="retry-btn"
                     type="button"
@@ -469,7 +464,7 @@ function ChatView({
         <div id="input-area">
           <div
             id="pending-files"
-            className={!allScenesReadOnly && state.files.length ? "active" : ""}
+            className={state.files.length ? "active" : ""}
           >
             {state.files.map((file, i) => (
               <div className="pending-file" key={`${file.name}-${i}`}>
@@ -499,21 +494,15 @@ function ChatView({
               </div>
             ))}
           </div>
-          <div id="input-row" className={allScenesReadOnly ? "read-only" : ""}>
-          {allScenesReadOnly && <div className="all-scenes-notice">
-            <span>全部场景仅供查看。请选择左侧场景，或新建场景开始对话。</span>
-            <button type="button" onClick={() => bridge.send({ type: "beings:session-create" })}>新建场景</button>
-          </div>}
-
+          <div id="input-row">
             <textarea
               ref={composer}
               id="input"
               rows={1}
               className={state.queued ? "queued" : ""}
-              placeholder={allScenesReadOnly ? "" : "说点什么…"}
-              disabled={allScenesReadOnly}
+              placeholder="说点什么…"
               aria-label="message input"
-              value={allScenesReadOnly ? "" : state.draft}
+              value={state.draft}
               onChange={(event) => {
                 state.draft = event.target.value;
                 state.changed();
@@ -544,7 +533,6 @@ function ChatView({
               type="button"
               title="添加附件"
               aria-label="添加附件"
-              disabled={allScenesReadOnly}
               onClick={() => fileInput.current?.click()}
             >
               ＋
@@ -558,7 +546,6 @@ function ChatView({
               type="button"
               title="send"
               aria-label="send message"
-              disabled={allScenesReadOnly}
               onClick={() => {
                 void runtime.send(state.draft);
                 composer.current?.focus();

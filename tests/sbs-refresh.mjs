@@ -138,7 +138,7 @@ try {
   // The upper-left scene indicator owns the persistent scene panel and details dialog.
   const sceneButton = page.locator('#chat-scene-indicator');
   const scenePanel = page.getByRole('complementary', { name: '场景列表' });
-  const allScenesButton = page.getByRole('button', { name: '全部场景', exact: true });
+  const contextToggle = page.getByRole('checkbox', { name: '显示全部场景上下文', exact: true });
   const currentSceneButton = page.getByRole('button', { name: '切换到场景：桌面·测试电脑', exact: true });
   const chat = page.frameLocator('#chat-frame');
   await scenePanel.waitFor();
@@ -150,19 +150,19 @@ try {
   await page.screenshot({ path: 'test-results/chat-scene-panel-light.png' });
   const beforeAll = historyReads.length;
   history.push({ seq: 4, role: 'being', content: '切换后从服务器取回的网页对话', scene_id: 'loom-fixture', at: '2026-09-15T08:00:03Z' });
-  await allScenesButton.click();
+  await contextToggle.check();
   await chat.getByText('这是来自 Loom 网页的对话', { exact: true }).waitFor();
   await chat.getByText('切换后从服务器取回的网页对话', { exact: true }).waitFor();
   assert.ok(historyReads.length > beforeAll, 'Switching to all scenes fetches the latest history');
-  await page.waitForFunction(() => document.querySelector('#chat-scene-indicator .chat-scene-label').textContent === '全部场景');
-  assert.equal(await chat.locator('#input').inputValue(), '');
-  assert.equal(await chat.locator('#input').isDisabled(), true, '全部场景只读视图不显示当前场景草稿');
+  await page.waitForFunction(() => document.querySelector('#chat-scene-indicator .chat-scene-label').textContent === '桌面·测试电脑');
+  assert.equal(await chat.locator('#input').inputValue(), '切换时保留的草稿');
+  assert.equal(await chat.locator('#input').isDisabled(), false, '全部场景上下文仍向当前场景发送');
   await sceneButton.click();
   assert.equal(await scenePanel.count(), 0);
   assert.equal(await sceneButton.evaluate(el => el === document.activeElement), true);
   await sceneButton.click();
-  assert.equal(await allScenesButton.getAttribute('aria-current'), 'true');
-  await currentSceneButton.click();
+  assert.equal(await contextToggle.isChecked(), true);
+  assert.equal(await currentSceneButton.getAttribute('aria-current'), 'true');
   await page.getByRole('button', { name: '场景详情', exact: true }).click();
   await page.locator('#chat-scene-dialog[open]').waitFor();
   await page.getByRole('button', { name: '复制场景 ID', exact: true }).click();
@@ -170,7 +170,7 @@ try {
   await page.getByRole('button', { name: '关闭场景详情', exact: true }).click();
   const beforeCurrent = historyReads.length;
   history.push({ seq: 5, role: 'being', content: '返回时从服务器取回的桌面对话', scene_id: 'desktop-fixture', at: '2026-09-15T08:00:04Z' });
-  await currentSceneButton.click();
+  await contextToggle.uncheck();
   await chat.getByText('这是来自 Loom 网页的对话', { exact: true }).waitFor({ state: 'hidden' });
   await chat.getByText('返回时从服务器取回的桌面对话', { exact: true }).waitFor();
   assert.ok(historyReads.length > beforeCurrent, 'Returning to the current scene also refreshes history');
@@ -198,7 +198,7 @@ try {
 
   // Refresh preserves either explicitly selected history view in the real frame.
   for (const scope of ['all', 'current']) {
-    await (scope === 'all' ? allScenesButton : currentSceneButton).click();
+    await (scope === 'all' ? contextToggle.check() : contextToggle.uncheck());
     await page.waitForFunction(scope => window.sbsApp.chatHistoryScopeKnown && window.sbsApp.chatHistoryScope === scope, scope);
     const source = await page.locator('#chat-frame').getAttribute('src');
     await page.getByRole('button', { name: '刷新 Being 对话', exact: true }).click();
@@ -207,7 +207,8 @@ try {
     await chat.getByText('当前桌面的对话', { exact: true }).waitFor();
     if (scope === 'all') await chat.getByText('这是来自 Loom 网页的对话', { exact: true }).waitFor();
     else assert.equal(await chat.getByText('这是来自 Loom 网页的对话', { exact: true }).count(), 0);
-    assert.equal(await (scope === 'all' ? allScenesButton : currentSceneButton).getAttribute('aria-current'), 'true');
+    assert.equal(await contextToggle.isChecked(), scope === 'all');
+    assert.equal(await currentSceneButton.getAttribute('aria-current'), 'true');
     await confirmed(false);
   }
 
