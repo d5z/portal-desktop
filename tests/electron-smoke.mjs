@@ -20,7 +20,11 @@ if (!background.enabled) console.log('SKIP: ' + background.reason);
 
 const dir = await mkdtemp(path.join(tmpdir(), 'beings-e2e-'));
 const token = 'local-fixture-token';
-const messages = [{ seq: 1, role: 'being', content: '你好，我在这里。我们可以从一个想法开始。', at: new Date().toISOString() }];
+const sceneId = 'desktop-smoke-fixture';
+const profile = path.join(dir, 'profile');
+await mkdir(profile, { recursive: true });
+await writeFile(path.join(profile, 'chat-scene.json'), JSON.stringify({ scene_id: sceneId }));
+const messages = [{ seq: 1, role: 'being', content: '你好，我在这里。我们可以从一个想法开始。', scene_id: sceneId, at: new Date().toISOString() }];
 let seq = 2, rpcID = 0, relay = null, chatBody = null, stopCount = 0, handshakeCount = 0;
 let llmConfig = {
   model: 'test-model',
@@ -58,7 +62,7 @@ const server = createServer(async (request, response) => {
   if (url.pathname.endsWith('/api/chat/stream')) {
     let body = ''; for await (const chunk of request) body += chunk;
     chatBody = JSON.parse(body);
-    messages.push({ seq: seq++, role: 'user', content: chatBody.message, at: new Date().toISOString() });
+    messages.push({ seq: seq++, role: 'user', content: chatBody.message, scene_id: chatBody.scene_id, at: new Date().toISOString() });
     response.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' });
     const event = (name, data) => response.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
     event('meta', { stream_id: 'fixture-stream' });
@@ -73,7 +77,7 @@ const server = createServer(async (request, response) => {
     const result = await rpc('tools/call', { name: 'portal_file_write', arguments: { path: 'hello.txt', content: '来自 Being 的问候' } });
     event('tool_result', { name: 'portal_file_write', content: result, is_error: false });
     event('content_block_delta', { delta: { text: '\n\n已在工作目录创建 **hello.txt**，本机 Portal 已完成操作。' } });
-    messages.push({ seq: seq++, role: 'being', content: '正在整理你的想法。\n\n已在工作目录创建 **hello.txt**，本机 Portal 已完成操作。', at: new Date().toISOString() });
+    messages.push({ seq: seq++, role: 'being', content: '正在整理你的想法。\n\n已在工作目录创建 **hello.txt**，本机 Portal 已完成操作。', scene_id: chatBody.scene_id, at: new Date().toISOString() });
     event('message_stop', { session_id: 'fixture-session' }); response.end(); return;
   }
   json({ error: 'not found' }, 404);
@@ -149,7 +153,7 @@ for (const [signal, code] of [['SIGINT', 130], ['SIGTERM', 143]]) {
   process.once(signal, () => { void cleanup().finally(() => process.exit(code)); });
 }
 try {
-  app = await launchDesktop({ executablePath, env: { ...process.env, PORTAL_DESKTOP_USER_DATA: path.join(dir, 'profile') } });
+  app = await launchDesktop({ executablePath, env: { ...process.env, PORTAL_DESKTOP_USER_DATA: profile } });
   const page = await app.firstWindow();
   traceContext = app.context();
   await traceContext.tracing.start({ screenshots: true, snapshots: true });
@@ -227,7 +231,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   assert.equal(await readFile(path.join(dir, '工作目录/hello.txt'), 'utf8'), '来自 Being 的问候');
   // Tick navigation previews and jumps within the frame; sidebar search shares the same targets.
   await frame.locator('.chat-index-tick').first().waitFor();
-  const appendHistory = (role, content) => messages.push({ indexOnly: true, seq: seq++, role, content, at: new Date().toISOString() });
+  const appendHistory = (role, content) => messages.push({ indexOnly: true, seq: seq++, role, content, scene_id: sceneId, at: new Date().toISOString() });
   for (let i = 0; i < 10; i++) {
     appendHistory('user', `历史提问 ${i + 1}：讨论客户端的界面和工具`);
     appendHistory('being', '这是一条用于验证快速索引的历史回复。');
@@ -295,17 +299,18 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   // Model settings and the compact options menu preserve the draft.
   await openClientSettings(page);
   await page.locator('[data-chat-action="model"]').click();
-  await frame.locator('#settings-panel.active').waitFor();
-  await frame.getByRole('button', { name: /^Alternate Model/ }).click();
-  await frame.getByRole('button', { name: '保存并使用' }).click();
-  await frame.locator('#llm-current').getByText('Alternate Model', { exact: true }).waitFor();
+  const modelPanel = page.locator('#subagent-model-panel #settings-panel');
+  await modelPanel.waitFor();
+  await modelPanel.getByRole('button', { name: /^Alternate Model/ }).click();
+  await modelPanel.getByRole('button', { name: '保存并使用' }).click();
+  await modelPanel.getByText('Alternate Model', { exact: true }).first().waitFor();
   assert.deepEqual(llmPatches.at(-1), {
     model: 'alternate-model',
     provider: 'anthropic',
     base_url: 'https://api.anthropic.com',
   });
-  await frame.locator('#settings-panel .btn-close').dispatchEvent('click');
-  await frame.locator('#settings-panel.active').waitFor({ state: 'hidden' });
+  await modelPanel.locator('.btn-close').dispatchEvent('click');
+  await modelPanel.waitFor({ state: 'hidden' });
   await frame.locator('#input').fill('unsent draft');
   const options = await openOptions(page);
   assert.equal(await options.getAttribute('open'), '');
@@ -350,7 +355,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   // remain available after restart even when absent from the latest response.
   for (let i = messages.length - 1; i >= 0; i--) if (messages[i].indexOnly) messages.splice(i, 1);
   // Reload encrypted settings from disk, without asking for the token again.
-  app = await launchDesktop({ executablePath, env: { ...process.env, PORTAL_DESKTOP_USER_DATA: path.join(dir, 'profile') } });
+  app = await launchDesktop({ executablePath, env: { ...process.env, PORTAL_DESKTOP_USER_DATA: profile } });
   const restored = await app.firstWindow();
   await waitForChatReady(restored);
   await restored.frameLocator('#chat-frame').getByText('本机 Portal 已完成操作。', { exact: false }).waitFor();
@@ -395,7 +400,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
     const loginDeadline = Date.now() + 20000;
     while (handshakeCount === beforeLogin && Date.now() < loginDeadline) await new Promise(resolve => setTimeout(resolve, 250));
     assert(handshakeCount > beforeLogin, 'loading the saved login registration must connect without launching the client');
-    app = await launchDesktop({ executablePath, env: { ...process.env, PORTAL_DESKTOP_USER_DATA: path.join(dir, 'profile') } });
+    app = await launchDesktop({ executablePath, env: { ...process.env, PORTAL_DESKTOP_USER_DATA: profile } });
     const reopened = await app.firstWindow();
     await waitForChatReady(reopened);
     await reopened.waitForFunction(() => document.querySelector('#portal-phase').textContent === '已连接', { timeout: 15000 });
@@ -418,7 +423,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
     assert.equal(stopped.background.enabled, false); assert.equal(stopped.settings.backgroundEnabled, false);
     await reopened.waitForTimeout(1000); assert.throws(() => process.kill(pid, 0), /ESRCH/);
     await app.close(); app = null;
-    app = await launchDesktop({ executablePath, env: { ...process.env, PORTAL_DESKTOP_USER_DATA: path.join(dir, 'profile') } });
+    app = await launchDesktop({ executablePath, env: { ...process.env, PORTAL_DESKTOP_USER_DATA: profile } });
     const disabledWindow = await app.firstWindow();
     await waitForChatReady(disabledWindow);
     await disabledWindow.locator('#conversation-name').getByText('willow', { exact: true }).waitFor();

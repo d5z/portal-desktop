@@ -11,12 +11,14 @@ const { outputFiles } = await build({ stdin: { resolveDir: process.cwd(), loader
   import { AppModel } from './desktop/renderer/app/models/app';
   import { useModel } from './desktop/renderer/shared/hooks/use-model';
   import { Topbar } from './desktop/renderer/app/components/topbar';
-  const app = new AppModel({ copyText: async text => { window.copiedScene = text; }, appearance: async theme => theme });
+  const app = new AppModel({ copyText: async text => { window.copiedScene = text; }, appearance: async theme => theme,
+    changeChatSession: async () => snapshot });
   window.sbsApp = app;
   window.sbsStates = [];
   window.scopeStates = [];
-  const snapshot = { settings: { being: 'fixture', hasToken: true }, portal: { phase: 'stopped', logs: [] },
-    chatScene: { scene_id: 'desktop-fixture', scene_meta: { client: 'portal-desktop/0.1.3', scene_label: '桌面·测试电脑' } } };
+  const scene = { scene_id: 'desktop-fixture', scene_meta: { client: 'portal-desktop/0.1.3', scene_label: '桌面·测试电脑' } };
+  const snapshot = { settings: { endpoint: 'https://fixture.test/being', being: 'fixture', hasToken: true }, portal: { phase: 'stopped', logs: [] },
+    chatScene: scene, chatSessions: [scene] };
   app.post = data => document.getElementById('chat-frame')?.contentWindow?.postMessage(data, location.origin);
   // HTTP transport for the fixture; production validates beings://chat and the same frame revision.
   window.addEventListener('message', event => {
@@ -133,46 +135,48 @@ try {
   holdReads = false; release(pendingReads);
   await confirmed(false);
 
-  // The original upper-left scene indicator owns the scope menu and keeps its details dialog.
+  // The upper-left scene indicator owns the persistent scene panel and details dialog.
   const sceneButton = page.locator('#chat-scene-indicator');
+  const scenePanel = page.getByRole('complementary', { name: '场景列表' });
+  const allScenesButton = page.getByRole('button', { name: '全部场景', exact: true });
+  const currentSceneButton = page.getByRole('button', { name: '切换到场景：桌面·测试电脑', exact: true });
   const chat = page.frameLocator('#chat-frame');
+  await scenePanel.waitFor();
   await chat.getByText('当前桌面的对话', { exact: true }).waitFor();
   assert.equal(await chat.locator('.chat-history-scope').count(), 0, 'Embedded chat has no duplicate scope toolbar');
   assert.equal(await chat.getByText('这是来自 Loom 网页的对话', { exact: true }).count(), 0);
   await chat.locator('#input').fill('切换时保留的草稿');
-  await sceneButton.focus(); await page.keyboard.press('ArrowDown');
-  await page.getByRole('menuitemradio', { name: '当前场景', exact: true }).waitFor();
   await mkdir('test-results', { recursive: true });
-  await page.screenshot({ path: 'test-results/chat-scene-menu-light.png' });
+  await page.screenshot({ path: 'test-results/chat-scene-panel-light.png' });
   const beforeAll = historyReads.length;
   history.push({ seq: 4, role: 'being', content: '切换后从服务器取回的网页对话', scene_id: 'loom-fixture', at: '2026-09-15T08:00:03Z' });
-  await page.keyboard.press('ArrowDown'); await page.keyboard.press('Enter');
+  await allScenesButton.click();
   await chat.getByText('这是来自 Loom 网页的对话', { exact: true }).waitFor();
   await chat.getByText('切换后从服务器取回的网页对话', { exact: true }).waitFor();
   assert.ok(historyReads.length > beforeAll, 'Switching to all scenes fetches the latest history');
   await page.waitForFunction(() => document.querySelector('#chat-scene-indicator .chat-scene-label').textContent === '全部场景');
-  assert.equal(await chat.locator('#input').inputValue(), '切换时保留的草稿');
+  assert.equal(await chat.locator('#input').inputValue(), '');
+  assert.equal(await chat.locator('#input').isDisabled(), true, '全部场景只读视图不显示当前场景草稿');
   await sceneButton.click();
-  assert.equal(await page.getByRole('menuitemradio', { name: '全部场景', exact: true }).getAttribute('aria-checked'), 'true');
-  await page.keyboard.press('Escape');
+  assert.equal(await scenePanel.count(), 0);
   assert.equal(await sceneButton.evaluate(el => el === document.activeElement), true);
   await sceneButton.click();
-  await page.getByRole('menuitem', { name: '场景详情', exact: true }).click();
+  assert.equal(await allScenesButton.getAttribute('aria-current'), 'true');
+  await currentSceneButton.click();
+  await page.getByRole('button', { name: '场景详情', exact: true }).click();
   await page.locator('#chat-scene-dialog[open]').waitFor();
   await page.getByRole('button', { name: '复制场景 ID', exact: true }).click();
   assert.equal(await page.evaluate(() => window.copiedScene), 'desktop-fixture');
   await page.getByRole('button', { name: '关闭场景详情', exact: true }).click();
-  assert.equal(await sceneButton.evaluate(el => el === document.activeElement), true);
-  await sceneButton.click();
   const beforeCurrent = historyReads.length;
   history.push({ seq: 5, role: 'being', content: '返回时从服务器取回的桌面对话', scene_id: 'desktop-fixture', at: '2026-09-15T08:00:04Z' });
-  await page.getByRole('menuitemradio', { name: '当前场景', exact: true }).click();
+  await currentSceneButton.click();
   await chat.getByText('这是来自 Loom 网页的对话', { exact: true }).waitFor({ state: 'hidden' });
   await chat.getByText('返回时从服务器取回的桌面对话', { exact: true }).waitFor();
   assert.ok(historyReads.length > beforeCurrent, 'Returning to the current scene also refreshes history');
   assert.equal(await chat.getByText('切换后从服务器取回的网页对话', { exact: true }).count(), 0);
   assert.equal(await chat.locator('#input').inputValue(), '切换时保留的草稿');
-  await page.waitForFunction(() => document.querySelector('#chat-scene-indicator .chat-scene-label').textContent === '桌面');
+  await page.waitForFunction(() => document.querySelector('#chat-scene-indicator .chat-scene-label').textContent === '桌面·测试电脑');
   // An out-of-date frame command cannot switch the current chat.
   const scopeReplies = await page.evaluate(() => {
     const count = window.scopeStates.length;
@@ -185,18 +189,16 @@ try {
   assert.equal(await chat.getByText('这是来自 Loom 网页的对话', { exact: true }).count(), 0);
   await page.setViewportSize({ width: 420, height: 820 });
   await page.evaluate(async () => { await window.sbsApp.toggleTheme(); document.documentElement.dataset.theme = window.sbsApp.theme; });
-  await sceneButton.click();
-  assert.equal(await page.locator('#chat-scene-menu').evaluate(el => { const box = el.getBoundingClientRect(); return box.left >= 0 && box.right <= innerWidth; }), true);
-  await page.screenshot({ path: 'test-results/chat-scene-menu-dark-narrow.png' });
-  await chat.locator('#input').click();
-  await page.locator('#chat-scene-menu').waitFor({ state: 'hidden' });
+  assert.equal(await scenePanel.evaluate(el => { const box = el.getBoundingClientRect(); return box.left >= 0 && box.right <= innerWidth; }), true);
+  await page.screenshot({ path: 'test-results/chat-scene-panel-dark-narrow.png' });
+  await chat.locator('#input').focus();
+  assert.equal(await scenePanel.isVisible(), true, 'Typing keeps scene navigation open');
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.evaluate(async () => { await window.sbsApp.toggleTheme(); document.documentElement.dataset.theme = window.sbsApp.theme; });
 
   // Refresh preserves either explicitly selected history view in the real frame.
   for (const scope of ['all', 'current']) {
-    await sceneButton.click();
-    await page.getByRole('menuitemradio', { name: scope === 'all' ? '全部场景' : '当前场景', exact: true }).click();
+    await (scope === 'all' ? allScenesButton : currentSceneButton).click();
     await page.waitForFunction(scope => window.sbsApp.chatHistoryScopeKnown && window.sbsApp.chatHistoryScope === scope, scope);
     const source = await page.locator('#chat-frame').getAttribute('src');
     await page.getByRole('button', { name: '刷新 Being 对话', exact: true }).click();
@@ -205,9 +207,7 @@ try {
     await chat.getByText('当前桌面的对话', { exact: true }).waitFor();
     if (scope === 'all') await chat.getByText('这是来自 Loom 网页的对话', { exact: true }).waitFor();
     else assert.equal(await chat.getByText('这是来自 Loom 网页的对话', { exact: true }).count(), 0);
-    await sceneButton.click();
-    assert.equal(await page.getByRole('menuitemradio', { name: scope === 'all' ? '全部场景' : '当前场景', exact: true }).getAttribute('aria-checked'), 'true');
-    await page.keyboard.press('Escape');
+    assert.equal(await (scope === 'all' ? allScenesButton : currentSceneButton).getAttribute('aria-current'), 'true');
     await confirmed(false);
   }
 
@@ -273,7 +273,7 @@ try {
   assert.equal(patches.length, 3, 'Only explicit test toggles write configuration');
   assert.deepEqual(errors, []);
   assert.deepEqual(external, []);
-  console.log('PASS: Integrated scene menu, keyboard navigation, scope synchronization, draft preservation, responsive themes; SBS refresh, stale-read isolation and failure recovery.');
+  console.log('PASS: Persistent scene panel, collapse/focus behavior, scope synchronization, draft preservation, responsive themes; SBS refresh, stale-read isolation and failure recovery.');
 } finally {
   release(pendingReads); release(pendingPatches);
   await browser?.close();

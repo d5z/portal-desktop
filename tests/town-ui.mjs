@@ -250,8 +250,8 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.pa
   const requests = await app.evaluate(() => globalThis.townRequests);
   assert(requests.filter(r => ['/api', '/api/grove', '/api/embers'].includes(r.path)).every(r => r.authorization === null));
   assert(requests.some(r => r.path === '/api/messages' && r.authorization === 'Bearer town-fixture-token'));
-  assert.equal(await page.evaluate(() => getComputedStyle(document.body).backgroundColor), 'rgba(0, 0, 0, 0)');
-  // Electron's getBackgroundColor() omits alpha; renderer transparency is asserted above.
+  const bodyBackground = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  assert.match(bodyBackground, /^rgb\(\d+, \d+, \d+\)$/, 'Renderer uses the configured opaque app background');
   assert.deepEqual(errors, []); console.log('Town UI passed: native material, real IPC, auth, mail folders, markdown, pagination, Kit import and tool schemas.');
 } catch (error) {
   await mkdir('test-results', { recursive: true });

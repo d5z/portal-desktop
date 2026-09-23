@@ -11,7 +11,7 @@ const markdownPrefix = markdownSource.split('\n')[0];
 const markdownFence = language => `\`\`\`\`${language}\n${markdownSource}\n\`\`\`\``;
 let seq = 1;
 const history = [];
-const append = (role, content) => history.push({ seq: seq++, role, content, at: new Date().toISOString() });
+const append = (role, content, scene_id = 'desktop-fixture') => history.push({ seq: seq++, role, content, scene_id, at: new Date().toISOString() });
 for (let i = 1; i <= 12; i++) { append('user', `历史问题 ${i}`); append('being', Array.from({ length: 6 }, (_, j) => `第 ${i} 轮回复，第 ${j + 1} 段。`).join('\n\n')); }
 history[0].at = '2024-01-02T03:04:05.000Z';
 append('being', '打开篝火，然后看 `seeds`。\n\n```javascript\nconst safe = "<script>never()</script>";\n```\n\n`https://example.com/manual`\n\n| 列一 | 列二 |\n| --- | --- |\n| 内容 | 内容 |\n\n[恶意链接](javascript:alert(1))\n\n<img src=x onerror=alert(1)>');
@@ -60,7 +60,7 @@ const server = createServer(async (request, response) => {
   }
   if (url.pathname === '/api/chat/stream') {
     let body = ''; for await (const chunk of request) body += chunk;
-    const input = JSON.parse(body); requests.push(input); append('user', input.message);
+    const input = JSON.parse(body); requests.push(input); append('user', input.message, input.scene_id);
     if (heldResponse) return json({ spliced: true }, 202);
     if (input.message === 'http-error') return json({ error: 'fixture request failed' }, 400);
     response.writeHead(200, { 'Content-Type': 'text/event-stream' });
@@ -73,12 +73,16 @@ const server = createServer(async (request, response) => {
     event(response, 'thinking', { text: '检查 React 状态与协议' });
     event(response, 'content_block_delta', { delta: { text: '开始回复。' } });
     if (input.message === 'hold') { heldResponse = response; return; }
-    if (input.message === 'continuation') event(response, 'message_stop', {});
+    const continuation = input.message === 'continuation';
+    if (continuation) {
+      event(response, 'message_stop', {});
+      append('being', '开始回复。', input.scene_id);
+    }
     setTimeout(() => {
       event(response, 'tool_use', { name: 'read_file', input: { path: '/tmp/fixture.txt' } });
       event(response, 'tool_result', { name: 'read_file', summary: 'fixture file read', is_error: false });
       event(response, 'content_block_delta', { delta: { text: '\n\n**React 回复完成**。查看花园与篝火。' } });
-      append('being', '开始回复。\n\n**React 回复完成**。查看花园与篝火。');
+      append('being', continuation ? '**React 回复完成**。查看花园与篝火。' : '开始回复。\n\n**React 回复完成**。查看花园与篝火。', input.scene_id);
       event(response, 'message_stop', { session_id: 'session-fixture' }); response.end();
     }, 150);
     return;
@@ -242,7 +246,11 @@ try {
   const repliesBeforeContinuation = await frame.locator('.message.being:not(.thinking-indicator)').count();
   await frame.locator('#input').fill('continuation'); await frame.locator('#send-btn').click();
   await page.waitForFunction(() => window.received.some(item => item.type === 'beings:scene-result' && item.ok));
-  await child().waitForFunction(count => document.querySelectorAll('.message.being:not(.thinking-indicator)').length === count + 2 && !document.querySelector('.run-activity.running'), repliesBeforeContinuation);
+  await frame.locator('.message.being:not(.thinking-indicator)').nth(repliesBeforeContinuation + 1).waitFor();
+  await frame.locator('.run-activity.running').waitFor({ state: 'hidden' });
+  const continuationReplies = await frame.locator('.message.being:not(.thinking-indicator)').allTextContents();
+  assert.equal(continuationReplies.length, repliesBeforeContinuation + 2,
+    `A reply boundary must split continuation bubbles: ${JSON.stringify(continuationReplies.slice(-4))}`);
   await frame.locator('#input').fill('hold'); await frame.locator('#send-btn').click(); await frame.locator('.run-activity.running .run-stop').waitFor();
   await frame.locator('#file-input').setInputFiles({ name: 'splice.txt', mimeType: 'text/plain', buffer: Buffer.from('splice attachment') });
   await frame.locator('#pending-files.active').waitFor(); await frame.locator('#input').fill('additional input'); await frame.locator('#send-btn').click();

@@ -83,7 +83,7 @@ try {
       globalThis.fixture.ready = true;
     });
   `, resolveDir: process.cwd(), loader: 'ts' }, bundle: true, platform: 'node', format: 'cjs', external: ['electron'], outfile: entry });
-  application = await electron.launch({ args: [entry], env: { ...process.env, ELECTRON_RUN_AS_NODE: '' } });
+  application = await electron.launch({ args: [entry], env: { ...process.env } });
   for (let i = 0; i < 100 && !await application.evaluate(() => globalThis.fixture?.ready); i++) await new Promise(resolve => setTimeout(resolve, 100));
   assert.equal(await application.evaluate(() => globalThis.fixture?.ready), true);
   const registration = await application.evaluate(() => globalThis.fixture.registration);

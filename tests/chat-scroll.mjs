@@ -7,7 +7,7 @@ const assets = new Map(await Promise.all(['loom.html', 'chat.js', 'chat.css', 'h
 let seq = 1, heldResponse = null;
 const history = [];
 for (let i = 0; i < 12; i++) {
-  for (const role of ['user', 'being']) history.push({ seq: seq++, role, content: `${role} 历史 ${i}\n\n第二段\n\n第三段`, at: new Date().toISOString() });
+  for (const role of ['user', 'being']) history.push({ seq: seq++, role, content: `${role} 历史 ${i}\n\n第二段\n\n第三段`, scene_id: 'desktop-fixture', at: new Date().toISOString() });
 }
 const event = (response, name, data) => response.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
 const server = createServer(async (request, response) => {
