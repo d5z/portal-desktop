@@ -118,6 +118,12 @@ try {
   }, value);
   const frame = () => page.frames().find(frame => frame.url().startsWith(origin + '/loom'));
   const request = () => page.evaluate(() => window.sbsApp.post({ type: 'beings:sbs-request' }));
+  const requestFreshRead = async () => {
+    const before = reads.length;
+    // A request can share an in-flight startup/focus read of the previous value.
+    // Once it settles, require a new GET before asserting the changed fixture.
+    await until(async () => { await request(); return reads.length > before; });
+  };
   await page.goto(origin);
   // Hosted Windows runners can take longer to mount the generated chat frame
   // after navigation; wait for its initial config request before checking SBS.
@@ -221,9 +227,13 @@ try {
   holdReads = false; release(pendingReads);
   await confirmed(true);
   assert.equal(await page.evaluate(() => window.sbsApp.chatHistoryScope), 'current');
+  // Keep a read of the previous value in flight while the server changes.
+  holdReads = true;
+  await until(async () => { await request(); return pendingReads.length > 0; });
   enabled = false;
   const beforeRequest = reads.length;
-  await request(); await confirmed(false);
+  setTimeout(() => { holdReads = false; release(pendingReads); }, 100);
+  await requestFreshRead(); await confirmed(false);
   assert.ok(reads.length > beforeRequest, 'SBS request reads the server instead of the memory snapshot');
 
   // Ordinary Loom config reads and focus refreshes also notify the shell.
@@ -264,8 +274,7 @@ try {
   assert.equal(await button.isDisabled(), true);
   assert.equal(await button.getAttribute('aria-pressed'), null);
   status = 200; malformed = true;
-  const beforeMalformed = reads.length;
-  await request(); await until(() => reads.length > beforeMalformed);
+  await requestFreshRead();
   assert.equal(await button.getAttribute('aria-pressed'), null);
   malformed = false; enabled = true;
   await page.getByRole('button', { name: '刷新 Being 对话', exact: true }).click();
