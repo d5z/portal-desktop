@@ -108,6 +108,13 @@ export function createChatBridge(state: ChatState) {
       const data = event.data;
       if (!data || typeof data !== "object") return;
       switch (data.type) {
+        case "beings:chat-refresh":
+          if (data.revision !== revision || typeof data.id !== "string" || data.id.length > 64) return;
+          void runtime.refreshHistory().then(
+            () => { if (!disposed) send({ type: "beings:chat-refreshed", id: data.id, ok: true }); },
+            () => { if (!disposed) send({ type: "beings:chat-refreshed", id: data.id, ok: false }); },
+          );
+          return;
         case 'beings:scene-tasks':
           if (data.revision !== revision || data.endpoint !== new URLSearchParams(location.search).get('history_scope') || !Array.isArray(data.tasks) || data.tasks.length > 200) return;
           if (!data.tasks.every((t: any) => t && typeof t.id === 'string' && typeof t.sceneId === 'string' && Number.isFinite(t.createdAt) && ['queued','running','done','failed','cancelled','interrupted','budget_exhausted','timeout'].includes(t.status))) return;
@@ -131,6 +138,7 @@ export function createChatBridge(state: ChatState) {
           void runtime.selectScene({ sceneId: data.scene.scene_id, sceneLabel: data.scene.scene_meta.scene_label, strict: true }).then(() => {
             ui.scope(data.scope === "all" ? "all" : "current");
             send({ type: "beings:history-scope-state", scope: state.historyScope });
+            send({ type: 'beings:session-selected', sceneId: state.currentScene.sceneId });
           });
           return;
         case "beings:history-scope":

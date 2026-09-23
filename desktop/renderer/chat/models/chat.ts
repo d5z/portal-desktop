@@ -140,6 +140,7 @@ export interface ChatRuntime {
   request(path: string, init?: RequestInit): Promise<Response>;
 }
 export interface RuntimeOptions {
+  connection?: { api: string; token: string; relaySecret?: string };
   onSceneActivity?(activity: Record<string, import("../../../shared/types").ChatSceneActivity>): void;
   onSbs?(enabled: boolean): void;
   onConnection?(state: string): void;

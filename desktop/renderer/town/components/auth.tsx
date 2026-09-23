@@ -3,8 +3,9 @@ import { useModel } from "../../shared/hooks/use-model";
 import { Dialog } from "../../shared/components/dialog";
 import { NavigationControls } from "../../shared/components/navigation-controls";
 import { townPairPrompt } from '../../../shared/town-pairing';
-export function TownAuth({ model, returnToSettings = false, onReturnToSettings = () => {}, onDismissSettingsRoute = () => {} }: {
+export function TownAuth({ model, pairPrompt = townPairPrompt, returnToSettings = false, onReturnToSettings = () => {}, onDismissSettingsRoute = () => {} }: {
   model: TownModel;
+  pairPrompt?: string;
   returnToSettings?: boolean;
   onReturnToSettings?: () => void;
   onDismissSettingsRoute?: () => void;
@@ -86,8 +87,8 @@ export function TownAuth({ model, returnToSettings = false, onReturnToSettings =
         <p className="field-help">
           {!town.authChatBeing ? '尚未连接 Being 对话，可先连接对话以使用自动配对，或继续手动配对。' : '也可以把下面这段请求发给 Being，再填写它返回的配对码。'}
         </p>
-        <details className="town-manual-prompt"><summary>获取配对码的请求</summary><p>{townPairPrompt}</p>
-          <button type="button" className="text-button" onClick={() => void town.api.copyText(townPairPrompt).catch(error => town.toast(error))}>复制请求</button>
+        <details className="town-manual-prompt"><summary>获取配对码的请求</summary><p>{pairPrompt}</p>
+          <button type="button" className="text-button" onClick={() => void town.api.copyText(pairPrompt).catch(error => town.toast(error))}>复制请求</button>
         </details>
         </div>
         {!town.authLoading && <button id="town-pair-mode" type="button" className="text-button" disabled={town.authBusy || town.authManual && !town.authChatBeing}

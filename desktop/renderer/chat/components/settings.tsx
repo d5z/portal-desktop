@@ -56,6 +56,7 @@ export function ChatSettings({
   onBusy,
   copyPreset,
   catalogHint,
+  mobilePage = false,
 }: {
   state: ChatState;
   runtime: Pick<ChatRuntime, "loadLlmConfig" | "applyConfigChange">;
@@ -69,6 +70,7 @@ export function ChatSettings({
   onBusy?: (busy: boolean) => void;
   copyPreset?: Preset;
   catalogHint?: string;
+  mobilePage?: boolean;
 }) {
   useModel(state);
   const subagent = target === "subagent";
@@ -206,6 +208,7 @@ export function ChatSettings({
       inert={!open}
       aria-hidden={!open}
       aria-label="模型设置"
+      data-mobile-page={mobilePage || undefined}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.stopPropagation();
@@ -217,7 +220,7 @@ export function ChatSettings({
         <div className="settings-heading-copy">
           <div className="settings-title-line">
             <h2 id={fieldId("settings-title")} >模型设置</h2>
-            <NavigationControls back={disabled ? undefined : back} />
+            {!mobilePage && <NavigationControls back={disabled ? undefined : back} />}
           </div>
           <p>{subagent ? (staged ? "选择 subagent 模型，随连接一起安装与配置" : "配置本机 subagent 使用的模型") : "选择当前 Being 使用的模型"}</p>
         </div>
@@ -225,11 +228,11 @@ export function ChatSettings({
           ref={closeButton}
           className="btn-close"
           type="button"
-          aria-label="关闭模型设置"
+          aria-label={mobilePage ? '返回对话' : '关闭模型设置'}
           onClick={close}
           disabled={disabled}
         >
-          ✕
+          {mobilePage ? <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m15 5-7 7 7 7" /></svg> : '✕'}
         </button>
       </div>
       }

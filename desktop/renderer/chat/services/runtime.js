@@ -80,13 +80,13 @@ function createStreamRuntime(state, options) {
   const API_URL =
     location.protocol === "beings:"
       ? "beings://chat"
-      : params.get("api") || location.origin;
+      : options.connection?.api || params.get("api") || location.origin;
   const LOOM_TOKEN =
-    location.protocol === "beings:" ? "" : params.get("token") || "";
+    location.protocol === "beings:" ? "" : options.connection?.token ?? params.get("token") ?? "";
   const RELAY_SECRET =
     location.protocol === "beings:"
       ? ""
-      : params.get("relay_secret") || params.get("secret") || LOOM_TOKEN;
+      : options.connection?.relaySecret || params.get("relay_secret") || params.get("secret") || LOOM_TOKEN;
   function apiUrl(path) {
     return `${API_URL}${path}${LOOM_TOKEN ? (path.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(LOOM_TOKEN) : ""}`;
   }
@@ -1949,7 +1949,7 @@ function createStreamRuntime(state, options) {
         () => {
           return {
             method: "POST",
-            headers: { "Content-Type": "application/json", ...(sendingScene.sceneId ? { "X-Portal-Scene-Id": sendingScene.sceneId } : {}) },
+            headers: { "Content-Type": "application/json", ...(location.protocol === "beings:" && sendingScene.sceneId ? { "X-Portal-Scene-Id": sendingScene.sceneId } : {}) },
             body: JSON.stringify(body),
             signal: sendController.signal,
           };
@@ -2341,7 +2341,7 @@ function createStreamRuntime(state, options) {
   let reconcileInFlight = null;
   const cacheEndpoint = location.protocol === "beings:"
     ? params.get("history_scope") || ""
-    : API_URL;
+    : params.get("history_scope") || API_URL;
   const historyCache = new HistoryCache(cacheEndpoint);
   let historyCacheSeeded = false;
   let historyCachePending = [];

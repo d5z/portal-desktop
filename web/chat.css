@@ -1,0 +1,304 @@
+html,
+body {
+  height: 100%;
+  overscroll-behavior: none;
+}
+:root,
+:root[data-theme="light"] {
+  --bg: #f5f6f3;
+  --bg-soft: #fff;
+  --bg-softer: #e4ede7;
+  --border: #e3e8e1;
+  --text: #29332f;
+  --text-dim: #7e7e88;
+  --text-muted: #a4a4ae;
+  --text-ghost: #d4d4dc;
+  --accent: #527462;
+  --accent-border: #d0dad4;
+  --accent-tint: #e8f0eb;
+  --accent-rgb: 82, 116, 98;
+  --green: #527462;
+  --context-surface: #fff;
+}
+:root[data-theme="dark"] {
+  --bg: #191919;
+  --bg-soft: #2c2c2c;
+  --bg-softer: #263b2f;
+  --border: #ffffff12;
+  --text: #f4f4f7;
+  --text-dim: #a0a0ac;
+  --text-muted: #7e7e89;
+  --accent: #58b77d;
+  --accent-border: #344b3c;
+  --accent-tint: #263b2f;
+  --context-surface: #252525;
+}
+.message.user .content {
+  background: #e0eadd;
+  color: #29332f;
+  border-radius: 16px 16px 5px 16px;
+  padding: 12px 17px;
+}
+.message.user .content a,
+.message.user .content code {
+  color: inherit;
+}
+.message.user .content code {
+  background: #0000000a;
+}
+.message .message-scene {
+  display: none;
+}
+.message.user .meta > span:not([class]) {
+  display: none;
+}
+.message.being .content {
+  width: fit-content;
+  max-width: 94%;
+  background: var(--bg-soft);
+  border: 1px solid #e8ece580;
+  border-radius: 5px 16px 16px 16px;
+  padding: 13px 17px;
+}
+.message .meta {
+  gap: 5px;
+  font-size: 10px;
+  margin: 5px 5px 7px;
+}
+.message .content p {
+  margin-bottom: 12px;
+}
+.message .content p:last-child {
+  margin-bottom: 0;
+}
+.message.user {
+  margin-bottom: 23px;
+}
+.message.being {
+  margin-bottom: 23px;
+}
+#input-area {
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px 16px;
+}
+#input-row {
+  grid-template-columns: 36px minmax(0, 1fr) 38px;
+  gap: 8px;
+  align-items: end;
+}
+#input {
+  grid-column: 2;
+  grid-row: 1;
+  min-height: 40px;
+  padding: 8px 0;
+  font-size: 16px;
+  line-height: 24px;
+}
+#input-row > .btn-icon:not(#send-btn) {
+  grid-column: 1;
+  grid-row: 1;
+  width: 36px;
+  height: 40px;
+  min-height: 40px;
+  font-size: 28px;
+  color: var(--accent);
+}
+#send-btn,
+#input-row:has(#input:not(:placeholder-shown)) #send-btn {
+  grid-row: 1;
+  background: var(--accent);
+  color: #fff;
+  width: 36px;
+  height: 36px;
+  align-self: end;
+  margin-bottom: 2px;
+}
+#send-btn:before,
+#input-row:has(#input:not(:placeholder-shown)) #send-btn:before {
+  background-color: #fff;
+}
+#send-btn:hover:not(:disabled),
+#input-row:has(#input:not(:placeholder-shown)) #send-btn:hover:not(:disabled) {
+  background: #079b50;
+}
+/* Navigation lives in the web shell's four tabs, leaving room for typing. */
+#desktop-composer-tools {
+  display: none;
+}
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+  button {
+    touch-action: manipulation;
+  }
+  #messages {
+    padding: 20px 16px 12px;
+  }
+  #input-area {
+    padding: 6px 8px;
+    margin-bottom: 12px;
+    width: calc(100% - 20px);
+    border-radius: 16px;
+  }
+  #chat-index {
+    display: none;
+  }
+  .message.being .content {
+    max-width: 95%;
+    padding: 12px 15px;
+  }
+  .message.user .content {
+    max-width: 90%;
+  }
+}
+
+:root[data-theme="dark"] .message.user .content {
+  background: #385d35;
+  color: #e5efe1;
+}
+#input-area {
+  box-shadow: none;
+}
+#send-btn {
+  border-radius: 12px;
+}
+#settings-panel {
+  background: var(--bg-soft);
+}
+#settings-panel .llm-current {
+  background: var(--bg);
+  border-color: var(--border);
+  border-radius: 16px;
+}
+#settings-panel .btn-apply {
+  color: #fff;
+}
+@media (max-width: 640px) {
+  #settings-panel {
+    width: 100%;
+  }
+  #settings-panel .settings-header,
+  #settings-panel .settings-body {
+    padding: 16px;
+  }
+  #settings-panel .model-target-header {
+    padding: 0 16px;
+  }
+  #settings-panel .provider-items {
+    grid-template-columns: 1fr;
+  }
+  #settings-panel .llm-item {
+    min-height: 54px;
+  }
+  #settings-panel .btn-close {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  #settings-panel .model-targets {
+    flex-wrap: wrap;
+  }
+  #settings-panel .model-targets button {
+    min-height: 44px;
+  }
+}
+
+:root {
+  --font-sans:
+    -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
+    "Microsoft YaHei", sans-serif;
+}
+.message .content {
+  font-family: var(--font-sans);
+  line-height: 1.8;
+}
+.message .meta {
+  color: #919b92;
+}
+#input-row > .btn-icon:not(#send-btn) {
+  color: var(--text-dim);
+}
+#input-area {
+  background: var(--bg-soft);
+}
+#messages {
+  padding-top: 28px;
+}
+@media (max-width: 640px) {
+  #messages {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  #input-area {
+    width: calc(100% - 32px);
+    margin-bottom: 14px;
+    padding: 8px;
+  }
+}
+
+/* The web model editor is a full page on phones, with one scrolling surface. */
+#settings-panel .btn-close {
+  font-size: 0;
+}
+#settings-panel .navigation-controls {
+  display: none;
+}
+#settings-panel[data-mobile-page] {
+  border: 0;
+  box-shadow: none;
+  overflow: hidden;
+  transition: none;
+}
+#settings-panel[data-mobile-page] .settings-header {
+  padding: calc(14px + env(safe-area-inset-top)) 20px 14px 8px;
+  align-items: center;
+  gap: 4px;
+}
+#settings-panel[data-mobile-page] .settings-header .btn-close {
+  order: -1;
+  width: 44px;
+  height: 44px;
+}
+#settings-panel[data-mobile-page] .settings-header .btn-close::before,
+#settings-panel[data-mobile-page] .settings-header .btn-close::after {
+  content: none;
+}
+#settings-panel[data-mobile-page] .settings-header h2 {
+  font-size: 19px;
+}
+#settings-panel[data-mobile-page] .settings-header p {
+  font-size: 11px;
+}
+#settings-panel[data-mobile-page] .settings-body {
+  padding: 22px 20px calc(28px + env(safe-area-inset-bottom));
+}
+#settings-panel[data-mobile-page] .llm-list {
+  max-height: none;
+  overflow: visible;
+}
+#settings-panel[data-mobile-page] .llm-current {
+  padding: 20px;
+  margin-bottom: 28px;
+}
+#settings-panel[data-mobile-page] .llm-item {
+  background: var(--bg-soft);
+  border-radius: 10px;
+  padding: 15px;
+}
+#settings-panel[data-mobile-page] .model-option-name {
+  font-size: 14px;
+}
+@media (max-width: 760px), (hover: none) and (pointer: coarse) {
+  #settings-panel {
+    width: 100%;
+  }
+  .message .content {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+  }
+}

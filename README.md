@@ -243,3 +243,8 @@ Bug reports should include the client version/build identifier, OS and architect
 This project uses the [MIT License](LICENSE). Heart Portal retains its [original license](heart-portal/LICENSE), with a copy included in distributable packages. Other dependencies retain their respective licenses.
 
 Thanks to Loom, Heart Portal, [Beings Town](https://beings.town/), and the [Town Client SDK](https://github.com/jeremyliu16/beings-town-client-sdk) for the underlying capabilities, and to [BeingDesktop](https://github.com/GuangCZ/BeingDesktop) for its open-source work and design references. See [UPSTREAM.md](UPSTREAM.md) for provenance and integration details.
+
+
+## Standalone Web application
+
+The responsive Web app includes Being chat and Town community features without Electron or Portal. Run `npm run dev:web` for development, `npm run build:web` to build `out/web`, or `npm run package:web` to generate `out/town-web.tar.gz`. The deployment package runs with Node.js 22.12+ using `node server.mjs`, with no runtime dependency installation. See [Web deployment documentation](web/README.md) for HTTPS, proxy configuration, scene management, and browser storage details.

@@ -57,7 +57,7 @@ export function Town({ model }: { model: TownModel }) {
             role="tablist"
             hidden={Boolean(town.directId) || !definition?.tabs.length}
           >
-            {definition?.tabs.map(([value, label]) => (
+            {definition?.tabs.filter(([value]) => value !== 'local' || town.supportsLocalKits).map(([value, label]) => (
               <button
                 key={value}
                 role="tab"

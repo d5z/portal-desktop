@@ -32,7 +32,7 @@ export function TownHome({ town, data }: { town: TownModel; data: Data }) {
       key: name.trim().split(/\s+/).at(-1)!,
       service: record(raw),
     }))
-    .filter(({ key }) => key !== "beings");
+    .filter(({ key }) => key !== "beings" && (key !== 'portal' || town.supportsLocalKits));
   const routes: Record<string, [string, string, string]> = {
     grove: ["◇", "Grove 工具市集", "kits"],
     bonfire: ["♧", "篝火", "bonfire"],
@@ -492,7 +492,7 @@ function KitDetail({ town, data }: { town: TownModel; data: Data }) {
           查看经验墙
         </button>
         {repo && <button className="secondary" onClick={() => void town.run(() => town.api.openBrowser(repo))}>查看 App 仓库 ↗</button>}
-        {downloadable && (
+        {downloadable && town.supportsLocalKits && (
           <button
             className="primary"
             disabled={town.prepareBusy || town.installBusy || Boolean(installed) || town.installedLoading || !town.installedLibrary}

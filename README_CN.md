@@ -100,6 +100,10 @@ macOS 按芯片选择安装包：Apple Silicon 下载 `portal-desktop-<版本>-m
 
 ## 本地开发
 
+### 独立网页版
+
+运行 `npm run dev:web` 启动适配电脑和手机的网页版；`npm run build:web` 输出独立的 `out/web/`，`npm run package:web` 生成 `out/town-web.tar.gz` 部署包。仅构建 Web，不依赖 Electron 打包或 Rust Portal。包含 Being 对话与 Town 社区，排除本机 Portal、Kit 安装及桌面专属功能。部署包只需 Node.js 即可启动，网络接入和配置见 [网页版说明](web/README.md)。
+
 ### 环境与启动
 
 完整构建需要 Git、Node.js 22.12+、npm、Rust stable 及目标平台的链接工具。macOS 需 Xcode Command Line Tools；Windows 需 MSVC、Visual Studio C++ Build Tools 和 Windows SDK。只开发聊天界面时可暂不构建 Portal。
@@ -234,3 +238,5 @@ Loom 与 Town 凭据分别通过系统密钥库加密保存，配对码不落盘
 本项目沿用 [MIT License](LICENSE)。Heart Portal 保留其 [原始许可](heart-portal/LICENSE)，分发包包含对应许可副本；其他依赖遵循各自许可证。
 
 感谢 Loom、Heart Portal、[Beings Town](https://beings.town/) 与 [Town Client SDK](https://github.com/jeremyliu16/beings-town-client-sdk) 提供的基础能力，也感谢 [BeingDesktop](https://github.com/GuangCZ/BeingDesktop) 的开源实践与设计参考。来源及集成方式见 [UPSTREAM.md](UPSTREAM.md)。
+
+纯静态 OSS 包：运行 `npm run package:web:static`，输出 `out/town-web-oss.zip`。支持设置页添加到主屏幕，默认直连真实 Town 并直接配对，无域名检测或连接预验证，见 [OSS 部署说明](web/OSS.md)。

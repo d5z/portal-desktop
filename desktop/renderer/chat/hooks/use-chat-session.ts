@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { ChatState, type ChatRuntime } from "../models/chat";
+import { ChatState, type ChatRuntime, type RuntimeOptions } from "../models/chat";
 import { createChatRuntime } from "../services/runtime";
 import { createChatBridge, type ChatBridge } from "../services/bridge";
 
@@ -10,12 +10,13 @@ interface ChatSession {
 }
 
 /** Each mount owns its requests, subscriptions, and stream recovery timers. */
-export function useChatSession() {
+export function useChatSession(connection?: RuntimeOptions['connection']) {
   const [session, setSession] = useState<ChatSession>();
   useEffect(() => {
     const state = new ChatState();
     const bridge = createChatBridge(state);
     const runtime = createChatRuntime(state, {
+      connection,
       onSbs: bridge.onSbs,
       onSceneActivity: activity => bridge.send({ type: "beings:scene-activity", activity }),
       onConnection: (value) =>
@@ -27,6 +28,6 @@ export function useChatSession() {
       bridge.dispose();
       runtime.dispose();
     };
-  }, []);
+  }, [connection]);
   return session;
 }

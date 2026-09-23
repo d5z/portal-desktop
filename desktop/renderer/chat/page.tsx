@@ -10,7 +10,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { ChatState, type ChatRuntime, type ChatPanel } from "./models/chat";
+import { ChatState, type ChatRuntime, type ChatPanel, type RuntimeOptions } from "./models/chat";
 import { inCurrentScene, sceneItems, sceneName, type HistoryScope } from "./models/scenes";
 import { useModel } from "../shared/hooks/use-model";
 import { Markdown } from "../shared/components/markdown";
@@ -48,11 +48,11 @@ class ChatErrorBoundary extends Component<
     );
   }
 }
-export function ChatApp() {
-  const session = useChatSession();
+export function ChatApp({ connection, keywordNavigation = true, mobileWeb = false }: { connection?: RuntimeOptions['connection']; keywordNavigation?: boolean; mobileWeb?: boolean } = {}) {
+  const session = useChatSession(connection);
   return (
     <ChatErrorBoundary>
-      {session ? <ChatView {...session} /> : <div role="status">正在连接…</div>}
+      {session ? <ChatView {...session} keywordNavigation={keywordNavigation} mobileWeb={mobileWeb} /> : <div role="status">正在连接…</div>}
     </ChatErrorBoundary>
   );
 }
@@ -60,12 +60,24 @@ function ChatView({
   state,
   runtime,
   bridge,
+  keywordNavigation,
+  mobileWeb,
 }: {
   state: ChatState;
   runtime: ChatRuntime;
   bridge: ChatBridge;
+  keywordNavigation: boolean;
+  mobileWeb: boolean;
 }) {
   useModel(state);
+  const [nativeTouch, setNativeTouch] = useState(() => mobileWeb && matchMedia('(max-width: 760px), (hover: none) and (pointer: coarse)').matches);
+  useEffect(() => {
+    if (!mobileWeb) return;
+    const media = matchMedia('(max-width: 760px), (hover: none) and (pointer: coarse)');
+    const change = () => setNativeTouch(media.matches);
+    media.addEventListener('change', change);
+    return () => media.removeEventListener('change', change);
+  }, [mobileWeb]);
   const visibleItems = sceneItems(withScheduling(state.items, state.sceneTasks), state.historyScope, state.currentScene);
   const currentSceneName = sceneName(state.currentScene, state.currentScene);
   const showActivity = state.historyScope === "all" || inCurrentScene(state.activeScene, state.currentScene);
@@ -128,8 +140,11 @@ function ChatView({
     composer.current?.focus();
   }, [bridge, runtime]);
   useEffect(() => {
-    bridge.send({ type: "beings:history-scope-state", scope: state.historyScope });
-  }, [bridge, state.historyScope]);
+    bridge.send({ type: "beings:history-scope-state", scope: state.historyScope, sceneId: state.currentScene.sceneId });
+  }, [bridge, state.historyScope, state.currentScene.sceneId]);
+  useEffect(() => {
+    if (mobileWeb) bridge.send({ type: 'beings:chat-panel', panel });
+  }, [bridge, mobileWeb, panel]);
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
@@ -301,11 +316,11 @@ function ChatView({
         }
       }}
     >
-      <TemperatureGlow items={visibleItems} />
+      {!mobileWeb && <TemperatureGlow items={visibleItems} />}
       <div id="drop-zone" className={dragging ? "active" : ""}>
         drop files here
       </div>
-      <div id="app">
+      <div id="app" inert={nativeTouch && panel === 'model'}>
         <header id="header">
           <button
             id="sbs-switch"
@@ -425,7 +440,7 @@ function ChatView({
                   text={item.text}
                   streaming={item.streaming}
                   chat
-                  onPlace={item.role === "system" ? undefined : openPlace}
+                  onPlace={item.role === "system" || !keywordNavigation ? undefined : openPlace}
                 />
                 {item.queued && <div className="local-queue-status" role="status">
                   {item.queueNotice || "排队中 · 等待其他场景完成，尚未发送"}
@@ -577,6 +592,7 @@ function ChatView({
         highlight={setHighlighted}
       />
       <ChatSettings
+        mobilePage={nativeTouch}
         state={state}
         runtime={runtime}
         open={panel === "model"}
@@ -584,11 +600,11 @@ function ChatView({
         back={panelReturnsToSettings ? () => bridge.send({ type: "beings:return-settings" }) : undefined}
       />
       <ChatInfoPanels state={state} panel={panel} close={close} />
-      <EditContextMenu edit={bridge.edit} onOpenChange={setContextMenuOpen} />
+      {!nativeTouch && <EditContextMenu edit={bridge.edit} onOpenChange={setContextMenuOpen} />}
       <button
         id="scene-selection-action"
         type="button"
-        hidden={!selection || parent === window || contextMenuOpen}
+        hidden={!selection || parent === window || contextMenuOpen || nativeTouch}
         style={
           selection ? { left: selection.left, top: selection.top } : undefined
         }

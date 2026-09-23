@@ -8,7 +8,7 @@ function fixture() {
   vi.stubGlobal('window', window); vi.stubGlobal('parent', parent);
   vi.stubGlobal('location', new URL('beings://chat/?revision=fixture'));
   const state = new ChatState(), bridge = createChatBridge(state);
-  const runtime = { loadSbsState: async () => false, send: vi.fn() };
+  const runtime = { loadSbsState: async () => false, send: vi.fn(), refreshHistory: vi.fn(async () => {}) };
   bridge.start(runtime as unknown as ChatRuntime, { panel() {}, theme() {}, reading() {}, activity() {}, search() {}, jump() {}, focus() {}, scope() {} });
   const send = (data: Record<string, unknown> = {}, origin = 'beings://desktop', source: unknown = parent) => {
     window.dispatchEvent(Object.assign(new Event('message'), { source, origin, data: {
@@ -39,6 +39,21 @@ it('reports clipboard failure instead of claiming success', async () => {
   const request = f.parent.postMessage.mock.calls.map(call => call[0]).find(message => message.type === 'beings:chat-copy');
   f.send({ type: 'beings:chat-edit-result', id: request.id, revision: 'fixture', ok: false });
   await expect(copied).rejects.toThrow('Copy failed');
+  f.bridge.dispose();
+});
+it('refreshes history from the current trusted shell without changing drafts or sending messages', async () => {
+  const f = fixture();
+  f.state.draft = '保留草稿';
+  const request = { type: 'beings:chat-refresh', revision: 'fixture', id: 'refresh-1' };
+  f.send(request, 'https://untrusted.example');
+  f.send({ ...request, revision: 'stale' });
+  expect(f.runtime.refreshHistory).not.toHaveBeenCalled();
+  f.send(request);
+  await Promise.resolve();
+  expect(f.runtime.refreshHistory).toHaveBeenCalledOnce();
+  expect(f.state.draft).toBe('保留草稿');
+  expect(f.runtime.send).not.toHaveBeenCalled();
+  expect(f.parent.postMessage.mock.calls.map(call => call[0])).toContainEqual({ type: 'beings:chat-refreshed', revision: 'fixture', id: 'refresh-1', ok: true });
   f.bridge.dispose();
 });
 it('places a log quotation in the existing draft and never sends a chat request', () => {

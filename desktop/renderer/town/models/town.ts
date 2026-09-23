@@ -165,7 +165,9 @@ type SendTarget = {
   beingId: string;
   reply?: FeedReply;
 };
+export type TownAPI = Pick<DesktopAPI, 'town' | 'townLive' | 'onTownLive' | 'reconnectTown' | 'sendTown' | 'townAuth' | 'autoPairTown' | 'cancelTownPair' | 'pairTown' | 'saveTownToken' | 'copyText' | 'openBrowser' | 'openTownLink' | 'localKits' | 'deleteKit' | 'importKit' | 'prepareKit' | 'installKit' | 'discardKit' | 'openKits'>;
 export class TownModel extends Store {
+  supportsLocalKits = true;
   visible = true;
   view = "";
   tab = "";
@@ -250,7 +252,7 @@ export class TownModel extends Store {
   private pageKey = '';
   refreshError = '';
   constructor(
-    readonly api: DesktopAPI,
+    readonly api: TownAPI,
     readonly toast: (error: unknown) => void,
     readonly navigate: (view: string, id?: string) => void,
     readonly scenes: SceneStore,
@@ -697,7 +699,7 @@ export class TownModel extends Store {
     this.refreshError = '';
     this.loading = true;
     if (!preserveContent) this.status = "";
-    if (this.view === "kits" && (this.tab !== "local" || this.directId))
+    if (this.supportsLocalKits && this.view === "kits" && (this.tab !== "local" || this.directId))
       void this.refreshInstalledKits();
     this.changed();
     try {

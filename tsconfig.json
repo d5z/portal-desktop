@@ -20,6 +20,8 @@
     "jsx": "react-jsx"
   },
   "include": [
+    "web/**/*.ts",
+    "web/**/*.tsx",
     "desktop/**/*.ts",
     "desktop/**/*.tsx",
     "*.ts",
