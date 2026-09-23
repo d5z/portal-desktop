@@ -15,6 +15,7 @@ import { WebSocketServer } from 'ws';
 import { desktopExecutable, waitForChatReady } from './support/desktop.mjs';
 import { launchDesktop } from './support/electron-lifecycle.mjs';
 import { isolateWindowsInstallation, powershell, psQuote } from './support/windows-installation.mjs';
+import { assertSingleClientWindow } from './support/windows-client-windows.mjs';
 
 if (process.platform !== 'win32') throw new Error('Run this test on Windows.');
 const execute = promisify(execFile), sha = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -90,36 +91,6 @@ async function clients() {
     $items=@(Get-CimInstance Win32_Process -Filter "Name='portal-desktop.exe'" | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($root,[StringComparison]::OrdinalIgnoreCase) -and $_.CommandLine -notmatch '--type=' } | Select-Object ProcessId,ExecutablePath,@{Name='MainWindowHandle';Expression={$p=Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue; if ($p) { $p.MainWindowHandle.ToInt64() } else { 0 }}});
     ConvertTo-Json -InputObject $items -Compress
   `));
-}
-async function assertSingleClientWindow(pid) {
-  // A single Electron main process can still own two visible BrowserWindows.
-  // Count native windows as well as processes after each automatic launch.
-  const count = await powershell(`
-Add-Type @'
-using System;
-using System.Runtime.InteropServices;
-using System.Text;
-public static class PortalTestWindows {
-  delegate bool Visitor(IntPtr window, IntPtr data);
-  [DllImport("user32.dll")] static extern bool EnumWindows(Visitor visitor, IntPtr data);
-  [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr window, out uint process);
-  [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr window);
-  [DllImport("user32.dll", CharSet=CharSet.Unicode)] static extern int GetClassName(IntPtr window, StringBuilder name, int length);
-  public static int Count(uint process) {
-    int count = 0;
-    EnumWindows((window, data) => {
-      uint owner; GetWindowThreadProcessId(window, out owner);
-      var name = new StringBuilder(256); GetClassName(window, name, name.Capacity);
-      if (owner == process && IsWindowVisible(window) && name.ToString() == "Chrome_WidgetWin_1") count++;
-      return true;
-    }, IntPtr.Zero);
-    return count;
-  }
-}
-'@
-[PortalTestWindows]::Count(${pid})
-  `);
-  assert.equal(Number(count), 1, `Client ${pid} must own exactly one visible window.`);
 }
 try {
   await Promise.all([mkdir(workspace), mkdir(kits)]);
