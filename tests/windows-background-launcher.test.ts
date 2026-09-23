@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { command, portableCommand } from '../desktop/main/portal/background';
@@ -29,7 +29,10 @@ exit 23
     await expect(execute(helper, ['-File', script, '-Value', "中文 spaces ' quote"], { cwd: root, timeout: 20_000 }))
       .rejects.toMatchObject({ code: 23 });
     const result = JSON.parse((await readFile(path.join(root, 'result.json'), 'utf8')).replace(/^\ufeff/, ''));
-    expect(result).toEqual({ window: 0, value: "中文 spaces ' quote", cwd: root });
+    // PowerShell expands Windows 8.3 paths (e.g. RUNNER~1) from the temp directory.
+    expect({ ...result, cwd: await realpath(result.cwd) }).toEqual({
+      window: 0, value: "中文 spaces ' quote", cwd: await realpath(root),
+    });
   } finally { await rm(root, { recursive: true, force: true }); }
 }, 30_000);
 
