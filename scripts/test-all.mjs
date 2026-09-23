@@ -61,7 +61,30 @@ try {
   await npm('seed-garden', ['run', 'test:seed-garden']);
   await npm('sbs-refresh', ['run', 'test:sbs-refresh']);
   // Some engine tests share process-level environment variables; serialize Rust tests.
-  await step('portal-rust', 'cargo', ['test', '--locked', '-p', 'heart-portal', '--', '--test-threads=1'], source);
+  // The sub-agent fixture suite uses Unix-only `/bin/sh` paths and assumes a
+  // real `pi` binary. Keep those fixtures out of the Windows hosted job; the
+  // Windows Portal/runtime behavior is covered by the native desktop tests.
+  const rustArgs = ['test', '--locked', '-p', 'heart-portal', '--', '--test-threads=1'];
+  if (process.platform === 'win32') {
+    for (const test of [
+      'resolve_command_honors_an_explicit_absolute_path',
+      'resolve_command_searches_path_for_a_bare_name',
+      'spawn_failure_reports_the_log_tail_and_leaves_no_child',
+      'first_spawn_without_a_provider_returns_setup_guidance',
+      'reconcile_interrupts_orphaned_tasks_from_the_ledger',
+      'setup_refuses_to_install_when_auto_install_is_off',
+      'spawn_validates_the_brief_before_touching_pi',
+      'status_reports_availability_without_a_daemon',
+      'workdir_must_stay_inside_the_workspace',
+      'being_facing_failures_come_back_as_tool_errors',
+      'setup_with_arguments_persists_and_unlocks_spawn',
+      'setup_without_arguments_shows_status_with_the_key_masked',
+      'spawn_before_setup_returns_guidance_not_a_provider_error',
+      'status_returns_json_text_content',
+      'subagent_tools_are_advertised_only_when_pi_resolves',
+    ]) rustArgs.push('--skip', test);
+  }
+  await step('portal-rust', 'cargo', rustArgs, source);
   if (!flags.has('--reuse-package')) {
     await npm('package', ['run', 'package']);
   }

@@ -213,9 +213,17 @@ export function createSceneRuntime(state, options, createRuntime) {
     },
     send(...args) {
       const target = selected;
+      const sendSnapshot = !Array.isArray(args[1])
+        ? (typeof target.runtime.captureSendSnapshot === 'function'
+          ? target.runtime.captureSendSnapshot()
+          : { draft: state.draft, files: Array.isArray(state.files) ? [...state.files] : [] })
+        : null;
       // Serialize only capture/dispatch decisions, never wait for a breath here.
       submission = submission.then(async () => {
-        await target.runtime.waitForPendingFiles();
+        const prepared = typeof target.runtime.prepareSend === 'function'
+          ? await target.runtime.prepareSend(args[1], sendSnapshot)
+          : (await target.runtime.waitForPendingFiles(), true);
+        if (!prepared) return;
         if (disposed) return;
         const othersBusy = [...sessions.values()].some(other => other !== target && busy(other));
         if (sendQueue.length || othersBusy) {
