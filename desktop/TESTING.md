@@ -61,7 +61,7 @@ Windows 的离线升级、坏引擎回滚与独立 Portal 接管另用 PowerShel
 
 ## 报告与隔离
 
-Windows 的 Vitest 测试文件串行执行，避免真实 PowerShell、CIM 与计划任务查询在托管 runner 上竞争冷启动资源；其他平台保持并行。Portal 工具测试分别覆盖普通 Windows PATH 与受限 PATH。原生测试的外层时限大于生产命令的时限：Portal RPC 40 秒（工具内部 30 秒），缺失计划任务检查 100 秒（依次执行三个最多 30 秒的命令）。测试不会自动重试失败用例或跳过真实截图。日志包含每个 RPC 的工具名、阶段和耗时，失败时额外保存 `portal-tools-native-<environment>-failure.json` 或 `background-native-failure.json`。
+Windows 的 Vitest 测试文件串行执行，避免真实 PowerShell、CIM 与计划任务查询在托管 runner 上竞争冷启动资源；其他平台保持并行。Portal 工具测试分别覆盖普通 Windows PATH 与受限 PATH，并验证中文 PowerShell、OEM 936 `cmd` 和嵌套 PowerShell 拒绝提示。原生测试的外层时限大于生产命令的时限：Portal RPC 40 秒（工具内部 30 秒），缺失计划任务检查 100 秒（依次执行三个最多 30 秒的命令）。测试不会自动重试失败用例或跳过真实截图。日志包含每个 RPC 的工具名、阶段和耗时，失败时额外保存 `portal-tools-native-<environment>-failure.json` 或 `background-native-failure.json`。
 
 - `test-results/summary.md`：阶段结果、耗时、平台和后台测试是否适用。
 - `test-results/summary.json`：适合其他 CI 系统读取的结构化结果；失败退出码为 1。

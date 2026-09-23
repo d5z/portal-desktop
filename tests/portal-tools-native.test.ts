@@ -16,11 +16,11 @@ const data = (result: any) => JSON.parse(result.content.find((item: any) => item
 it.skipIf(process.platform !== 'win32').each([
   { environment: 'normal', restricted: false },
   { environment: 'restricted', restricted: true },
-])('uses the bundled Portal for exec, background sessions and workspace screenshots with $environment PATH', async ({ environment, restricted }) => {
+])('uses the selected Portal binary for exec, background sessions and workspace screenshots with $environment PATH', async ({ environment, restricted }) => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'portal-tools-native-'));
   const workspace = path.join(root, "中文 workspace ' fixture");
   await mkdir(workspace);
-  const binary = path.resolve('resources/heart-portal.exe');
+  const binary = path.resolve(process.env.PORTAL_TOOLS_TEST_BINARY || 'resources/heart-portal.exe');
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
   let relay: any, id = 0;
   let phase = 'start';
@@ -107,7 +107,28 @@ it.skipIf(process.platform !== 'win32').each([
     expect(status.portal.build_id).toBe('sha256:' + createHash('sha256').update(await readFile(binary)).digest('hex'));
     expect(JSON.stringify(await call('portal_exec', { command: 'echo client-cmd-ok' }))).toContain('client-cmd-ok');
     expect(JSON.stringify(await call('portal_exec', { shell: 'powershell', command: "Write-Output '中文命令成功'" }))).toContain('中文命令成功');
+    const nestedPowerShell = await rpc('tools/call', {
+      name: 'portal_exec',
+      arguments: { command: 'powershell -Command "Write-Output nested"' },
+    });
+    expect(nestedPowerShell.isError).toBe(true);
+    expect(JSON.stringify(nestedPowerShell)).toContain(
+      "PowerShell commands require shell='powershell'; pass the script directly",
+    );
+    const oemCodePageText = (await call('portal_exec', {
+      shell: 'powershell',
+      command: 'Write-Output (([System.Globalization.CultureInfo]::CurrentCulture).TextInfo.OEMCodePage)',
+    })).content.find((item: any) => item.type === 'text').text.trim();
+    const oemCodePageMatch = oemCodePageText.match(/^(\d+)/);
+    expect(oemCodePageMatch, oemCodePageText).not.toBeNull();
+    const oemCodePage = Number(oemCodePageMatch![1]);
+    if (oemCodePage === 936) {
+      expect(JSON.stringify(await call('portal_exec', { command: 'echo 中文' }))).toContain('中文');
+    } else {
+      console.info(`[portal-tools] CP936 assertion skipped on OEM code page ${oemCodePage}`);
+    }
     const started = data(await call('portal_exec', { shell: 'powershell', command: "$line = [Console]::ReadLine(); Write-Output $line", background: true }));
+    expect(started.output_encoding).toBe('utf8');
     await call('portal_process', { action: 'write', session_id: started.session_id, data: 'background-stdin-ok\n' });
     await vi.waitFor(async () => {
       const log = data(await call('portal_process', { action: 'log', session_id: started.session_id }));

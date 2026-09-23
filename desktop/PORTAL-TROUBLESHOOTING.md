@@ -52,6 +52,18 @@ Windows PowerShell 使用 `portal_exec` 的 `shell:"powershell"`，直接传脚�
 {"shell":"powershell","command":"Write-Output '中文命令成功'"}
 ```
 
+不要在默认 `cmd` shell 中再调用 `powershell -Command "..."`。Portal 会拒绝
+这种形状，并返回 `PowerShell commands require shell='powershell'; pass the
+script directly`；这条错误同时给出了修复方式。Portal 负责解码
+`portal_exec`/`portal_process` 自己启动的子进程管道；Kit 如果内部再启动
+子进程，应在 Kit 内解码该管道，并向 Portal 输出有效 UTF-8 MCP JSON
+和结构化错误。
+
+Windows `cmd` 的默认 `output_encoding:"auto"` 逐行优先识别 UTF-8，
+否则按系统 OEM 代码页解码；PowerShell 则固定为 UTF-8。只有已知
+子进程输出编码时才显式指定 `utf8` 或 `oem`，不要用统一强制
+UTF-8 替代 Windows OEM 兼容。
+
 长任务设置 `background:true`，再用 `portal_process` 的 `list/poll/log/write/kill`
 管理对应 `session_id`。以当前 Portal 返回的 `tools/list` 为准。
 `desktop_terminal_*` 不属于本仓库内置工具；若这些扩展工具异常，排查其提供方和
@@ -61,6 +73,9 @@ Windows PowerShell 使用 `portal_exec` 的 `shell:"powershell"`，直接传脚�
 
 - `npm test`：包含缺失 PATH、旧实例发现、配置升级和客户端启动失败恢复。
 - `npm run build:portal` 后运行 `npx vitest run tests/portal-tools-native.test.ts`：
-  Windows 本地 relay 验证内置引擎摘要、中文命令、后台输入、截图与文件读取。
+  Windows 本地 relay 验证内置引擎摘要、中文 PowerShell、CP936 `cmd`（在
+  OEM 936 主机上）、嵌套 PowerShell 拒绝提示、后台输入、截图与文件读取。
+  默认验证 `resources/heart-portal.exe`；开发时该文件被运行中的 Portal 占用，
+  可设置 `PORTAL_TOOLS_TEST_BINARY` 指向刚编译的 release 二进制。
   使用临时工作目录和 24×24 像素截图，完成后清理，不连接真实 Being。
 - `npm run package`：编译并打包配套客户端和 Portal。
