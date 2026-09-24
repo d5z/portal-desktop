@@ -18,6 +18,48 @@ describe("scene history refresh", () => {
     vi.stubGlobal("cancelAnimationFrame", clearTimeout);
   });
 
+  it.each([false, true])("deduplicates a reply closed without message_stop after history catches up (new topic=%s)", async newTopic => {
+    const history: { seq: number; role: string; content: string; scene_id: string }[] = [];
+    let stream!: ReadableStreamDefaultController<Uint8Array>;
+    let sends = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname === "/api/history") return Response.json({ messages: history.filter(m => m.seq > Number(url.searchParams.get("after") || 0)) });
+      if (url.pathname === "/api/stream/active") return new Response(null, { status: 204 });
+      if (url.pathname === "/health") return new Response("OK fixture");
+      if (url.pathname === "/api/chat/stream") {
+        sends++;
+        return new Response(new ReadableStream({ start(controller) { stream = controller; } }));
+      }
+      return Response.json({ sbs_enabled: false });
+    }));
+    const state = new ChatState(), runtime = createChatRuntime(state);
+    try {
+      await runtime.start();
+      if (newTopic) await runtime.selectScene({ sceneId: "new-topic", strict: true });
+      await runtime.send("一次提问");
+      await vi.advanceTimersByTimeAsync(0);
+      const sceneId = state.currentScene.sceneId!;
+      stream.enqueue(new TextEncoder().encode(`event: content_block_delta\ndata: ${JSON.stringify({ scene_id: sceneId, delta: { text: "完整回复" } })}\n\n`));
+      stream.close();
+      await vi.advanceTimersByTimeAsync(20);
+      const reply = state.items.find(item => item.kind === "message" && item.role === "being");
+      expect(reply).toMatchObject({ text: "完整回复", streaming: false });
+      expect(state.streaming).toBe(false);
+      history.push(
+        { seq: 1, role: "user", content: "一次提问", scene_id: sceneId },
+        { seq: 2, role: "being", content: "完整回复", scene_id: sceneId },
+        { seq: 3, role: "being", content: "其他场景的独立回复", scene_id: "other-topic" },
+      );
+      await runtime.refreshHistory();
+      await runtime.refreshHistory();
+      expect(sends).toBe(1);
+      expect(state.items).toContain(reply);
+      expect(state.items.filter(item => item.kind === "message").map(item => item.text))
+        .toEqual(["一次提问", "完整回复", "其他场景的独立回复"]);
+    } finally { runtime.dispose(); }
+  });
+
   it("sends into the selected scene while displaying all scene context", async () => {
     vi.useRealTimers();
     vi.stubGlobal("location", new URL("beings://chat/loom.html?scene_id=desktop-test&strict_scene=1"));

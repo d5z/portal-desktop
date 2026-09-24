@@ -30,12 +30,14 @@
 }
 html,
 body {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
   font-family:
     -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC",
     "Microsoft YaHei", sans-serif;
 }
 body {
-  height: 100dvh;
   background: var(--ios-bg);
 }
 button,
@@ -52,6 +54,9 @@ select:focus-visible {
   outline-offset: 2px;
 }
 .web-app {
+  position: fixed;
+  top: var(--web-viewport-offset, 0px);
+  left: 0;
   display: flex;
   width: 100%;
   min-width: 0;
@@ -681,6 +686,12 @@ dialog {
   border-radius: 20px;
   background: var(--ios-card);
   border-color: var(--ios-separator);
+}
+/* These dialogs have auto height capped by max-height. A zero flex basis on
+   the nested form/body can collapse their content before that height resolves. */
+:is(#web-settings, #town-auth-dialog, #town-send-dialog) > form,
+dialog .dialog-body {
+  flex: 1 1 auto;
 }
 dialog .dialog-footer {
   background: var(--ios-card);

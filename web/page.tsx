@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { installWebViewport } from "./viewport";
 import { Town } from "../desktop/renderer/town/page";
 import { TownModel, definitions } from "../desktop/renderer/town/models/town";
 import { TownAuth } from "../desktop/renderer/town/components/auth";
@@ -244,25 +245,7 @@ export function WebApp({ installation }: { installation: InstallController }) {
     return { transport, town, scenes };
   });
   const town = useModel(resources.town);
-  useEffect(() => {
-    const resize = () => {
-      const height = window.visualViewport?.height || innerHeight;
-      document.documentElement.style.setProperty(
-        "--web-viewport-height",
-        `${height}px`,
-      );
-      document.documentElement.dataset.keyboard = String(
-        innerHeight - height > 120,
-      );
-    };
-    resize();
-    window.visualViewport?.addEventListener("resize", resize);
-    window.addEventListener("resize", resize);
-    return () => {
-      window.visualViewport?.removeEventListener("resize", resize);
-      window.removeEventListener("resize", resize);
-    };
-  }, []);
+  useEffect(() => installWebViewport(), []);
   useEffect(() => {
     const stop = town.start();
     const change = () => setRoute(readRoute());

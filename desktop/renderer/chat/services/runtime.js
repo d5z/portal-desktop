@@ -1734,6 +1734,9 @@ function createStreamRuntime(state, options) {
         } else if (visibleText) {
           addMessage("being", visibleText);
         }
+        // EOF can finalize a reply without message_stop. Retain its echo before
+        // releasing the live scene so a later history read does not append it again.
+        noteLocalEcho("being", streamText);
         setStatus("connected");
         tuiDone();
       }
