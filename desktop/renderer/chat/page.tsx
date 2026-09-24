@@ -32,6 +32,22 @@ import {
   applyShiftEnterListContinue,
 } from "./list-continuation";
 
+function scrollComposerCaretIntoView(el: HTMLTextAreaElement) {
+  if (el.scrollHeight <= el.clientHeight) return;
+  const style = getComputedStyle(el);
+  const lineHeight = parseFloat(style.lineHeight) || 22;
+  const padTop = parseFloat(style.paddingTop) || 0;
+  const before = el.value.slice(0, el.selectionStart ?? 0);
+  const lineIndex = before.split("\n").length - 1;
+  const caretTop = padTop + lineIndex * lineHeight;
+  const caretBottom = caretTop + lineHeight;
+  const viewTop = el.scrollTop;
+  const viewBottom = viewTop + el.clientHeight;
+  if (caretTop < viewTop) el.scrollTop = Math.max(0, caretTop - lineHeight);
+  else if (caretBottom > viewBottom)
+    el.scrollTop = caretBottom - el.clientHeight + lineHeight;
+}
+
 class ChatErrorBoundary extends Component<
   { children: ReactNode },
   { failed: boolean }
@@ -219,6 +235,7 @@ function ChatView({
       el.setSelectionRange(next, next);
       pendingComposerSelection.current = null;
     }
+    if (el && document.activeElement === el) scrollComposerCaretIntoView(el);
   }, [state.draft]);
   useLayoutEffect(() => {
     if (messages.current && scrollLock.current)

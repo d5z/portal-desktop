@@ -102,6 +102,8 @@ test("line-start Tab inserts two spaces", () => {
   assert.deepEqual(atStart, { text: "  hello", selection: 2 });
   const beforeMarker = applyLineStartTab("  - item", 2, 2);
   assert.deepEqual(beforeMarker, { text: "    - item", selection: 4 });
+  const emptyListItem = applyLineStartTab("2. ", 3, 3);
+  assert.deepEqual(emptyListItem, { text: "  2. ", selection: 5 });
 });
 
 test("line-start Shift+Tab removes two spaces", () => {

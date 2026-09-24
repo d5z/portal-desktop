@@ -147,6 +147,12 @@ export function applyShiftEnterListContinue(
 function atLineStartTabPoint(line: string, cursorInLine: number): boolean {
   if (cursorInLine === 0) return true;
   const matched = matchListPrefix(line);
+  return matched !== null && cursorInLine <= matched.length;
+}
+
+function atLineStartShiftTabPoint(line: string, cursorInLine: number): boolean {
+  if (cursorInLine === 0) return true;
+  const matched = matchListPrefix(line);
   return matched !== null && cursorInLine <= matched.indent.length;
 }
 
@@ -161,7 +167,7 @@ export function applyLineStartTab(
   if (!atLineStartTabPoint(line, start - lineStart)) return null;
   const insert = "  ";
   return {
-    text: text.slice(0, start) + insert + text.slice(start),
+    text: text.slice(0, lineStart) + insert + text.slice(lineStart),
     selection: start + insert.length,
   };
 }
@@ -174,13 +180,13 @@ export function applyLineStartShiftTab(
   if (start !== end) return null;
   const { start: lineStart } = lineBounds(text, start);
   const cursorInLine = start - lineStart;
-  if (cursorInLine !== 0) return null;
   const line = text.slice(lineStart, lineBounds(text, start).end);
+  if (!atLineStartShiftTabPoint(line, cursorInLine)) return null;
   if (!line.startsWith("  ")) return null;
   const { end: lineEnd } = lineBounds(text, start);
   const newLine = line.slice(2);
   return {
     text: text.slice(0, lineStart) + newLine + text.slice(lineEnd),
-    selection: lineStart,
+    selection: Math.max(lineStart, start - 2),
   };
 }
