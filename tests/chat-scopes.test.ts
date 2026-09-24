@@ -61,6 +61,11 @@ describe("scene history refresh", () => {
   });
 
   it("deduplicates history that arrives before message_stop under a known legacy scene id", async () => {
+    vi.setSystemTime("2026-09-24T12:00:00Z");
+    const historyAt = "2026-09-24T17:55:15+08:00";
+    const historyDate = new Date(historyAt);
+    const pad = (value: number) => String(value).padStart(2, "0");
+    const expectedTimestamp = `${pad(historyDate.getHours())}:${pad(historyDate.getMinutes())}:${pad(historyDate.getSeconds())}`;
     const history: { seq: number; role: string; content: string; scene_id: string; at?: string }[] = [];
     let stream!: ReadableStreamDefaultController<Uint8Array>;
     const event = (name: string, data: unknown) => stream.enqueue(new TextEncoder().encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`));
@@ -83,7 +88,7 @@ describe("scene history refresh", () => {
       event("content_block_delta", { scene_id: "desktop-test", delta: { text: "同一条回复" } });
       await vi.advanceTimersByTimeAsync(20);
 
-      history.push({ seq: 1, role: "being", content: "同一条回复", scene_id: "loom-legacy", at: "2026-09-24T17:55:15+08:00" });
+      history.push({ seq: 1, role: "being", content: "同一条回复", scene_id: "loom-legacy", at: historyAt });
       await runtime.refreshHistory();
       expect(state.items.filter(item => item.kind === "message" && item.text === "同一条回复")).toHaveLength(2);
 
@@ -93,7 +98,7 @@ describe("scene history refresh", () => {
       await vi.advanceTimersByTimeAsync(20);
       const replies = state.items.filter(item => item.kind === "message" && item.text === "同一条回复");
       expect(replies).toHaveLength(1);
-      expect(replies[0]).toMatchObject({ sceneId: "desktop-test", historySeq: 1, timestamp: "17:55:15" });
+      expect(replies[0]).toMatchObject({ sceneId: "desktop-test", historySeq: 1, timestamp: expectedTimestamp });
     } finally { runtime.dispose(); }
   });
 
