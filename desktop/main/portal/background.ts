@@ -467,9 +467,14 @@ if ($supervisorId -gt 0) {
   if ($supervisor) {
     if ($supervisor.Name -ine 'powershell.exe' -or $supervisor.CommandLine -notlike ('*' + $runner + '*')) { throw 'Portal supervisor identity changed; refusing to stop an unrelated process' }
     & taskkill.exe /PID $supervisorId /T /F | Out-Null;
-    if ($LASTEXITCODE -ne 0 -and (Get-Process -Id $supervisorId -ErrorAction SilentlyContinue)) { throw 'Portal supervisor process tree did not stop' }
-    Wait-Process -Id $supervisorId -Timeout 15 -ErrorAction SilentlyContinue;
-    if (Get-Process -Id $supervisorId -ErrorAction SilentlyContinue) { throw 'Portal supervisor is still running' }
+    $deadline=[DateTime]::UtcNow.AddSeconds(15);
+    do {
+      $remaining=Get-CimInstance Win32_Process -Filter "ProcessId=$supervisorId" -ErrorAction SilentlyContinue;
+      $sameSupervisor=$remaining -and $remaining.Name -ieq 'powershell.exe' -and $remaining.CommandLine -like ('*' + $runner + '*');
+      if (-not $sameSupervisor) { break }
+      if ([DateTime]::UtcNow -ge $deadline) { throw 'Portal supervisor is still running' }
+      Start-Sleep -Milliseconds 200;
+    } while ($true)
   }
 }
 # The runner may have started the engine before its PID file was written.
