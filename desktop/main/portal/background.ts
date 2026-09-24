@@ -455,6 +455,23 @@ else { [string]$t.State }`);
       }
     } else await this.powershell(`$task=Find-PortalTask ${ps(service.label)};
 if ($task) { Disable-ScheduledTask -TaskName ${ps(service.label)} | Out-Null; Stop-ScheduledTask -TaskName ${ps(service.label)}; }
+# Stopping a scheduled task can terminate the native launcher without killing
+# its PowerShell child. Verify the persisted supervisor identity, then stop its
+# exact process tree before the recovery loop can launch another engine.
+$runner=${ps(path.join(service.root, 'run.ps1'))};
+$supervisorFile=${ps(path.join(service.root, 'supervisor.pid'))};
+$supervisorId=0;
+if (Test-Path -LiteralPath $supervisorFile) { [void][int]::TryParse((Get-Content -LiteralPath $supervisorFile -Raw).Trim(), [ref]$supervisorId) }
+if ($supervisorId -gt 0) {
+  $supervisor=Get-CimInstance Win32_Process -Filter "ProcessId=$supervisorId" -ErrorAction SilentlyContinue;
+  if ($supervisor) {
+    if ($supervisor.Name -ine 'powershell.exe' -or $supervisor.CommandLine -notlike ('*' + $runner + '*')) { throw 'Portal supervisor identity changed; refusing to stop an unrelated process' }
+    & taskkill.exe /PID $supervisorId /T /F | Out-Null;
+    if ($LASTEXITCODE -ne 0 -and (Get-Process -Id $supervisorId -ErrorAction SilentlyContinue)) { throw 'Portal supervisor process tree did not stop' }
+    Wait-Process -Id $supervisorId -Timeout 15 -ErrorAction SilentlyContinue;
+    if (Get-Process -Id $supervisorId -ErrorAction SilentlyContinue) { throw 'Portal supervisor is still running' }
+  }
+}
 # The runner may have started the engine before its PID file was written.
 # Select only this installation's executable, never a global process name kill.
 $engine=${ps(path.join(service.root, 'heart-portal.exe'))};
