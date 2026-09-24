@@ -11,7 +11,7 @@ vi.mock('electron', async () => {
   const { EventEmitter } = await import('node:events');
   const app = Object.assign(new EventEmitter(), {
     isPackaged: false, setName: vi.fn(), setAppUserModelId: vi.fn(), setAboutPanelOptions: vi.fn(), setPath: vi.fn(),
-    getPath: (name: string) => { if (name === 'appData') throw new Error("Failed to get 'appData' path"); return fixture.directory; },
+    getPath: (name: string) => fixture.directory,
     getAppPath: () => fixture.directory, getVersion: () => '0.1.6',
     requestSingleInstanceLock: () => true, quit: vi.fn(),
     whenReady: () => ({ then: (ready: () => Promise<void>) => (fixture.startup = Promise.resolve().then(ready)) }),
@@ -74,7 +74,7 @@ it('defers repeated launch until initialization and opens one usable window even
     expect(await handlers.get('beings:notification-target')!(request as never)).toBeNull();
     await expect(handlers.get('beings:notifications')!({ ...request, senderFrame: {} } as never, { enabled: false })).rejects.toThrow('Untrusted');
     const snapshot = await handlers.get('beings:snapshot')!(request as never);
-    expect(snapshot.portal.message).toBe('Windows 命令环境不可用，请检查后重试。');
+    expect(snapshot.portal.message).toBe('开发实例使用独立配置目录，不会自动启动内嵌 Portal；请在界面中手动启动，或使用已安装的客户端。');
     expect(snapshot.notice).not.toContain('ENOENT');
     const detail = 'powershell.exe (1): Error: Config file not found: status\n#< CLIXML\n<Objs>runtime details</Objs>';
     vi.spyOn(SettingsStore.prototype, 'save').mockRejectedValueOnce(new Error(detail));
