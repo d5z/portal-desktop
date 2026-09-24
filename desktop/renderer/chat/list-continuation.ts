@@ -72,6 +72,96 @@ function lineBounds(text: string, pos: number) {
   return { start, end };
 }
 
+function replaceOrderedNumber(line: string, matched: MatchedListPrefix, newNum: number): string {
+  const suffix = line.slice(matched.indent.length + String(matched.number).length + matched.marker.length);
+  return `${matched.indent}${newNum}${matched.marker}${suffix}`;
+}
+
+/** Renumber every contiguous same-indent ordered block (outside code fences). */
+export function renumberOrderedLists(
+  text: string,
+  selection: number,
+): { text: string; selection: number } {
+  const lines = text.split("\n");
+  let selLine = 0;
+  let pos = 0;
+  for (let i = 0; i < lines.length; i += 1) {
+    const lineEnd = pos + lines[i].length;
+    if (selection <= lineEnd || i === lines.length - 1) {
+      selLine = i;
+      break;
+    }
+    pos = lineEnd + 1;
+  }
+
+  const lineStarts: number[] = [];
+  let scan = 0;
+  for (let li = 0; li < lines.length; li += 1) {
+    lineStarts[li] = scan;
+    scan += lines[li].length + 1;
+  }
+
+  let newSelection = selection;
+  let i = 0;
+  while (i < lines.length) {
+    if (isInCodeFence(text, lineStarts[i])) {
+      i += 1;
+      continue;
+    }
+    const head = matchListPrefix(lines[i]);
+    if (!head || head.type !== "ordered") {
+      i += 1;
+      continue;
+    }
+    const { indent, marker } = head;
+    const blockStart = i;
+    let blockEnd = i;
+    while (blockEnd + 1 < lines.length) {
+      if (isInCodeFence(text, lineStarts[blockEnd + 1])) break;
+      const next = matchListPrefix(lines[blockEnd + 1]);
+      if (!next || next.type !== "ordered" || next.indent !== indent || next.marker !== marker) {
+        break;
+      }
+      blockEnd += 1;
+    }
+
+    for (let j = blockStart; j <= blockEnd; j += 1) {
+      const oldLine = lines[j];
+      const mp = matchListPrefix(oldLine);
+      if (!mp) continue;
+      const newNum = j - blockStart + 1;
+      const newLine = replaceOrderedNumber(oldLine, mp, newNum);
+      if (newLine === oldLine) continue;
+
+      const ls = lineStarts[j];
+      const delta = newLine.length - oldLine.length;
+      if (newSelection > ls + oldLine.length) {
+        newSelection += delta;
+      } else if (newSelection > ls && j === selLine) {
+        const cursorInLine = newSelection - ls;
+        const oldNumLen = String(mp.number).length;
+        const newNumLen = String(newNum).length;
+        const afterOldNum = mp.indent.length + oldNumLen + mp.marker.length;
+        if (cursorInLine >= afterOldNum) {
+          newSelection += newNumLen - oldNumLen;
+        }
+      }
+      lines[j] = newLine;
+    }
+
+    i = blockEnd + 1;
+  }
+
+  return { text: lines.join("\n"), selection: newSelection };
+}
+
+function withListRenumber(
+  text: string,
+  selection: number,
+): { text: string; selection: number } {
+  return renumberOrderedLists(text, selection);
+}
+
 function findPreviousListLineWithIndent(
   text: string,
   lineStart: number,
@@ -111,8 +201,12 @@ function emptyListShiftEnter(
     }
   }
   const remainder = line.slice(matched.length).trimEnd();
+  let textAfter = text.slice(lineEnd);
+  if (remainder === "" && textAfter.startsWith("\n")) {
+    textAfter = textAfter.slice(1);
+  }
   return {
-    text: text.slice(0, lineStart) + remainder + text.slice(lineEnd),
+    text: text.slice(0, lineStart) + remainder + textAfter,
     selection: lineStart + remainder.length,
   };
 }
@@ -132,16 +226,29 @@ export function applyShiftEnterListContinue(
 
   const continuation = buildContinuation(matched, line);
   if (continuation === "") {
-    return emptyListShiftEnter(text, lineStart, lineEnd, line, matched);
+    const exited = emptyListShiftEnter(text, lineStart, lineEnd, line, matched);
+    return withListRenumber(exited.text, exited.selection);
   }
 
+  if (start === lineStart && matched.type === "ordered") {
+    const newItem = `${matched.indent}1${matched.marker} `;
+    const insert = `${newItem}\n`;
+    const inserted = {
+      text: text.slice(0, lineStart) + insert + text.slice(lineStart),
+      selection: lineStart + newItem.length,
+    };
+    return withListRenumber(inserted.text, inserted.selection);
+  }
+
+  const minInsert = lineStart + matched.length;
   let insertAt = start;
-  while (insertAt > lineStart && text[insertAt - 1] === " ") insertAt -= 1;
+  while (insertAt > minInsert && text[insertAt - 1] === " ") insertAt -= 1;
   const insert = `\n${continuation}`;
-  return {
+  const continued = {
     text: text.slice(0, insertAt) + insert + text.slice(start),
     selection: insertAt + insert.length,
   };
+  return withListRenumber(continued.text, continued.selection);
 }
 
 function atLineStartTabPoint(line: string, cursorInLine: number): boolean {
@@ -166,10 +273,11 @@ export function applyLineStartTab(
   const line = text.slice(lineStart, lineBounds(text, start).end);
   if (!atLineStartTabPoint(line, start - lineStart)) return null;
   const insert = "  ";
-  return {
+  const tabbed = {
     text: text.slice(0, lineStart) + insert + text.slice(lineStart),
     selection: start + insert.length,
   };
+  return withListRenumber(tabbed.text, tabbed.selection);
 }
 
 export function applyLineStartShiftTab(
@@ -185,8 +293,9 @@ export function applyLineStartShiftTab(
   if (!line.startsWith("  ")) return null;
   const { end: lineEnd } = lineBounds(text, start);
   const newLine = line.slice(2);
-  return {
+  const unTabbed = {
     text: text.slice(0, lineStart) + newLine + text.slice(lineEnd),
     selection: Math.max(lineStart, start - 2),
   };
+  return withListRenumber(unTabbed.text, unTabbed.selection);
 }
