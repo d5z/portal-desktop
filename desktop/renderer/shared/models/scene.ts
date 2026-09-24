@@ -1,4 +1,4 @@
-export type SceneView = 'chat' | 'town' | 'bonfire' | 'firesides' | 'mail' | 'seeds' | 'embers' | 'scrolls' | 'kits' | 'portal';
+export type SceneView = 'chat' | 'town' | 'bonfire' | 'firesides' | 'mail' | 'seeds' | 'embers' | 'scrolls' | 'kits' | 'portal' | 'announcements' | 'contacts';
 export const sceneExcerpt = (text: string) => text.length > 2000 ? text.slice(0, 2000) + '\n[仅引用前 2000 字符，完整内容见来源]' : text;
 export interface SceneResource { id: string; title: string; author?: string; revision?: string; excerpt: string; private: boolean }
 export interface SceneObservation {
@@ -11,7 +11,7 @@ export interface SceneEnvelope {
   schema: 'being.environment/v1'; messageId: string; source: { channel: 'portal-desktop'; instanceId: string };
   audience: string; capturedAt: string; environment: SceneObservation; delivery: 'local-only';
 }
-const titles: Record<SceneView, string> = { chat: '与你的 Being 交谈', town: '小镇广场', bonfire: '篝火', firesides: '围炉', mail: '私信', seeds: '种子花园', embers: '书架', scrolls: '卷轴', kits: '工具间', portal: 'Portal 设置' };
+const titles: Record<SceneView, string> = { chat: '与你的 Being 交谈', town: '小镇广场', bonfire: '篝火', firesides: '围炉', mail: '私信', seeds: '种子花园', embers: '书架', scrolls: '卷轴', kits: '工具间', portal: 'Portal 设置', announcements: '公告', contacts: '通讯录' };
 export class SceneStore extends EventTarget {
   readonly instanceId = crypto.randomUUID();
   current: SceneObservation = { sceneId: 'desktop:chat:unconnected', view: 'chat', title: titles.chat, identity: '', revision: 1, observedAt: new Date().toISOString(), status: 'loading', scope: '尚未连接', filters: {} };

@@ -2645,7 +2645,7 @@ function createStreamRuntime(state, options) {
   }
   function pendingReplyArrived() {
     return pendingReply && state.items.some(item => item.kind === "message" && item.role === "being"
-      && item.sceneId === state.currentScene.sceneId && !item.streaming && !pendingReply.baseline.has(item));
+      && inCurrentScene(item, state.currentScene) && !item.streaming && !pendingReply.baseline.has(item));
   }
   function startCatchUpWatcher() {
     stopCatchUpWatcher();

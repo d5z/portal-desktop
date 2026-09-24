@@ -80,6 +80,11 @@ const places = [
       </>
     ),
   },
+  {
+    view: "contacts" as PlaceView,
+    label: "通讯录",
+    icon: <><rect x="5" y="3" width="16" height="18" rx="2" /><circle cx="13" cy="9" r="2" /><path d="M9 17v-1a4 4 0 0 1 8 0v1M2 7h4M2 12h4M2 17h4" /></>,
+  },
 ];
 export function ChatPlaces({
   send,

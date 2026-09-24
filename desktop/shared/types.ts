@@ -125,9 +125,9 @@ export interface DesktopAPI {
 }
 declare global { interface Window { beings: DesktopAPI } }
 
-export type TownKind = 'home' | 'bonfire' | 'firesides' | 'fireside' | 'fireside-members' | 'inbox' | 'sent' | 'embers' | 'scrolls' | 'my-scrolls' | 'grove' | 'kit-comments' | 'kit' | 'ember' | 'scroll' | 'seeds' | 'seed' | 'seed-lineage' | 'seed-absorbs';
+export type TownKind = 'home' | 'bonfire' | 'firesides' | 'fireside' | 'fireside-members' | 'inbox' | 'sent' | 'embers' | 'scrolls' | 'my-scrolls' | 'grove' | 'kit-comments' | 'kit' | 'ember' | 'scroll' | 'seeds' | 'seed' | 'seed-lineage' | 'seed-absorbs' | 'announcements' | 'announcement' | 'contacts';
 export interface SeedFilters { q: string; domain: string; tag: string; kit: string; lifecycle: string }
-export interface TownQuery { kind: TownKind; offset?: number; id?: string; scrollKind?: string; groveStatus?: string; q?: string; domain?: string; tag?: string; kit?: string; lifecycle?: string }
+export interface TownQuery { kind: TownKind; offset?: number; id?: string; scrollKind?: string; groveStatus?: string; q?: string; domain?: string; tag?: string; kit?: string; lifecycle?: string; category?: string; includeExpired?: boolean }
 export type TownResult = { ok: true; data: Record<string, unknown>; fetchedAt: string; warnings?: string[] } | { ok: false; code: 'auth' | 'forbidden' | 'not-found' | 'http' | 'timeout' | 'format' | 'too-large' | 'network'; message: string };
 export type TownChannel = 'bonfire' | 'mail' | 'firesides';
 export interface TownLiveState {

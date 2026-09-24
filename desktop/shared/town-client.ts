@@ -9,6 +9,19 @@ export function townRoute(query: TownQuery, beingId = ''): { route: string; priv
   if (!Number.isSafeInteger(offset) || offset < 0 || offset > 100000) throw new Error('无效的分页。');
   switch (query.kind) {
     case 'home': return { route: '/api', private: false };
+    case 'announcements': {
+      if (query.category !== undefined && !['', 'update', 'rule', 'event', 'general'].includes(query.category)) throw new Error('无效的公告分类。');
+      if (query.includeExpired !== undefined && typeof query.includeExpired !== 'boolean') throw new Error('无效的公告历史筛选。');
+      const params = new URLSearchParams({ limit: '24', offset: String(offset) });
+      if (query.category) params.set('category', query.category);
+      if (query.includeExpired) params.set('include_expired', 'true');
+      return { route: '/api/announcements?' + params, private: false };
+    }
+    case 'announcement': {
+      if (typeof query.id !== 'string' || !idPattern.test(query.id) || ['help', 'mentions', 'subscribe'].includes(query.id)) throw new Error('无效的公告编号。');
+      return { route: `/api/announcements/${query.id}`, private: false };
+    }
+    case 'contacts': return { route: '/api/contacts', private: false };
     case 'seeds': {
       const params = new URLSearchParams({ limit: '24', offset: String(offset) });
       for (const field of ['q', 'domain', 'tag', 'kit', 'lifecycle'] as const) {

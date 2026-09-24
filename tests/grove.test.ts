@@ -8,6 +8,7 @@ import type { TownModel } from '../desktop/renderer/town/models/town';
 function town(kit: Record<string, unknown>) {
   return {
     tab: 'grove', view: 'kits', selectedId: kit.id, installedLoading: false, installedError: '',
+    supportsLocalKits: true,
     installedLibrary: { enabled: true, kits: [] }, installedKit: () => undefined,
     matches: () => true, directId: undefined, detailLoading: false, detailError: undefined,
     detail: { fragments: [kit], query: { kind: 'kit', id: kit.id } },

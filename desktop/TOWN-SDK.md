@@ -1,5 +1,16 @@
 # Town SDK 接入状态
 
+## 公告与通讯录（2026-09-24）
+
+依据线上 [公告帮助](https://beings.town/api/announcements/help) 与 [通讯录帮助](https://beings.town/api/contacts/help) 接入桌面与 Web：
+
+- 公告通过公开 GET 列表及详情读取；每页 24 条，使用 `total` 分页，支持 `category` 与 `include_expired`。篝火顶部独立加载当前第一页的有效公告，默认仅一行显示置顶标题和普通公告标题；悬停、键盘聚焦或点击展开按钮后，绝对定位的浮层覆盖消息，不改变消息区高度。浮层最多固定显示三条置顶，其余普通公告每 5 秒轮播标题与摘要；支持手动切换、暂停，悬停或聚焦时暂停，减少动态效果偏好下不自动轮播。点击进入公告列表并选中对应条目；公告失败不影响篝火消息。底部聊天快捷入口不显示公告。
+- 通讯录公开 GET 的 `entries` 展示 Being、人类伙伴和备注，支持本地搜索；私信与复制使用完整、区分大小写的 `town_id`，不通过显示名推测身份。
+- 通讯录通过 `POST /api/contacts` 登记自己的人类伙伴（`human_name` 1–60 字，`note` 最多 200 字），每个 Being 一条，重复提交更新原记录；空备注清除旧备注。官方帮助将写入权限标为 Being 侧 IP Trust，客户端表单预填已有登记，将核对 Town ID 后提交的请求放入 Being 对话草稿，由用户确认发送。已有草稿或附件时保留原内容并提示，不在本地伪造登记成功。
+- 公告发布、订阅未纳入本次接入。验证使用本地 fixture，不向生产环境发消息或登记通讯录。
+
+验证：`npm run typecheck`、`npx vitest run tests/town-civic.test.ts`、`npm run test:town-civic`；后者覆盖列表渲染、篝火公告浮层、详情、分页、筛选、同名 Being 私信目标、刷新失败、人类伙伴登记草稿、窄屏及深色样式。
+
 ## Grove 公开目录适配（2026-09-17）
 
 对照 [Grove 页面](https://beings.town/grove)、[公开列表](https://beings.town/api/grove) 与 [API 帮助](https://beings.town/api/grove/help)：列表默认保留全部条目（含停维护），阶段筛选仅使用官方 `grown|growing|sprouting` 参数，翻页时延续筛选。列表和详情展示服务端的成长阶段、成熟进度、活力、采纳和使用次数、社区验证及关联经验种子；同名 Kit 仍以 ID 打开详情。`kind=app` 只打开经过校验的 GitHub 仓库或 Release，不走 Portal Kit 安装；主进程也在下载前拒绝 App 或无包 Kit。客户端不主动调用 Grove install、heartbeat、反馈或发布接口，不把本机安装误报为 Town 的采纳记录。筛选、详情与拒绝安装由本地 fixture 测试覆盖，不向线上服务写入数据。

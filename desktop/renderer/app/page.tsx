@@ -33,7 +33,8 @@ export function App({ model }: { model: AppModel }) {
       app.readingSize + "px",
     );
     document.body.dataset.view = app.view;
-  }, [app.theme, app.view, app.readingSize, app.api]);
+    document.body.dataset.placePresentation = app.placePresentation;
+  }, [app.theme, app.view, app.placePresentation, app.readingSize, app.api]);
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
       const dialog = document.querySelector("dialog[open]");
@@ -145,6 +146,15 @@ export function App({ model }: { model: AppModel }) {
               />
             </section>
           </div>
+          {app.view !== "chat" && app.placePresentation === "panel" && (
+            <>
+              <PlaceResizeHandle app={app} />
+              <aside id="place-panel" className="place-surface" aria-labelledby="view-title"
+                style={{ width: app.placePanelWidth, flexBasis: app.placePanelWidth }}>
+                <PlaceContent app={app} />
+              </aside>
+            </>
+          )}
           <Companion model={app.workspace} />
           <Browser model={app} />
         </div>
@@ -152,20 +162,13 @@ export function App({ model }: { model: AppModel }) {
       <Diagnostics model={app} />
       <Dialog
         id="place-sheet"
+        className="place-surface"
         aria-labelledby="view-title"
-        open={app.view !== "chat"}
+        open={app.view !== "chat" && app.placePresentation === "dialog"}
         onClose={app.closePlace}
         dismissOnBackdrop
       >
-        <PlaceHeading
-          view={app.view}
-          navigate={app.navigate}
-          onBack={app.settingsRoute === "portal" || app.town.returnView ? app.returnFromPlace : undefined}
-          onForward={app.town.forwardView ? app.forwardFromPlace : undefined}
-          onClose={app.closePlace}
-        />
-        <Portal model={app} />
-        <Town model={app.town} />
+        {app.placePresentation === "dialog" && <PlaceContent app={app} />}
       </Dialog>
       <ChatSearch model={app} />
       <TownComposer model={app.town} />
@@ -178,6 +181,75 @@ export function App({ model }: { model: AppModel }) {
       <Toast message={app.toastMessage} />
       <EditContextMenu edit={app.api.editSelection} rootSelector="#client-main, dialog[open]"
         selectionSelector=".reading-text, .dialog-body, #town-body" />
+    </>
+  );
+}
+
+function PlaceResizeHandle({ app }: { app: AppModel }) {
+  const bounds = () => {
+    const available = Math.max(220, window.innerWidth - 280);
+    return { min: Math.min(360, available), max: available };
+  };
+  const resize = (clientX: number, persist = false) => {
+    const { min, max } = bounds();
+    app.setPlacePanelWidth(Math.max(min, Math.min(max, window.innerWidth - clientX)), persist);
+  };
+  const finish = (element: HTMLElement, pointerId: number) => {
+    delete element.dataset.resizing;
+    if (element.hasPointerCapture(pointerId)) element.releasePointerCapture(pointerId);
+  };
+  const { min, max } = bounds();
+  return (
+    <div id="place-resize-handle" className="place-resize-handle" role="separator" tabIndex={0}
+      aria-label="调整对话与内容区域宽度" aria-orientation="vertical"
+      aria-valuemin={min} aria-valuemax={max} aria-valuenow={Math.max(min, Math.min(max, app.placePanelWidth))}
+      onDoubleClick={() => app.setPlacePanelWidth(620, true)}
+      onKeyDown={event => {
+        const step = event.shiftKey ? 64 : 24;
+        let next = app.placePanelWidth;
+        if (event.key === "ArrowLeft") next += step;
+        else if (event.key === "ArrowRight") next -= step;
+        else if (event.key === "Home") next = min;
+        else if (event.key === "End") next = max;
+        else return;
+        event.preventDefault();
+        app.setPlacePanelWidth(Math.max(min, Math.min(max, next)), true);
+      }}
+      onPointerDown={event => {
+        if (event.button !== 0) return;
+        event.preventDefault();
+        event.currentTarget.dataset.resizing = "true";
+        event.currentTarget.setPointerCapture(event.pointerId);
+      }}
+      onPointerMove={event => {
+        if (event.currentTarget.hasPointerCapture(event.pointerId)) resize(event.clientX);
+      }}
+      onPointerUp={event => {
+        resize(event.clientX, true);
+        finish(event.currentTarget, event.pointerId);
+      }}
+      onPointerCancel={event => {
+        app.setPlacePanelWidth(app.placePanelWidth, true);
+        finish(event.currentTarget, event.pointerId);
+      }}
+    />
+  );
+}
+
+function PlaceContent({ app }: { app: AppModel }) {
+  return (
+    <>
+      <PlaceHeading
+        view={app.view}
+        navigate={app.navigate}
+        presentation={app.placePresentation}
+        onPresentationChange={app.setPlacePresentation}
+        onBack={app.settingsRoute === "portal" || app.town.returnView ? app.returnFromPlace : undefined}
+        onForward={app.town.forwardView ? app.forwardFromPlace : undefined}
+        onClose={app.closePlace}
+      />
+      <Portal model={app} />
+      <Town model={app.town} />
     </>
   );
 }

@@ -240,6 +240,28 @@ describe("React desktop state lifecycle", () => {
     expect(app.chatHistoryScope).toBe('current');
     expect(new URL(app.chatSource).searchParams.get('scene_scope')).toBe('current');
   });
+  it("announces the scene context only when a session change enters another scene", async () => {
+    vi.useFakeTimers();
+    const original = { scene_id: "desktop-original", scene_meta: { client: "portal-desktop", scene_label: "日常对话" } };
+    const discussion = { scene_id: "desktop-discussion", scene_meta: { client: "portal-desktop", scene_label: "方案讨论" } };
+    const initial = { ...state(), chatScene: original, chatSessions: [original, discussion] };
+    const changed = { ...initial, chatScene: discussion };
+    const changeChatSession = vi.fn()
+      .mockResolvedValueOnce(changed)
+      .mockResolvedValueOnce({ ...changed, chatScene: { ...discussion, scene_meta: { ...discussion.scene_meta, scene_label: "技术方案" } } });
+    const app = new AppModel(api({ changeChatSession }).value);
+    app.applySnapshot(initial);
+    app.setPlacePresentation("panel");
+    app.navigate("bonfire");
+
+    await app.changeChatSession("select", discussion.scene_id);
+    expect(app.toastMessage).toBe("已切到「方案讨论」场景");
+    expect(app.view).toBe("bonfire");
+
+    app.toastMessage = "";
+    await app.changeChatSession("rename", "技术方案", discussion.scene_id);
+    expect(app.toastMessage).toBe("");
+  });
   it("previews Portal logs through Together without posting until the user composes a reference", async () => {
     vi.useFakeTimers();
     const pending = deferred<{ endpoint: string; text: string }>();

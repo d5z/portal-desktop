@@ -137,12 +137,20 @@ export function Topbar({ model }: { model: AppModel }) {
     ? "外部运行"
     : portalLabels[portalPhase];
   const portalName = app.snapshot?.settings.portalName?.trim() || "Heart Portal";
+  const checkingUpdate = app.updateChecking || app.update?.phase === "checking";
+  const updateActivity = app.update?.activity;
+  const downloadUpdate = () => {
+    toggle(false, true);
+    void app.downloadClientUpdate();
+  };
   return (
     <header className="topbar">
       <ChatSceneIndicator
         createRequest={app.chatSessionCreateRequest}
-        visible={app.view === "chat"}
-        onReveal={() => app.navigate("chat")}
+        visible={app.view === "chat" || app.placePresentation === "panel"}
+        onReveal={() => {
+          if (app.placePresentation !== "panel") app.navigate("chat");
+        }}
         scene={app.snapshot?.chatScene}
         sessions={app.snapshot?.chatSessions}
         activity={app.chatSceneActivity}
@@ -197,7 +205,7 @@ export function Topbar({ model }: { model: AppModel }) {
         </button>
         <UpdateProgress
           state={app.update}
-          onDownload={() => void app.run(() => app.api.downloadUpdate())}
+          onDownload={downloadUpdate}
           onCancel={() => void app.run(() => app.api.cancelUpdate())}
           onInstall={() => void app.run(() => app.api.installUpdate())}
         />
@@ -224,6 +232,7 @@ export function Topbar({ model }: { model: AppModel }) {
             const button = (event.target as Element).closest("button");
             if (
               button &&
+              button.id !== "check-updates" &&
               button !== helpButton.current &&
               button !== backButton.current
             )
@@ -332,6 +341,24 @@ export function Topbar({ model }: { model: AppModel }) {
                 onClick={() => showHelp(true)}
               >
                 对话与帮助 <span aria-hidden="true">›</span>
+              </button>
+              <button
+                id="check-updates"
+                disabled={checkingUpdate || Boolean(updateActivity && updateActivity.phase !== "ready")}
+                onClick={() => {
+                  if (updateActivity?.phase === "ready") {
+                    toggle(false, true);
+                    void app.run(() => app.api.installUpdate());
+                  } else if (app.update?.phase === "available") {
+                    downloadUpdate();
+                  } else void app.checkClientUpdates();
+                }}
+              >
+                {updateActivity?.phase === "ready" ? "安装更新"
+                  : updateActivity ? updateActivity.phase === "installing" ? "正在安装…" : "正在下载更新…"
+                  : checkingUpdate ? "正在检查更新…"
+                  : app.update?.phase === "available" ? "下载更新" : "手动检查更新"}
+                {app.update?.phase === "available" && <small>v{app.update.latestVersion}</small>}
               </button>
               <button
                 id="quit-client"

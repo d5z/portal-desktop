@@ -1,4 +1,4 @@
-import { TownClient, TOWN_ORIGIN } from "../desktop/shared/town-client";
+import { TownClient, TOWN_ORIGIN, townRoute } from "../desktop/shared/town-client";
 import { TownLive } from "../desktop/shared/town-live";
 import type { TownAPI } from "../desktop/renderer/town/models/town";
 import type { TownLiveState } from "../desktop/shared/types";
@@ -80,7 +80,7 @@ export function createTownAPI(): { api: TownAPI; dispose(): void } {
           message: "Town 身份已变更，请刷新。",
         };
       if (result.ok) live.remember(query, result.data);
-      else if (result.code === "auth") live.rejectAuth();
+      else if (result.code === "auth" && credential.token && query.kind !== "my-scrolls" && townRoute(query).private) live.rejectAuth();
       return result;
     },
     sendTown: async (input) => {

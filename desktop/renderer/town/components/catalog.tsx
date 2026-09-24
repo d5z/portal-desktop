@@ -38,6 +38,8 @@ export function TownHome({ town, data }: { town: TownModel; data: Data }) {
     bonfire: ["♧", "篝火", "bonfire"],
     fireside: ["◎", "围炉", "firesides"],
     messages: ["✉", "私信", "mail"],
+    announcements: ["⚑", "公告", "announcements"],
+    contacts: ["◎", "通讯录", "contacts"],
     garden: ["♧", "种子花园 · Seed Garden", "seeds"],
     seeds: ["♧", "种子花园 · Seed Garden", "seeds"],
     ember: ["▤", "书架", "embers"],
@@ -231,10 +233,10 @@ export function Pagination({ town }: { town: TownModel }) {
     !town.data ||
     town.error ||
     town.directId ||
-    ["town", "bonfire", "mail", "firesides"].includes(town.view)
+    ["town", "bonfire", "mail", "firesides", "contacts"].includes(town.view)
   )
     return null;
-  const entries = list(town.data, town.tab === "grove" ? "kits" : town.view === "seeds" ? "seeds" : "scrolls"),
+  const entries = list(town.data, town.tab === "grove" ? "kits" : town.view === "seeds" ? "seeds" : town.view === "announcements" ? "items" : "scrolls"),
     total = Number(town.data.total ?? town.data.count ?? entries.length);
   return (
     <>

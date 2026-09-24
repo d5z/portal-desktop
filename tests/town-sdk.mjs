@@ -100,7 +100,7 @@ try {
   };
   // Compact menu: nested navigation, interrupted motion, keyboard and merged settings.
   await page.locator('#options-trigger').click();
-  assert.equal(await page.locator('#options-home > button').count(), 7);
+  assert.equal(await page.locator('#options-home > button').count(), 8);
   await page.locator('#options-help').click();
   assert.equal(await page.locator('#conversation-options').getAttribute('open'), '');
   await page.keyboard.press('Escape');

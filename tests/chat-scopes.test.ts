@@ -455,6 +455,47 @@ describe("scene history refresh", () => {
     } finally { runtime.dispose(); }
   });
 
+  it.each([
+    { replyScene: undefined, strict: false }, { replyScene: "loom-legacy", strict: false },
+    { replyScene: undefined, strict: true }, { replyScene: "loom-legacy", strict: true },
+  ])("settles compatible history replies without crossing strict scenes ($replyScene, strict=$strict)", async ({ replyScene, strict }) => {
+    const history: object[] = [];
+    const requests: { message: string }[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
+      const path = new URL(input).pathname;
+      if (path === "/api/history") return Response.json({ messages: history });
+      if (path === "/api/stream/active") return new Response(null, { status: 204 });
+      if (path === "/health") return new Response("OK fixture");
+      if (path === "/api/chat/stream") {
+        requests.push(JSON.parse(String(init?.body)));
+        return Response.json({ queued: true }, { status: 202 });
+      }
+      return Response.json({ sbs_enabled: false });
+    }));
+    const state = new ChatState();
+    state.currentScene = { ...state.currentScene, legacySceneId: "loom-legacy", strict };
+    const runtime = createChatRuntime(state);
+    try {
+      await runtime.start();
+      await runtime.send("A 输入");
+      await vi.advanceTimersByTimeAsync(20);
+      await runtime.selectScene({ sceneId: "desktop-b", strict: true });
+      await runtime.send("B 输入");
+      expect(requests.map(r => r.message)).toEqual(["A 输入"]);
+      history.push({ seq: 1, role: "being", content: "A 旧格式回复", ...(replyScene ? { scene_id: replyScene } : {}) });
+      await vi.advanceTimersByTimeAsync(4100);
+      expect(state.items.some(item => item.kind === "message" && item.text === "A 旧格式回复")).toBe(true);
+      if (strict) {
+        expect(requests.map(r => r.message)).toEqual(["A 输入"]);
+        expect(state.items.find(item => item.kind === "run" && item.sceneId === "desktop-test")).toMatchObject({ label: "已排队，等待回复", waitingForReply: true });
+        history.push({ seq: 2, role: "being", content: "A 场景回复", scene_id: "desktop-test" });
+        await vi.advanceTimersByTimeAsync(4100);
+      }
+      expect(state.items.find(item => item.kind === "run" && item.sceneId === "desktop-test")).toMatchObject({ outcome: "done", label: "已回复" });
+      expect(requests.map(r => r.message)).toEqual(["A 输入", "B 输入"]);
+    } finally { runtime.dispose(); }
+  });
+
   it("keeps an accepted A request pending when Heart emits an empty stop then switches to B", async () => {
     let stream!: ReadableStreamDefaultController<Uint8Array>;
     const emit = (event: string, scene: string, data: object = {}) => stream.enqueue(new TextEncoder().encode(

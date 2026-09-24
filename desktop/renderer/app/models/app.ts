@@ -21,6 +21,8 @@ export class AppModel extends Store {
   theme: "light" | "dark" = "light";
   startup: "loading" | "ready" | "error" = "loading";
   view = "chat";
+  placePresentation: "dialog" | "panel" = "dialog";
+  placePanelWidth = 620;
   chatSource = "";
   chatLoading = false;
   chatHistoryScope: HistoryScope = "current";
@@ -67,6 +69,39 @@ export class AppModel extends Store {
   searchEntries: { id: string; text: string }[] = [];
   readingSize = 15;
   update?: UpdateState;
+  updateChecking = false;
+  async checkClientUpdates() {
+    if (this.updateChecking || this.update?.phase === "checking" || this.update?.activity) return;
+    this.updateChecking = true;
+    this.changed();
+    try {
+      const state = await this.api.checkUpdates();
+      if (!this.update?.activity) this.update = state;
+      if (state.phase !== "available") this.toast(state.message);
+    } catch (error) {
+      this.toast(error);
+    } finally {
+      this.updateChecking = false;
+      this.changed();
+    }
+  }
+  async downloadClientUpdate() {
+    if (this.update?.phase !== "available" || !this.update.latestVersion || this.update.activity) return;
+    const activity: NonNullable<UpdateState["activity"]> = { phase: "metadata", version: this.update.latestVersion };
+    this.update = { ...this.update, activity };
+    this.changed();
+    try {
+      await this.api.downloadUpdate();
+    } catch (error) {
+      this.toast(error);
+    } finally {
+      // Main-process progress replaces this immediate pending state.
+      if (this.update?.activity === activity) {
+        this.update = { ...this.update, activity: undefined };
+        this.changed();
+      }
+    }
+  }
   portalAction: "start" | "stop" | "restart" | "force" | null = null;
   portalError = "";
   logsLoading = false;
@@ -126,6 +161,11 @@ export class AppModel extends Store {
       const size = Number(localStorage.getItem("beings:reading-size"));
       if (Number.isInteger(size) && size >= 13 && size <= 21)
         this.readingSize = size;
+      if (localStorage.getItem("beings:place-presentation") === "panel")
+        this.placePresentation = "panel";
+      const panelWidth = Number(localStorage.getItem("beings:place-panel-width"));
+      if (Number.isInteger(panelWidth) && panelWidth >= 220 && panelWidth <= 1600)
+        this.placePanelWidth = panelWidth;
     } catch {
       /* Optional preference. */
     }
@@ -220,6 +260,30 @@ export class AppModel extends Store {
     this.town.show(view, id);
     this.changed();
   };
+  setPlacePresentation = (presentation: "dialog" | "panel") => {
+    if (this.placePresentation === presentation) return;
+    this.placePresentation = presentation;
+    try {
+      localStorage.setItem("beings:place-presentation", presentation);
+    } catch {
+      /* Optional preference. */
+    }
+    this.changed();
+  };
+  setPlacePanelWidth = (width: number, persist = false) => {
+    const next = Math.round(Math.max(220, Math.min(1600, width)));
+    if (this.placePanelWidth !== next) {
+      this.placePanelWidth = next;
+      this.changed();
+    }
+    if (persist) {
+      try {
+        localStorage.setItem("beings:place-panel-width", String(next));
+      } catch {
+        /* Optional preference. */
+      }
+    }
+  };
   applySnapshot(next: Snapshot, reload = false) {
     const sameChat = Boolean(this.chatSource &&
       this.snapshot?.settings.endpoint === next.settings.endpoint &&
@@ -280,12 +344,16 @@ export class AppModel extends Store {
   async changeChatSession(operation: "create" | "bind" | "select" | "rename" | "delete", value: string, sceneId?: string) {
     const endpoint = this.snapshot?.settings.endpoint;
     if (!endpoint) throw new Error("请先连接 Being。");
+    const previousSceneId = this.snapshot?.chatScene?.scene_id;
     const next = await this.api.changeChatSession(operation, value, endpoint, sceneId);
     if (this.snapshot?.settings.endpoint !== endpoint) return;
     this.applySnapshot(next);
     this.chatHistoryScope = "current";
-    this.navigate("chat");
+    if (this.placePresentation !== "panel" || this.view === "chat")
+      this.navigate("chat");
     this.postCurrentSession();
+    if (next.chatScene && next.chatScene.scene_id !== previousSceneId)
+      this.toast(`已切到「${next.chatScene.scene_meta.scene_label}」场景`);
   }
   private postCurrentSession() {
     if (this.chatSource && this.snapshot?.chatScene) this.post({
@@ -297,7 +365,8 @@ export class AppModel extends Store {
   changeChatHistoryScope(scope: HistoryScope) {
     if (!this.chatSource || this.chatLoading || !this.chatHistoryScopeKnown || (scope === "current" && !this.snapshot?.chatScene)) return;
     this.chatHistoryScope = scope;
-    this.navigate("chat");
+    if (this.placePresentation !== "panel" || this.view === "chat")
+      this.navigate("chat");
     this.post({ type: "beings:history-scope", scope, revision: new URL(this.chatSource).searchParams.get("revision") });
   }
   setChatHistoryScope(scope: HistoryScope) {

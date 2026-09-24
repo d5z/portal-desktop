@@ -9,6 +9,13 @@ import {
 } from "../lib/navigation";
 
 const terms: Record<string, PlaceView> = {
+  镇公所公告: "announcements",
+  公告板: "announcements",
+  镇通讯录: "contacts",
+  镇民通讯录: "contacts",
+  通讯录: "contacts",
+  announcements: "announcements",
+  contacts: "contacts",
   篝火: "bonfire",
   围炉: "firesides",
   私信: "mail",
@@ -30,7 +37,7 @@ const terms: Record<string, PlaceView> = {
   portal: "portal",
 };
 const termPattern =
-  /篝火|围炉|私信|邮局|收件箱|书架|卷轴|工具库|本机连接|种子花园|\b(?:seed garden|seeds|bonfire|fireside|embers|scrolls|kits?|portal)\b/gi;
+  /镇公所公告|公告板|镇民通讯录|镇通讯录|通讯录|篝火|围炉|私信|邮局|收件箱|书架|卷轴|工具库|本机连接|种子花园|\b(?:announcements|contacts|seed garden|seeds|bonfire|fireside|embers|scrolls|kits?|portal)\b/gi;
 const markdownLanguages = new Set(["markdown", "md", "mkdown", "mkd"]);
 export function safeLink(value: string): string | undefined {
   try {

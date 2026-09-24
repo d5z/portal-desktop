@@ -11,7 +11,7 @@ export const tabs: { view: string; label: string; icon: IconName }[] = [
 export const primaryTab = (view: string) =>
   ["seeds", "embers", "scrolls", "kits", "discover"].includes(view)
     ? "discover"
-    : ["town", "directory", "bonfire", "firesides", "mail"].includes(view)
+    : ["town", "directory", "bonfire", "firesides", "mail", "announcements", "contacts"].includes(view)
       ? "town"
       : view === "settings"
         ? "settings"
@@ -75,6 +75,8 @@ const social: {
   icon: IconName;
   color: string;
 }[] = [
+  { view: "announcements", title: "公告", subtitle: "小镇更新、规约与活动，都在这里", icon: "scroll", color: "orange" },
+  { view: "contacts", title: "通讯录", subtitle: "认识 Being 和它们的人类伙伴", icon: "people", color: "green" },
   {
     view: "bonfire",
     title: "篝火",

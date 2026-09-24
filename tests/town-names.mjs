@@ -256,7 +256,7 @@ try {
   assert.equal(await trigger.getAttribute('aria-expanded'), 'true');
   const row = page.locator('#chat-places-menu button');
   assert.deepEqual(await row.evaluateAll(items => items.map(item => item.dataset.place)),
-    ['bonfire', 'firesides', 'mail', 'seeds', 'embers', 'scrolls', 'kits']);
+    ['bonfire', 'firesides', 'mail', 'seeds', 'embers', 'scrolls', 'kits', 'contacts']);
   assert.equal(await row.evaluateAll(items => new Set(items.map(item => Math.round(item.getBoundingClientRect().y))).size), 1);
   await page.locator('#input').fill('保留我的草稿');
   await trigger.click();
@@ -270,16 +270,16 @@ try {
   await page.keyboard.press('ArrowRight');
   assert.equal(await page.locator('[data-place="firesides"]').evaluate(el => el === document.activeElement), true);
   await page.keyboard.press('End');
-  assert.equal(await page.locator('[data-place="kits"]').evaluate(el => el === document.activeElement), true);
+  assert.equal(await page.locator('[data-place="contacts"]').evaluate(el => el === document.activeElement), true);
   await page.keyboard.press('Enter');
-  assert.deepEqual(await page.evaluate(() => window.fixturePlaces), [{ type: 'beings:open-place', view: 'kits' }]);
+  assert.deepEqual(await page.evaluate(() => window.fixturePlaces), [{ type: 'beings:open-place', view: 'contacts' }]);
   await page.keyboard.press('Escape');
   assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
   assert.equal(await trigger.evaluate(el => el === document.activeElement), true);
   await trigger.press('Enter');
   await page.locator('[data-place="mail"]').click();
   assert.deepEqual(await page.evaluate(() => window.fixturePlaces), [
-    { type: 'beings:open-place', view: 'kits' },
+    { type: 'beings:open-place', view: 'contacts' },
     { type: 'beings:open-place', view: 'mail' },
   ]);
   assert.equal(await page.locator('#input').inputValue(), '保留我的草稿');

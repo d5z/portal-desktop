@@ -58,6 +58,7 @@ export function useChatBridge(
       }
       if (message.revision !== new URL(target.src).searchParams.get("revision"))
         return;
+      if (app.town.receiveContactDraft(message)) return;
       if (message.type === 'beings:scene-tasks-request') {
         void app.api.sceneTasks?.().then(snapshot => {
           if (snapshot.endpoint === app.snapshot?.settings.endpoint && frame.current === target && new URL(target.src).searchParams.get('revision') === message.revision)

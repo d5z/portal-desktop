@@ -2,7 +2,7 @@ import type { CSSProperties } from 'react';
 import type { UpdateState } from '../../../shared/types';
 
 const stages: Record<NonNullable<UpdateState['activity']>['phase'], string> = {
-  metadata: '正在读取更新信息…',
+  metadata: '正在准备下载更新…',
   downloading: '正在下载更新…',
   verifying: '正在校验安装包…',
   preparing: '正在准备安装文件…',
@@ -46,9 +46,7 @@ export function UpdateProgress({ state, onDownload, onCancel, onInstall }: {
           {ratio === undefined ? null : <span>{Math.floor(ratio * 100)}</span>}
         </span>
       ) : activity?.phase === 'ready' ? (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M7 17h10M12 4v9m0 0 3-3m-3 3-3-3" />
-        </svg>
+        <span className="client-update-install" aria-hidden="true">安装</span>
       ) : (
         <svg viewBox="0 0 24 24" aria-hidden="true">
           <path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18v2h14v-2" />

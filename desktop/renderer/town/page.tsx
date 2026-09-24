@@ -21,6 +21,7 @@ import {
 } from "./components/catalog";
 import { TownFeed } from "./components/feed";
 import { SeedGarden, SeedDetail, SeedSearch } from "./components/seeds";
+import { Announcements, AnnouncementDetail, BonfireAnnouncements, Contacts, announcementCategories } from "./components/civic";
 export function Town({ model }: { model: TownModel }) {
   const town = useModel(model),
     definition = definitions[town.view],
@@ -28,7 +29,7 @@ export function Town({ model }: { model: TownModel }) {
     social = Boolean(channel),
     paginated =
       !town.directId &&
-      (["embers", "scrolls", "seeds"].includes(town.view) ||
+      (["embers", "scrolls", "seeds", "announcements"].includes(town.view) ||
         (town.view === "kits" && town.tab === "grove")),
     refreshing = Boolean((town.loading || town.detailLoading) && (town.data || town.ringData || town.library || town.detail)),
     root = useRef<HTMLElement>(null);
@@ -37,7 +38,7 @@ export function Town({ model }: { model: TownModel }) {
     <section
       id="town-view"
       ref={root}
-      className={`view${social ? " social-view" : ""}${paginated ? " paginated-view" : ""}${town.view === "embers" ? " bookshelf-view" : ""}${["scrolls", "embers"].includes(town.view) && !town.directId ? " reading-catalog" : ""}${town.view === "kits" && town.tab === "grove" && !town.directId ? " kit-catalog" : ""}${town.view === "seeds" && !town.directId ? " seed-catalog" : ""}`}
+      className={`view${social ? " social-view" : ""}${paginated ? " paginated-view" : ""}${town.view === "embers" ? " bookshelf-view" : ""}${["scrolls", "embers", "announcements"].includes(town.view) && !town.directId ? " reading-catalog" : ""}${town.view === "kits" && town.tab === "grove" && !town.directId ? " kit-catalog" : ""}${town.view === "seeds" && !town.directId ? " seed-catalog" : ""}`}
       hidden={!town.visible || !definition}
     >
       <div className="town-content">
@@ -113,11 +114,16 @@ export function Town({ model }: { model: TownModel }) {
             <option value="growing">🌿 成长中</option>
             <option value="sprouting">🌱 发芽中</option>
           </select>
+          {town.view === "announcements" && !town.directId && <select aria-label="公告分类" value={town.announcementCategory}
+            onChange={event => { town.announcementCategory = event.target.value; town.offset = 0; void town.load(); }}>
+            <option value="">全部分类</option>
+            {Object.entries(announcementCategories).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>}
           <input
             id="town-search"
             type="search"
-            aria-label={social ? "搜索已加载的消息与作者" : "筛选当前列表"}
-            placeholder={social ? "搜索消息、作者…" : "筛选当前列表…"}
+            aria-label={social ? "搜索已加载的消息与作者" : town.view === "contacts" ? "搜索通讯录" : "筛选当前列表"}
+            placeholder={social ? "搜索消息、作者…" : town.view === "contacts" ? "搜索 Being、人类伙伴…" : town.view === "announcements" ? "搜索本页公告…" : "筛选当前列表…"}
             hidden={Boolean(town.directId) || town.view === "seeds"}
             value={town.search}
             onChange={(event) => town.setSearch(event.target.value)}
@@ -167,13 +173,13 @@ export function Town({ model }: { model: TownModel }) {
             role="status"
             data-phase={town.live?.phase || "connecting"}
           >
-            {town.view === "seeds" ? "Seed Garden · 公开经验" : town.live?.message || "正在读取 Town 连接状态"}
+            {town.view === "seeds" ? "Seed Garden · 公开经验" : town.view === "announcements" ? "公开公告" : town.view === "contacts" ? "通讯录 · 自愿公开" : town.live?.message || "正在读取 Town 连接状态"}
           </span>
           <button
             id="town-live-retry"
             className="text-button"
             hidden={
-              town.view === "seeds" || !town.live ||
+              ["seeds", "announcements", "contacts"].includes(town.view) || !town.live ||
               !["reconnecting", "auth-error"].includes(town.live.phase)
             }
             onClick={() => void town.run(() => town.api.reconnectTown())}
@@ -196,6 +202,7 @@ export function Town({ model }: { model: TownModel }) {
         </div>
         {town.view === "kits" && town.tab === "grove" && <button className="secondary grove-help-button" onClick={() => void town.run(() => town.api.openTownLink("/grove"))}>Grove Help ↗</button>}
         </div>
+        {town.view === "bonfire" && <BonfireAnnouncements town={town} />}
         <div
           id="town-body"
           className={
@@ -253,7 +260,7 @@ function TownBody({ town }: { town: TownModel }) {
       <div className="direct-reading">
         <FiresideThread town={town} />
       </div>
-    ) : town.view === "seeds" ? <SeedDetail town={town} direct /> : (
+    ) : town.view === "seeds" ? <SeedDetail town={town} direct /> : town.view === "announcements" ? <AnnouncementDetail town={town} direct /> : (
       <CatalogDetail town={town} direct />
     );
   if (town.library) return <LocalKits town={town} />;
@@ -270,6 +277,8 @@ function TownBody({ town }: { town: TownModel }) {
     );
   if (town.view === "firesides") return <Firesides town={town} />;
   if (town.view === "seeds") return <SeedGarden town={town} data={town.data} />;
+  if (town.view === "announcements") return <Announcements town={town} data={town.data} />;
+  if (town.view === "contacts") return <Contacts town={town} data={town.data} />;
   return <Catalog town={town} data={town.data} />;
 }
 function Firesides({ town }: { town: TownModel }) {

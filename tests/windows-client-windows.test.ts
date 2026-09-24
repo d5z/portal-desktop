@@ -1,4 +1,4 @@
-import { expect, it, vi } from 'vitest';
+import { expect, it } from 'vitest';
 import { _electron as electron } from 'playwright';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
@@ -23,15 +23,14 @@ app.whenReady().then(async () => {
     await assertSingleClientWindow(pid);
     await page.getByRole('button', { name: 'Hover', exact: true }).hover();
     // Let Windows' hover delay elapse before launching the native inspector.
+    // Some hosted Windows sessions disable native tooltip windows entirely, so
+    // their presence cannot be a prerequisite for the window-count contract.
     await page.waitForTimeout(1500);
-    await vi.waitFor(async () => {
-      const windows = await clientWindowSnapshot(pid);
-      const visible = windows.filter(window => window.visible && window.className === 'Chrome_WidgetWin_1');
-      // The old class-name-only assertion counts the native tooltip as a second
-      // client. Keep that window present while checking the new classification.
-      expect(visible).toHaveLength(2);
-      expect(visible.filter(isClientMainWindow)).toHaveLength(1);
-    }, { timeout: 10_000, interval: 100 });
+    const hoveredWindows = await clientWindowSnapshot(pid);
+    expect(hoveredWindows.filter(isClientMainWindow)).toHaveLength(1);
+    // Chromium tooltips share the main-window class but lack WS_CAPTION.
+    expect(isClientMainWindow({ handle: 2, owner: 1, visible: true, className: 'Chrome_WidgetWin_1',
+      title: 'Native tooltip fixture', style: 0, extendedStyle: 0 })).toBe(false);
     await assertSingleClientWindow(pid);
     await page.mouse.move(400, 300);
     await app.evaluate(({ BrowserWindow }) => {

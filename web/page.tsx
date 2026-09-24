@@ -48,6 +48,8 @@ const places = [
   ["discover", "发现"],
   ["settings", "设置"],
   ["directory", "小镇服务"],
+  ["announcements", "公告"],
+  ["contacts", "通讯录"],
   ["bonfire", "篝火"],
   ["firesides", "围炉"],
   ["mail", "私信"],
@@ -164,11 +166,16 @@ export function WebApp({ installation }: { installation: InstallController }) {
       )
     )
       throw new Error("此场景正在回复，请结束后再移除。");
+    const previousSceneId = sceneRef.current.active;
     const next = changeScene(sceneRef.current, operation, value, id);
     saveScenes(connection.endpoint, next);
     sceneRef.current = next;
     setSceneGroup(next);
     selectScene(next);
+    if (next.active !== previousSceneId) {
+      const scene = next.scenes.find((item) => item.scene_id === next.active);
+      if (scene) notify(`已切到「${scene.scene_meta.scene_label}」场景`);
+    }
   };
   const updateScope = (scope: "current" | "all") => {
     if (!connection || !sceneRef.current) return;
@@ -407,7 +414,7 @@ export function WebApp({ installation }: { installation: InstallController }) {
         )
       )
         setEntries(data.entries);
-      if (data.type === "beings:scene-draft-result")
+      if (data.type === "beings:scene-draft-result" && !resources.town.receiveContactDraft(data))
         notify(
           data.ok ? "引用已放入对话草稿" : "对话中已有草稿，请先处理后再引用",
         );
