@@ -26,6 +26,11 @@ import {
 } from "./components/navigation";
 import type { ChatBridge } from "./services/bridge";
 import { useChatSession } from "./hooks/use-chat-session";
+import {
+  applyLineStartShiftTab,
+  applyLineStartTab,
+  applyShiftEnterListContinue,
+} from "./list-continuation";
 
 class ChatErrorBoundary extends Component<
   { children: ReactNode },
@@ -101,7 +106,8 @@ function ChatView({
   }
   const dragDepth = useRef(0),
     composing = useRef(false),
-    compositionEnd = useRef(0);
+    compositionEnd = useRef(0),
+    pendingComposerSelection = useRef<number | null>(null);
   const [dragging, setDragging] = useState(false),
     [highlighted, setHighlighted] = useState<string | null>(null),
     [panel, setPanel] = useState<ChatPanel>(null),
@@ -206,6 +212,14 @@ function ChatView({
     el.style.height = Math.min(el.scrollHeight, max) + "px";
     el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
   }, [state.draft, viewport.height]);
+  useLayoutEffect(() => {
+    const el = composer.current;
+    const next = pendingComposerSelection.current;
+    if (el && next !== null) {
+      el.setSelectionRange(next, next);
+      pendingComposerSelection.current = null;
+    }
+  }, [state.draft]);
   useLayoutEffect(() => {
     if (messages.current && scrollLock.current)
       messages.current.scrollTop = messages.current.scrollHeight;
@@ -530,15 +544,52 @@ function ChatView({
                 compositionEnd.current = Date.now();
               }}
               onKeyDown={(event) => {
-                if (
-                  event.key !== "Enter" ||
-                  event.shiftKey ||
+                const imeBlocked =
                   composing.current ||
                   event.nativeEvent.isComposing ||
                   event.keyCode === 229 ||
-                  Date.now() - compositionEnd.current < 50
-                )
+                  Date.now() - compositionEnd.current < 50;
+
+                if (event.key === "Tab" && !imeBlocked) {
+                  const el = composer.current;
+                  if (!el) return;
+                  const start = el.selectionStart ?? 0;
+                  const end = el.selectionEnd ?? 0;
+                  const result = event.shiftKey
+                    ? applyLineStartShiftTab(state.draft, start, end)
+                    : applyLineStartTab(state.draft, start, end);
+                  if (result) {
+                    event.preventDefault();
+                    pendingComposerSelection.current = result.selection;
+                    state.draft = result.text;
+                    state.changed();
+                  }
                   return;
+                }
+
+                if (event.key !== "Enter") return;
+
+                if (event.shiftKey) {
+                  if (imeBlocked) return;
+                  const el = composer.current;
+                  if (!el) return;
+                  const start = el.selectionStart ?? 0;
+                  const end = el.selectionEnd ?? 0;
+                  const result = applyShiftEnterListContinue(
+                    state.draft,
+                    start,
+                    end,
+                  );
+                  if (result) {
+                    event.preventDefault();
+                    pendingComposerSelection.current = result.selection;
+                    state.draft = result.text;
+                    state.changed();
+                  }
+                  return;
+                }
+
+                if (imeBlocked) return;
                 event.preventDefault();
                 void runtime.send(state.draft);
               }}
