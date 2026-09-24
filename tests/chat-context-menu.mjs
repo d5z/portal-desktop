@@ -97,7 +97,16 @@ try {
   const frame = page.frameLocator('#chat'), input = frame.locator('#input');
   await input.waitFor();
   const child = page.frames().find(frame => frame.url().startsWith('beings://chat/'));
-  await child.waitForFunction(() => performance.getEntriesByName('loom:ready').length > 0);
+  if (!child) throw new Error('Chat frame did not load.');
+  // The input mounts before history/storage restoration finishes. A cold Windows
+  // CI runner can need longer than the menu interaction timeout to reach the
+  // runtime readiness mark, so keep the short action timeout and widen only this
+  // initialization barrier (matching the chat-history integration test).
+  await child.waitForFunction(
+    () => performance.getEntriesByName('loom:ready').length > 0,
+    undefined,
+    { timeout: 15000 },
+  );
   await app.evaluate(async ({ clipboard, ClipboardItem }) => {
     // Electron can return an item with no formats for an empty native clipboard.
     // Such items carry no data and cannot be passed to the ClipboardItem constructor.
