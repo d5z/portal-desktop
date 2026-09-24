@@ -1,6 +1,6 @@
 import { createSceneRuntime } from "./scene-runtime";
 import { HistoryCache } from "./history-cache";
-import { inCurrentScene, messageScene } from "../models/scenes";
+import { inCurrentScene, messageScene, sceneTransitionNotice, stripSceneTransition } from "../models/scenes";
 
 /**
  * Loom's streaming, replay and history protocol, independent of rendering.
@@ -250,6 +250,7 @@ function createStreamRuntime(state, options) {
         start: Date.now(),
         label: "思考中",
         hint: "",
+        context: turnContext,
         arg: "",
       };
       state.items.push(currentRun);
@@ -499,6 +500,7 @@ function createStreamRuntime(state, options) {
   let tuiCurrentState = null;
   let tuiCurrentArg = "";
   let tuiCurrentPreview = "";
+  let turnContext = "";
 
   // ── Per-breath activity log ─────────────────────────────────
   // Entries:
@@ -718,7 +720,7 @@ function createStreamRuntime(state, options) {
     isoTime = null,
     scene = role === "being" ? state.activeScene : state.currentScene,
   ) {
-    if (!streaming && role !== "system") text = cleanContent(text);
+    if (!streaming && role !== "system") text = cleanContent(role === "user" ? stripSceneTransition(text) : text);
     if (!text && !streaming) return null; // skip empty after cleaning
 
     const ts = timestamp || formatTime();
@@ -1076,7 +1078,7 @@ function createStreamRuntime(state, options) {
     }
   }
 
-  function addNetworkFailureMessage(text, files) {
+  function addNetworkFailureMessage(text, files, requestMessage) {
     const scene = { ...state.activeScene };
     const message = addMessage("system", "⚠ 网络连接失败，请检查网络后重试", false, undefined, undefined, scene);
     message.retry = () => {
@@ -1084,7 +1086,7 @@ function createStreamRuntime(state, options) {
         message.text = "请切换回这条消息所属的场景后重试。"; changed(); return;
       }
       removeMessage(message);
-      return send(text, files?.length ? files : null, { isManualRetry: true });
+      return send(text, files?.length ? files : null, { isManualRetry: true, requestMessage });
     };
     message.retryLabel = "重试";
     changed();
@@ -1915,14 +1917,17 @@ function createStreamRuntime(state, options) {
       : [...pendingFiles];
     if (!msg && !filesToSend.length) return;
     if (!isManualRetry) msg = options.prepareMessage?.(msg || `[${filesToSend.length} file(s)]`) ?? msg;
+    const requestMessage = sendOptions.requestMessage ??
+      options.prepareRequestMessage?.(msg || `[${filesToSend.length} file(s)]`, sendingScene, sendOptions) ?? msg;
+    turnContext = sceneTransitionNotice(requestMessage);
     replyRunSettled = false;
     pendingReply = { baseline: replyBaseline, label: "等待回复", waiting: false };
     replayTransportOnly = false;
     setStreamScene(state.currentScene);
 
     if (!isManualRetry) {
-      if (!sendOptions.queuedMessage) addMessage("user", msg || `[${filesToSend.length} file(s)]`);
-      noteLocalEcho("user", msg || `[${filesToSend.length} file(s)]`);
+      const localMessage = sendOptions.queuedMessage || addMessage("user", msg || `[${filesToSend.length} file(s)]`);
+      noteLocalEcho("user", requestMessage || `[${filesToSend.length} file(s)]`, sendingScene, localMessage);
       if (!fromQueue) clearComposer();
     }
     setStatus("thinking");
@@ -1933,7 +1938,7 @@ function createStreamRuntime(state, options) {
     stopAutonomousWatch();
     updateSendButton();
 
-    const body = { message: msg || `[Sent ${filesToSend.length} file(s)]`, ...browserScenePayload(sendingScene) };
+    const body = { message: requestMessage || `[Sent ${filesToSend.length} file(s)]`, ...browserScenePayload(sendingScene) };
     if (sessionId) body.session_id = sessionId;
     if (filesToSend.length) {
       body.attachments = filesToSend.map((f) => ({
@@ -1965,7 +1970,7 @@ function createStreamRuntime(state, options) {
         },
       );
     } catch (e) {
-      handleStreamError(e, msg, filesToSend);
+      handleStreamError(e, msg, filesToSend, requestMessage);
       finalizeSendCleanup();
       return;
     }
@@ -1996,12 +2001,12 @@ function createStreamRuntime(state, options) {
       return;
     }
 
-    await driveChatStream(res, msg, filesToSend, replyBaseline);
+    await driveChatStream(res, msg, filesToSend, replyBaseline, requestMessage);
   }
 
   // 读取循环 + 统一的异常处理 + 统一的收尾。
   // send() 和 spliceSend() 都走这里，保证 isStreaming / 队列 / 按钮在任何路径上都能复位。
-  async function driveChatStream(res, msg, filesToSend, replyBaseline = new Set(state.items)) {
+  async function driveChatStream(res, msg, filesToSend, replyBaseline = new Set(state.items), requestMessage = msg) {
     let handedOff = false;
     try {
       const result = await consumeChatStream(res, msg, filesToSend);
@@ -2022,7 +2027,7 @@ function createStreamRuntime(state, options) {
       }
       return result;
     } catch (e) {
-      handleStreamError(e, msg, filesToSend);
+      handleStreamError(e, msg, filesToSend, requestMessage);
       return { outcome: "aborted", streamId: lastStreamId, localSeq: liveSeq };
     } finally {
       if (renderTimer) {
@@ -2051,7 +2056,7 @@ function createStreamRuntime(state, options) {
   // 统一的流异常处理。注意它**总是**让调用方走 finalizeSendCleanup()：
   // 断线恢复路径靠 pendingRecovery 让 finalizeSendCleanup 跳过队列 flush，
   // 而不是靠"不收尾"——isStreaming 卡在 true 是这次修复要根除的东西。
-  function handleStreamError(e, msg, filesToSend) {
+  function handleStreamError(e, msg, filesToSend, requestMessage = msg) {
     pendingReply = null;
     stopCatchUpWatcher();
     clearFetchRetryStatus();
@@ -2080,7 +2085,7 @@ function createStreamRuntime(state, options) {
         tuiClear();
       } else {
         // 初始连接就失败，消息根本没送出去 → 保留手动重试按钮
-        addNetworkFailureMessage(msg, filesToSend);
+        addNetworkFailureMessage(msg, filesToSend, requestMessage);
         setStatus("error");
         lastSendFailed = true;
         tuiClear();
@@ -2365,23 +2370,52 @@ function createStreamRuntime(state, options) {
   function normalizeEcho(text) {
     return (cleanContent(text || "") || "").replace(/\s+/g, " ").trim();
   }
-  function noteLocalEcho(role, text, scene = state.activeScene) {
+  function noteLocalEcho(role, text, scene = state.activeScene, localMessage) {
     const owner = options.historyOwner?.();
-    if (owner) return owner.noteLocalEcho(role, text, scene);
+    if (owner) return owner.noteLocalEcho(role, text, scene, localMessage);
     const t = normalizeEcho(text);
     if (!t) return;
-    const message = [...state.items].reverse().find(item => item.kind === "message" && item.role === role && item.sceneId === scene.sceneId && normalizeEcho(item.text) === t);
+    const message = localMessage || [...state.items].reverse().find(item => item.kind === "message" && item.role === role && item.sceneId === scene.sceneId && normalizeEcho(item.text) === t);
+    // History can win the race against message_stop. In that order the normal
+    // history -> local echo matcher has not been registered yet, so reconcile
+    // the already-rendered persisted row back into the live bubble here.
+    const history = [...state.items].reverse().find(item => item !== message &&
+      item.kind === "message" && item.historySeq && item.role === role &&
+      normalizeEcho(item.text) === t && echoScenesMatch(item, message || scene));
+    if (history && message) {
+      applyHistoryIdentity(message, history);
+      state.items = state.items.filter(item => item !== history);
+      changed();
+      return;
+    }
     localEchoes.push({ role, text: t, message });
     if (localEchoes.length > 40) localEchoes.shift();
   }
-  function consumeLocalEcho(role, text, scene) {
+  function echoScenesMatch(a = {}, b = {}) {
+    if (!a.sceneId || !b.sceneId || a.sceneId === b.sceneId) return true;
+    return a.legacySceneId === b.sceneId || b.legacySceneId === a.sceneId;
+  }
+  function applyHistoryIdentity(message, history) {
+    if (!message || !history) return;
+    if (history.historySeq) message.historySeq = history.historySeq;
+    if (history.timestamp) message.timestamp = history.timestamp;
+    if (Number.isFinite(history.createdAt)) message.createdAt = history.createdAt;
+    // Keep the live canonical scene when the server row uses its known legacy
+    // alias. A missing live scene can safely adopt the persisted one.
+    if (!message.sceneId && history.sceneId) {
+      message.sceneId = history.sceneId;
+      message.sceneLabel = history.sceneLabel;
+    }
+  }
+  function consumeLocalEcho(role, text, scene, history) {
     const t = normalizeEcho(text);
     if (!t) return false;
     for (let i = 0; i < localEchoes.length; i++) {
       const echo = localEchoes[i];
-      if (echo.role === role && echo.text === t && (!scene.sceneId || !echo.message?.sceneId || scene.sceneId === echo.message.sceneId)) {
-        if (echo.message && scene.sceneId) {
-          Object.assign(echo.message, scene);
+      if (echo.role === role && echo.text === t && echoScenesMatch(scene, echo.message || {})) {
+        if (echo.message) {
+          if (scene.sceneId && !echo.message.sceneId) Object.assign(echo.message, scene);
+          applyHistoryIdentity(echo.message, history);
           changed();
         }
         localEchoes.splice(i, 1);
@@ -2389,6 +2423,30 @@ function createStreamRuntime(state, options) {
       }
     }
     return false;
+  }
+
+  function historyIdentity(message, scene = messageScene(message)) {
+    const time = message.at ? new Date(message.at).getTime() : undefined;
+    return {
+      ...scene,
+      historySeq: Number(message.seq) || undefined,
+      timestamp: formatHistoryTime(message.at),
+      createdAt: Number.isFinite(time) ? time : undefined,
+    };
+  }
+
+  function addHistoryMessage(message) {
+    const scene = messageScene(message);
+    const rendered = addMessage(
+      message.role === "user" ? "user" : "being",
+      message.content,
+      false,
+      formatHistoryTime(message.at),
+      message.at,
+      scene,
+    );
+    if (rendered) applyHistoryIdentity(rendered, historyIdentity(message, scene));
+    return rendered;
   }
 
   // 返回一个在**最后一批渲染完成时**才 resolve 的 Promise（修初始化竞态 P1-G / P2-H）
@@ -2409,14 +2467,7 @@ function createStreamRuntime(state, options) {
             addBreathMarker(msg.content, ts, messageScene(msg));
             continue;
           }
-          addMessage(
-            msg.role === "user" ? "user" : "being",
-            msg.content,
-            false,
-            ts,
-            msg.at,
-            messageScene(msg),
-          );
+          addHistoryMessage(msg);
         }
         if (i < messages.length) {
           // keep scroll locked between batches
@@ -2535,8 +2586,8 @@ function createStreamRuntime(state, options) {
           }
           const role = m.role === "user" ? "user" : "being";
           const scene = messageScene(m);
-          if (consumeLocalEcho(role, m.content, scene) || (role === "being" && options.isLiveScene?.(scene))) continue; // 本地已经渲染过了
-          addMessage(role, m.content, false, formatHistoryTime(m.at), m.at, scene);
+          if (consumeLocalEcho(role, m.content, scene, historyIdentity(m, scene)) || (role === "being" && options.isLiveScene?.(scene))) continue; // 本地已经渲染过了
+          addHistoryMessage(m);
           if (role === "being") {
             lastHistoryReplyScenes.push(scene);
             if (inCurrentScene(scene, state.currentScene)) lastReconcileSawBeing = true;
@@ -2594,8 +2645,8 @@ function createStreamRuntime(state, options) {
             const role = m.role === "user" ? "user" : "being";
             // Current-room replies are already drawn by live/replay, including
             // continuations that older servers persist as a single combined row.
-            if (!consumeLocalEcho(role, m.content, scene) && !options.isLiveScene?.(scene)) {
-              addMessage(role, m.content, false, formatHistoryTime(m.at), m.at, scene);
+            if (!consumeLocalEcho(role, m.content, scene, historyIdentity(m, scene)) && !options.isLiveScene?.(scene)) {
+              addHistoryMessage(m);
             }
           }
         }

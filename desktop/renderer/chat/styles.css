@@ -1057,6 +1057,7 @@ body{-webkit-font-smoothing:antialiased;background:var(--bg)}
 .run-label{font-size:13px;font-weight:500;overflow-wrap:anywhere}
 .run-elapsed,.run-count{font-size:12px;line-height:20px;color:var(--text-muted);white-space:nowrap;font-variant-numeric:tabular-nums}
 .run-count:empty{display:none}
+.run-context{flex-basis:100%;font-size:11px;line-height:18px;color:var(--text-muted);opacity:.72;overflow-wrap:anywhere}
 .run-chevron{width:14px;height:14px;flex-basis:14px;color:var(--text-muted);transition:transform .18s ease}
 .run-activity[open] .run-chevron{transform:rotate(90deg)}
 .run-activity.running .run-icon svg{display:none}

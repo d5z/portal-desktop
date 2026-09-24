@@ -63,15 +63,16 @@ try {
         if (route.endsWith('/api/stream/active')) return new Response(null,{status:204});
         if (route.endsWith('/api/chat/stream')) {
           const body = JSON.parse(init.body); requests.push(body);
-          if (body.message.startsWith('并发')) {
+          const content = body.message.replace(/^【新消息来自 scene「[^」\\r\\n]{1,256}」】\\r?\\n\\r?\\n/, '');
+          if (content.startsWith('并发')) {
             return new Response(new ReadableStream({start(controller) {
               globalThis.fixture.streams.set(body.scene_id, controller);
             }}), {headers:{'content-type':'text/event-stream'}});
           }
-          if (body.message.startsWith('排队')) return Response.json({queued:true},{status:202});
-          const row = {seq:history.length+1,role:'user',content:body.message,scene_id:body.scene_id,at:new Date().toISOString()}; history.push(row);
-          history.push({...row,seq:history.length+1,role:'being',content:'回复：'+body.message});
-          return new Response('event: content_block_delta\\ndata: '+JSON.stringify({scene_id:body.scene_id,delta:{text:'回复：'+body.message}})+'\\n\\nevent: message_stop\\ndata: '+JSON.stringify({scene_id:body.scene_id})+'\\n\\n', {headers:{'content-type':'text/event-stream'}});
+          if (content.startsWith('排队')) return Response.json({queued:true},{status:202});
+          const row = {seq:history.length+1,role:'user',content,scene_id:body.scene_id,at:new Date().toISOString()}; history.push(row);
+          history.push({...row,seq:history.length+1,role:'being',content:'回复：'+content});
+          return new Response('event: content_block_delta\\ndata: '+JSON.stringify({scene_id:body.scene_id,delta:{text:'回复：'+content}})+'\\n\\nevent: message_stop\\ndata: '+JSON.stringify({scene_id:body.scene_id})+'\\n\\n', {headers:{'content-type':'text/event-stream'}});
         }
         if (route.endsWith('/health')) return new Response('OK');
         return Response.json({sbs_enabled:false,being_name:'同一个 Being'});
@@ -157,6 +158,7 @@ try {
   await page.getByRole('button',{name:'切换到场景：桌面·测试设备'}).click();
   await chat.locator('#input').fill('并发 A');
   await chat.locator('#send-btn').click();
+  await chat.getByText('【新消息来自 scene「桌面·测试设备 · ID: '+original+'」】',{exact:true}).waitFor();
   const emit = async (scene, text, close = false) => application.evaluate((_, {scene,text,close}) => {
     const stream = globalThis.fixture.streams.get(scene);
     assertStream(stream);

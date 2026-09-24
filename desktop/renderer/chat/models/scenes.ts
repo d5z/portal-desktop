@@ -8,6 +8,28 @@ export interface MessageScene {
 }
 export type HistoryScope = "current" | "all";
 
+const sceneTransitionPattern = /^【新消息来自 scene「[^」\r\n]{1,256}」】\r?\n\r?\n/;
+
+/** Add a small wire-only cue when consecutive conversation messages cross scenes. */
+export function withSceneTransition(text: string, current: MessageScene, previous?: MessageScene): string {
+  if (!current.sceneId || !previous?.sceneId || current.sceneId === previous.sceneId) return text;
+  const sceneId = current.sceneId.replace(/[\r\n」]/g, " ").trim().slice(0, 128);
+  if (!sceneId) return text;
+  const label = (current.sceneLabel || "").replace(/[\r\n」]/g, " ").trim().slice(0, 96);
+  const identity = label && label !== sceneId ? `${label} · ID: ${sceneId}` : `ID: ${sceneId}`;
+  return `【新消息来自 scene「${identity}」】\n\n${stripSceneTransition(text)}`;
+}
+
+/** Keep the transport cue out of the user's editable and rendered body. */
+export function stripSceneTransition(text: string): string {
+  return text.replace(sceneTransitionPattern, "");
+}
+
+/** Return the short transport cue so the waiting UI can surface it unobtrusively. */
+export function sceneTransitionNotice(text: string): string {
+  return text.match(sceneTransitionPattern)?.[0].trim() || "";
+}
+
 export function messageScene(value: unknown): MessageScene {
   if (!value || typeof value !== "object") return {};
   const data = value as Record<string, unknown>;

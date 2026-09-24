@@ -93,6 +93,7 @@ export function ChatActivity({
             {tools.length ? `· ${tools.length} 次工具调用` : ""}
             {run.end && tools.some((entry) => entry.error) ? " · 含失败项" : ""}
           </span>
+          {!run.end && run.context && <span className="run-context">{run.context}</span>}
         </span>
         <span className="run-chevron">
           <Icon name="chevron" />

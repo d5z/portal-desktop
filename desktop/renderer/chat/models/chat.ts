@@ -19,6 +19,7 @@ export interface Message extends MessageScene {
   streaming: boolean;
   timestamp: string;
   createdAt?: number;
+  historySeq?: number;
   label: string;
   consecutive: boolean;
   retry?: () => void | Promise<void>;
@@ -48,6 +49,7 @@ export interface Run extends MessageScene {
   end?: number;
   label: string;
   hint: string;
+  context?: string;
   arg: string;
   waitingForReply?: boolean;
   scheduling?: { hint: string; tasks: import("../../../shared/types").SceneTask[] };

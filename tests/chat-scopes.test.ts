@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ChatState, type ChatItem } from "../desktop/renderer/chat/models/chat";
-import { inCurrentScene, messageScene, sceneItems, sceneName } from "../desktop/renderer/chat/models/scenes";
+import { inCurrentScene, messageScene, sceneItems, sceneName, sceneTransitionNotice, stripSceneTransition, withSceneTransition } from "../desktop/renderer/chat/models/scenes";
 import { withScheduling } from "../desktop/renderer/chat/models/scheduling";
 import { createChatRuntime } from "../desktop/renderer/chat/services/runtime";
 
@@ -60,10 +60,48 @@ describe("scene history refresh", () => {
     } finally { runtime.dispose(); }
   });
 
-  it("sends into the selected scene while displaying all scene context", async () => {
+  it("deduplicates history that arrives before message_stop under a known legacy scene id", async () => {
+    const history: { seq: number; role: string; content: string; scene_id: string; at?: string }[] = [];
+    let stream!: ReadableStreamDefaultController<Uint8Array>;
+    const event = (name: string, data: unknown) => stream.enqueue(new TextEncoder().encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`));
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname === "/api/history") return Response.json({ messages: history.filter(m => m.seq > Number(url.searchParams.get("after") || 0)) });
+      if (url.pathname === "/api/stream/active") return new Response(null, { status: 204 });
+      if (url.pathname === "/health") return new Response("OK fixture");
+      if (url.pathname === "/api/chat/stream") return new Response(new ReadableStream({ start(controller) { stream = controller; } }));
+      return Response.json({ sbs_enabled: false });
+    }));
+    const state = new ChatState();
+    state.currentScene = { sceneId: "desktop-test", legacySceneId: "loom-legacy", strict: true };
+    state.activeScene = state.currentScene;
+    const runtime = createChatRuntime(state);
+    try {
+      await runtime.start();
+      const sending = runtime.send("一次提问");
+      await vi.advanceTimersByTimeAsync(0);
+      event("content_block_delta", { scene_id: "desktop-test", delta: { text: "同一条回复" } });
+      await vi.advanceTimersByTimeAsync(20);
+
+      history.push({ seq: 1, role: "being", content: "同一条回复", scene_id: "loom-legacy", at: "2026-09-24T17:55:15+08:00" });
+      await runtime.refreshHistory();
+      expect(state.items.filter(item => item.kind === "message" && item.text === "同一条回复")).toHaveLength(2);
+
+      event("message_stop", { scene_id: "desktop-test" });
+      stream.close();
+      await sending;
+      await vi.advanceTimersByTimeAsync(20);
+      const replies = state.items.filter(item => item.kind === "message" && item.text === "同一条回复");
+      expect(replies).toHaveLength(1);
+      expect(replies[0]).toMatchObject({ sceneId: "desktop-test", historySeq: 1, timestamp: "17:55:15" });
+    } finally { runtime.dispose(); }
+  });
+
+  it("compares the selected scene with the global previous message even when other scenes are hidden", async () => {
     vi.useRealTimers();
     vi.stubGlobal("location", new URL("beings://chat/loom.html?scene_id=desktop-test&strict_scene=1"));
     const requests: { scene_id: string; message: string }[] = [];
+    let stream!: ReadableStreamDefaultController<Uint8Array>;
     vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
       const route = new URL(input).pathname;
       if (route === "/api/history") return Response.json({ messages: [
@@ -73,7 +111,7 @@ describe("scene history refresh", () => {
       if (route === "/health") return new Response("OK fixture");
       if (route === "/api/chat/stream") {
         requests.push({ ...JSON.parse(String(init?.body)), scene_id: new Headers(init?.headers).get("X-Portal-Scene-Id") });
-        return new Response('event: done\ndata: {}\n\n', { headers: { "Content-Type": "text/event-stream" } });
+        return new Response(new ReadableStream({ start(controller) { stream = controller; } }), { headers: { "Content-Type": "text/event-stream" } });
       }
       return Response.json({ sbs_enabled: false });
     }));
@@ -82,18 +120,77 @@ describe("scene history refresh", () => {
     await runtime.start();
     try {
       await runtime.selectScene({ ...current, strict: true });
-      state.historyScope = "all";
+      state.historyScope = "current";
       state.draft = "继续当前场景";
-      expect(sceneItems(state.items, "all", state.currentScene).some(item => item.kind === "message" && item.text === "其他场景上下文")).toBe(true);
-      await runtime.send(state.draft);
+      expect(state.items.some(item => item.kind === "message" && item.text === "其他场景上下文")).toBe(true);
+      expect(sceneItems(state.items, "current", state.currentScene).some(item => item.kind === "message" && item.text === "其他场景上下文")).toBe(false);
+      const sending = runtime.send(state.draft);
       await new Promise(resolve => setTimeout(resolve, 30));
-      expect(requests).toEqual([expect.objectContaining({ scene_id: current.sceneId, message: "继续当前场景" })]);
+      expect(requests).toEqual([expect.objectContaining({
+        scene_id: current.sceneId,
+        message: "【新消息来自 scene「桌面·测试机 · ID: desktop-test」】\n\n继续当前场景",
+      })]);
+      expect(state.items.find(item => item.kind === "message" && item.role === "user" && item.sceneId === current.sceneId))
+        .toMatchObject({ text: "继续当前场景" });
+      expect(state.items.find(item => item.kind === "run" && !item.end && item.sceneId === current.sceneId))
+        .toMatchObject({ context: "【新消息来自 scene「桌面·测试机 · ID: desktop-test」】" });
+      stream.enqueue(new TextEncoder().encode('event: content_block_delta\ndata: {"scene_id":"desktop-test","delta":{"text":"收到"}}\n\nevent: message_stop\ndata: {"scene_id":"desktop-test"}\n\n'));
+      stream.close();
+      await sending;
+      await new Promise(resolve => setTimeout(resolve, 30));
       expect(state.currentScene.sceneId).toBe(current.sceneId);
-      expect(state.historyScope).toBe("all");
+      expect(state.historyScope).toBe("current");
     } finally { runtime.dispose(); }
   });
 
-  it.each([false, true])("queues independent scenes in FIFO order without changing their text (subagent=%s)", async subagentReady => {
+  it("preserves the global cross-scene cue across a manual network retry", async () => {
+    vi.stubGlobal("location", new URL("beings://chat/loom.html?scene_id=desktop-test&scene_label=桌面·测试机"));
+    const requests: string[] = [];
+    let online = false;
+    vi.stubGlobal("fetch", vi.fn(async (input: string, init?: RequestInit) => {
+      const route = new URL(input).pathname;
+      if (route === "/api/history") return Response.json({ messages: [] });
+      if (route === "/api/stream/active") return new Response(null, { status: 204 });
+      if (route === "/health") return new Response("OK fixture");
+      if (route === "/api/chat/stream") {
+        requests.push(JSON.parse(String(init?.body)).message);
+        if (!online) throw new TypeError("offline");
+        return new Response('event: content_block_delta\ndata: {"scene_id":"desktop-test","delta":{"text":"收到"}}\n\nevent: message_stop\ndata: {"scene_id":"desktop-test"}\n\n', { headers: { "Content-Type": "text/event-stream" } });
+      }
+      return Response.json({ sbs_enabled: false });
+    }));
+    const state = new ChatState();
+    state.items.push({
+      kind: "message", id: "previous", role: "being", text: "其他场景的上一条回复",
+      streaming: false, timestamp: "", label: "being", consecutive: false, sceneId: "other-scene",
+    });
+    const runtime = createChatRuntime(state);
+    try {
+      const sending = runtime.send("保留正文");
+      await vi.advanceTimersByTimeAsync(0);
+      expect(requests).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1000);
+      expect(requests).toHaveLength(2);
+      await vi.advanceTimersByTimeAsync(2000);
+      expect(requests).toHaveLength(3);
+      await vi.advanceTimersByTimeAsync(4000);
+      expect(requests).toHaveLength(4);
+      await sending;
+      const failure = state.items.find((item): item is Extract<ChatItem, { kind: "message" }> =>
+        item.kind === "message" && item.retryLabel === "重试");
+      expect(failure?.retry).toBeTypeOf("function");
+      online = true;
+      const retrying = failure!.retry!();
+      await vi.advanceTimersByTimeAsync(20);
+      await retrying;
+      const expected = "【新消息来自 scene「桌面·测试机 · ID: desktop-test」】\n\n保留正文";
+      expect(requests).toEqual([expected, expected, expected, expected, expected]);
+      expect(state.items.filter(item => item.kind === "message" && item.role === "user" && item.text === "保留正文")).toHaveLength(1);
+      expect(state.items.some(item => item.kind === "message" && item.role === "user" && item.text === expected)).toBe(false);
+    } finally { runtime.dispose(); }
+  });
+
+  it.each([false, true])("queues independent scenes in FIFO order without changing their visible text (subagent=%s)", async subagentReady => {
     const requests: { message: string; scene_id: string }[] = [];
     const streams: ReadableStreamDefaultController<Uint8Array>[] = [];
     const signals: AbortSignal[] = [];
@@ -134,14 +231,14 @@ describe("scene history refresh", () => {
       streams[0].close();
       await vi.advanceTimersByTimeAsync(2100);
       expect(requests.map(r => [r.scene_id, r.message])).toEqual([
-        ["desktop-test", "A 独立任务"], ["desktop-b", "B 独立任务"],
+        ["desktop-test", "A 独立任务"], ["desktop-b", "【新消息来自 scene「ID: desktop-b」】\n\nB 独立任务"],
       ]);
       expect(state.items.filter(i => i.kind === "message" && i.queued).map(i => i.sceneId)).toEqual(["desktop-c"]);
       emit(1, "content_block_delta", { scene_id: "desktop-b", delta: { text: "B 完成" } });
       emit(1, "message_stop", { scene_id: "desktop-b" });
       streams[1].close();
       await vi.advanceTimersByTimeAsync(2100);
-      expect(requests[2]).toMatchObject({ scene_id: "desktop-c", message: "C 独立任务" });
+      expect(requests[2]).toMatchObject({ scene_id: "desktop-c", message: "【新消息来自 scene「ID: desktop-c」】\n\nC 独立任务" });
       emit(2, "content_block_delta", { scene_id: "desktop-c", delta: { text: "C 完成" } });
       emit(2, "message_stop", { scene_id: "desktop-c" });
       streams[2].close();
@@ -446,7 +543,9 @@ describe("scene history refresh", () => {
       history.push({ seq: 1, role: "user", content: "B 输入", scene_id: "desktop-b" },
         { seq: 2, role: "being", content: "B 排队回复", scene_id: "desktop-b" });
       await vi.advanceTimersByTimeAsync(4100);
-      expect(requests.map(r => r.message)).toEqual(["B 输入", "C 输入"]);
+      expect(requests.map(r => r.message)).toEqual([
+        "B 输入", "【新消息来自 scene「ID: desktop-c」】\n\nC 输入",
+      ]);
       expect(state.items.filter(i => i.kind === "message" && i.text === "B 输入")).toHaveLength(1);
       expect(state.items.filter(i => i.kind === "message" && i.text === "B 排队回复")).toHaveLength(1);
       expect(state.items.find(i => i.kind === "run" && i.sceneId === "desktop-b")).toMatchObject({ outcome: "done" });
@@ -492,7 +591,10 @@ describe("scene history refresh", () => {
         await vi.advanceTimersByTimeAsync(4100);
       }
       expect(state.items.find(item => item.kind === "run" && item.sceneId === "desktop-test")).toMatchObject({ outcome: "done", label: "已回复" });
-      expect(requests.map(r => r.message)).toEqual(["A 输入", "B 输入"]);
+      expect(requests.map(r => r.message)).toEqual([
+        "A 输入",
+        replyScene || strict ? "【新消息来自 scene「ID: desktop-b」】\n\nB 输入" : "B 输入",
+      ]);
     } finally { runtime.dispose(); }
   });
 
@@ -635,6 +737,17 @@ describe("scene history refresh", () => {
 });
 
 describe("chat scene scopes", () => {
+  it("adds an idempotent wire-only cue only when consecutive scene IDs differ", () => {
+    const text = "保留自定义正文\n和格式";
+    const changed = withSceneTransition(text, { sceneId: "b", sceneLabel: "讨论 B" }, { sceneId: "a" });
+    expect(changed).toBe("【新消息来自 scene「讨论 B · ID: b」】\n\n" + text);
+    expect(sceneTransitionNotice(changed)).toBe("【新消息来自 scene「讨论 B · ID: b」】");
+    expect(stripSceneTransition(changed)).toBe(text);
+    expect(withSceneTransition(changed, { sceneId: "b", sceneLabel: "讨论 B" }, { sceneId: "a" })).toBe(changed);
+    expect(withSceneTransition(text, { sceneId: "b" }, { sceneId: "b" })).toBe(text);
+    expect(withSceneTransition(text, { sceneId: "b" }, {})).toBe(text);
+  });
+
   it("shares Loom's legacy-message rule while preserving all scenes", () => {
     const items: ChatItem[] = [
       { kind: "separator", id: "local", text: "local", ...current },

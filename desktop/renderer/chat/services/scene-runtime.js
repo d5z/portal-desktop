@@ -1,5 +1,5 @@
 import { SceneQueueStore } from "./scene-queue";
-import { inCurrentScene, messageScene } from "../models/scenes";
+import { inCurrentScene, messageScene, withSceneTransition } from "../models/scenes";
 
 /** One Being coordinator; scene-local state is not a separate agent or breath. */
 export function createSceneRuntime(state, options, createRuntime) {
@@ -143,9 +143,15 @@ export function createSceneRuntime(state, options, createRuntime) {
         if (selected === session) state.currentScene = { ...scene };
       },
       prepareMessage(text) {
-        // Track submission for scene status without adding cross-scene context.
+        // Track submission without changing the editable or locally rendered body.
         session.submittedAt = Date.now();
         return text;
+      },
+      prepareRequestMessage(text, scene, sendOptions = {}) {
+        const previous = [...state.items].reverse().find(item =>
+          item !== sendOptions.queuedMessage && item.kind === "message" &&
+          (item.role === "user" || item.role === "being") && !item.queued);
+        return withSceneTransition(text, scene, previous);
       },
       onConnection(next) {
         for (const other of sessions.values()) if (other !== session) other.runtime?.syncConnection(next);
