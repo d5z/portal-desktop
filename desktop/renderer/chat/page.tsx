@@ -13,7 +13,6 @@ import {
 import { ChatState, type ChatRuntime, type ChatPanel, type RuntimeOptions } from "./models/chat";
 import { inCurrentScene, sceneItems, sceneName, type HistoryScope } from "./models/scenes";
 import { useModel } from "../shared/hooks/use-model";
-import { Markdown } from "../shared/components/markdown";
 import { CopyMessage } from '../shared/components/copy-message';
 import { TemperatureGlow, ChatActivity } from "./components/messages";
 import { ChatSettings } from "./components/settings";
@@ -31,6 +30,7 @@ import {
   applyLineStartTab,
   applyShiftEnterListContinue,
 } from "./list-continuation";
+import { ComposerField } from "./components/composer-field";
 
 function scrollComposerCaretIntoView(el: HTMLTextAreaElement) {
   if (el.scrollHeight <= el.clientHeight) return;
@@ -137,6 +137,7 @@ function ChatView({
   );
   const [viewport, setViewport] = useState({ height: innerHeight, offset: 0 });
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [imeComposing, setImeComposing] = useState(false);
   const [selection, setSelection] = useState<{
     id: string;
     text: string;
@@ -541,11 +542,12 @@ function ChatView({
             ))}
           </div>
           <div id="input-row">
-            <textarea
-              ref={composer}
+            <ComposerField
+              textareaRef={composer}
               id="input"
               rows={1}
               className={state.queued ? "queued" : ""}
+              composing={imeComposing}
               placeholder="说点什么…"
               aria-label="message input"
               value={state.draft}
@@ -555,10 +557,12 @@ function ChatView({
               }}
               onCompositionStart={() => {
                 composing.current = true;
+                setImeComposing(true);
               }}
               onCompositionEnd={() => {
                 composing.current = false;
                 compositionEnd.current = Date.now();
+                setImeComposing(false);
               }}
               onKeyDown={(event) => {
                 const imeBlocked =

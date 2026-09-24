@@ -1207,3 +1207,96 @@ button.llm-custom-link, button.step2-back { border: 0; cursor: pointer; }
 
 label.chat-scope-switch{align-items:center;gap:8px;font-size:12px;color:var(--text-muted);cursor:pointer}
 label.chat-scope-switch input{margin:0;accent-color:var(--accent)}
+
+/* Composer typing preview: markdown overlay aligned to textarea (SPEC §2). */
+.composer-stack {
+  position: relative;
+  grid-column: 1 / -1;
+  grid-row: 1;
+  width: 100%;
+  min-width: 0;
+}
+.composer-preview {
+  position: absolute;
+  inset: 0;
+  overflow: auto;
+  scrollbar-width: none;
+  pointer-events: none;
+  color: var(--text);
+  z-index: 0;
+}
+.composer-preview::-webkit-scrollbar {
+  display: none;
+}
+.composer-stack .composer-input {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent;
+  caret-color: var(--text);
+}
+.composer-stack .composer-input:not(:placeholder-shown) {
+  color: transparent;
+  -webkit-text-fill-color: transparent;
+}
+.composer-stack.ime-composing .composer-input {
+  color: var(--text);
+  -webkit-text-fill-color: var(--text);
+}
+.composer-stack.ime-composing .composer-preview {
+  visibility: hidden;
+}
+.composer-stack .composer-input::placeholder {
+  color: var(--text-muted);
+  -webkit-text-fill-color: var(--text-muted);
+}
+.composer-preview-markdown {
+  font-family: inherit;
+  font-size: var(--composer-font-size, 15px);
+  line-height: var(--composer-line-height, 22.5px);
+  letter-spacing: var(--composer-letter-spacing, normal);
+  padding: var(--composer-padding-top, 0) var(--composer-padding-right, 0)
+    var(--composer-padding-bottom, 8px) var(--composer-padding-left, 0);
+  margin: 0;
+  overflow-wrap: anywhere;
+  color: var(--text);
+}
+.composer-preview-markdown p,
+.composer-preview-markdown .composer-preview-line,
+.composer-preview-markdown h1,
+.composer-preview-markdown h2,
+.composer-preview-markdown h3,
+.composer-preview-markdown h4,
+.composer-preview-markdown h5,
+.composer-preview-markdown h6,
+.composer-preview-markdown ul,
+.composer-preview-markdown ol,
+.composer-preview-markdown li {
+  margin: 0;
+  padding: 0;
+  line-height: var(--composer-line-height, 22.5px);
+}
+.composer-preview-markdown .composer-preview-heading {
+  font-weight: 600;
+  color: var(--text);
+}
+.composer-preview-markdown h1.composer-preview-heading {
+  font-size: calc(var(--composer-font-size, 15px) * 1.07);
+}
+.composer-preview-markdown h2.composer-preview-heading {
+  font-size: calc(var(--composer-font-size, 15px) * 1.04);
+}
+.composer-preview-markdown h3.composer-preview-heading {
+  font-size: calc(var(--composer-font-size, 15px) * 1.02);
+}
+.composer-preview-markdown .composer-preview-list {
+  list-style-position: outside;
+  padding-left: 1.35em;
+}
+.composer-preview-markdown .composer-preview-list .composer-preview-list {
+  padding-left: 1.35em;
+}
+.composer-preview-markdown .composer-preview-list ul {
+  list-style-type: disc;
+}
