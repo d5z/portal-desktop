@@ -3,6 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { ClientBrowser } from '../browser/browser';
 import { refreshSystemTheme } from './system-theme';
+import { sendToShell } from './shell-ipc';
 
 const CLIENT_NAME = 'Portal Desktop';
 
@@ -60,7 +61,7 @@ export function createMainWindow(options: MainWindowOptions) {
   });
 
   const browser = new ClientBrowser(window, state => {
-    if (!window.isDestroyed() && !window.webContents.isDestroyed()) window.webContents.send('beings:browser-state', state);
+    sendToShell(window, 'beings:browser-state', state);
   });
   options.onBrowser(browser);
   window.on('close', event => {

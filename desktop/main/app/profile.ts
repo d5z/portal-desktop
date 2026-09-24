@@ -1,6 +1,11 @@
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 
+/** Dev `npm start` with `PORTAL_DESKTOP_USER_DATA` must not auto-manage Portal alongside a packaged install. */
+export function isIsolatedDevelopment(isPackaged: boolean, userDataOverride?: string) {
+  return !isPackaged && Boolean(userDataOverride);
+}
+
 export function clientUserData(appData: string | (() => string), override?: string, exists = existsSync) {
   if (override) return path.resolve(override);
   const directory = typeof appData === 'function' ? appData() : appData;

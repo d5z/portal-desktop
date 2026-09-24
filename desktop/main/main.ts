@@ -9,7 +9,8 @@ import { repairDevelopmentShortcut, updateNotificationShortcutIcon, windowsAppId
 import { brandingPath, notificationIcon } from './app/branding';
 import { systemUsesDarkColors, watchSystemTheme } from './app/system-theme';
 import { clientStartup } from './app/startup';
-import { clientUserData } from './app/profile';
+import { clientUserData, isIsolatedDevelopment } from './app/profile';
+import { sendToShell } from './app/shell-ipc';
 import type { ClientBrowser } from './browser/browser';
 import { createMainWindow } from './app/window';
 import { editChat } from './app/context-menu';
@@ -87,6 +88,10 @@ let sessionEnding = false;
 let tray: Tray | undefined;
 let lifecycleError = '';
 const errorLog = new ClientErrorLog(userData, () => [store?.connection?.token || '', store?.connection?.relaySecret || '']);
+process.on('uncaughtException', error => {
+  if ((error as NodeJS.ErrnoException).code === 'EPIPE') return;
+  errorLog.report('uncaught-exception', error);
+});
 let mutation = Promise.resolve();
 let prepareInstallerShutdown: ((target: string) => void) | undefined;
 let pendingInstallerTarget: string | undefined;
@@ -193,14 +198,14 @@ async function ready() {
       if (quitting) return;
       pendingNotification = { target, generation: townLive.state.generation };
       showWindow();
-      window?.webContents.send('beings:notification-open');
+      sendToShell(window, 'beings:notification-open');
     },
   });
   await notifications.load();
   townLive = new TownLive(() => townCredentials.token, () => townCredentials.beingId, state => {
     notifications.reset(state.generation);
     if (state.phase === 'auth-error' || state.phase === 'unpaired') { notifications.clear(); pendingNotification = undefined; }
-    if (window && !window.webContents.isDestroyed()) window.webContents.send('beings:town-live', state);
+    sendToShell(window, 'beings:town-live', state);
   }, net.fetch.bind(net) as typeof fetch, TOWN_ORIGIN, () => townCredentials.display, target => notifications.receive(target));
   const town = new TownClient(() => townCredentials.token, net.fetch.bind(net) as typeof fetch, TOWN_ORIGIN, () => townLive.state.beingId || '', event => {
     errorLog.report('town-request', new Error(JSON.stringify(event)));
@@ -348,7 +353,7 @@ async function ready() {
   });
   let runtimeUpdate: RuntimeUpdateResult = { phase: 'current', message: 'Portal 升级状态将在启动检查后显示。' };
   const updates = new UpdateChecker(app.getVersion(), PORTAL_DESKTOP_UPDATE_REPOSITORY, net.fetch.bind(net) as typeof fetch,
-    state => { if (window && !window.isDestroyed()) window.webContents.send('beings:update-state', state); });
+    state => { sendToShell(window, 'beings:update-state', state); });
   let updateDownload: AbortController | undefined;
   let updateHandoff: Awaited<ReturnType<typeof stageInstaller>> | undefined;
   const downloadUpdate = async () => {
@@ -543,7 +548,7 @@ async function ready() {
   };
   const sceneTasks = new SceneTaskObserver(tasks => {
     void taskSnapshot(tasks).then(snapshot => {
-      if (snapshot.endpoint === store.connection?.endpoint && window && !window.isDestroyed()) window.webContents.send('beings:scene-tasks', snapshot);
+      if (snapshot.endpoint === store.connection?.endpoint) sendToShell(window, 'beings:scene-tasks', snapshot);
     });
   }, () => new Set((chatSessions?.list(store.connection?.endpoint) || []).map(scene => scene.scene_id)));
   app.once('will-quit', () => sceneTasks.close());
@@ -647,10 +652,11 @@ async function ready() {
       state = { ...state, message: errorLog.report('portal-state', state.message, 'Portal 启动未完成，请查看日志后重试。') };
       portal.state = state;
     }
-    if (window && !window.isDestroyed()) window.webContents.send('beings:portal-state', state);
+    sendToShell(window, 'beings:portal-state', state);
     // A competing service can start between discovery and launch. Resolve that
     // race once through the same stop/start path, never from a retry timer.
-    if (state.conflict && !handlingConflict && !takeover.holdMessage && !quitting) {
+    const isolatedDev = isIsolatedDevelopment(app.isPackaged, process.env.PORTAL_DESKTOP_USER_DATA);
+    if (state.conflict && !handlingConflict && !takeover.holdMessage && !quitting && !isolatedDev) {
       handlingConflict = true;
       void exclusive(async () => {
         if (background.state.enabled && !background.state.running) await background.disable();
@@ -667,7 +673,14 @@ async function ready() {
     void updates.check();
   });
   tray = createApplicationTray(showWindow, app.isPackaged);
+  const isolatedDevProfile = isIsolatedDevelopment(app.isPackaged, process.env.PORTAL_DESKTOP_USER_DATA);
   async function restoreStartup(intent: 'manual' | 'automatic' = 'automatic') {
+    if (isolatedDevProfile && intent === 'automatic') {
+      runtimeUpdate = { phase: 'skipped', message: '开发实例使用独立配置目录，不会自动启动内嵌 Portal；请在界面中手动启动，或使用已安装的客户端。' };
+      portal.state = { phase: 'stopped', message: runtimeUpdate.message, logs: [] };
+      portal.emit('state', portal.state);
+      return;
+    }
     if (!store.connection) {
       if (installIntent) {
         await clientInstall.finish();
