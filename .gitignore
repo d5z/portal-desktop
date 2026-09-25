@@ -3,6 +3,7 @@ node_modules/
 desktop/renderer/.vite/
 out/
 desktop/generated/
+.dev-profile/
 resources/heart-portal*
 !resources/HEART-PORTAL-LICENSE
 .DS_Store

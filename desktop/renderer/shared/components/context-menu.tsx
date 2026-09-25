@@ -1,11 +1,12 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { EditorView } from "@codemirror/view";
 import type { ChatEditCommand } from "../../../shared/types";
 
 type TextField = HTMLInputElement | HTMLTextAreaElement;
 type Context = {
   x: number; y: number; editable: boolean; selected: boolean; canSelect: boolean;
-  field: TextField | null; container: HTMLElement; portal: HTMLElement; restore(): void;
+  field: TextField | null; editor: EditorView | null; container: HTMLElement; portal: HTMLElement; restore(): void;
 };
 
 export function EditContextMenu({ edit, onOpenChange, rootSelector = ".chat-root",
@@ -31,15 +32,22 @@ export function EditContextMenu({ edit, onOpenChange, rootSelector = ".chat-root
       const element = event.target.closest<HTMLElement>("input, textarea, [contenteditable=true]");
       const field = element instanceof HTMLTextAreaElement ||
         (element instanceof HTMLInputElement && element.selectionStart !== null) ? element : null;
+      const editor = element?.classList.contains("cm-content") ? EditorView.findFromDOM(element) : null;
       const editable = field ? !field.readOnly && !field.disabled : !!element?.isContentEditable;
       const selection = window.getSelection();
       const range = selection?.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
       const start = field?.selectionStart ?? 0, end = field?.selectionEnd ?? 0;
       const direction = field?.selectionDirection ?? "none";
+      const editorSelection = editor?.state.selection.main;
       const active = document.activeElement instanceof HTMLElement ? document.activeElement : null;
       const container = field || element || event.target.closest<HTMLElement>(selectionSelector) || event.target;
       const portal = event.target.closest<HTMLElement>("dialog[open]") || document.body;
       const restore = () => {
+        if (editor && editorSelection) {
+          editor.focus();
+          editor.dispatch({ selection: { anchor: editorSelection.anchor, head: editorSelection.head } });
+          return;
+        }
         const focus = field || element || active;
         if (focus?.isConnected) focus.focus({ preventScroll: true });
         if (field?.isConnected) field.setSelectionRange(start, end, direction);
@@ -51,8 +59,9 @@ export function EditContextMenu({ edit, onOpenChange, rootSelector = ".chat-root
       };
       setError(null);
       setContext({ x: event.clientX, y: event.clientY, editable,
-        selected: field ? end > start : !!selection?.toString(),
-        canSelect: !!(field ? field.value : container.textContent), field, container, portal, restore });
+        selected: editorSelection ? !editorSelection.empty : field ? end > start : !!selection?.toString(),
+        canSelect: editor ? editor.state.doc.length > 0 : !!(field ? field.value : container.textContent),
+        field, editor, container, portal, restore });
     };
     const dismiss = (event: Event) => {
       if (event.target instanceof Node && menu.current?.contains(event.target)) return;
@@ -96,7 +105,8 @@ export function EditContextMenu({ edit, onOpenChange, rootSelector = ".chat-root
     context.restore();
     setContext(null);
     if (command === "selectAll") {
-      if (context.field) context.field.select();
+      if (context.editor) context.editor.dispatch({ selection: { anchor: 0, head: context.editor.state.doc.length } });
+      else if (context.field) context.field.select();
       else {
         const range = document.createRange();
         range.selectNodeContents(context.container);
@@ -107,6 +117,13 @@ export function EditContextMenu({ edit, onOpenChange, rootSelector = ".chat-root
       return;
     }
     try {
+      if (context.editor && command === "cut") {
+        const { from, to } = context.editor.state.selection.main;
+        if (from < to && await edit("copy")) {
+          context.editor.dispatch({ changes: { from, to }, selection: { anchor: from } });
+          return;
+        }
+      }
       if (await edit(command)) return;
     } catch { /* Surface failures without discarding the draft or selection. */ }
     setError({ message: `操作未完成，请使用 ${modifier}${{ cut: "X", copy: "C", paste: "V" }[command]} 重试`, portal: context.portal });

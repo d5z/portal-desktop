@@ -94,7 +94,7 @@ try {
   const page = await app.firstWindow();
   page.setDefaultTimeout(5000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));
-  const frame = page.frameLocator('#chat'), input = frame.locator('#input');
+  const frame = page.frameLocator('#chat'), input = frame.locator('#input .cm-content');
   await input.waitFor();
   const child = page.frames().find(frame => frame.url().startsWith('beings://chat/'));
   if (!child) throw new Error('Chat frame did not load.');
@@ -135,7 +135,9 @@ try {
   const menu = frame.getByRole('menu', { name: '编辑菜单' });
   async function open(target = input) { await target.click({ button: 'right' }); await menu.waitFor(); }
   async function choose(label) { await menu.getByRole('menuitem', { name: new RegExp('^' + label) }).click(); await menu.waitFor({ state: 'hidden' }); }
-  async function textIs(text) { await child.waitForFunction(text => document.querySelector('#input').value === text, text); }
+  async function textIs(text) { await child.waitForFunction(text => text === ''
+    ? document.querySelector('#input')?.dataset.hasDraft === 'false'
+    : document.querySelector('#input .cm-content')?.textContent === text, text); }
   await input.fill('保留草稿与选区');
   await open();
   assert.equal(await menu.getByRole('menuitem').count(), 4);
@@ -148,12 +150,16 @@ try {
   await open(); await page.keyboard.press('ArrowUp');
   assert.equal(await menu.getByRole('menuitem', { name: /^全选/ }).evaluate(el => el === document.activeElement), true);
   await choose('全选');
-  assert.equal(await input.evaluate(el => el.selectionEnd - el.selectionStart), '保留草稿与选区'.length);
+  assert.equal(await input.evaluate(() => getSelection().toString().length), '保留草稿与选区'.length);
   await open(); await choose('复制');
   assert.equal(await app.evaluate(({ clipboard }) => clipboard.readText()), '保留草稿与选区');
   await open(); await choose('剪切'); await textIs('');
   await open(); await choose('粘贴'); await textIs('保留草稿与选区');
-  await input.evaluate(el => el.setSelectionRange(2, 4));
+  await input.press('Home');
+  await input.press('ArrowRight');
+  await input.press('ArrowRight');
+  await input.press('Shift+ArrowRight');
+  await input.press('Shift+ArrowRight');
   await input.evaluate(el => el.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 200, clientY: 500 })));
   await choose('粘贴'); await textIs('保留保留草稿与选区与选区');
 

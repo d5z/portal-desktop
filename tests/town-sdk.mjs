@@ -85,7 +85,7 @@ try {
     await window.beings.save({ ...settings, connectionLink: 'http://127.0.0.1:1/willow/?token=local-ui-fixture', workspace: dir, backgroundEnabled: false, autoStart: false });
   }, dir);
   await waitForChatReady(page);
-  const chatInput = page.frameLocator('#chat-frame').locator('#input');
+  const chatInput = page.frameLocator('#chat-frame').locator('#input .cm-content');
   const home = async () => {
     if (await page.locator('#place-sheet').evaluate(el => el.open)) await page.locator('#back-to-chat').click();
     const trigger = page.locator('#options-trigger');
@@ -139,7 +139,7 @@ try {
   await page.waitForFunction(() => !document.querySelector('#conversation-options').open);
   await page.emulateMedia({ reducedMotion: 'no-preference' });
   await home();
-  await page.frameLocator('#chat-frame').locator('#input').fill('配对期间保留草稿');
+  await page.frameLocator('#chat-frame').locator('#input .cm-content').fill('配对期间保留草稿');
   await page.locator('#town-auth-button').click();
   await page.getByRole('button', { name: '自动连接 Town', exact: true }).waitFor();
   assert.equal(await page.locator('#town-pair-code').isVisible(), false);
@@ -169,8 +169,8 @@ try {
   await page.locator('#town-auth-form button[type="submit"]').click();
   await page.waitForFunction(() => !document.querySelector('#town-auth-dialog').open);
   await page.waitForFunction(async () => (await window.beings.townLive()).phase === 'connected');
-  assert.equal(await page.frameLocator('#chat-frame').locator('#input').inputValue(), '配对期间保留草稿');
-  await page.frameLocator('#chat-frame').locator('#input').fill('');
+  assert.equal(await page.frameLocator('#chat-frame').locator('#input .cm-content').textContent(), '配对期间保留草稿');
+  await page.frameLocator('#chat-frame').locator('#input .cm-content').fill('');
   const pairs = await app.evaluate(() => ({ chats: globalThis.sdkPairChats, confirms: globalThis.sdkPairConfirms }));
   assert.equal(pairs.chats.length, 3);
   assert.deepEqual(pairs.confirms, [{ being_id: 'willow', code: 'AB3XY9' }]);
@@ -213,7 +213,7 @@ try {
   assert.match(beingReplyRequest, /回复对象：服务端展示名/);
   assert.match(beingReplyRequest, /伙伴代发消息/);
   assert.match(beingReplyRequest, /语气温和一些/);
-  assert.equal(await chatInput.inputValue(), '保留手写草稿');
+  assert.equal(await chatInput.innerText(), '保留手写草稿');
   await chatInput.fill('');
   await open('篝火');
   await partner.getByRole('button', { name: '回复', exact: true }).click();
@@ -228,14 +228,14 @@ try {
   await partner.getByRole('button', { name: '一起看', exact: true }).click();
   await page.locator('#scene-compose').click();
   await page.waitForFunction(() => document.querySelector('#companion-panel').hidden);
-  assert.equal(await chatInput.inputValue(), '一起看看篝火里的这段（t_WillowFull）：\n\n> 伙伴代发消息');
+  assert.equal(await chatInput.innerText(), '一起看看篝火里的这段（t_WillowFull）：\n\n> 伙伴代发消息');
   // An existing draft is preserved, and inserting a quote never sends it.
   await chatInput.fill('保留我的草稿');
   await open('篝火');
   await page.locator('.social-message').filter({ hasText: '伙伴代发消息' }).getByRole('button', { name: '一起看', exact: true }).click();
   await page.locator('#scene-compose').click();
   await page.getByText('对话输入框已有草稿，请先处理原草稿，再放入引用。', { exact: true }).waitFor();
-  assert.equal(await chatInput.inputValue(), '保留我的草稿');
+  assert.equal(await chatInput.innerText(), '保留我的草稿');
   await page.locator('#close-companion').click();
   await chatInput.fill('');
   await open('篝火');
@@ -272,7 +272,7 @@ try {
   await page.locator('.social-message').getByRole('button', { name: '一起看', exact: true }).click();
   await page.locator('#scene-compose').click();
   await page.waitForFunction(() => document.querySelector('#companion-panel').hidden);
-  assert.match(await chatInput.inputValue(), /来自伙伴的私信/);
+  assert.match(await chatInput.innerText(), /来自伙伴的私信/);
   assert.equal(await app.evaluate(() => globalThis.sdkWrites.length), 2);
   await chatInput.fill('');
   await open('私信');
@@ -300,7 +300,7 @@ try {
   await page.locator('.social-message').getByRole('button', { name: '一起看', exact: true }).click();
   await page.locator('#scene-compose').click();
   await page.waitForFunction(() => document.querySelector('#companion-panel').hidden);
-  assert.match(await chatInput.inputValue(), /伙伴代发消息/);
+  assert.match(await chatInput.innerText(), /伙伴代发消息/);
   await chatInput.fill('');
   await open('围炉');
   await page.locator('.social-message').getByRole('button', { name: '回复', exact: true }).click();
@@ -316,7 +316,7 @@ try {
   await page.locator('.social-message').getByRole('button', { name: '一起看', exact: true }).click();
   await page.locator('#scene-compose').click();
   await page.waitForFunction(() => document.querySelector('#companion-panel').hidden);
-  assert.match(await chatInput.inputValue(), /来自伙伴的私信/);
+  assert.match(await chatInput.innerText(), /来自伙伴的私信/);
   assert.equal(await app.evaluate(() => globalThis.sdkWrites.length), 4);
   assert.equal(await app.evaluate(() => globalThis.sdkPairConfirms.length), 1);
   assert.equal(await app.evaluate(() => globalThis.sdkPairChats.length), 5);

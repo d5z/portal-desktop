@@ -90,28 +90,28 @@ try {
   page.setDefaultTimeout(15000);
   const errors=[]; page.on('pageerror',error=>errors.push(error.message));
   const chat = page.frameLocator('iframe');
-  await chat.locator('#input').waitFor();
+  await chat.locator('#input .cm-content').waitFor();
   const original = await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id);
-  await chat.locator('#input').fill('原会话草稿');
+  await chat.locator('#input .cm-content').fill('原会话草稿');
   await page.getByRole('button',{name:'新建场景',exact:true}).click();
   await page.getByRole('textbox',{name:'场景名称'}).fill('方案讨论');
   await page.getByRole('button',{name:'创建并进入'}).click();
   await page.locator('#chat-session-editor').waitFor({state:'hidden'});
   await page.waitForFunction(async () => (await window.beings.snapshot()).chatSessions.length === 2);
-  await chat.locator('#input').fill('方案内容');
+  await chat.locator('#input .cm-content').fill('方案内容');
   await chat.locator('#send-btn').click();
   await chat.getByText('回复：方案内容',{exact:true}).waitFor();
   const discussion = await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id);
   assert.notEqual(discussion,original);
-  await chat.locator('#input').fill('方案草稿');
+  await chat.locator('#input .cm-content').fill('方案草稿');
   await page.getByRole('button',{name:'切换到场景：桌面·测试设备'}).click();
-  await chat.locator('#input').waitFor();
+  await chat.locator('#input .cm-content').waitFor();
   await page.waitForFunction(() => document.querySelector('#chat-scene-indicator')?.textContent.includes('桌面·测试设备'));
-  assert.equal(await chat.locator('#input').inputValue(),'原会话草稿');
+  assert.equal(await chat.locator('#input .cm-content').textContent(),'原会话草稿');
   assert.equal(await chat.getByText('回复：方案内容',{exact:true}).count(),0);
   await page.getByRole('button',{name:'切换到场景：方案讨论'}).click();
   await chat.getByText('回复：方案内容',{exact:true}).waitFor();
-  assert.equal(await chat.locator('#input').inputValue(),'方案草稿');
+  assert.equal(await chat.locator('#input .cm-content').textContent(),'方案草稿');
   await page.getByRole('button',{name:'切换到场景：方案讨论'}).click({button:'right'});
   await page.getByRole('menuitem',{name:'重命名',exact:true}).click();
   await page.getByRole('textbox',{name:'场景名称'}).fill('技术方案');
@@ -123,7 +123,7 @@ try {
   const selectedItemBox = await page.getByRole('button',{name:'切换到场景：技术方案'}).boundingBox();
   const composerBeforeAll = await chat.locator('#input-area').boundingBox();
   await page.getByRole('checkbox',{name:'显示全部场景上下文',exact:true}).check();
-  await chat.locator('#input:not(:disabled)').waitFor();
+  await chat.locator('#input .cm-content[contenteditable="true"]').waitFor();
   assert.equal(await chat.locator('#send-btn').isDisabled(),false);
   const unselectedItemBox = await page.getByRole('button',{name:'切换到场景：技术方案'}).boundingBox();
   assert.equal(selectedItemBox.height,40);
@@ -134,15 +134,15 @@ try {
   assert.equal(await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id),discussion);
   await chat.locator('.message-scene').filter({hasText:'技术方案'}).first().waitFor();
   await page.getByRole('button',{name:'切换到场景：技术方案'}).click();
-  await chat.locator('#input:not(:disabled)').waitFor();
-  assert.equal(await chat.locator('#input').inputValue(),'方案草稿');
+  await chat.locator('#input .cm-content[contenteditable="true"]').waitFor();
+  assert.equal(await chat.locator('#input .cm-content').textContent(),'方案草稿');
   assert.equal((await application.evaluate(() => globalThis.fixture.requests))[0].scene_id,discussion);
   await mkdir('test-results',{recursive:true});
   const panel = page.getByRole('complementary',{name:'场景列表'});
   assert.equal(await panel.isVisible(),true);
   const panelBox = await panel.boundingBox(), chatBox = await page.locator('#chat-view').boundingBox();
   assert.ok(panelBox.x + panelBox.width <= chatBox.x, 'Floating panel must not cover the conversation');
-  await chat.locator('#input').click();
+  await chat.locator('#input .cm-content').click();
   assert.equal(await panel.isVisible(),true, 'Typing must not dismiss session navigation');
   await page.screenshot({animations:'disabled',path:'test-results/chat-sessions-panel.png'});
   await page.getByRole('button',{name:'关闭场景列表',exact:true}).click();
@@ -156,7 +156,7 @@ try {
   // One Being owns one live breath. Messages from other scenes queue locally
   // in FIFO order, then dispatch after the active stream finishes.
   await page.getByRole('button',{name:'切换到场景：桌面·测试设备'}).click();
-  await chat.locator('#input').fill('并发 A');
+  await chat.locator('#input .cm-content').fill('并发 A');
   await chat.locator('#send-btn').click();
   await chat.getByText('【新消息来自 scene「桌面·测试设备 · ID: '+original+'」】',{exact:true}).waitFor();
   const emit = async (scene, text, close = false) => application.evaluate((_, {scene,text,close}) => {
@@ -178,7 +178,7 @@ try {
   await chat.getByText('A1',{exact:true}).waitFor();
   await page.locator(`[data-scene-id="${original}"] [data-status="replying"]`).waitFor();
   await page.getByRole('button',{name:'切换到场景：技术方案'}).click();
-  await chat.locator('#input').fill('并发 B');
+  await chat.locator('#input .cm-content').fill('并发 B');
   await chat.locator('#send-btn').click();
   await page.locator(`[data-scene-id="${discussion}"] [data-status="queued"]`).waitFor();
   assert.equal(await application.evaluate((_,id) => globalThis.fixture.streams.has(id),discussion),false,'B must wait for A');
@@ -187,7 +187,7 @@ try {
   await page.getByRole('textbox',{name:'场景名称'}).fill('排队测试');
   await page.getByRole('button',{name:'创建并进入'}).click();
   await page.locator('#chat-session-editor').waitFor({state:'hidden'});
-  await chat.locator('#input').fill('排队 C');
+  await chat.locator('#input .cm-content').fill('排队 C');
   await chat.locator('#send-btn').click();
   const queuedScene = await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id);
   const localQueueStatus = chat.locator('.local-queue-status').filter({hasText:'排队中 · 等待其他场景完成，尚未发送'});
@@ -274,12 +274,12 @@ try {
   await page.getByRole('button',{name:'切换到场景：新场景'}).waitFor();
   assert.equal(await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id),replacement);
   await page.getByRole('checkbox',{name:'显示全部场景上下文',exact:true}).check();
-  await chat.locator('#input:not(:disabled)').waitFor();
+  await chat.locator('#input .cm-content[contenteditable="true"]').waitFor();
   await page.locator('#new-chat-session').click();
   await page.getByRole('textbox',{name:'场景名称'}).fill('快捷新会话');
   await page.getByRole('button',{name:'创建并进入'}).click();
   await page.locator('#chat-session-editor').waitFor({state:'hidden'});
-  await chat.locator('#input:not(:disabled)').waitFor();
+  await chat.locator('#input .cm-content[contenteditable="true"]').waitFor();
   const quick = await page.evaluate(() => window.beings.snapshot());
   assert.equal(quick.chatScene.scene_meta.scene_label,'快捷新会话');
   assert.notEqual(quick.chatScene.scene_id,replacement);
@@ -292,7 +292,7 @@ try {
   await page.locator('#chat-session-editor').waitFor({state:'hidden'});
   await page.getByRole('button',{name:'切换到场景：跨客户端场景'}).waitFor();
   assert.equal((await page.evaluate(() => window.beings.snapshot())).chatScene.scene_id,'feishu-shared');
-  await chat.locator('#input').fill('Bound scene message');
+  await chat.locator('#input .cm-content').fill('Bound scene message');
   await chat.locator('#send-btn').click();
   await chat.locator('.message.user').filter({hasText:'Bound scene message'}).waitFor();
   assert.equal((await application.evaluate(() => globalThis.fixture.requests)).at(-1).scene_id,'feishu-shared');
@@ -301,7 +301,7 @@ try {
   assert.equal((await page.evaluate(() => window.beings.snapshot())).chatScene.scene_id,'feishu-shared');
   // Scheduling is inspectable process metadata, never inline conversation prose.
   const wire = '独立问题\n\n[Desktop 场景调度提示]\n当前输入属于 scene_id="feishu-shared"。本客户端其他场景尚在处理或等待回复：\n[{"scene_id":"background-a"}]\n[/Desktop 场景调度提示]';
-  await chat.locator('#input').fill(wire);
+  await chat.locator('#input .cm-content').fill(wire);
   await chat.locator('#send-btn').click();
   await chat.locator('.run-activity .scene-scheduling').waitFor({state:'attached'});
   const visibleQuestion = chat.locator('.message.user').filter({hasText:'独立问题'});

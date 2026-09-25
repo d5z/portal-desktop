@@ -224,7 +224,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   await openPlace(page, 'chat');
   await frame.locator('#file-input').setInputFiles({ name: 'note.txt', mimeType: 'text/plain', buffer: Buffer.from('attachment fixture') });
   await frame.locator('#pending-files.active').waitFor();
-  await frame.locator('#input').fill('请帮我写一份问候。');
+  await frame.locator('#input .cm-content').fill('请帮我写一份问候。');
   await frame.locator('#send-btn').dispatchEvent('click');
   await frame.getByText('本机 Portal 已完成操作。', { exact: false }).waitFor();
   assert.equal(chatBody.attachments[0].data, Buffer.from('attachment fixture').toString('base64'));
@@ -243,7 +243,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   // Feed real history through the API instead of calling retired DOM globals.
   await childFrame.goto(childFrame.url());
   await childFrame.waitForFunction(() => document.querySelectorAll('.chat-index-tick').length === 13);
-  await frame.locator('#input').fill('索引跳转保留的草稿');
+  await frame.locator('#input .cm-content').fill('索引跳转保留的草稿');
   const firstTick = frame.getByRole('button', { name: /跳转到提问.*第一项/ });
   await firstTick.hover();
   await frame.locator('#chat-index-preview').waitFor();
@@ -255,7 +255,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
     const el = document.querySelector('.index-target');
     return el && Math.abs(el.getBoundingClientRect().top - document.querySelector('#messages').getBoundingClientRect().top - 24) < 2;
   });
-  assert.equal(await frame.locator('#input').inputValue(), '索引跳转保留的草稿');
+  assert.equal(await frame.locator('#input .cm-content').textContent(), '索引跳转保留的草稿');
   const readingPosition = await childFrame.evaluate(() => document.querySelector('#messages').scrollTop);
   appendHistory('being', '索引浏览时收到新回复。');
   await page.waitForTimeout(1600); // Pass the attention-refresh debounce.
@@ -267,7 +267,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   await childFrame.evaluate(() => {
     document.querySelector('#input').addEventListener('keydown', event => event.stopPropagation(), { once: true });
   });
-  await frame.locator('#input').focus();
+  await frame.locator('#input .cm-content').focus();
   await page.keyboard.press(process.platform === 'darwin' ? 'Meta+f' : 'Control+f');
   await page.locator('#chat-search-panel[open]').waitFor();
   await page.locator('#chat-search-input').fill('第一项');
@@ -276,7 +276,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   await page.locator('#chat-search-panel').evaluate(async el => { await Promise.all(el.getAnimations({ subtree: true }).map(animation => animation.finished.catch(() => {}))); });
   await page.screenshot({ path: 'test-results/chat-search.png' });
   await page.locator('.chat-search-result').click();
-  assert.equal(await frame.locator('#input').inputValue(), '索引跳转保留的草稿');
+  assert.equal(await frame.locator('#input .cm-content').textContent(), '索引跳转保留的草稿');
   await openChatSearch(page);
   await page.locator('#chat-search-input').fill('不存在的提问');
   assert.equal(await page.locator('#chat-search-status').textContent(), '没有匹配的提问');
@@ -292,7 +292,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
     return messages.scrollHeight - messages.scrollTop - messages.clientHeight < 2;
   });
   await childFrame.waitForFunction(() => document.querySelector('.chat-index-tick[aria-current="location"]')?.getAttribute('aria-label').includes('第二项'));
-  await frame.locator('#input').fill('');
+  await frame.locator('#input .cm-content').fill('');
   console.log('PASS: tick previews/jump, sidebar search, scroll tracking, draft preservation and streaming scroll lock.');
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/chat.png' });
@@ -311,12 +311,12 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   });
   await modelPanel.locator('.btn-close').dispatchEvent('click');
   await modelPanel.waitFor({ state: 'hidden' });
-  await frame.locator('#input').fill('unsent draft');
+  await frame.locator('#input .cm-content').fill('unsent draft');
   const options = await openOptions(page);
   assert.equal(await options.getAttribute('open'), '');
-  assert.equal(await frame.locator('#input').inputValue(), 'unsent draft');
+  assert.equal(await frame.locator('#input .cm-content').textContent(), 'unsent draft');
   await options.locator('summary').click();
-  assert.equal(await frame.locator('#input').inputValue(), 'unsent draft');
+  assert.equal(await frame.locator('#input .cm-content').textContent(), 'unsent draft');
   // Repeat the native dialog/menu transition that used to drop Intel CI input.
   for (let round = 0; round < 3; round++) {
     await openClientSettings(page);
@@ -334,7 +334,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   await page.screenshot({ path: 'test-results/chat-index-dark.png' });
 
   // Stream cancellation goes all the way from the local Loom frame to /api/stop.
-  await frame.locator('#input').fill('test-stop'); await frame.locator('#send-btn').dispatchEvent('click');
+  await frame.locator('#input .cm-content').fill('test-stop'); await frame.locator('#send-btn').dispatchEvent('click');
   await frame.locator('.run-activity.running .run-stop').waitFor();
   await frame.locator('.run-activity.running .run-stop').click();
   await page.waitForTimeout(300); assert.equal(stopCount, 1);

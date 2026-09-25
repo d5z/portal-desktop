@@ -21,7 +21,7 @@ it('logs a failed system profile lookup and exits with a short dialog instead of
     await expect(import('../desktop/main/main')).resolves.toBeDefined();
     await fixture.startup;
     expect(report).toHaveBeenCalledWith('profile-initialization', expect.objectContaining({ message: "Failed to get 'appData' path" }), expect.any(String));
-    expect(dialog.showErrorBox).toHaveBeenCalledWith('Portal Desktop 启动失败', '客户端配置目录不可用，请检查系统用户目录后重试。');
+    expect(dialog.showErrorBox).toHaveBeenCalledWith('Portal Desktop Dev 启动失败', '客户端配置目录不可用，请检查系统用户目录后重试。');
     expect(app.requestSingleInstanceLock).not.toHaveBeenCalled();
     expect(app.quit).toHaveBeenCalledOnce();
   } finally { vi.restoreAllMocks(); vi.unstubAllEnvs(); }

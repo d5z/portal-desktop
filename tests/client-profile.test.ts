@@ -1,8 +1,14 @@
 import { describe, expect, it, vi } from 'vitest';
 import path from 'node:path';
-import { clientUserData } from '../desktop/main/app/profile';
+import { clientUserData, isIsolatedDevelopment } from '../desktop/main/app/profile';
 
 describe('client profile compatibility', () => {
+  it('treats npm start with PORTAL_DESKTOP_USER_DATA as isolated development', () => {
+    expect(isIsolatedDevelopment(false, '/tmp/dev-profile')).toBe(true);
+    expect(isIsolatedDevelopment(true, '/tmp/test-profile')).toBe(false);
+    expect(isIsolatedDevelopment(false, undefined)).toBe(false);
+  });
+
   it('keeps an explicit isolated profile for tests and development', () => {
     const exists = vi.fn();
     expect(clientUserData('C:\\Users\\fixture\\AppData\\Roaming', '.\\profile', exists)).toBe(path.resolve('.\\profile'));

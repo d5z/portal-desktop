@@ -119,6 +119,7 @@ export const Markdown = memo(function Markdown({
   chat = false,
   renderText,
   previewMarkdownCode = true,
+  composerPreview = false,
 }: {
   content: string;
   className?: string;
@@ -126,6 +127,7 @@ export const Markdown = memo(function Markdown({
   chat?: boolean;
   renderText?: (text: string) => ReactNode;
   previewMarkdownCode?: boolean;
+  composerPreview?: boolean;
 }) {
   const tokens = useMemo(
     () => marked.lexer(content, { gfm: true, breaks: chat }),
@@ -151,7 +153,10 @@ export const Markdown = memo(function Markdown({
       }
     }
   }
-  collect(tokens);
+  if (!composerPreview) collect(tokens);
+  function previewRaw(token: Token): ReactNode {
+    return unescapeText(token.raw);
+  }
   function words(value: string, decorate: boolean): ReactNode {
     const text = unescapeText(value);
     const plain = (value: string) => decorate && renderText ? renderText(value) : value;
@@ -206,56 +211,73 @@ export const Markdown = memo(function Markdown({
   }
   function render(list: Token[], decorate = true): ReactNode {
     return list.map((token, index) => {
+      if (composerPreview && ["strong", "em", "del", "codespan", "link", "image"].includes(token.type)) {
+        return <Fragment key={index}>{previewRaw(token)}</Fragment>;
+      }
       const inner = ["link", "code", "codespan", "html", "image"].includes(
         token.type,
       )
         ? null
         : "tokens" in token && Array.isArray(token.tokens)
           ? render(token.tokens, decorate)
-          : words("text" in token ? String(token.text) : "", decorate);
+          : words("text" in token ? String(token.text) : "", decorate && !composerPreview);
       let node: ReactNode;
       switch (token.type) {
         case "space":
           node = null;
           break;
         case "paragraph":
-          node = <p>{inner}</p>;
+          node = composerPreview ? (
+            <p className="composer-preview-line">{inner}</p>
+          ) : (
+            <p>{inner}</p>
+          );
           break;
         case "text":
         case "escape":
           node = inner;
           break;
         case "strong":
-          node = <strong>{inner}</strong>;
+          node = composerPreview ? previewRaw(token) : <strong>{inner}</strong>;
           break;
         case "em":
-          node = <em>{inner}</em>;
+          node = composerPreview ? previewRaw(token) : <em>{inner}</em>;
           break;
         case "del":
-          node = <del>{inner}</del>;
+          node = composerPreview ? previewRaw(token) : <del>{inner}</del>;
           break;
         case "br":
           node = <br />;
           break;
         case "hr":
-          node = <hr />;
+          node = composerPreview ? previewRaw(token) : <hr />;
           break;
         case "heading": {
           const Tag = `h${(token as Tokens.Heading).depth}` as
             "h1" | "h2" | "h3" | "h4" | "h5" | "h6";
-          node = <Tag>{inner}</Tag>;
+          node = composerPreview ? (
+            <Tag className="composer-preview-heading">{inner}</Tag>
+          ) : (
+            <Tag>{inner}</Tag>
+          );
           break;
         }
         case "blockquote":
-          node = <blockquote>{inner}</blockquote>;
+          node = composerPreview ? previewRaw(token) : <blockquote>{inner}</blockquote>;
           break;
         case "codespan":
-          node = (
+          node = composerPreview ? (
+            previewRaw(token)
+          ) : (
             <code>{code(unescapeText((token as Tokens.Codespan).text))}</code>
           );
           break;
         case "code": {
           const block = token as Tokens.Code;
+          if (composerPreview) {
+            node = previewRaw(token);
+            break;
+          }
           const lang = (block.lang || "")
             .split(/\s/)[0]
             .replace(/[^a-z0-9_-]/gi, "");
@@ -274,6 +296,10 @@ export const Markdown = memo(function Markdown({
           break;
         }
         case "link": {
+          if (composerPreview) {
+            node = previewRaw(token);
+            break;
+          }
           const link = token as Tokens.Link,
             href = safeLink(unescapeText(link.href)),
             target = onPlace ? placeFromURL(link.href) : null;
@@ -308,6 +334,10 @@ export const Markdown = memo(function Markdown({
           break;
         }
         case "image": {
+          if (composerPreview) {
+            node = previewRaw(token);
+            break;
+          }
           const image = token as Tokens.Image,
             href = safeLink(image.href);
           node =
@@ -327,7 +357,7 @@ export const Markdown = memo(function Markdown({
           const list = token as Tokens.List;
           const items = list.items.map((item, i) => (
             <li key={i}>
-              {item.task && (
+              {item.task && !composerPreview && (
                 <input
                   type="checkbox"
                   checked={!!item.checked}
@@ -335,17 +365,25 @@ export const Markdown = memo(function Markdown({
                   readOnly
                 />
               )}
-              {render(item.tokens, decorate)}
+              {composerPreview && item.task
+                ? unescapeText(item.raw)
+                : render(item.tokens, decorate)}
             </li>
           ));
           node = list.ordered ? (
-            <ol start={list.start || 1}>{items}</ol>
+            <ol className={composerPreview ? "composer-preview-list" : undefined} start={list.start || 1}>
+              {items}
+            </ol>
           ) : (
-            <ul>{items}</ul>
+            <ul className={composerPreview ? "composer-preview-list" : undefined}>{items}</ul>
           );
           break;
         }
         case "table": {
+          if (composerPreview) {
+            node = previewRaw(token);
+            break;
+          }
           const table = token as Tokens.Table;
           node = (
             <div className="table-wrap">
@@ -382,7 +420,7 @@ export const Markdown = memo(function Markdown({
           break;
         }
         case "html":
-          node = chat ? token.raw : null;
+          node = composerPreview ? previewRaw(token) : chat ? token.raw : null;
           break;
         default:
           node = token.raw;

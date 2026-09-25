@@ -13,7 +13,6 @@ import {
 import { ChatState, type ChatRuntime, type ChatPanel, type RuntimeOptions } from "./models/chat";
 import { inCurrentScene, sceneItems, sceneName, type HistoryScope } from "./models/scenes";
 import { useModel } from "../shared/hooks/use-model";
-import { Markdown } from "../shared/components/markdown";
 import { CopyMessage } from '../shared/components/copy-message';
 import { TemperatureGlow, ChatActivity } from "./components/messages";
 import { ChatSettings } from "./components/settings";
@@ -26,6 +25,13 @@ import {
 } from "./components/navigation";
 import type { ChatBridge } from "./services/bridge";
 import { useChatSession } from "./hooks/use-chat-session";
+import {
+  applyLineStartShiftTab,
+  applyLineStartTab,
+  applyShiftEnterListContinue,
+} from "./list-continuation";
+import { ComposerField } from "./components/composer-field";
+import { EditorView } from "@codemirror/view";
 
 class ChatErrorBoundary extends Component<
   { children: ReactNode },
@@ -82,7 +88,7 @@ function ChatView({
   const currentSceneName = sceneName(state.currentScene, state.currentScene);
   const showActivity = state.historyScope === "all" || inCurrentScene(state.activeScene, state.currentScene);
   const messages = useRef<HTMLDivElement>(null),
-    composer = useRef<HTMLTextAreaElement>(null),
+    composer = useRef<EditorView>(null),
     fileInput = useRef<HTMLInputElement>(null);
   const messageElements = useRef(new Map<string, HTMLDivElement>()),
     index = useRef<ChatIndexHandle>(null),
@@ -193,19 +199,6 @@ function ChatView({
     scrollLock.current = saved?.locked ?? true;
     if (messages.current && saved) messages.current.scrollTop = saved.top;
   }, [state.historyScope]);
-  useLayoutEffect(() => {
-    const el = composer.current;
-    if (!el) return;
-    const style = getComputedStyle(el),
-      line = parseFloat(style.lineHeight) || 22;
-    const max =
-      line * (matchMedia("(max-width: 640px)").matches ? 4 : 6) +
-      (parseFloat(style.paddingTop) || 0) +
-      (parseFloat(style.paddingBottom) || 0);
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, max) + "px";
-    el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
-  }, [state.draft, viewport.height]);
   useLayoutEffect(() => {
     if (messages.current && scrollLock.current)
       messages.current.scrollTop = messages.current.scrollHeight;
@@ -510,16 +503,14 @@ function ChatView({
             ))}
           </div>
           <div id="input-row">
-            <textarea
-              ref={composer}
+            <ComposerField
+              editorRef={composer}
               id="input"
-              rows={1}
               className={state.queued ? "queued" : ""}
               placeholder="说点什么…"
-              aria-label="message input"
               value={state.draft}
-              onChange={(event) => {
-                state.draft = event.target.value;
+              onChange={(value) => {
+                state.draft = value;
                 state.changed();
               }}
               onCompositionStart={() => {
@@ -529,16 +520,54 @@ function ChatView({
                 composing.current = false;
                 compositionEnd.current = Date.now();
               }}
-              onKeyDown={(event) => {
-                if (
-                  event.key !== "Enter" ||
-                  event.shiftKey ||
+              onKeyDown={(event, view) => {
+                const imeBlocked =
                   composing.current ||
-                  event.nativeEvent.isComposing ||
+                  event.isComposing ||
                   event.keyCode === 229 ||
-                  Date.now() - compositionEnd.current < 50
-                )
+                  Date.now() - compositionEnd.current < 50;
+
+                if (event.key === "Tab" && !imeBlocked) {
+                  event.preventDefault();
+                  const { from: start, to: end } = view.state.selection.main;
+                  const result = event.shiftKey
+                    ? applyLineStartShiftTab(state.draft, start, end)
+                    : applyLineStartTab(state.draft, start, end);
+                  if (result && result.text !== state.draft) {
+                    const backward = view.state.selection.main.anchor > view.state.selection.main.head;
+                    view.dispatch({
+                      changes: { from: 0, to: view.state.doc.length, insert: result.text },
+                      selection: backward
+                        ? { anchor: result.selectionEnd ?? result.selection, head: result.selection }
+                        : { anchor: result.selection, head: result.selectionEnd ?? result.selection },
+                      scrollIntoView: true,
+                    });
+                  }
                   return;
+                }
+
+                if (event.key !== "Enter") return;
+
+                if (event.shiftKey) {
+                  if (imeBlocked) return;
+                  const { from: start, to: end } = view.state.selection.main;
+                  const result = applyShiftEnterListContinue(
+                    state.draft,
+                    start,
+                    end,
+                  );
+                  if (result) {
+                    event.preventDefault();
+                    view.dispatch({
+                      changes: { from: 0, to: view.state.doc.length, insert: result.text },
+                      selection: { anchor: result.selection },
+                      scrollIntoView: true,
+                    });
+                  }
+                  return;
+                }
+
+                if (imeBlocked) return;
                 event.preventDefault();
                 void runtime.send(state.draft);
               }}

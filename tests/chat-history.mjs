@@ -93,7 +93,7 @@ try {
   await waitCache(100);
   assert.equal(await page.locator('#messages .message').count(), 100);
   await page.getByText('历史 3', { exact: true }).waitFor(); // A different scene remains visible.
-  await page.locator('#input').fill('本地记录验证'); await page.locator('#send-btn').click();
+  await page.locator('#input .cm-content').fill('本地记录验证'); await page.locator('#send-btn').click();
   await page.getByText('已持久化的流式回复', { exact: true }).waitFor();
   const initial = await waitCache(102);
   assert.equal(sent[0].scene_id, 'loom-willow-id', 'Standalone browsers use the Being identity rather than its display name');
@@ -109,7 +109,7 @@ try {
   assert.equal(await page.getByRole('checkbox', { name: '显示全部场景上下文', exact: true }).isChecked(), false);
   assert.equal(await page.locator('#messages .message').count(), 67);
   assert.equal(await page.getByText('历史 3', { exact: true }).count(), 0);
-  await page.locator('#input').fill('切换时保留草稿');
+  await page.locator('#input .cm-content').fill('切换时保留草稿');
   await page.locator('#messages').evaluate(el => { el.scrollTop = 120; });
   await page.waitForFunction(() => document.querySelector('#messages').scrollTop === 120);
   const queryCount = queries.length;
@@ -117,7 +117,7 @@ try {
   assert.equal(await page.locator('#messages .message').count(), 102);
   assert.equal(await page.getByText('历史 3', { exact: true }).count(), 1);
   assert.ok(await page.locator('.message-scene').getByText('town-mail', { exact: true }).count());
-  assert.equal(await page.locator('#input').inputValue(), '切换时保留草稿');
+  assert.equal(await page.locator('#input .cm-content').textContent(), '切换时保留草稿');
   assert.match(await page.locator('.chat-scope-caption').textContent(), /发送到：Loom/);
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/chat-scenes-all.png' });

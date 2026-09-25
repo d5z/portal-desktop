@@ -53,7 +53,7 @@ try {
   const child = () => page.frames().find(frame => frame.url().includes('/loom.html'));
   const post = data => page.evaluate(data => document.querySelector('iframe').contentWindow.postMessage(data, location.origin), data);
   await frame.locator('.chat-index-tick').nth(11).waitFor();
-  await frame.locator('#input').fill('hold');
+  await frame.locator('#input .cm-content').fill('hold');
   await frame.locator('#send-btn').click();
   await frame.locator('.run-activity.running .run-stop').waitFor();
   // Small trackpad movements must release bottom-following even within 80px.

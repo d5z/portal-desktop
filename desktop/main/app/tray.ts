@@ -2,7 +2,7 @@ import { app, Menu, nativeImage, Tray } from 'electron';
 import path from 'node:path';
 import { watchSystemTheme } from './system-theme';
 
-const CLIENT_NAME = 'Portal Desktop';
+const CLIENT_NAME = app.isPackaged ? 'Portal Desktop' : 'Portal Desktop Dev';
 
 export function createApplicationTray(showWindow: () => void, isPackaged: boolean) {
   const branding = path.join(
