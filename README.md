@@ -121,6 +121,14 @@ npm run build:portal
 npm start
 ```
 
+For a repeatable test instance alongside an installed release, run `npm run start:dev`.
+It uses the persistent, git-ignored `.dev-profile/` directory and labels the
+development window/menu **Portal Desktop Dev**. This source build needs the
+repository and development process to stay available; it is not a separately
+installed app. The isolated Dev instance does not automatically start or take
+over the installed Portal service. After changing chat source, restart Dev to
+rebuild its chat assets.
+
 For an existing clone, or after pulling updates, run `git submodule update --init --recursive` to obtain the pinned engine revision. GitHub source ZIPs do not include submodules. Follow [UPSTREAM.md](UPSTREAM.md) when updating Portal or maintaining its compatibility branch. Normal builds do not track a moving remote branch.
 
 ### Checks and packaging

@@ -48,7 +48,7 @@ declare const MAIN_WINDOW_VITE_NAME: string;
 declare const PORTAL_DESKTOP_UPDATE_REPOSITORY: string;
 declare const PORTAL_DESKTOP_BUILD: string;
 const startedAt = new Date().toISOString();
-const CLIENT_NAME = 'Portal Desktop';
+const CLIENT_NAME = app.isPackaged ? 'Portal Desktop' : 'Portal Desktop Dev';
 const CLIENT_ID = 'portal-desktop';
 
 protocol.registerSchemesAsPrivileged([{ scheme: 'beings', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);

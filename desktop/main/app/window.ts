@@ -5,7 +5,7 @@ import { ClientBrowser } from '../browser/browser';
 import { refreshSystemTheme } from './system-theme';
 import { sendToShell } from './shell-ipc';
 
-const CLIENT_NAME = 'Portal Desktop';
+const CLIENT_NAME = app.isPackaged ? 'Portal Desktop' : 'Portal Desktop Dev';
 
 export interface MainWindowOptions {
   shellURL: () => string;
@@ -52,6 +52,10 @@ export function createMainWindow(options: MainWindowOptions) {
     else window.webContents.openDevTools({ mode: 'detach' });
   });
   window.webContents.setWindowOpenHandler(({ url }) => { options.openExternal(url); return { action: 'deny' }; });
+  window.webContents.on('page-title-updated', event => {
+    event.preventDefault();
+    window.setTitle(CLIENT_NAME);
+  });
   window.webContents.on('will-navigate', event => event.preventDefault());
   window.webContents.on('will-frame-navigate', event => {
     const url = event.url;
