@@ -31,22 +31,7 @@ import {
   applyShiftEnterListContinue,
 } from "./list-continuation";
 import { ComposerField } from "./components/composer-field";
-
-function scrollComposerCaretIntoView(el: HTMLTextAreaElement) {
-  if (el.scrollHeight <= el.clientHeight) return;
-  const style = getComputedStyle(el);
-  const lineHeight = parseFloat(style.lineHeight) || 22;
-  const padTop = parseFloat(style.paddingTop) || 0;
-  const before = el.value.slice(0, el.selectionStart ?? 0);
-  const lineIndex = before.split("\n").length - 1;
-  const caretTop = padTop + lineIndex * lineHeight;
-  const caretBottom = caretTop + lineHeight;
-  const viewTop = el.scrollTop;
-  const viewBottom = viewTop + el.clientHeight;
-  if (caretTop < viewTop) el.scrollTop = Math.max(0, caretTop - lineHeight);
-  else if (caretBottom > viewBottom)
-    el.scrollTop = caretBottom - el.clientHeight + lineHeight;
-}
+import { EditorView } from "@codemirror/view";
 
 class ChatErrorBoundary extends Component<
   { children: ReactNode },
@@ -103,7 +88,7 @@ function ChatView({
   const currentSceneName = sceneName(state.currentScene, state.currentScene);
   const showActivity = state.historyScope === "all" || inCurrentScene(state.activeScene, state.currentScene);
   const messages = useRef<HTMLDivElement>(null),
-    composer = useRef<HTMLTextAreaElement>(null),
+    composer = useRef<EditorView>(null),
     fileInput = useRef<HTMLInputElement>(null);
   const messageElements = useRef(new Map<string, HTMLDivElement>()),
     index = useRef<ChatIndexHandle>(null),
@@ -122,8 +107,7 @@ function ChatView({
   }
   const dragDepth = useRef(0),
     composing = useRef(false),
-    compositionEnd = useRef(0),
-    pendingComposerSelection = useRef<number | null>(null);
+    compositionEnd = useRef(0);
   const [dragging, setDragging] = useState(false),
     [highlighted, setHighlighted] = useState<string | null>(null),
     [panel, setPanel] = useState<ChatPanel>(null),
@@ -137,7 +121,6 @@ function ChatView({
   );
   const [viewport, setViewport] = useState({ height: innerHeight, offset: 0 });
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
-  const [imeComposing, setImeComposing] = useState(false);
   const [selection, setSelection] = useState<{
     id: string;
     text: string;
@@ -216,28 +199,6 @@ function ChatView({
     scrollLock.current = saved?.locked ?? true;
     if (messages.current && saved) messages.current.scrollTop = saved.top;
   }, [state.historyScope]);
-  useLayoutEffect(() => {
-    const el = composer.current;
-    if (!el) return;
-    const style = getComputedStyle(el),
-      line = parseFloat(style.lineHeight) || 22;
-    const max =
-      line * (matchMedia("(max-width: 640px)").matches ? 4 : 6) +
-      (parseFloat(style.paddingTop) || 0) +
-      (parseFloat(style.paddingBottom) || 0);
-    el.style.height = "auto";
-    el.style.height = Math.min(el.scrollHeight, max) + "px";
-    el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
-  }, [state.draft, viewport.height]);
-  useLayoutEffect(() => {
-    const el = composer.current;
-    const next = pendingComposerSelection.current;
-    if (el && next !== null) {
-      el.setSelectionRange(next, next);
-      pendingComposerSelection.current = null;
-    }
-    if (el && document.activeElement === el) scrollComposerCaretIntoView(el);
-  }, [state.draft]);
   useLayoutEffect(() => {
     if (messages.current && scrollLock.current)
       messages.current.scrollTop = messages.current.scrollHeight;
@@ -543,47 +504,44 @@ function ChatView({
           </div>
           <div id="input-row">
             <ComposerField
-              textareaRef={composer}
+              editorRef={composer}
               id="input"
-              rows={1}
               className={state.queued ? "queued" : ""}
-              composing={imeComposing}
               placeholder="说点什么…"
-              aria-label="message input"
               value={state.draft}
-              onChange={(event) => {
-                state.draft = event.target.value;
+              onChange={(value) => {
+                state.draft = value;
                 state.changed();
               }}
               onCompositionStart={() => {
                 composing.current = true;
-                setImeComposing(true);
               }}
               onCompositionEnd={() => {
                 composing.current = false;
                 compositionEnd.current = Date.now();
-                setImeComposing(false);
               }}
-              onKeyDown={(event) => {
+              onKeyDown={(event, view) => {
                 const imeBlocked =
                   composing.current ||
-                  event.nativeEvent.isComposing ||
+                  event.isComposing ||
                   event.keyCode === 229 ||
                   Date.now() - compositionEnd.current < 50;
 
                 if (event.key === "Tab" && !imeBlocked) {
-                  const el = composer.current;
-                  if (!el) return;
-                  const start = el.selectionStart ?? 0;
-                  const end = el.selectionEnd ?? 0;
+                  event.preventDefault();
+                  const { from: start, to: end } = view.state.selection.main;
                   const result = event.shiftKey
                     ? applyLineStartShiftTab(state.draft, start, end)
                     : applyLineStartTab(state.draft, start, end);
-                  if (result) {
-                    event.preventDefault();
-                    pendingComposerSelection.current = result.selection;
-                    state.draft = result.text;
-                    state.changed();
+                  if (result && result.text !== state.draft) {
+                    const backward = view.state.selection.main.anchor > view.state.selection.main.head;
+                    view.dispatch({
+                      changes: { from: 0, to: view.state.doc.length, insert: result.text },
+                      selection: backward
+                        ? { anchor: result.selectionEnd ?? result.selection, head: result.selection }
+                        : { anchor: result.selection, head: result.selectionEnd ?? result.selection },
+                      scrollIntoView: true,
+                    });
                   }
                   return;
                 }
@@ -592,10 +550,7 @@ function ChatView({
 
                 if (event.shiftKey) {
                   if (imeBlocked) return;
-                  const el = composer.current;
-                  if (!el) return;
-                  const start = el.selectionStart ?? 0;
-                  const end = el.selectionEnd ?? 0;
+                  const { from: start, to: end } = view.state.selection.main;
                   const result = applyShiftEnterListContinue(
                     state.draft,
                     start,
@@ -603,9 +558,11 @@ function ChatView({
                   );
                   if (result) {
                     event.preventDefault();
-                    pendingComposerSelection.current = result.selection;
-                    state.draft = result.text;
-                    state.changed();
+                    view.dispatch({
+                      changes: { from: 0, to: view.state.doc.length, insert: result.text },
+                      selection: { anchor: result.selection },
+                      scrollIntoView: true,
+                    });
                   }
                   return;
                 }

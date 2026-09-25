@@ -151,7 +151,7 @@ try {
   await chat.getByText('当前桌面的对话', { exact: true }).waitFor();
   assert.equal(await chat.locator('.chat-history-scope').count(), 0, 'Embedded chat has no duplicate scope toolbar');
   assert.equal(await chat.getByText('这是来自 Loom 网页的对话', { exact: true }).count(), 0);
-  await chat.locator('#input').fill('切换时保留的草稿');
+  await chat.locator('#input .cm-content').fill('切换时保留的草稿');
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/chat-scene-panel-light.png' });
   const beforeAll = historyReads.length;
@@ -161,8 +161,8 @@ try {
   await chat.getByText('切换后从服务器取回的网页对话', { exact: true }).waitFor();
   assert.ok(historyReads.length > beforeAll, 'Switching to all scenes fetches the latest history');
   await page.waitForFunction(() => document.querySelector('#chat-scene-indicator .chat-scene-label').textContent === '桌面·测试电脑');
-  assert.equal(await chat.locator('#input').inputValue(), '切换时保留的草稿');
-  assert.equal(await chat.locator('#input').isDisabled(), false, '全部场景上下文仍向当前场景发送');
+  assert.equal(await chat.locator('#input .cm-content').textContent(), '切换时保留的草稿');
+  assert.equal(await chat.locator('#input .cm-content').isDisabled(), false, '全部场景上下文仍向当前场景发送');
   await sceneButton.click();
   assert.equal(await scenePanel.count(), 0);
   assert.equal(await sceneButton.evaluate(el => el === document.activeElement), true);
@@ -181,7 +181,7 @@ try {
   await chat.getByText('返回时从服务器取回的桌面对话', { exact: true }).waitFor();
   assert.ok(historyReads.length > beforeCurrent, 'Returning to the current scene also refreshes history');
   assert.equal(await chat.getByText('切换后从服务器取回的网页对话', { exact: true }).count(), 0);
-  assert.equal(await chat.locator('#input').inputValue(), '切换时保留的草稿');
+  assert.equal(await chat.locator('#input .cm-content').textContent(), '切换时保留的草稿');
   await page.waitForFunction(() => document.querySelector('#chat-scene-indicator .chat-scene-label').textContent === '桌面·测试电脑');
   // An out-of-date frame command cannot switch the current chat.
   const scopeReplies = await page.evaluate(() => {
@@ -197,7 +197,7 @@ try {
   await page.evaluate(async () => { await window.sbsApp.toggleTheme(); document.documentElement.dataset.theme = window.sbsApp.theme; });
   assert.equal(await scenePanel.evaluate(el => { const box = el.getBoundingClientRect(); return box.left >= 0 && box.right <= innerWidth; }), true);
   await page.screenshot({ path: 'test-results/chat-scene-panel-dark-narrow.png' });
-  await chat.locator('#input').focus();
+  await chat.locator('#input .cm-content').focus();
   assert.equal(await scenePanel.isVisible(), true, 'Typing keeps scene navigation open');
   await page.setViewportSize({ width: 1280, height: 720 });
   await page.evaluate(async () => { await window.sbsApp.toggleTheme(); document.documentElement.dataset.theme = window.sbsApp.theme; });

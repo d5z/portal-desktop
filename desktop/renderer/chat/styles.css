@@ -500,12 +500,6 @@ html, body {
 /* Markdown */
 .message .content p { margin-bottom: 8px; white-space: normal; }
 .message .content p:last-child { margin-bottom: 0; }
-.message .content h1, .message .content h2, .message .content h3 {
-  margin: 12px 0 6px; line-height: 1.3; font-weight: 650; white-space: normal;
-}
-.message .content h1 { font-size: 20px; }
-.message .content h2 { font-size: 18px; }
-.message .content h3 { font-size: 16px; }
 .message .content code {
   background: var(--bg-softer); padding: 2px 6px; border-radius: 4px;
   font-family: var(--mono); font-size: 13px;
@@ -900,7 +894,7 @@ html, body {
 
 /* Filled/accent state when textarea has content.
    :placeholder-shown = empty; :not(:placeholder-shown) = has text. */
-#input-row:has(#input:not(:placeholder-shown)) #send-btn {
+#input-row:has(#input[data-has-draft="true"]) #send-btn {
   background: rgba(var(--accent-rgb), 0.15);
   border-color: rgba(var(--accent-rgb), 0.3);
 }
@@ -908,10 +902,10 @@ html, body {
   background: rgba(var(--accent-rgb), 0.15);
   border-color: rgba(var(--accent-rgb), 0.3);
 }
-#input-row:has(#input:not(:placeholder-shown)) #send-btn::before {
+#input-row:has(#input[data-has-draft="true"]) #send-btn::before {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2358a6ff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M12 20V5'/><path d='M5 12l7-7 7 7'/></svg>");
 }
-#input-row:has(#input:not(:placeholder-shown)) #send-btn:hover {
+#input-row:has(#input[data-has-draft="true"]) #send-btn:hover {
   background: rgba(var(--accent-rgb), 0.25);
   border-color: rgba(var(--accent-rgb), 0.45);
 }
@@ -972,8 +966,12 @@ body{-webkit-font-smoothing:antialiased;background:var(--bg)}
 .message.user .content{max-width:85%;background:var(--bg-softer);padding:12px 16px;border-radius:16px;white-space:normal}
 .message .content{font-size:var(--reading-size,15px);line-height:1.85;color:var(--text);overflow-wrap:anywhere}
 .message .content p{margin-bottom:16px}.message .content p:last-child{margin-bottom:0}
-.message .content h1,.message .content h2,.message .content h3{font-weight:550;line-height:1.55;margin:26px 0 12px;letter-spacing:-.3px}
-.message .content h1{font-size:22px}.message .content h2{font-size:20px}.message .content h3{font-size:17px}
+.message .content h1,.message .content h2,.message .content h3,
+#input.composer-editor .cm-composer-heading-1,#input.composer-editor .cm-composer-heading-2,#input.composer-editor .cm-composer-heading-3{font-weight:550;line-height:1.55;letter-spacing:-.3px}
+.message .content h1,.message .content h2,.message .content h3{margin:26px 0 12px;white-space:normal}
+.message .content h1,#input.composer-editor .cm-composer-heading-1{font-size:22px}
+.message .content h2,#input.composer-editor .cm-composer-heading-2{font-size:20px}
+.message .content h3,#input.composer-editor .cm-composer-heading-3{font-size:17px}
 .message .content li{margin:6px 0}.message .content strong{font-weight:600}.message .content a{color:var(--text);text-decoration:underline;text-underline-offset:3px}
 .message .content code{background:var(--bg-softer);font-size:.86em;border-radius:4px;padding:2px 5px}
 .message .content .code-block{background:var(--bg-soft);border:1px solid var(--border);border-radius:10px;margin:18px 0}.message .content pre{padding:16px}.message .content pre code{font-size:.86em;background:transparent}
@@ -1007,9 +1005,9 @@ body{-webkit-font-smoothing:antialiased;background:var(--bg)}
 #desktop-composer-tools{grid-row:2;grid-column:2;display:flex;align-items:center;gap:4px;min-width:0}
 #desktop-composer-tools button{display:flex;align-items:center;gap:4px;border:0;padding:5px 7px;border-radius:6px;background:none;color:var(--text-dim);font:11px/20px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;cursor:pointer;white-space:nowrap}
 #desktop-composer-tools button:hover:not(:disabled){background:var(--hover-overlay)}#desktop-composer-tools svg{width:13px;height:13px;fill:none;stroke:currentColor;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round}.composer-privacy{margin-left:auto}
-#send-btn,#input-row:has(#input:not(:placeholder-shown)) #send-btn{grid-column:3;grid-row:2;width:30px;height:30px;min-width:30px;min-height:30px;border:0;border-radius:50%;padding:0;margin:0;background:var(--text);color:var(--bg);box-shadow:none;align-self:center}
-#send-btn:before,#input-row:has(#input:not(:placeholder-shown)) #send-btn:before{background-image:none;background-color:var(--bg);mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 19V5m-6 6 6-6 6 6' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/18px no-repeat}
-#send-btn:hover:not(:disabled),#input-row:has(#input:not(:placeholder-shown)) #send-btn:hover:not(:disabled){background:var(--text);opacity:.8}
+#send-btn,#input-row:has(#input[data-has-draft="true"]) #send-btn{grid-column:3;grid-row:2;width:30px;height:30px;min-width:30px;min-height:30px;border:0;border-radius:50%;padding:0;margin:0;background:var(--text);color:var(--bg);box-shadow:none;align-self:center}
+#send-btn:before,#input-row:has(#input[data-has-draft="true"]) #send-btn:before{background-image:none;background-color:var(--bg);mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 19V5m-6 6 6-6 6 6' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/18px no-repeat}
+#send-btn:hover:not(:disabled),#input-row:has(#input[data-has-draft="true"]) #send-btn:hover:not(:disabled){background:var(--text);opacity:.8}
 #input-row:has(#input.queued) #send-btn{background:var(--text)}
 #tui-wrapper{width:calc(100% - 64px);max-width:760px;margin:0 auto 8px}
 #tui-bar,#activity-log{border-color:var(--border);background:var(--bg-soft)}
@@ -1041,7 +1039,7 @@ body{-webkit-font-smoothing:antialiased;background:var(--bg)}
 #chat-index-preview p{margin:6px 0 0;color:var(--text-muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
 @media(max-width:880px){#messages{padding-left:54px;padding-right:24px}}
 @media(prefers-reduced-motion:reduce){.chat-index-tick span,#chat-index-latest{transition:none}}
-#send-btn.stop::before,#input-row:has(#input:not(:placeholder-shown)) #send-btn.stop::before{mask:none;background-image:none;background-color:var(--bg);inset:10px;border-radius:2px}
+#send-btn.stop::before,#input-row:has(#input[data-has-draft="true"]) #send-btn.stop::before{mask:none;background-image:none;background-color:var(--bg);inset:10px;border-radius:2px}
 #input-row:has(#input.queued) #send-btn{animation:none}
 /* One 16px icon column and 8px gap throughout the process summary and details. */
 #tui-wrapper,.message.thinking-indicator{display:none!important}
@@ -1208,95 +1206,48 @@ button.llm-custom-link, button.step2-back { border: 0; cursor: pointer; }
 label.chat-scope-switch{align-items:center;gap:8px;font-size:12px;color:var(--text-muted);cursor:pointer}
 label.chat-scope-switch input{margin:0;accent-color:var(--accent)}
 
-/* Composer typing preview: markdown overlay aligned to textarea (SPEC §2). */
-.composer-stack {
-  position: relative;
+/* One editable surface draws the text, selection, and caret. */
+#input.composer-editor {
   grid-column: 1 / -1;
   grid-row: 1;
   width: 100%;
   min-width: 0;
-}
-.composer-preview {
-  position: absolute;
-  inset: 0;
-  overflow: auto;
-  scrollbar-width: none;
-  pointer-events: none;
-  color: var(--text);
-  z-index: 0;
-}
-.composer-preview::-webkit-scrollbar {
-  display: none;
-}
-.composer-stack .composer-input {
-  position: relative;
-  z-index: 1;
-  width: 100%;
-  box-sizing: border-box;
-  background: transparent;
-  caret-color: var(--text);
-}
-.composer-stack .composer-input:not(:placeholder-shown) {
-  color: transparent;
-  -webkit-text-fill-color: transparent;
-}
-.composer-stack.ime-composing .composer-input {
-  color: var(--text);
-  -webkit-text-fill-color: var(--text);
-}
-.composer-stack.ime-composing .composer-preview {
-  visibility: hidden;
-}
-.composer-stack .composer-input::placeholder {
-  color: var(--text-muted);
-  -webkit-text-fill-color: var(--text-muted);
-}
-.composer-preview-markdown {
-  font-family: inherit;
-  font-size: var(--composer-font-size, 15px);
-  line-height: var(--composer-line-height, 22.5px);
-  letter-spacing: var(--composer-letter-spacing, normal);
-  padding: var(--composer-padding-top, 0) var(--composer-padding-right, 0)
-    var(--composer-padding-bottom, 8px) var(--composer-padding-left, 0);
-  margin: 0;
-  overflow-wrap: anywhere;
-  color: var(--text);
-}
-.composer-preview-markdown p,
-.composer-preview-markdown .composer-preview-line,
-.composer-preview-markdown h1,
-.composer-preview-markdown h2,
-.composer-preview-markdown h3,
-.composer-preview-markdown h4,
-.composer-preview-markdown h5,
-.composer-preview-markdown h6,
-.composer-preview-markdown ul,
-.composer-preview-markdown ol,
-.composer-preview-markdown li {
-  margin: 0;
+  min-height: 46px;
+  max-height: none;
   padding: 0;
-  line-height: var(--composer-line-height, 22.5px);
-}
-.composer-preview-markdown .composer-preview-heading {
-  font-weight: 600;
   color: var(--text);
+  background: transparent;
+  border: 0;
+  box-shadow: none;
 }
-.composer-preview-markdown h1.composer-preview-heading {
-  font-size: calc(var(--composer-font-size, 15px) * 1.07);
+#input.composer-editor:focus-within { outline: none; }
+#input.composer-editor .cm-editor {
+  width: 100%;
+  min-height: 46px;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 22.5px;
+  font-family: inherit;
+  letter-spacing: normal;
 }
-.composer-preview-markdown h2.composer-preview-heading {
-  font-size: calc(var(--composer-font-size, 15px) * 1.04);
+#input.composer-editor .cm-editor.cm-focused { outline: none; }
+#input.composer-editor .cm-scroller {
+  max-height: 143px;
+  overflow: auto;
+  font-family: inherit;
 }
-.composer-preview-markdown h3.composer-preview-heading {
-  font-size: calc(var(--composer-font-size, 15px) * 1.02);
+#input.composer-editor .cm-content {
+  min-height: 46px;
+  padding: 0 0 8px;
+  caret-color: var(--text);
+  tab-size: 8;
 }
-.composer-preview-markdown .composer-preview-list {
-  list-style-position: outside;
-  padding-left: 1.35em;
-}
-.composer-preview-markdown .composer-preview-list .composer-preview-list {
-  padding-left: 1.35em;
-}
-.composer-preview-markdown .composer-preview-list ul {
-  list-style-type: disc;
+#input.composer-editor .cm-line { padding: 0; }
+#input.composer-editor .cm-placeholder { color: var(--text-muted); }
+#input.composer-editor .cm-composer-list-indent { display: inline-block; }
+#input.composer-editor .cm-composer-bullet { display: inline-block; width: 18px; color: var(--text); text-align: center; }
+#input.composer-editor .cm-composer-ordered { display: inline-block; width: 18px; text-align: right; }
+@media (max-width: 640px) {
+  #input.composer-editor .cm-scroller { max-height: 98px; }
 }
