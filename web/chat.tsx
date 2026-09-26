@@ -2,6 +2,7 @@ import { createRoot } from "react-dom/client";
 import { ChatApp } from "../desktop/renderer/chat/page";
 import { readConnection, deploymentConnection } from "./connection";
 import "../desktop/renderer/chat/styles.css";
+import "../desktop/renderer/shared/activity.css";
 import "../desktop/renderer/shared/model-settings.css";
 import "highlight.js/styles/github-dark.min.css";
 import "./chat.css";

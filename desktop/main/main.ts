@@ -1,3 +1,4 @@
+import type { ChatSessionOperation } from "../shared/types";
 import { subagentReady } from './portal/subagent-ready';
 import { SceneTaskObserver } from './portal/subagent-tasks';
 import { setupSubagent, validateSubagentSetup, readSubagentConfig, setSubagentEnabled } from './portal/subagent-setup';
@@ -424,11 +425,11 @@ async function ready() {
   handle('beings:cancel-update', () => { updateDownload?.abort(); });
   handle('beings:update-state', () => updates.state);
   const snapshot = () => ({ settings: store.settings, portal: portal.state, background: background.state, chatScene: chatSessions?.current(store.connection?.endpoint) || chatScene, chatSessions: chatSessions?.list(store.connection?.endpoint), notice: [startupNotice && errorLog.report('startup-notice', startupNotice), chatSceneNotice].filter(Boolean).join('\n') || undefined });
-  handle('beings:chat-session', (operation: string, value: string, endpoint: string, sceneId?: string) => exclusive(async () => {
+  handle('beings:chat-session', (operation: string, value: string | string[], endpoint: string, sceneId?: string) => exclusive(async () => {
     if (!chatSessions || !store.connection) throw new Error('请先连接 Being，或检查场景目录。');
     if (endpoint !== store.connection.endpoint) throw new Error('Being 连接已切换，请重试。');
-    if (!['create', 'bind', 'select', 'rename', 'delete'].includes(operation)) throw new Error('无效的场景操作。');
-    await chatSessions.change(endpoint, operation as 'create' | 'bind' | 'select' | 'rename' | 'delete', value, sceneId);
+    if (!['create', 'bind', 'select', 'rename', 'delete', 'move'].includes(operation)) throw new Error('无效的场景操作。');
+    await chatSessions.change(endpoint, operation as ChatSessionOperation, value, sceneId);
     return snapshot();
   }));
   const verifyConnection = async () => {

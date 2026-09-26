@@ -8,6 +8,15 @@ export function useChatBridge(
   app: AppModel,
   frame: RefObject<HTMLIFrameElement | null>,
 ) {
+  useEffect(() => {
+    const dismissIndex = () => {
+      const target = frame.current;
+      if (target?.getAttribute("src")) app.post({ type: "beings:search-preview-dismiss",
+        revision: new URL(target.src).searchParams.get("revision") });
+    };
+    window.addEventListener("beings:sidebar-peek", dismissIndex);
+    return () => window.removeEventListener("beings:sidebar-peek", dismissIndex);
+  }, [app, frame]);
   useLayoutEffect(() => {
     app.post = (data) => {
       if (frame.current?.getAttribute("src"))
@@ -58,6 +67,10 @@ export function useChatBridge(
       }
       if (message.revision !== new URL(target.src).searchParams.get("revision"))
         return;
+      if (message.type === "beings:sidebar-dismiss" || message.type === "beings:sidebar-pointer-away") {
+        window.dispatchEvent(new Event(message.type));
+        return;
+      }
       if (app.town.receiveContactDraft(message)) return;
       if (message.type === 'beings:scene-tasks-request') {
         void app.api.sceneTasks?.().then(snapshot => {

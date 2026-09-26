@@ -1,4 +1,7 @@
 import { SceneScheduling } from './scheduling';
+import { ActivitySpinner } from '../../shared/components/activity-spinner';
+import { ActivityStopped } from '../../shared/components/activity-stopped';
+import { Check } from 'lucide-react';
 import { useEffect, useMemo, useState } from "react";
 import type { ChatItem, Message, ChatRuntime, Run } from "../models/chat";
 const duration = (seconds: number) =>
@@ -6,7 +9,6 @@ const duration = (seconds: number) =>
     ? `${seconds} 秒`
     : `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
 const icons = {
-  check: <path d="m3.5 8 3 3 6-6" />,
   think: <path d="M6 11h4M6.5 13h3M5.5 9.5a4.5 4.5 0 1 1 5 0L10 11H6Z" />,
   tool: <path d="m3.5 5 3 3-3 3M9 11h3.5" />,
   error: (
@@ -15,8 +17,6 @@ const icons = {
       <path d="M8 4.5v4M8 11h.01" />
     </>
   ),
-  stop: <path d="M4 8h8" />,
-  wait: <><circle cx="8" cy="8" r="5.5" /><path d="M8 4.5V8l2 1.5" /></>,
   chevron: <path d="m6 4 4 4-4 4" />,
 };
 function Icon({ name }: { name: keyof typeof icons }) {
@@ -42,7 +42,7 @@ export function ChatActivity({
   canStop = true,
 }: {
   run: Run;
-  runtime: ChatRuntime;
+  runtime: Pick<ChatRuntime, 'stopCurrentTurn'>;
   stopping: boolean;
   sceneLabel?: string;
   canStop?: boolean;
@@ -69,15 +69,7 @@ export function ChatActivity({
     >
       <summary>
         <span className="run-icon">
-          <Icon
-            name={
-              run.outcome === "stopped"
-                ? "stop"
-                : run.outcome === "error"
-                  ? "error"
-                  : passive ? "wait" : "check"
-            }
-          />
+          {!run.end ? <ActivitySpinner /> : run.outcome === "stopped" ? <ActivityStopped /> : run.outcome === "error" ? <Icon name="error" /> : <Check className="activity-state-icon" aria-hidden="true" />}
         </span>
         <span className="run-caption">
           <span className="run-label" title={run.arg}>

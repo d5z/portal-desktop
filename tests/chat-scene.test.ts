@@ -99,6 +99,68 @@ describe('desktop scene request scope', () => {
 });
 
 describe('multiple sessions for one Being', () => {
+  it('moves and removes a selection atomically, preserves order and replaces an empty list once', async () => {
+    const { ChatSessions } = await import('../desktop/main/chat/scene');
+    const directory = await profile(), original = await loadDesktopScene(directory, 'test', 'PC');
+    const sessions = new ChatSessions(directory, original);
+    await sessions.load();
+    for (const id of ['b', 'c', 'd']) await sessions.change('alice', 'bind', id, id);
+    await sessions.change('alice', 'move', ['d', 'b'], original.scene_id);
+    expect(sessions.list('alice').map(item => item.scene_id)).toEqual(['b', 'd', original.scene_id, 'c']);
+    expect(sessions.current('alice').scene_id).toBe('d');
+    const saved = await readFile(path.join(directory, 'chat-sessions.json'), 'utf8');
+    for (const operation of ['move', 'delete'] as const) {
+      for (const ids of [[], ['b', 'missing']]) await expect(sessions.change('alice', operation, ids)).rejects.toThrow('不存在');
+      expect(await readFile(path.join(directory, 'chat-sessions.json'), 'utf8')).toBe(saved);
+    }
+    await sessions.change('alice', 'delete', ['b', 'c']);
+    expect(sessions.current('alice').scene_id).toBe('d');
+    const reopened = new ChatSessions(directory, original); await reopened.load();
+    expect(reopened.list('alice').map(item => item.scene_id)).toEqual(['d', original.scene_id]);
+    expect(reopened.list('bob')).toEqual([original]);
+    await reopened.change('alice', 'delete', ['d', original.scene_id]);
+    expect(reopened.list('alice')).toHaveLength(1);
+    expect(reopened.current('alice').scene_meta.scene_label).toBe('新场景');
+  });
+
+  it.each(['move', 'delete'] as const)('rolls back the whole batch when %s cannot be saved', async operation => {
+    const { ChatSessions } = await import('../desktop/main/chat/scene');
+    const directory = await profile(), original = await loadDesktopScene(directory, 'test', 'PC');
+    const sessions = new ChatSessions(directory, original);
+    await sessions.load();
+    for (const id of ['b', 'c']) await sessions.change('alice', 'bind', id, id);
+    const saved = sessions.list('alice'), active = sessions.current('alice');
+    await mkdir(path.join(directory, 'chat-sessions.json.tmp'));
+    await expect(sessions.change('alice', operation, ['b', 'c'], original.scene_id)).rejects.toThrow();
+    expect(sessions.list('alice')).toEqual(saved);
+    expect(sessions.current('alice')).toEqual(active);
+  });
+
+  it('persists relative moves per Being without changing selection and rejects stale targets atomically', async () => {
+    const { ChatSessions } = await import('../desktop/main/chat/scene');
+    const directory = await profile();
+    const original = await loadDesktopScene(directory, 'test', 'PC');
+    const sessions = new ChatSessions(directory, original);
+    await sessions.load();
+    await sessions.change('alice', 'bind', 'B', 'b');
+    await sessions.change('alice', 'bind', 'C', 'c');
+    await sessions.change('alice', 'move', 'c', original.scene_id);
+    expect(sessions.list('alice').map(scene => scene.scene_id)).toEqual(['c', original.scene_id, 'b']);
+    expect(sessions.current('alice').scene_id).toBe('c');
+    expect(sessions.list('bob')).toEqual([original]);
+    await sessions.change('alice', 'move', 'c');
+    const reopened = new ChatSessions(directory, original);
+    await reopened.load();
+    const saved = reopened.list('alice');
+    expect(saved.map(scene => scene.scene_id)).toEqual([original.scene_id, 'b', 'c']);
+    expect(reopened.current('alice').scene_id).toBe('c');
+    for (const [id, target] of [['missing', 'b'], ['b', 'missing']])
+      await expect(reopened.change('alice', 'move', id, target)).rejects.toThrow('不存在');
+    expect(reopened.list('alice')).toEqual(saved);
+    await mkdir(path.join(directory, 'chat-sessions.json.tmp'));
+    await expect(reopened.change('alice', 'move', 'b', original.scene_id)).rejects.toThrow();
+    expect(reopened.list('alice')).toEqual(saved);
+  });
   it('binds external scene IDs, deduplicates, persists and only removes the local entry', async () => {
     const { ChatSessions } = await import('../desktop/main/chat/scene');
     const directory = await profile();

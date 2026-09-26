@@ -12,8 +12,11 @@ const { outputFiles } = await build({
     function Fixture() {
       const [scope, setScope] = React.useState('current');
       const [scene, setScene] = React.useState(scenes[0]);
-      return <ChatSceneIndicator scene={scene} sessions={scenes} scope={scope} scopeReady connected
-        onScope={setScope} onCopy={() => {}} onSession={async (_, id) => { setScene(scenes.find(s => s.scene_id === id)); setScope('current'); }} />;
+      return <main id="client-main"><div className="workspace-body"><div className="workspace-stage">
+        <header className="topbar"><ChatSceneIndicator scene={scene} sessions={scenes} scope={scope} scopeReady connected
+          onScope={setScope} onCopy={() => {}} onSession={async (_, id) => { setScene(scenes.find(s => s.scene_id === id)); setScope('current'); }} /></header>
+        <section id="chat-view" className="view" />
+      </div></div></main>;
     }
     createRoot(document.getElementById('root')).render(<Fixture />);
   ` }, bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic',
@@ -30,18 +33,19 @@ try {
   await toggle.check();
   assert.equal(await toggle.isChecked(), true);
   assert.equal(await selected.getAttribute('aria-current'), 'true');
-  assert.equal(await page.locator('.chat-scene-label').innerText(), '方案讨论');
-  await page.getByRole('button', { name: '场景详情', exact: true }).click();
+  assert.equal(await page.locator('.chat-scene-label').textContent(), '方案讨论');
+  assert.equal(await page.locator('.chat-scene-label').isVisible(), true);
+  await page.getByRole('button', { name: '场景信息', exact: true }).click();
   await page.locator('#chat-scene-dialog').waitFor();
   assert.equal(await page.locator('#chat-scene-id').innerText(), 'scene-0');
-  await page.getByRole('button', { name: '关闭场景详情' }).click();
+  await page.getByRole('button', { name: '关闭场景信息' }).click();
   await toggle.uncheck();
   assert.equal(await selected.getAttribute('aria-current'), 'true');
   await toggle.check();
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/chat-scene-context.png' });
   await page.getByRole('button', { name: '切换到场景：日常交流' }).click();
-  assert.equal(await page.locator('.chat-scene-label').innerText(), '日常交流');
+  assert.equal(await page.locator('.chat-scene-label').textContent(), '日常交流');
   assert.equal(await toggle.isChecked(), false);
   console.log('PASS: context toggle preserves selected scene, label and details; no standalone all-scenes item.');
 } finally { await browser.close(); }
