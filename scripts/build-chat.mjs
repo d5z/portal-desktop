@@ -31,7 +31,8 @@ await copyFile(
 );
 await writeFile(path.join(output, "chat.css"),
   await readFile("desktop/renderer/chat/styles.css", "utf8") + "\n" +
-  await readFile("desktop/renderer/shared/model-settings.css", "utf8"));
+  await readFile("desktop/renderer/shared/model-settings.css", "utf8") + "\n" +
+  await readFile("desktop/renderer/shared/activity.css", "utf8"));
 const notices = [];
 for (const [name, file] of [
   ["marked", "LICENSE.md"],
@@ -39,6 +40,7 @@ for (const [name, file] of [
   ["react", "LICENSE"],
   ["react-dom", "LICENSE"],
   ["scheduler", "LICENSE"],
+  ["lucide-react", "LICENSE"],
 ]) {
   notices.push(
     `${name}\n${await readFile(path.join("node_modules", name, file), "utf8")}`,

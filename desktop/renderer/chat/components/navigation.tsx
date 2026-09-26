@@ -199,6 +199,7 @@ export function ChatPlaces({
 export interface ChatIndexHandle {
   publish(): void;
   jump(id: string): void;
+  dismissPreview(): void;
 }
 export function ChatIndex({
   items,
@@ -289,7 +290,7 @@ export function ChatIndex({
     setHovered(null);
     updateActive();
   }
-  useImperativeHandle(ref, () => ({ publish, jump }));
+  useImperativeHandle(ref, () => ({ publish, jump, dismissPreview: () => setHovered(null) }));
   useEffect(publish, [turns, send]);
   useEffect(() => () => clearTimeout(timer.current), []);
   useLayoutEffect(() => {

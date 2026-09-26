@@ -1045,40 +1045,7 @@ body{-webkit-font-smoothing:antialiased;background:var(--bg)}
 #input-row:has(#input.queued) #send-btn{animation:none}
 /* One 16px icon column and 8px gap throughout the process summary and details. */
 #tui-wrapper,.message.thinking-indicator{display:none!important}
-.run-activity{--run-icon:16px;--run-gap:8px;margin:8px 0 24px;min-width:0;color:var(--text-dim);font:13px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:normal;text-align:left}
-.message.being:has(+ .run-activity){margin-bottom:8px}
-.run-activity>summary{list-style:none;display:flex;align-items:center;gap:var(--run-gap);min-height:32px;padding:4px 0;cursor:pointer;user-select:none}
-.run-activity>summary::-webkit-details-marker{display:none}
-.run-activity>summary:hover .run-label{color:var(--text)}
-.run-activity>summary:focus-visible{outline:1px solid var(--text-muted);outline-offset:4px;border-radius:4px}
-.run-icon,.run-entry-icon,.run-chevron{display:grid;place-items:center;width:var(--run-icon);height:var(--run-icon);flex:0 0 var(--run-icon);color:var(--text-dim)}
-.run-icon svg,.run-entry-icon svg,.run-chevron svg{display:block;width:16px;height:16px}
-.run-caption{display:flex;align-items:baseline;gap:8px;min-width:0;flex-wrap:wrap;row-gap:2px}
-.run-label{font-size:13px;font-weight:500;overflow-wrap:anywhere}
-.run-elapsed,.run-count{font-size:12px;line-height:20px;color:var(--text-muted);white-space:nowrap;font-variant-numeric:tabular-nums}
-.run-count:empty{display:none}
-.run-context{flex-basis:100%;font-size:11px;line-height:18px;color:var(--text-muted);opacity:.72;overflow-wrap:anywhere}
-.run-chevron{width:14px;height:14px;flex-basis:14px;color:var(--text-muted);transition:transform .18s ease}
-.run-activity[open] .run-chevron{transform:rotate(90deg)}
-.run-activity.running .run-icon svg{display:none}
-.run-activity.running .run-icon:before{content:'';width:12px;height:12px;box-sizing:border-box;border:1.5px solid var(--border);border-top-color:var(--text-dim);border-right-color:var(--text-dim);border-radius:50%;animation:run-spin 1s linear infinite}
-.run-activity[data-outcome=error] .run-icon,.run-entry-icon.error{color:var(--red)}
-.run-list{position:relative;margin:8px 0 0;padding:0 8px 0 0;max-height:320px;overflow:auto;overscroll-behavior:contain}
-.run-entry{position:relative;padding:0 0 18px;margin:0}
-.run-entry:last-child{padding-bottom:4px}
-.run-entry:not(:last-child):after{content:'';position:absolute;left:7px;top:24px;bottom:4px;width:1px;background:var(--border)}
-.run-entry-heading{display:flex;align-items:flex-start;gap:var(--run-gap);min-width:0;line-height:22px}
-.run-entry-icon{margin-top:3px;background:var(--bg)}
-.run-entry-caption{display:flex;align-items:baseline;flex-wrap:wrap;gap:4px 10px;min-width:0}
-.run-entry-title{font-size:12px;font-weight:500;color:var(--text-dim);overflow-wrap:anywhere}
-.run-entry-heading small{font-size:10px;line-height:18px;color:var(--text-muted);white-space:nowrap}
-.run-entry p{font-size:12px;line-height:1.85;margin:5px 0 0 24px;white-space:pre-wrap;overflow-wrap:anywhere;color:var(--text-dim)}
-.run-empty,.run-hint{font-size:12px;line-height:1.8;margin:4px 0 8px 24px;color:var(--text-muted)}
-.run-stop{display:grid;place-items:center;flex:0 0 26px;margin-left:auto;width:26px;height:26px;padding:0;border:0;border-radius:6px;background:transparent;cursor:pointer;color:var(--text-dim)}
-.run-stop:before{content:'';width:8px;height:8px;background:currentColor;border-radius:2px}
-.run-stop:hover:not(:disabled){background:var(--bg-softer);color:var(--text)}.run-stop:disabled{opacity:.4;cursor:wait}.run-stop[hidden]{display:none}
-@keyframes run-spin{to{transform:rotate(360deg)}}
-@media(prefers-reduced-motion:reduce){.run-activity.running .run-icon:before{animation:none}.run-chevron{transition:none}}
+
 
 /* The conversation belongs to the same shared place as the reading surfaces. */
 :root{--bg:#faf9f5;--bg-soft:#f0eee6;--bg-softer:#e9eee2;--border:#e1e4d9;--text:#2a3631;--text-dim:#637068;--text-muted:#82897e;--accent:#37644e;--accent-rgb:55,100,78;--accent-border:#91ab94}
@@ -1121,6 +1088,9 @@ body{-webkit-font-smoothing:antialiased;background:var(--bg)}
 #chat-places-trigger{opacity:.8}
 #send-btn{opacity:.86}
 #chat-index{opacity:.25;transition:opacity .2s}
+/* Keep the conversation index clear of the shell's 8px sidebar hotzone. */
+.chat-root:not(.standalone-chat) #chat-index{left:20px}
+.chat-root:not(.standalone-chat) #chat-index-preview{left:64px}
 #chat-index:hover,#chat-index:focus-within{opacity:1}
 @media(max-width:680px){#messages{padding:20px 28px 22px 38px}#input-area{width:calc(100% - 48px);padding:14px 0 0;margin-bottom:20px}}
 
@@ -1201,6 +1171,7 @@ button.llm-custom-link, button.step2-back { border: 0; cursor: pointer; }
 .scene-task-spinner { display: inline-block; width: 10px; height: 10px; margin-right: 8px; border: 1.5px solid currentColor; border-right-color: transparent; border-radius: 50%; animation: scene-task-spin 1s linear infinite; }
 @keyframes scene-task-spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) { .scene-task-spinner { animation: none; } }
+
 
 .local-queue-status{display:flex;align-items:center;gap:12px;margin-top:12px;color:var(--text-muted,#888);font-size:13px}
 .local-queue-status button{background:none;border:0;color:inherit;text-decoration:underline;cursor:pointer}

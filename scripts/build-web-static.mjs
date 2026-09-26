@@ -34,6 +34,7 @@ for (const [name, file] of [
   ["react", "LICENSE"],
   ["react-dom", "LICENSE"],
   ["scheduler", "LICENSE"],
+  ["lucide-react", "LICENSE"],
 ])
   notices.push(
     `${name}\n${await readFile(path.join("node_modules", name, file), "utf8")}`,

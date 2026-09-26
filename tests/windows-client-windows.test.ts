@@ -5,6 +5,14 @@ import os from 'node:os';
 import path from 'node:path';
 import { assertSingleClientWindow, clientWindowSnapshot, isClientMainWindow } from './support/windows-client-windows.mjs';
 
+it('recognizes integrated caption windows without counting owned tooltips', () => {
+  const window = { handle:1, owner:0, visible:true, className:'Chrome_WidgetWin_1', title:'Portal', style:0x00040000, extendedStyle:0 };
+  expect(isClientMainWindow(window)).toBe(true);
+  expect(isClientMainWindow({...window, owner:1})).toBe(false);
+  expect(isClientMainWindow({...window, style:0})).toBe(false);
+  expect(isClientMainWindow({...window, visible:false})).toBe(false);
+});
+
 it.skipIf(process.platform !== 'win32')('ignores real Chromium tooltips but rejects duplicate or missing client windows', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'portal-native-windows-'));
   let app;

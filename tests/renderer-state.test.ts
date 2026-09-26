@@ -240,6 +240,40 @@ describe("React desktop state lifecycle", () => {
     expect(app.chatHistoryScope).toBe('current');
     expect(new URL(app.chatSource).searchParams.get('scene_scope')).toBe('current');
   });
+  it("saves manual order without changing chat, history scope, activity or workspace", async () => {
+    const a = { scene_id: 'a', scene_meta: { client: 'test', scene_label: 'A' } };
+    const b = { scene_id: 'b', scene_meta: { client: 'test', scene_label: 'B' } };
+    const initial = { ...state(), chatScene: a, chatSessions: [a, b] };
+    const changeChatSession = vi.fn().mockResolvedValue({ ...initial, chatSessions: [b, a] });
+    const app = new AppModel(api({ changeChatSession }).value), post = vi.fn();
+    app.applySnapshot(initial); app.frameLoaded(); app.post = post;
+    app.chatHistoryScope = 'all'; app.chatHistoryScopeKnown = true;
+    app.chatSceneActivity = { b: 'working' };
+    app.navigate('bonfire');
+    const source = app.chatSource;
+    await app.changeChatSession('move', 'b', 'a');
+    expect(app.snapshot?.chatSessions).toEqual([b, a]);
+    expect(app.snapshot?.chatScene).toEqual(a);
+    expect(app.chatHistoryScope).toBe('all');
+    expect(app.chatSource).toBe(source);
+    expect(app.chatHistoryScopeKnown).toBe(true);
+    expect(app.chatSceneActivity).toEqual({ b: 'working' });
+    expect(app.view).toBe('bonfire');
+    expect(post.mock.calls.some(([message]) => message.type === 'beings:session-select')).toBe(false);
+  });
+  it.each(['rename', 'delete'] as const)('keeps navigation and scope when %s changes only inactive entries', async operation => {
+    const a = { scene_id: 'a', scene_meta: { client: 'test', scene_label: 'A' } };
+    const b = { scene_id: 'b', scene_meta: { client: 'test', scene_label: 'B' } };
+    const initial = { ...state(), chatScene: a, chatSessions: [a, b] };
+    const next = { ...initial, chatSessions: operation === 'delete' ? [a] : [a, { ...b, scene_meta: { ...b.scene_meta, scene_label: 'Renamed' } }] };
+    const app = new AppModel(api({ changeChatSession: vi.fn().mockResolvedValue(next) }).value);
+    app.applySnapshot(initial); app.frameLoaded();
+    app.chatHistoryScope = 'all'; app.navigate('bonfire');
+    const source = app.chatSource;
+    await app.changeChatSession(operation, operation === 'delete' ? ['b'] : 'Renamed', 'b');
+    expect(app.snapshot?.chatScene).toEqual(a);
+    expect(app.view).toBe('bonfire'); expect(app.chatHistoryScope).toBe('all'); expect(app.chatSource).toBe(source);
+  });
   it("announces the scene context only when a session change enters another scene", async () => {
     vi.useFakeTimers();
     const original = { scene_id: "desktop-original", scene_meta: { client: "portal-desktop", scene_label: "日常对话" } };
