@@ -1,15 +1,16 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, type RefObject } from "react";
 
 // Rationale and evidence: docs/SIDEBAR-INTERACTION-2026-09-25.md.
 export const SIDEBAR_PEEK = { hotzoneWidth: 8, openDelay: 300, closeDelay: 300 } as const;
 
 /** Hover is transient. Only the titlebar button changes the pinned state. */
-export function useSidebarPeek(enabled: boolean, engaged: boolean) {
+export function useSidebarPeek(enabled: boolean, engaged: boolean, canOccupySpace = true, panelRef?: RefObject<HTMLElement | null>) {
   const [pinned, setPinned] = useState(true);
   const [peek, setPeek] = useState(false);
   const [instant, setInstant] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
-  const panel = useRef<HTMLElement>(null);
+  const localPanel = useRef<HTMLElement>(null);
+  const panel = panelRef ?? localPanel;
   const edge = useRef<HTMLDivElement>(null);
   const peeking = useRef(false);
   const nativeDrag = useRef(false);
@@ -29,21 +30,43 @@ export function useSidebarPeek(enabled: boolean, engaged: boolean) {
     setPeek(false);
   }, [cancelOpen, cancelClose]);
 
+  const effectivePinned = pinned && canOccupySpace;
   const toggle = (fromKeyboard: boolean) => {
+    if (!canOccupySpace) {
+      suppressed.current = true;
+      if (peek && pinned) {
+        dismiss(fromKeyboard);
+        return;
+      }
+      cancelOpen(); cancelClose();
+      peeking.current = true;
+      setInstant(false);
+      setPeek(true);
+      setPinned(true);
+      return;
+    }
     suppressed.current = true;
     dismiss(fromKeyboard);
     setPinned(value => !value);
   };
   useEffect(() => {
-    if (enabled && !pinned && peek) window.dispatchEvent(new Event("beings:sidebar-peek"));
-  }, [enabled, pinned, peek]);
+    if (enabled && !effectivePinned && peek) window.dispatchEvent(new Event("beings:sidebar-peek"));
+  }, [enabled, effectivePinned, peek]);
+
+  useEffect(() => {
+    if (!effectivePinned) return;
+    cancelOpen(); cancelClose();
+    nativeDrag.current = false;
+    peeking.current = false;
+    setPeek(false);
+  }, [effectivePinned, cancelOpen, cancelClose]);
 
   useEffect(() => {
     if (!enabled) {
       dismiss(true);
       return;
     }
-    if (pinned) return;
+    if (effectivePinned) return;
     let pressed = false;
     const containsPointer = (element: HTMLElement | null) => {
       const rect = element?.getBoundingClientRect();
@@ -201,9 +224,9 @@ export function useSidebarPeek(enabled: boolean, engaged: boolean) {
       window.removeEventListener("beings:sidebar-dismiss", frameDismiss);
       window.removeEventListener("beings:sidebar-pointer-away", frameAway);
     };
-  }, [enabled, pinned, engaged, cancelOpen, cancelClose, dismiss]);
+  }, [enabled, effectivePinned, engaged, cancelOpen, cancelClose, dismiss]);
 
-  return { pinned, shown: enabled && (pinned || peek), peek: enabled && !pinned && peek,
+  return { pinned, effectivePinned, shown: enabled && (effectivePinned || peek), peek: enabled && !effectivePinned && peek,
     instant, trigger, panel, edge, toggle,
     collapse: () => { suppressed.current = true; dismiss(true); setPinned(false); } };
 }

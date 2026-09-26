@@ -12,6 +12,7 @@ export function useSidebarWidth(panel: RefObject<HTMLElement | null>, storageKey
     return SIDEBAR_WIDTH.default;
   });
   const [bounds, setBounds] = useState({ min: SIDEBAR_WIDTH.min, max: SIDEBAR_WIDTH.max });
+  const [canOccupySpace, setCanOccupySpace] = useState(true);
   const [resizing, setResizing] = useState(false);
   const drag = useRef<{ x: number; width: number; preferred: number; element: HTMLElement; pointer: number } | null>(null);
   const current = useRef(preferred);
@@ -34,12 +35,19 @@ export function useSidebarWidth(panel: RefObject<HTMLElement | null>, storageKey
   useLayoutEffect(() => {
     const stage = panel.current?.closest<HTMLElement>('.workspace-stage');
     if (!stage) return;
-    const observer = new ResizeObserver(() => {
+    const measure = () => {
       const available = stage.clientWidth;
+      if (!available) return;
       const min = Math.min(SIDEBAR_WIDTH.min, Math.max(0, available - 48));
-      setBounds({ min, max: Math.max(min, Math.min(SIDEBAR_WIDTH.max, available - SIDEBAR_WIDTH.contentMin)) });
-    });
+      const max = Math.max(min, Math.min(SIDEBAR_WIDTH.max, available - SIDEBAR_WIDTH.contentMin));
+      setBounds(current => current.min === min && current.max === max ? current : { min, max });
+      const sidebarWidth = panel.current?.getBoundingClientRect().width ?? 0;
+      setCanOccupySpace(available - sidebarWidth >= SIDEBAR_WIDTH.contentMin);
+    };
+    const observer = new ResizeObserver(measure);
     observer.observe(stage);
+    if (panel.current) observer.observe(panel.current);
+    measure();
     return () => observer.disconnect();
   }, [panel]);
   useLayoutEffect(() => {
@@ -63,7 +71,7 @@ export function useSidebarWidth(panel: RefObject<HTMLElement | null>, storageKey
       window.removeEventListener('blur', cancel);
     };
   }, [resizing, panel]);
-  return { width, bounds, resizing, reset: () => update(SIDEBAR_WIDTH.default, true),
+  return { width, bounds, resizing, canOccupySpace, reset: () => update(SIDEBAR_WIDTH.default, true),
     props: {
       onPointerDown: (event: React.PointerEvent<HTMLElement>) => {
         if (event.button !== 0) return;

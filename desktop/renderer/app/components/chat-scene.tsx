@@ -159,8 +159,9 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
     catch (error) { setError(error instanceof Error ? error.message : String(error)); }
     finally { changing.current = false; setBusy(false); }
   };
-  const sidebar = useSidebarPeek(visible, !!(details || editing || renameId || deleting || menu || hint.active || dragging || sizing));
-  const size = useSidebarWidth(sidebar.panel, widthPreferenceKey);
+  const sidebarPanel = useRef<HTMLElement>(null);
+  const size = useSidebarWidth(sidebarPanel, widthPreferenceKey);
+  const sidebar = useSidebarPeek(visible, !!(details || editing || renameId || deleting || menu || hint.active || dragging || sizing), size.canOccupySpace, sidebarPanel);
   useEffect(() => { setSizing(size.resizing); }, [size.resizing]);
   const move = async (ids: string[], before?: string) => {
     await selectionRequest.current;
@@ -185,10 +186,10 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
     <>
       <div className="chat-scene-control">
         <button ref={sidebar.trigger} id="chat-scene-indicator" className="chat-scene-indicator" type="button"
-          aria-label={`${sidebar.peek ? "固定" : sidebar.pinned && visible ? "收起" : "展开"}场景列表`}
-          aria-controls="chat-session-panel" aria-expanded={sidebar.shown} aria-pressed={sidebar.pinned && visible}
+          aria-label={`${sidebar.peek && !sidebar.pinned ? "固定" : sidebar.shown ? "收起" : "展开"}场景列表`}
+          aria-controls="chat-session-panel" aria-expanded={sidebar.shown} aria-pressed={sidebar.effectivePinned && visible}
           data-instant={sidebar.instant}
-          data-sidebar-hint={sidebar.peek ? "固定场景列表" : sidebar.pinned && visible ? "收起场景列表" : "展开场景列表"} onClick={event => {
+          data-sidebar-hint={size.canOccupySpace ? sidebar.peek && !sidebar.pinned ? "固定场景列表" : sidebar.shown ? "收起场景列表" : "展开场景列表" : "窗口空间不足，场景列表暂以浮层显示；窗口变宽后恢复固定布局"} onClick={event => {
             setMenu(undefined);
             if (visible || !sidebar.pinned) sidebar.toggle(event.detail === 0);
             if (!visible) onReveal?.();
@@ -198,7 +199,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
         <div ref={sidebar.edge} className="chat-sidebar-edge" aria-hidden="true" hidden={!visible || sidebar.pinned}
           style={{ width: SIDEBAR_PEEK.hotzoneWidth }} />
         <aside ref={sidebar.panel} id="chat-session-panel" className="chat-session-panel" aria-label="场景列表"
-          data-pinned={sidebar.pinned && visible} data-open={sidebar.shown} data-peek={sidebar.peek} data-instant={sidebar.instant}
+          data-pinned={sidebar.effectivePinned && visible} data-open={sidebar.shown} data-peek={sidebar.peek} data-instant={sidebar.instant}
           inert={!sidebar.shown} aria-hidden={!sidebar.shown}>
           <div className="chat-session-create-actions">
             <button id="new-chat-session" className="chat-session-new" type="button" aria-label="新建场景"
