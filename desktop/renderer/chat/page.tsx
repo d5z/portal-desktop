@@ -10,7 +10,13 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { ChatState, type ChatRuntime, type ChatPanel, type RuntimeOptions } from "./models/chat";
+import {
+  ChatState,
+  type ChatRuntime,
+  type ChatPanel,
+  type Message,
+  type RuntimeOptions,
+} from "./models/chat";
 import { inCurrentScene, sceneItems, sceneName, type HistoryScope } from "./models/scenes";
 import { useModel } from "../shared/hooks/use-model";
 import { Markdown } from "../shared/components/markdown";
@@ -86,11 +92,24 @@ function ChatView({
     fileInput = useRef<HTMLInputElement>(null);
   const messageElements = useRef(new Map<string, HTMLDivElement>()),
     index = useRef<ChatIndexHandle>(null),
-    scrollLock = useRef(true);
+    scrollLock = useRef(true),
+    anchoredReplyId = useRef<string | null>(null),
+    wheelAccum = useRef(0);
   const scopeScroll = useRef<Partial<Record<HistoryScope, { top: number; locked: boolean }>>>({});
+  function releaseAnchor() {
+    if (!anchoredReplyId.current) return;
+    anchoredReplyId.current = null;
+    wheelAccum.current = 0;
+  }
+  function sendDraft() {
+    releaseAnchor();
+    scrollLock.current = true;
+    void runtime.send(state.draft);
+  }
   function changeScope(scope: HistoryScope) {
     if (scope === state.historyScope || (scope === "current" && !state.currentScene.sceneId)) return;
     if (messages.current) scopeScroll.current[state.historyScope] = { top: messages.current.scrollTop, locked: scrollLock.current };
+    releaseAnchor();
     state.historyScope = scope;
     setSelection(null);
     setHighlighted(null);
@@ -187,9 +206,11 @@ function ChatView({
   }, []);
   useLayoutEffect(() => {
     scrollLock.current = true;
+    releaseAnchor();
   }, [state.resetScroll]);
   useLayoutEffect(() => {
     const saved = scopeScroll.current[state.historyScope];
+    releaseAnchor();
     scrollLock.current = saved?.locked ?? true;
     if (messages.current && saved) messages.current.scrollTop = saved.top;
   }, [state.historyScope]);
@@ -207,8 +228,35 @@ function ChatView({
     el.style.overflowY = el.scrollHeight > max ? "auto" : "hidden";
   }, [state.draft, viewport.height]);
   useLayoutEffect(() => {
-    if (messages.current && scrollLock.current)
-      messages.current.scrollTop = messages.current.scrollHeight;
+    const container = messages.current;
+    if (!container) return;
+    const streamingReply = visibleItems.find(
+      (item): item is Message =>
+        item.kind === "message" && item.role === "being" && item.streaming,
+    );
+    if (anchoredReplyId.current && (!streamingReply || streamingReply.id !== anchoredReplyId.current)) {
+      anchoredReplyId.current = null;
+      wheelAccum.current = 0;
+    }
+    if (anchoredReplyId.current) {
+      const reply = messageElements.current.get(anchoredReplyId.current);
+      if (reply) container.scrollTop = reply.offsetTop - 20;
+      return;
+    }
+    if (scrollLock.current && streamingReply) {
+      const reply = messageElements.current.get(streamingReply.id);
+      if (reply) {
+        const replyTop = reply.getBoundingClientRect().top;
+        const containerTop = container.getBoundingClientRect().top;
+        if (replyTop < containerTop + 20) {
+          anchoredReplyId.current = streamingReply.id;
+          scrollLock.current = false;
+          container.scrollTop = reply.offsetTop - 20;
+          return;
+        }
+      }
+    }
+    if (scrollLock.current) container.scrollTop = container.scrollHeight;
   });
   useEffect(() => {
     const readSelection = () => {
@@ -385,7 +433,15 @@ function ChatView({
           id="messages"
           ref={messages}
           onWheel={(event) => {
+            if (anchoredReplyId.current) {
+              wheelAccum.current += Math.abs(event.deltaY);
+              if (wheelAccum.current > 30) releaseAnchor();
+              return;
+            }
             if (event.deltaY < 0) scrollLock.current = false;
+          }}
+          onTouchMove={() => {
+            if (anchoredReplyId.current) releaseAnchor();
           }}
           onScroll={() => {
             const el = messages.current!;
@@ -540,7 +596,7 @@ function ChatView({
                 )
                   return;
                 event.preventDefault();
-                void runtime.send(state.draft);
+                sendDraft();
               }}
             />
             <button
@@ -562,7 +618,7 @@ function ChatView({
               title="send"
               aria-label="send message"
               onClick={() => {
-                void runtime.send(state.draft);
+                sendDraft();
                 composer.current?.focus();
               }}
             >
@@ -588,6 +644,7 @@ function ChatView({
         container={messages}
         elements={messageElements}
         scrollLock={scrollLock}
+        clearAnchor={releaseAnchor}
         send={bridge.send}
         highlight={setHighlighted}
       />

@@ -205,6 +205,7 @@ export function ChatIndex({
   container,
   elements,
   scrollLock,
+  clearAnchor,
   send,
   highlight,
   ref,
@@ -213,6 +214,7 @@ export function ChatIndex({
   container: RefObject<HTMLDivElement | null>;
   elements: RefObject<Map<string, HTMLDivElement>>;
   scrollLock: RefObject<boolean>;
+  clearAnchor: () => void;
   send: (data: Record<string, unknown>) => void;
   highlight: (id: string | null) => void;
   ref: Ref<ChatIndexHandle>;
@@ -272,6 +274,7 @@ export function ChatIndex({
     const turn = turns.find((turn) => turn.id === id),
       messages = container.current;
     if (!messages || (id && !turn)) return;
+    clearAnchor();
     const target = turn && elements.current.get(turn.messageId);
     scrollLock.current = !turn;
     messages.scrollTo({
