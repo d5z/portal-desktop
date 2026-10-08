@@ -102,6 +102,56 @@ describe("scene history refresh", () => {
     } finally { runtime.dispose(); }
   });
 
+  it.each(["before", "after"] as const)("reconciles one recent reply when history uses a newly assigned scene id (%s stop)", async order => {
+    vi.setSystemTime("2026-10-08T12:00:00Z");
+    const history: { seq: number; role: string; content: string; scene_id: string; at: string }[] = [];
+    let stream!: ReadableStreamDefaultController<Uint8Array>;
+    const event = (name: string, data: unknown) => stream.enqueue(new TextEncoder().encode(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`));
+    vi.stubGlobal("fetch", vi.fn(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname === "/api/history") return Response.json({ messages: history.filter(m => m.seq > Number(url.searchParams.get("after") || 0)) });
+      if (url.pathname === "/api/stream/active") return new Response(null, { status: 204 });
+      if (url.pathname === "/health") return new Response("OK fixture");
+      if (url.pathname === "/api/chat/stream") return new Response(new ReadableStream({ start(controller) { stream = controller; } }));
+      return Response.json({ sbs_enabled: false });
+    }));
+    const state = new ChatState();
+    state.currentScene = { sceneId: "desktop-test", strict: true };
+    state.activeScene = state.currentScene;
+    const runtime = createChatRuntime(state);
+    try {
+      await runtime.start();
+      const sending = runtime.send("一次提问");
+      await vi.advanceTimersByTimeAsync(0);
+      event("content_block_delta", { scene_id: "desktop-test", delta: { text: "只应显示一次" } });
+      await vi.advanceTimersByTimeAsync(20);
+
+      if (order === "before") {
+        history.push({ seq: 1, role: "being", content: "只应显示一次", scene_id: "server-assigned-scene", at: "2026-10-08T12:00:01Z" });
+        await runtime.refreshHistory();
+        expect(state.items.filter(item => item.kind === "message" && item.text === "只应显示一次")).toHaveLength(2);
+      }
+
+      event("message_stop", { scene_id: "desktop-test" });
+      stream.close();
+      await sending;
+      await vi.advanceTimersByTimeAsync(20);
+
+      if (order === "after") {
+        history.push({ seq: 1, role: "being", content: "只应显示一次", scene_id: "server-assigned-scene", at: "2026-10-08T12:00:01Z" });
+        await runtime.refreshHistory();
+      }
+
+      const replies = state.items.filter(item => item.kind === "message" && item.text === "只应显示一次");
+      expect(replies).toHaveLength(1);
+      expect(replies[0]).toMatchObject({
+        sceneId: "desktop-test",
+        legacySceneId: "server-assigned-scene",
+        historySeq: 1,
+      });
+    } finally { runtime.dispose(); }
+  });
+
   it("compares the selected scene with the global previous message even when other scenes are hidden", async () => {
     vi.useRealTimers();
     vi.stubGlobal("location", new URL("beings://chat/loom.html?scene_id=desktop-test&strict_scene=1"));

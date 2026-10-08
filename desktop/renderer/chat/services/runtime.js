@@ -1675,7 +1675,7 @@ function createStreamRuntime(state, options) {
                 if (visibleText) updateMessage(streamMessage, visibleText);
                 else removeMessage(streamMessage);
               }
-              noteLocalEcho("being", streamText);
+              noteLocalEcho("being", streamText, state.activeScene, streamMessage);
               settleReplyBoundary();
               streamMessage = null;
               streamText = "";
@@ -1734,11 +1734,11 @@ function createStreamRuntime(state, options) {
           removeMessage(streamMessage);
           streamMessage = null;
         } else if (visibleText) {
-          addMessage("being", visibleText);
+          streamMessage = addMessage("being", visibleText);
         }
         // EOF can finalize a reply without message_stop. Retain its echo before
         // releasing the live scene so a later history read does not append it again.
-        noteLocalEcho("being", streamText);
+        noteLocalEcho("being", streamText, state.activeScene, streamMessage);
         setStatus("connected");
         tuiDone();
       }
@@ -1835,8 +1835,8 @@ function createStreamRuntime(state, options) {
     let spliceMsg = (text || "").trim();
     if (!spliceMsg && !files.length) return;
     spliceMsg = options.prepareMessage?.(spliceMsg || `[${files.length} file(s)]`) ?? spliceMsg;
-    addMessage("user", spliceMsg || `[${files.length} file(s)]`);
-    noteLocalEcho("user", spliceMsg);
+    const localMessage = addMessage("user", spliceMsg || `[${files.length} file(s)]`);
+    noteLocalEcho("user", spliceMsg, state.currentScene, localMessage);
     clearComposer();
     let res;
     try {
@@ -2070,7 +2070,7 @@ function createStreamRuntime(state, options) {
         lastSendFailed = true;
       } else if (userStoppedStream) {
         // 用户手动停止：内容已在屏幕上，只需推进历史游标避免下次对账重复渲染
-        noteLocalEcho("being", streamText);
+        noteLocalEcho("being", streamText, state.activeScene, streamMessage);
         syncHistoryCursor();
         setStatus("connected");
       }
@@ -2367,8 +2367,34 @@ function createStreamRuntime(state, options) {
 
   // 本地已经渲染、但还没被历史游标覆盖的消息。用于避免"本地回显 + 历史对账"渲染两遍。
   let localEchoes = [];
+  const ECHO_SCENE_FALLBACK_MS = 2 * 60 * 1000;
   function normalizeEcho(text) {
     return (cleanContent(text || "") || "").replace(/\s+/g, " ").trim();
+  }
+  function echoScene(echo) {
+    return echo.message || echo.scene || {};
+  }
+  function echoTimesMatch(message, history) {
+    const localTime = Number(message?.createdAt);
+    const historyTime = Number(history?.createdAt);
+    return !Number.isFinite(localTime) || !Number.isFinite(historyTime) ||
+      Math.abs(localTime - historyTime) <= ECHO_SCENE_FALLBACK_MS;
+  }
+  function historyEchoFor(role, text, scene, message) {
+    const candidates = state.items.map((item, index) => ({ item, index })).filter(({ item }) =>
+      item !== message && item.kind === "message" && item.historySeq &&
+      item.role === role && normalizeEcho(item.text) === text);
+    const exact = [...candidates].reverse().find(({ item }) => echoScenesMatch(item, message || scene));
+    if (exact) return exact.item;
+    if (role !== "being" || !message) return null;
+
+    // A server can assign the canonical scene id while a reply is still live.
+    // Only relax scene matching for the one persisted row appended after this
+    // exact recent bubble; never collapse arbitrary equal text across scenes.
+    const localIndex = state.items.indexOf(message);
+    const fallback = candidates.filter(({ item, index }) =>
+      index > localIndex && echoTimesMatch(message, item));
+    return fallback.length === 1 ? fallback[0].item : null;
   }
   function noteLocalEcho(role, text, scene = state.activeScene, localMessage) {
     const owner = options.historyOwner?.();
@@ -2379,16 +2405,14 @@ function createStreamRuntime(state, options) {
     // History can win the race against message_stop. In that order the normal
     // history -> local echo matcher has not been registered yet, so reconcile
     // the already-rendered persisted row back into the live bubble here.
-    const history = [...state.items].reverse().find(item => item !== message &&
-      item.kind === "message" && item.historySeq && item.role === role &&
-      normalizeEcho(item.text) === t && echoScenesMatch(item, message || scene));
+    const history = historyEchoFor(role, t, scene, message);
     if (history && message) {
       applyHistoryIdentity(message, history);
       state.items = state.items.filter(item => item !== history);
       changed();
       return;
     }
-    localEchoes.push({ role, text: t, message });
+    localEchoes.push({ role, text: t, scene: { ...scene }, message, notedAt: Date.now() });
     if (localEchoes.length > 40) localEchoes.shift();
   }
   function echoScenesMatch(a = {}, b = {}) {
@@ -2405,24 +2429,33 @@ function createStreamRuntime(state, options) {
     if (!message.sceneId && history.sceneId) {
       message.sceneId = history.sceneId;
       message.sceneLabel = history.sceneLabel;
+    } else if (message.sceneId && history.sceneId && message.sceneId !== history.sceneId && !message.legacySceneId) {
+      message.legacySceneId = history.sceneId;
     }
   }
   function consumeLocalEcho(role, text, scene, history) {
     const t = normalizeEcho(text);
     if (!t) return false;
-    for (let i = 0; i < localEchoes.length; i++) {
-      const echo = localEchoes[i];
-      if (echo.role === role && echo.text === t && echoScenesMatch(scene, echo.message || {})) {
-        if (echo.message) {
-          if (scene.sceneId && !echo.message.sceneId) Object.assign(echo.message, scene);
-          applyHistoryIdentity(echo.message, history);
-          changed();
-        }
-        localEchoes.splice(i, 1);
-        return true;
-      }
+    const candidates = localEchoes.map((echo, index) => ({ echo, index })).filter(({ echo }) =>
+      echo.role === role && echo.text === t);
+    const exact = candidates.find(({ echo }) => echoScenesMatch(scene, echoScene(echo)));
+    let match = exact;
+    if (!match && role === "being") {
+      const fallback = candidates.filter(({ echo }) =>
+        echo.message && !echo.message.historySeq &&
+        Date.now() - echo.notedAt <= ECHO_SCENE_FALLBACK_MS &&
+        echoTimesMatch(echo.message, history));
+      if (fallback.length === 1) match = fallback[0];
     }
-    return false;
+    if (!match) return false;
+    const { echo, index } = match;
+    if (echo.message) {
+      if (scene.sceneId && !echo.message.sceneId) Object.assign(echo.message, scene);
+      applyHistoryIdentity(echo.message, history);
+      changed();
+    }
+    localEchoes.splice(index, 1);
+    return true;
   }
 
   function historyIdentity(message, scene = messageScene(message)) {
@@ -3139,7 +3172,7 @@ function createStreamRuntime(state, options) {
     }
     solidifyReplayBubble();
     settleReplyBoundary();
-    noteLocalEcho("being", streamText);
+    noteLocalEcho("being", streamText, state.activeScene, streamMessage);
     streamMessage = null;
     streamText = "";
     removeThinkingIndicator();
@@ -3160,12 +3193,12 @@ function createStreamRuntime(state, options) {
 
   function finalizeReplayStream() {
     options.finishRoutes?.();
-    noteLocalEcho("being", streamText);
     if (activeStreamPollTimer) clearTimeout(activeStreamPollTimer);
     activeStreamPollTimer = null;
 
     // 先把 streamText 固化为正式消息（如果还没渲染）
     solidifyReplayBubble();
+    noteLocalEcho("being", streamText, state.activeScene, streamMessage);
     settleReplyBoundary();
 
     isStreaming = false;
