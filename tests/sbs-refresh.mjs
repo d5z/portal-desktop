@@ -38,8 +38,9 @@ const { outputFiles } = await build({ stdin: { resolveDir: process.cwd(), loader
   });
   function Fixture() {
     useModel(app);
-    return <><Topbar model={app} /><iframe id="chat-frame" title="Loom fixture"
-      src={'/loom' + new URL(app.chatSource).search} onLoad={() => app.frameLoaded()} /></>;
+    return <div id="client-main" className="workspace-stage" style={{height:'100vh',width:'100%'}}>
+      <Topbar model={app} /><section id="chat-view" className="view"><iframe id="chat-frame" title="Loom fixture"
+        src={'/loom' + new URL(app.chatSource).search} onLoad={() => app.frameLoaded()} /></section></div>;
   }
   app.applySnapshot(snapshot);
   createRoot(document.getElementById('root')).render(<Fixture />);
@@ -160,7 +161,7 @@ try {
   await chat.getByText('这是来自 Loom 网页的对话', { exact: true }).waitFor();
   await chat.getByText('切换后从服务器取回的网页对话', { exact: true }).waitFor();
   assert.ok(historyReads.length > beforeAll, 'Switching to all scenes fetches the latest history');
-  await page.waitForFunction(() => document.querySelector('#chat-scene-indicator .chat-scene-label').textContent === '桌面·测试电脑');
+  await page.waitForFunction(() => document.querySelector('.chat-scene-control .chat-scene-label').textContent === '桌面·测试电脑');
   assert.equal(await chat.locator('#input').inputValue(), '切换时保留的草稿');
   assert.equal(await chat.locator('#input').isDisabled(), false, '全部场景上下文仍向当前场景发送');
   await sceneButton.click();
@@ -182,7 +183,7 @@ try {
   assert.ok(historyReads.length > beforeCurrent, 'Returning to the current scene also refreshes history');
   assert.equal(await chat.getByText('切换后从服务器取回的网页对话', { exact: true }).count(), 0);
   assert.equal(await chat.locator('#input').inputValue(), '切换时保留的草稿');
-  await page.waitForFunction(() => document.querySelector('#chat-scene-indicator .chat-scene-label').textContent === '桌面·测试电脑');
+  await page.waitForFunction(() => document.querySelector('.chat-scene-control .chat-scene-label').textContent === '桌面·测试电脑');
   // An out-of-date frame command cannot switch the current chat.
   const scopeReplies = await page.evaluate(() => {
     const count = window.scopeStates.length;

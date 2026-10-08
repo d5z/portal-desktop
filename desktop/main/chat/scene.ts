@@ -1,3 +1,5 @@
+import { moveChatSessions, selectedChatSessions } from "../../shared/chat-session-order";
+import type { ChatSessionOperation } from "../../shared/types";
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -57,20 +59,26 @@ export class ChatSessions {
     const scenes = this.list(endpoint);
     return scenes.find(scene => scene.scene_id === (endpoint && this.groups[endpoint]?.active)) || scenes[0];
   }
-  async change(endpoint: string, operation: 'create' | 'bind' | 'select' | 'rename' | 'delete', value: string, sceneId?: string) {
+  async change(endpoint: string, operation: ChatSessionOperation, value: string | string[], sceneId?: string) {
     if (!endpoint) throw new Error('请先连接 Being。');
-    if (typeof value !== 'string') throw new Error('无效的场景参数。');
+    if (typeof value !== 'string' && (!Array.isArray(value) || !['move', 'delete'].includes(operation))) throw new Error('无效的场景参数。');
     let scenes = this.list(endpoint);
     let active = this.current(endpoint).scene_id;
-    if (operation === 'select') {
+    if (operation === 'move') {
+      scenes = moveChatSessions(scenes, Array.isArray(value) ? value : [value], sceneId);
+    } else if (operation === 'delete') {
+      const removed = new Set(selectedChatSessions(scenes, Array.isArray(value) ? value : [value]).map(scene => scene.scene_id));
+      const index = scenes.findIndex(scene => scene.scene_id === active);
+      const neighbor = scenes.slice(index + 1).find(scene => !removed.has(scene.scene_id))
+        || scenes.slice(0, index).reverse().find(scene => !removed.has(scene.scene_id));
+      scenes = scenes.filter(scene => !removed.has(scene.scene_id));
+      if (!scenes.length) scenes.push({ scene_id: `desktop-${randomUUID()}`, scene_meta: { ...this.fallback.scene_meta, scene_label: '新场景' } });
+      if (removed.has(active)) active = neighbor?.scene_id || scenes[0].scene_id;
+    } else if (typeof value !== 'string') {
+      throw new Error('无效的场景参数。');
+    } else if (operation === 'select') {
       if (!scenes.some(scene => scene.scene_id === value)) throw new Error('场景不存在。');
       active = value;
-    } else if (operation === 'delete') {
-      const index = scenes.findIndex(scene => scene.scene_id === value);
-      if (index < 0) throw new Error('场景不存在。');
-      scenes.splice(index, 1);
-      if (!scenes.length) scenes.push({ scene_id: `desktop-${randomUUID()}`, scene_meta: { ...this.fallback.scene_meta, scene_label: '新场景' } });
-      if (active === value) active = scenes[Math.min(index, scenes.length - 1)].scene_id;
     } else {
       const label = value.trim();
       if (!label || label.length > 128 || /[\r\n\u0000-\u001f]/.test(label)) throw new Error('场景名称需为 1–128 个字符。');

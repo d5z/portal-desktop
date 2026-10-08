@@ -1,3 +1,4 @@
+import type { ChatSessionOperation } from "../../../shared/types";
 import type {
   DesktopAPI,
   Snapshot,
@@ -341,13 +342,20 @@ export class AppModel extends Store {
     this.post({ type: "beings:sbs-toggle" });
     this.changed();
   }
-  async changeChatSession(operation: "create" | "bind" | "select" | "rename" | "delete", value: string, sceneId?: string) {
+  async changeChatSession(operation: ChatSessionOperation, value: string | string[], sceneId?: string) {
     const endpoint = this.snapshot?.settings.endpoint;
     if (!endpoint) throw new Error("请先连接 Being。");
     const previousSceneId = this.snapshot?.chatScene?.scene_id;
     const next = await this.api.changeChatSession(operation, value, endpoint, sceneId);
     if (this.snapshot?.settings.endpoint !== endpoint) return;
     this.applySnapshot(next);
+    if (operation === "move") return;
+    // Renaming or removing inactive entries updates metadata without navigating
+    // or changing the user's history scope.
+    if ((operation === "rename" || operation === "delete") && next.chatScene?.scene_id === previousSceneId) {
+      this.postCurrentSession();
+      return;
+    }
     this.chatHistoryScope = "current";
     if (this.placePresentation !== "panel" || this.view === "chat")
       this.navigate("chat");

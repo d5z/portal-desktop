@@ -14,6 +14,7 @@ vi.mock('electron', async () => {
       constructor(public options: unknown) { super(); }
       webContents = Object.assign(new EventEmitter(), { setWindowOpenHandler: vi.fn() });
       setMenuBarVisibility = vi.fn();
+      setTitleBarOverlay = vi.fn();
       setAppDetails = vi.fn();
       setIcon = vi.fn();
       hookWindowMessage = vi.fn();
@@ -29,13 +30,16 @@ import { watchSystemTheme } from '../desktop/main/app/system-theme';
 
 afterEach(() => { nativeTheme.removeAllListeners(); vi.restoreAllMocks(); });
 
-it('keeps the caption black while shell theme listeners follow Windows independently', async () => {
+it('keeps native overlay controls readable while shell icons follow Windows independently', async () => {
   vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
   const { window } = createMainWindow({
     shellURL: () => 'beings://desktop/', isQuitting: () => false, isSessionEnding: () => false,
     markSessionEnding: vi.fn(), openExternal: vi.fn(), onBrowser: vi.fn(), onClosed: vi.fn(),
   });
   expect((window as unknown as { options: { icon: string } }).options.icon).toMatch(/logo\.png$/);
+  expect((window as unknown as { options: object }).options).toMatchObject({
+    titleBarStyle: 'hidden', titleBarOverlay: { height: 52, color: '#00000000' },
+  });
   expect(window.setAppDetails).not.toHaveBeenCalled();
   const shellIcon = vi.fn();
   const stopWatching = watchSystemTheme(shellIcon);
@@ -43,6 +47,7 @@ it('keeps the caption black while shell theme listeners follow Windows independe
   shellTheme.light = 1;
   Object.assign(nativeTheme, { shouldUseDarkColors: true, shouldUseDarkColorsForSystemIntegratedUI: false });
   nativeTheme.emit('updated');
+  expect(window.setTitleBarOverlay).toHaveBeenLastCalledWith({symbolColor:'#e5ebe0'});
   await vi.waitFor(() => expect(shellIcon).toHaveBeenLastCalledWith(false));
   shellTheme.light = 0;
   const settingChange = vi.mocked(window.hookWindowMessage).mock.calls[0];
@@ -51,7 +56,9 @@ it('keeps the caption black while shell theme listeners follow Windows independe
   await vi.waitFor(() => expect(shellIcon).toHaveBeenLastCalledWith(true));
   stopWatching();
   window.emit('closed');
+  vi.mocked(window.setTitleBarOverlay).mockClear();
   nativeTheme.emit('updated');
   await Promise.resolve();
   expect(window.setIcon).not.toHaveBeenCalled();
+  expect(window.setTitleBarOverlay).not.toHaveBeenCalled();
 });

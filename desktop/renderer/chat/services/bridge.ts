@@ -77,6 +77,7 @@ export function createChatBridge(state: ChatState) {
       jump(id: string): void;
       focus(): void;
       scope(value: HistoryScope): void;
+      dismissIndexPreview?(): void;
     },
   ) {
     const refreshSbs = async () => {
@@ -108,6 +109,9 @@ export function createChatBridge(state: ChatState) {
       const data = event.data;
       if (!data || typeof data !== "object") return;
       switch (data.type) {
+        case "beings:search-preview-dismiss":
+          if (data.revision === revision) ui.dismissIndexPreview?.();
+          return;
         case "beings:chat-refresh":
           if (data.revision !== revision || typeof data.id !== "string" || data.id.length > 64) return;
           void runtime.refreshHistory().then(

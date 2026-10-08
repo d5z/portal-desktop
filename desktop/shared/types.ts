@@ -61,9 +61,10 @@ export interface DiagnosticReport { version: string; build: string; platform: st
 export interface BrowserBounds { x: number; y: number; width: number; height: number; visible: boolean }
 export type BrowserAction = 'back' | 'forward' | 'reload' | 'stop' | 'external' | 'close';
 export type ChatEditCommand = 'cut' | 'copy' | 'paste';
+export type ChatSessionOperation = 'create' | 'bind' | 'select' | 'rename' | 'delete' | 'move';
 export interface DesktopAPI {
   platform: string;
-  changeChatSession(operation: 'create' | 'bind' | 'select' | 'rename' | 'delete', value: string, endpoint: string, sceneId?: string): Promise<Snapshot>;
+  changeChatSession(operation: ChatSessionOperation, value: string | string[], endpoint: string, sceneId?: string): Promise<Snapshot>;
   clientStartup(enabled?: boolean): Promise<ClientStartup>;
   notifications(patch?: Partial<NotificationPreferences>): Promise<NotificationSettings>;
   testNotification(): Promise<void>;

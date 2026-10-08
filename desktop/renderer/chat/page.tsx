@@ -154,6 +154,7 @@ function ChatView({
       activity: setChannels,
       search: () => index.current?.publish(),
       jump: (id) => index.current?.jump(id),
+      dismissIndexPreview: () => index.current?.dismissPreview(),
       focus: () => composer.current?.focus(),
       scope: changeScope,
     });
@@ -353,8 +354,13 @@ function ChatView({
           "--app-offset": `${viewport.offset}px`,
       } as CSSProperties
       }
+      onPointerMove={() => bridge.send({ type: "beings:sidebar-pointer-away" })}
+      onPointerDown={() => bridge.send({ type: "beings:sidebar-dismiss" })}
       onKeyDown={(event) => {
         if (event.key === "Escape") {
+          if (!event.defaultPrevented && !panel && !selection && !document.querySelector("dialog[open]")) {
+            bridge.send({ type: "beings:sidebar-dismiss" });
+          }
           setSelection(null);
           if (panel) close();
         }

@@ -239,6 +239,8 @@ try {
   await frame.locator('#input').fill('send-test'); await frame.locator('#send-btn').click();
   await frame.getByText('React 回复完成', { exact: true }).waitFor();
   await frame.locator('.run-activity[data-outcome="done"]').waitFor();
+  assert.equal(await frame.locator('.run-activity[data-outcome="done"] > summary > .run-icon > svg.activity-state-icon').count(), 1, 'Completed runs retain a visible completion mark');
+  assert.equal(await frame.locator('.run-activity[data-outcome="done"] .activity-spinner').count(), 0, 'Completed runs must stop animating');
   assert.equal(requests.length, 1); assert.equal(requests[0].attachments[0].media_type, 'image/png'); assert.equal(requests[0].attachments[0].data, image.toString('base64'));
   assert.equal(await frame.locator('.run-activity').count(), 1, 'One process record per completed turn');
   assert.equal(await frame.locator('.run-activity.running').count(), 0);
@@ -252,12 +254,20 @@ try {
   assert.equal(continuationReplies.length, repliesBeforeContinuation + 2,
     `A reply boundary must split continuation bubbles: ${JSON.stringify(continuationReplies.slice(-4))}`);
   await frame.locator('#input').fill('hold'); await frame.locator('#send-btn').click(); await frame.locator('.run-activity.running .run-stop').waitFor();
+  const progressMark = frame.locator('.run-activity.running .run-icon .activity-spinner');
+  await progressMark.waitFor();
+  assert.deepEqual(await progressMark.evaluate(element => {
+    const style = getComputedStyle(element);
+    return [style.width, style.height, style.animationName, style.animationDuration, style.animationTimingFunction];
+  }), ['12px', '12px', 'activity-spin', '1s', 'linear'], 'The bundled transcript loads the shared progress mark styles');
   await frame.locator('#file-input').setInputFiles({ name: 'splice.txt', mimeType: 'text/plain', buffer: Buffer.from('splice attachment') });
   await frame.locator('#pending-files.active').waitFor(); await frame.locator('#input').fill('additional input'); await frame.locator('#send-btn').click();
   await waitUntil(() => requests.at(-1)?.message === 'additional input', 'The interrupting message reaches the server');
   assert.equal(requests.at(-1).attachments[0].data, Buffer.from('splice attachment').toString('base64'));
   assert.equal(await frame.getByText(/消息已送达/).count(), 0, 'Interrupting a reply does not add a system bubble to the conversation');
   await frame.locator('.run-activity.running .run-stop').click(); await frame.locator('.run-activity[data-outcome="stopped"]').waitFor(); assert.equal(stopCount, 1);
+  assert.equal(await frame.locator('.run-activity[data-outcome="stopped"] > summary > .run-icon > .activity-stopped').count(), 1, 'The stop control leaves a visible stopped mark');
+  assert.equal(await frame.locator('.run-activity[data-outcome="stopped"] .activity-spinner').count(), 0, 'Stopped runs must stop animating');
   await frame.locator('#input').fill('http-error'); await frame.locator('#send-btn').click(); await frame.getByText(/fixture request failed/).waitFor();
   assert.equal(await frame.locator('.run-activity.running').count(), 0);
   assert.equal(await frame.locator('.run-activity').last().getAttribute('data-outcome'), 'error');

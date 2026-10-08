@@ -30,7 +30,10 @@ export function createMainWindow(options: MainWindowOptions) {
     icon: windowIcon(),
     backgroundColor: acrylic ? '#00000000' : nativeTheme.shouldUseDarkColors ? '#212121' : '#ffffff',
     ...(acrylic ? { backgroundMaterial: 'acrylic' as const } : {}),
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : process.platform === 'win32' ? 'hidden' : 'default',
+    ...(process.platform === 'win32' ? { titleBarOverlay: {
+      height: 52, color: '#00000000', symbolColor: nativeTheme.shouldUseDarkColors ? '#e5ebe0' : '#2a3631',
+    } } : {}),
     autoHideMenuBar: process.platform === 'win32',
     trafficLightPosition: { x: 18, y: 20 },
     webPreferences: {
@@ -40,8 +43,12 @@ export function createMainWindow(options: MainWindowOptions) {
   });
   if (process.platform === 'win32') {
     window.setMenuBarVisibility(false);
-    // Keep the native caption icon black. The installed shell shortcut and tray
-    // select their own icon from the taskbar theme.
+    const updateCaption = () => {
+      if (!window.isDestroyed()) window.setTitleBarOverlay({ symbolColor: nativeTheme.shouldUseDarkColors ? '#e5ebe0' : '#2a3631' });
+    };
+    nativeTheme.on('updated', updateCaption);
+    window.once('closed', () => nativeTheme.removeListener('updated', updateCaption));
+    // The installed shell shortcut and tray follow the taskbar theme.
     window.hookWindowMessage(0x001a, refreshSystemTheme);
   }
   window.webContents.on('before-input-event', (event, input) => {

@@ -1,12 +1,12 @@
 import assert from 'node:assert/strict';
 import { powershell } from './windows-installation.mjs';
 
-// createMainWindow uses the standard Windows title bar. Chromium tooltips also
-// use Chrome_WidgetWin_1, but do not have WS_CAPTION (0x00c00000).
+// The app may use native captions or an integrated caption overlay.
+// Both have a top-level resizable frame; Chromium tooltips do not.
 export function isClientMainWindow(window) {
-  const WS_CAPTION = 0x00c00000;
-  return window.visible && window.className === 'Chrome_WidgetWin_1' &&
-    (window.style & WS_CAPTION) === WS_CAPTION;
+  const WS_CAPTION = 0x00c00000, WS_THICKFRAME = 0x00040000;
+  return window.visible && window.owner === 0 && window.className === 'Chrome_WidgetWin_1' &&
+    ((window.style & WS_CAPTION) === WS_CAPTION || (window.style & WS_THICKFRAME) !== 0);
 }
 
 export async function assertSingleClientWindow(pid) {
