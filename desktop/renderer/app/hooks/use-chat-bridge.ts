@@ -31,6 +31,7 @@ export function useChatBridge(
     return () => { disposed = true; stop?.(); target?.removeEventListener('load', refresh); };
   }, [app, frame, app.snapshot?.settings.endpoint, app.snapshot?.settings.portalConfigPath, app.snapshot?.portal.phase, app.snapshot?.portal.pid, app.chatSource, app.snapshot?.chatSessions?.map(scene => scene.scene_id).join('|')]);
   useEffect(() => {
+    let enablingSubagent = false;
     const receive = (event: MessageEvent) => {
       const target = frame.current;
       if (
@@ -64,6 +65,20 @@ export function useChatBridge(
           if (snapshot.endpoint === app.snapshot?.settings.endpoint && frame.current === target && new URL(target.src).searchParams.get('revision') === message.revision)
             app.post({ type: 'beings:scene-tasks', ...snapshot, revision: message.revision });
         }).catch(() => {});
+        return;
+      }
+      if (message.type === 'beings:subagent-enable' && typeof message.id === 'string' && message.id.length <= 64) {
+        const reply = (ok: boolean) => {
+          if (frame.current === target && new URL(target.src).searchParams.get('revision') === message.revision)
+            app.post({ type: 'beings:subagent-enable-result', id: message.id, revision: message.revision, ok });
+        };
+        const settings = app.snapshot?.settings;
+        if (enablingSubagent || !settings) { reply(false); return; }
+        enablingSubagent = true;
+        void (async () => {
+          await app.enableSubagent();
+          reply(true);
+        })().catch(() => reply(false)).finally(() => { enablingSubagent = false; });
         return;
       }
       if (message.type === "beings:session-create") {

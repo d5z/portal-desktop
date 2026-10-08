@@ -142,6 +142,7 @@ export function SubagentModelSettings({ app }: { app: AppModel }) {
       {(['Heart', 'subagent'] as const).map(value => <div key={value} id={`model-content-${value}`} role="tabpanel" aria-labelledby={`model-tab-${value}`} className="model-target-content" hidden={target !== value}>
         {visited.has(value) && <ChatSettings state={value === 'Heart' ? being.state : adapter.state} runtime={value === 'Heart' ? being.runtime : adapter.runtime}
           copyPreset={value === 'subagent' ? beingPreset : undefined} catalogHint={value === 'subagent' ? catalogHint : undefined}
+          onEnableSubagent={value === 'subagent' && !staged ? () => app.enableSubagent() : undefined}
           open contentOnly target={value} staged={value === 'subagent' && staged} close={close} onBusy={setBusy} />}
       </div>)}
     </aside>

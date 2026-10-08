@@ -98,6 +98,8 @@ export interface Soul {
 export class ChatState extends Store {
   items: ChatItem[] = [];
   subagentReady = false;
+  subagentConfigured?: boolean;
+  subagentEnabled?: boolean;
   sceneTasks: import('../../../shared/types').SceneTask[] = [];
   sceneNames: Record<string, string> = {};
   currentScene: MessageScene = { ...messageScene(Object.fromEntries(new URLSearchParams(location.search))), ...(new URLSearchParams(location.search).get("scene_strict") === "1" ? { strict: true } : {}) };

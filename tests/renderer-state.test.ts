@@ -469,6 +469,17 @@ describe("React desktop state lifecycle", () => {
     app.closeSubagentSettings();
     expect(app.settingsOpen).toBe(false);
   });
+  it("starts an already configured subagent directly", async () => {
+    const subagentConfig = vi.fn()
+      .mockResolvedValueOnce({ enabled: false, provider: "openai", model: "fixture", thinking: "medium" })
+      .mockResolvedValueOnce({ enabled: true, provider: "openai", model: "fixture", thinking: "medium" });
+    const save = vi.fn(async () => state());
+    const app = new AppModel(api({ subagentConfig, save }).value);
+    app.applySnapshot(state());
+    await app.enableSubagent();
+    expect(save).toHaveBeenCalledWith(expect.objectContaining({ subagentEnabled: true }));
+    expect(subagentConfig).toHaveBeenCalledTimes(2);
+  });
   it("returns from every settings destination to the settings hub", async () => {
     const fixture = api({ clientStartup: vi.fn(async () => ({ supported: true, enabled: false, message: "关闭" })) });
     const app = new AppModel(fixture.value), post = vi.fn();

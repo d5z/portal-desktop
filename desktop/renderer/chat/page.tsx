@@ -24,6 +24,7 @@ import { CopyMessage } from '../shared/components/copy-message';
 import { TemperatureGlow, ChatActivity } from "./components/messages";
 import { ChatSettings } from "./components/settings";
 import { ChatInfoPanels } from "./components/panels";
+import { SubagentSetupHint } from "./components/subagent-hint";
 import { EditContextMenu } from "../shared/components/context-menu";
 import {
   ChatIndex,
@@ -136,6 +137,9 @@ function ChatView({
   );
   const [viewport, setViewport] = useState({ height: innerHeight, offset: 0 });
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const [subagentHintDismissed, setSubagentHintDismissed] = useState(false);
+  const [subagentEnabling, setSubagentEnabling] = useState(false);
+  const [subagentEnableFailed, setSubagentEnableFailed] = useState(false);
   const [selection, setSelection] = useState<{
     id: string;
     text: string;
@@ -143,6 +147,17 @@ function ChatView({
     left: number;
     top: number;
   } | null>(null);
+  const subagentHintMode = state.subagentConfigured === false
+    ? 'configure'
+    : state.subagentConfigured === true && state.subagentEnabled === false ? 'enable' : null;
+  async function enableSubagent() {
+    if (subagentEnabling) return;
+    setSubagentEnabling(true);
+    setSubagentEnableFailed(false);
+    const ok = await bridge.enableSubagent();
+    if (!ok) setSubagentEnableFailed(true);
+    setSubagentEnabling(false);
+  }
   useEffect(() => {
     bridge.start(runtime, {
       panel: (value, returnToSettings = false) => {
@@ -653,6 +668,14 @@ function ChatView({
               ↵
             </button>
           </div>
+          <SubagentSetupHint
+            mode={!subagentHintDismissed && parent !== window && location.protocol === "beings:" ? subagentHintMode : null}
+            enabling={subagentEnabling}
+            enableFailed={subagentEnableFailed}
+            onConfigure={() => bridge.send({ type: "beings:subagent-settings" })}
+            onEnable={() => { void enableSubagent(); }}
+            onClose={() => setSubagentHintDismissed(true)}
+          />
           <input
             ref={fileInput}
             type="file"

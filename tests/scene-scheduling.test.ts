@@ -5,6 +5,7 @@ import path from 'node:path';
 import { SceneTaskObserver, publicSceneTasks } from '../desktop/main/portal/subagent-tasks';
 import { splitSchedulingHint, withScheduling } from '../desktop/renderer/chat/models/scheduling';
 import { createSceneRuntime } from '../desktop/renderer/chat/services/scene-runtime';
+import { SceneQueueStore } from '../desktop/renderer/chat/services/scene-queue';
 
 it('only exposes bounded, scene-scoped task status and generic auth errors', () => {
   const task = { task_id: 'task1', scene_id: 'a', status: 'failed', created_ms: 10, error: '401 secret-key', brief_head: 'private instructions' };
@@ -146,5 +147,87 @@ it('does not resurrect a timed-out or stopped reply when the background task is 
     const output:any[]=withScheduling(input,[{id:'sub-b',sceneId:'b',createdAt:20,endedAt:30,status:'done'}]);
     expect(output[1]).toMatchObject({label:'等待回复超时',outcome,end:100});
     expect(output[1].scheduling.tasks).toHaveLength(1);
+  }
+});
+
+it('removes a restored uncertain send after history confirms that Heart accepted it', async () => {
+  const createdAt = Date.now();
+  const saved:any = {id:'saved-send',endpoint:'fixture',scene:{sceneId:'a',strict:true},text:'已送达',files:[],createdAt,phase:'sending'};
+  const read = vi.spyOn(SceneQueueStore.prototype,'read').mockResolvedValue([saved]);
+  const write = vi.spyOn(SceneQueueStore.prototype,'write').mockResolvedValue();
+  const activity = vi.fn();
+  const state:any = {items:[],currentScene:{sceneId:'a',strict:true},draft:'',files:[],sceneTasks:[],sceneNames:{},changed:vi.fn()};
+  const runtime = createSceneRuntime(state,{onSceneActivity:activity},(sessionState:any) => ({
+    sceneActivity:()=> 'done', isBusy:()=>false, syncConnection:()=>{}, waitForPendingFiles:async()=>{},
+    refreshHistory:async()=>{}, request:async()=>new Response(null,{status:204}), send:vi.fn(), dispose:()=>{},
+    stageQueuedSend(text:string,files:any[]) {
+      const message:any = {kind:'message',role:'user',text,queued:true,createdAt,...sessionState.currentScene};
+      sessionState.items.push(message);
+      return {text,files,message};
+    },
+    async start() {
+      sessionState.items.push({kind:'message',role:'user',text:'已送达',historySeq:9,createdAt:createdAt+1000,...sessionState.currentScene});
+    },
+  }));
+  try {
+    await runtime.start();
+    expect(state.queued).toBe(0);
+    expect(state.items.filter((item:any)=>item.queued)).toEqual([]);
+    expect(state.items.filter((item:any)=>item.historySeq).map((item:any)=>item.text)).toEqual(['已送达']);
+    expect(write).toHaveBeenCalledWith('saved-send');
+    expect(activity.mock.lastCall?.[0]).toEqual({a:'done'});
+  } finally {
+    runtime.dispose();
+    read.mockRestore();
+    write.mockRestore();
+  }
+});
+
+it('rolls a sending transition back and clears activity when disposal wins the dispatch race', async () => {
+  vi.useFakeTimers();
+  const writes:any[] = [];
+  let releaseSending!:()=>void;
+  const sending = new Promise<void>(resolve => { releaseSending = resolve; });
+  const read = vi.spyOn(SceneQueueStore.prototype,'read').mockResolvedValue([]);
+  const write = vi.spyOn(SceneQueueStore.prototype,'write').mockImplementation(async (row:any) => {
+    writes.push(typeof row === 'string' ? row : {...row});
+    if (typeof row !== 'string' && row.phase === 'sending') await sending;
+  });
+  const busy:Record<string,boolean> = {a:true,b:false};
+  const sent = vi.fn();
+  const activity = vi.fn();
+  const state:any = {items:[],currentScene:{sceneId:'a',strict:true},draft:'',files:[],sceneTasks:[],sceneNames:{},changed:vi.fn()};
+  const runtime = createSceneRuntime(state,{onSceneActivity:activity},(sessionState:any) => ({
+    sceneActivity:()=> 'done', isBusy:()=>busy[sessionState.currentScene.sceneId] === true,
+    syncConnection:()=>{}, waitForPendingFiles:async()=>{}, refreshHistory:async()=>{},
+    request:async()=>new Response(null,{status:204}), send:sent, dispose:()=>{}, start:async()=>{},
+    stageQueuedSend(text:string,files:any[] = []) {
+      const message:any = {kind:'message',role:'user',text,queued:true,createdAt:Date.now(),...sessionState.currentScene};
+      sessionState.items.push(message);
+      return {text,files,message};
+    },
+  }));
+  try {
+    await runtime.start();
+    await runtime.selectScene({sceneId:'b',strict:true});
+    await runtime.send('等待发送',[]);
+    expect(state.queued).toBe(1);
+    busy.a = false;
+    runtime.updateSceneTasks([]);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(writes.map(row=>row.phase)).toEqual(['queued','sending']);
+    runtime.dispose();
+    releaseSending();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(writes.map(row=>row.phase)).toEqual(['queued','sending','queued']);
+    expect(sent).not.toHaveBeenCalled();
+    expect(state.queued).toBe(0);
+    expect(activity.mock.lastCall?.[0]).toEqual({});
+  } finally {
+    releaseSending();
+    runtime.dispose();
+    read.mockRestore();
+    write.mockRestore();
+    vi.useRealTimers();
   }
 });

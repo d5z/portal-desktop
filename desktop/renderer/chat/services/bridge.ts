@@ -17,6 +17,7 @@ export function createChatBridge(state: ChatState) {
     disposed = false;
   const waiting = new Map<string, () => void>();
   const edits = new Map<string, (ok: boolean) => void>();
+  const subagentEnables = new Map<string, (ok: boolean) => void>();
   function edit(command: ChatEditCommand): Promise<boolean> {
     if (!embedded || location.protocol !== "beings:") return Promise.resolve(document.execCommand(command));
     if (disposed) return Promise.resolve(false);
@@ -40,6 +41,16 @@ export function createChatBridge(state: ChatState) {
       send({ type: 'beings:chat-copy', id, text });
     });
     if (!ok) throw new Error('Copy failed');
+  }
+  function enableSubagent(): Promise<boolean> {
+    if (!embedded || location.protocol !== 'beings:' || disposed) return Promise.resolve(false);
+    const id = crypto.randomUUID();
+    return new Promise(resolve => {
+      const finish = (ok: boolean) => { clearTimeout(timer); subagentEnables.delete(id); resolve(ok); };
+      const timer = setTimeout(() => finish(false), 60000);
+      subagentEnables.set(id, finish);
+      send({ type: 'beings:subagent-enable', id });
+    });
   }
   function onSbs(enabled: boolean) {
     ++sbsRequest;
@@ -118,7 +129,12 @@ export function createChatBridge(state: ChatState) {
         case 'beings:scene-tasks':
           if (data.revision !== revision || data.endpoint !== new URLSearchParams(location.search).get('history_scope') || !Array.isArray(data.tasks) || data.tasks.length > 200) return;
           if (!data.tasks.every((t: any) => t && typeof t.id === 'string' && typeof t.sceneId === 'string' && Number.isFinite(t.createdAt) && ['queued','running','done','failed','cancelled','interrupted','budget_exhausted','timeout'].includes(t.status))) return;
+          if (typeof data.subagentConfigured === 'boolean') state.subagentConfigured = data.subagentConfigured;
+          if (typeof data.subagentEnabled === 'boolean') state.subagentEnabled = data.subagentEnabled;
           runtime.updateSceneTasks(data.tasks, data.subagentReady === true);
+          return;
+        case 'beings:subagent-enable-result':
+          if (data.revision === revision && typeof data.id === 'string') subagentEnables.get(data.id)?.(data.ok === true);
           return;
         case "beings:chat-edit-result":
           if (data.revision === revision && typeof data.id === "string") edits.get(data.id)?.(data.ok === true);
@@ -237,6 +253,7 @@ export function createChatBridge(state: ChatState) {
     send,
     edit,
     copyText,
+    enableSubagent,
     onSbs,
     beforeSend,
     start,
@@ -247,6 +264,8 @@ export function createChatBridge(state: ChatState) {
       waiting.clear();
       edits.forEach(finish => finish(false));
       edits.clear();
+      subagentEnables.forEach(finish => finish(false));
+      subagentEnables.clear();
     },
   };
 }

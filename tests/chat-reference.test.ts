@@ -95,3 +95,27 @@ it('sends a Town reply request immediately without replacing the visible draft o
   expect(f.state.files).toHaveLength(1);
   f.bridge.dispose();
 });
+
+it('forwards the explicit subagent configuration state from the trusted desktop shell', () => {
+  const f = fixture();
+  const updateSceneTasks = vi.fn();
+  Object.assign(f.runtime, { updateSceneTasks });
+  f.send({
+    type: 'beings:scene-tasks', revision: 'fixture', endpoint: null,
+    tasks: [], subagentReady: false, subagentConfigured: true, subagentEnabled: false,
+  });
+  expect(updateSceneTasks).toHaveBeenCalledWith([], false);
+  expect(f.state.subagentConfigured).toBe(true);
+  expect(f.state.subagentEnabled).toBe(false);
+  f.bridge.dispose();
+});
+
+it('requests one-click subagent enablement and waits for the trusted shell result', async () => {
+  const f = fixture();
+  const enabled = f.bridge.enableSubagent();
+  const request = f.parent.postMessage.mock.calls.map(call => call[0]).find(message => message.type === 'beings:subagent-enable');
+  expect(request).toMatchObject({ revision: 'fixture' });
+  f.send({ type: 'beings:subagent-enable-result', id: request.id, revision: 'fixture', ok: true });
+  await expect(enabled).resolves.toBe(true);
+  f.bridge.dispose();
+});

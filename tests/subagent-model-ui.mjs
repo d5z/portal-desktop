@@ -15,7 +15,8 @@ const app=Object.assign(new Store(), {
     beingModelConfig:async patch=>{if(patch){window.heartPatches.push(patch);return {ok:true,config:{provider:patch.provider,model:patch.model}}}return window.currentBeing || {provider:'anthropic',model:'heart-fixture',presets:[]}},
     save:async input=>{window.saves.push(input);if(window.failSave)throw new Error('fixture save failed');return {settings:input}}},
   editForm(k,v){this.form[k]=v;this.changed()},closeSubagentSettings(){this.subagentSettingsOpen=false;this.changed()},
-  applySnapshot(s){this.snapshot=s;this.changed()}
+  applySnapshot(s){this.snapshot=s;this.changed()},
+  async enableSubagent(){const config=await this.api.subagentConfig();const next=await this.api.save({...this.snapshot.settings,subagentEnabled:true});this.api.subagentConfig=async()=>({...config,enabled:true});this.applySnapshot(next)}
 });
 window.saves=[];window.heartPatches=[];window.app=app;
 window.openSettings=(staged,target='subagent')=>{app.modelSettingsTarget=target;app.subagentFromConnection=staged;app.subagentSettingsOpen=true;app.changed()};
@@ -101,6 +102,13 @@ try {
   await page.evaluate(()=>{window.app.api.subagentConfig=async()=>({enabled:false,provider:'openai',model:'disabled-model',thinking:'medium'});window.openSettings(false)});
   await page.getByText('subagent 尚未启用',{exact:true}).waitFor();
   assert.equal(await page.locator('#subagent-llm-current .current-model-caption').innerText(),'未启用');
+  await page.getByRole('button',{name:'启动 subagent',exact:true}).click();
+  await page.getByText('subagent 已启动。',{exact:true}).waitFor();
+  assert.equal(await page.evaluate(()=>window.saves.at(-1).subagentEnabled),true);
+  await page.getByRole('button',{name:'关闭模型设置'}).click();
+  await page.waitForFunction(()=>!window.app.subagentSettingsOpen);
+  await page.evaluate(()=>{window.app.api.subagentConfig=async()=>({enabled:false,provider:'openai',model:'disabled-model',thinking:'medium'});window.openSettings(false)});
+  await page.getByText('subagent 尚未启用',{exact:true}).waitFor();
   await page.getByRole('button',{name:'编辑配置'}).click();
   await page.getByText('subagent 尚未启用',{exact:true}).waitFor();
   await page.locator('#subagent-s2-apply').click();

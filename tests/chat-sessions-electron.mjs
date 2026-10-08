@@ -18,7 +18,7 @@ try {
     import {ChatSceneIndicator} from './desktop/renderer/app/components/chat-scene';
     import {useChatBridge} from './desktop/renderer/app/hooks/use-chat-bridge';
     import './desktop/renderer/app/styles.css';
-    const app = new AppModel(window.beings);
+    const app = new AppModel(window.beings); (window as any).fixtureApp = app;
     function Shell() {
       useSyncExternalStore(app.subscribe, app.getVersion);
       const frame = useRef(null); useChatBridge(app, frame);
@@ -41,7 +41,7 @@ try {
     const {contextBridge, ipcRenderer} = require('electron');
     contextBridge.exposeInMainWorld('beings', {
       platform: process.platform, snapshot: () => ipcRenderer.invoke('snapshot'),
-      sceneTasks: () => Promise.resolve({endpoint:'https://fixture.test/being',tasks:[],subagentReady:true}),
+      sceneTasks: () => Promise.resolve({endpoint:'https://fixture.test/being',tasks:[],subagentReady:false,subagentConfigured:false,subagentEnabled:false}),
       changeChatSession: (operation,value,endpoint,sceneId) => ipcRenderer.invoke('session',operation,value,endpoint,sceneId),
     });
   ` }, bundle: true, platform: 'node', external: ['electron'], outfile: path.join(directory, 'preload.cjs') });
@@ -91,6 +91,18 @@ try {
   const errors=[]; page.on('pageerror',error=>errors.push(error.message));
   const chat = page.frameLocator('iframe');
   await chat.locator('#input').waitFor();
+  await page.evaluate(async () => {
+    const frame = document.querySelector('iframe');
+    const snapshot = await window.beings.snapshot();
+    frame.contentWindow.postMessage({type:'beings:scene-tasks',revision:new URL(frame.src).searchParams.get('revision'),endpoint:snapshot.settings.endpoint,
+      tasks:[],subagentReady:false,subagentConfigured:false,subagentEnabled:false},'beings://chat');
+  });
+  const subagentHint = chat.locator('#subagent-setup-hint');
+  await subagentHint.waitFor();
+  assert.equal(await subagentHint.locator('.subagent-hint-text').textContent(),'用 subagent 并行处理任务');
+  await subagentHint.getByRole('button',{name:'去配置'}).click();
+  await page.waitForFunction(() => window.fixtureApp.subagentSettingsOpen === true);
+  await page.evaluate(() => window.fixtureApp.closeSubagentSettings());
   const original = await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id);
   await chat.locator('#input').fill('原会话草稿');
   await page.getByRole('button',{name:'新建场景',exact:true}).click();
@@ -310,14 +322,15 @@ try {
   const schedulingRun = chat.locator('.run-activity').filter({has:chat.locator('.scene-scheduling pre')});
   assert.equal(await schedulingRun.getAttribute('open'), null);
   await schedulingRun.locator('summary').click();
-  assert.match(await schedulingRun.locator('.scene-scheduling pre').innerText(), /background-a/);
+  assert.match(await schedulingRun.locator('.scene-scheduling pre').textContent(), /background-a/);
   const pushTasks = async status => page.evaluate(async status => {
     const frame = document.querySelector('iframe');
     const snapshot = await window.beings.snapshot();
     frame.contentWindow.postMessage({type:'beings:scene-tasks', revision:new URL(frame.src).searchParams.get('revision'), endpoint:snapshot.settings.endpoint,
-      subagentReady:true, tasks:[{id:'sub-fixture',sceneId:'feishu-shared',status,createdAt:Date.now()+1000,endedAt:status==='done'?Date.now()+2000:undefined,error:status==='failed'?'模型鉴权失败，请检查 subagent 密钥':undefined}]},'beings://chat');
+      subagentReady:true, subagentConfigured:true, subagentEnabled:true, tasks:[{id:'sub-fixture',sceneId:'feishu-shared',status,createdAt:Date.now()+1000,endedAt:status==='done'?Date.now()+2000:undefined,error:status==='failed'?'模型鉴权失败，请检查 subagent 密钥':undefined}]},'beings://chat');
   },status);
   await pushTasks('running');
+  await subagentHint.waitFor({state:'hidden'});
   await page.getByRole('button',{name:'切换到场景：跨客户端场景'}).getByText('执行中').waitFor();
   if (await schedulingRun.getAttribute('open') === null) await schedulingRun.locator('summary').click();
   await chat.locator('.scene-task-list').getByText('后台执行中',{exact:true}).waitFor();

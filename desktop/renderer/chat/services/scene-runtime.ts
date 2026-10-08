@@ -1,6 +1,6 @@
 import { SceneQueueStore } from "./scene-queue";
 import type { SavedSceneSend } from "./scene-queue";
-import { inCurrentScene, messageScene, withSceneTransition } from "../models/scenes";
+import { inCurrentScene, messageScene, stripSceneTransition, withSceneTransition } from "../models/scenes";
 import type { ChatRuntime, ChatState, RuntimeOptions } from "../models/chat";
 
 /** One Being coordinator; scene-local state is not a separate agent or breath. */
@@ -14,6 +14,12 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
   let queueReady = false, drainTimer: any;
   const pageLocation = typeof location === 'undefined' ? { search: '', origin: '' } : location;
   const queueStore = new SceneQueueStore(new URLSearchParams(pageLocation.search).get('history_scope') || pageLocation.origin);
+  let queueStoreClosed = false;
+  function closeQueueStore() {
+    if (queueStoreClosed) return;
+    queueStoreClosed = true;
+    queueStore.close();
+  }
   function retryDrain() {
     if (!disposed && !drainTimer) drainTimer = setTimeout(() => { drainTimer = null; scheduleDrain(); }, 2000);
   }
@@ -28,12 +34,35 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
       catch { entry.message.queueNotice = '无法保存取消操作，请重试'; publish(); return; }
       const index = sendQueue.indexOf(queued);
       if (index < 0) return;
-      sendQueue.splice(index, 1);
-      target.local.queued--;
+      detachQueued(queued);
       state.items = state.items.filter((item: any) => item !== entry.message);
       publish();
     };
     return queued;
+  }
+  function detachQueued(queued: any, sent = false) {
+    const index = sendQueue.indexOf(queued);
+    if (index < 0) return false;
+    sendQueue.splice(index, 1);
+    queued.session.local.queued = Math.max(0, queued.session.local.queued - 1);
+    if (sent) {
+      queued.entry.message.queued = false;
+      queued.entry.message.cancelQueued = undefined;
+      queued.entry.message.queueNotice = undefined;
+    }
+    return true;
+  }
+  function restoredSendWasAccepted(queued: any) {
+    if (queued.saved.phase !== 'sending') return false;
+    const expected = stripSceneTransition(queued.saved.text || '').replace(/\s+/g, ' ').trim();
+    if (!expected) return false;
+    return state.items.some((item: any) => {
+      if (item.kind !== 'message' || item.role !== 'user' || !item.historySeq || item === queued.entry.message) return false;
+      const actual = stripSceneTransition(item.text || '').replace(/\s+/g, ' ').trim();
+      if (actual !== expected || !inCurrentScene(item, queued.saved.scene) || !inCurrentScene(queued.saved.scene, item)) return false;
+      const sentAt = Number(queued.saved.createdAt), acceptedAt = Number(item.createdAt);
+      return Number.isFinite(sentAt) && Number.isFinite(acceptedAt) && Math.abs(sentAt - acceptedAt) <= 2 * 60 * 1000;
+    });
   }
   const busy = (session: any) => session.runtime?.isBusy?.() ||
     ["thinking", "replying", "working", "waiting"].includes(sceneStatus(session));
@@ -57,11 +86,14 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
         if (disposed || [...sessions.values()].some(busy)) { retryDrain(); return; }
         await queueStore.write({ ...next.saved, phase: 'sending' });
         next.saved.phase = 'sending';
-        if (disposed) return;
-        sendQueue.shift();
-        next.session.local.queued--;
-        next.entry.message.queued = false;
-        next.entry.message.cancelQueued = undefined;
+        if (disposed) {
+          // No send can start after disposal. Put the durable row back into the
+          // retryable state instead of restoring it as an uncertain send.
+          next.saved.phase = 'queued';
+          try { await queueStore.write(next.saved); } catch { /* The next load keeps the conservative sending row. */ }
+          return;
+        }
+        detachQueued(next, true);
         await next.session.runtime.send(next.entry.text, next.entry.files, { queuedMessage: next.entry.message });
         // If refresh interrupts the request, retain the uncertain record instead
         // of risking a duplicate send on the next page load.
@@ -69,7 +101,11 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
       } catch {
         if (sendQueue.includes(next)) next.entry.message.queueNotice = '等待连接或本地存储恢复';
         retryDrain();
-      } finally { dispatching = false; publish(); }
+      } finally {
+        dispatching = false;
+        if (disposed) closeQueueStore();
+        publish();
+      }
     });
   }
   const localKeys = new Set<PropertyKey>(["currentScene", "activeScene", "draft", "files", "queued", "thinking", "streaming", "stopping", "dotClass"]);
@@ -212,6 +248,12 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
           if (entry) { entry.message.createdAt = row.createdAt; attachQueued(target, entry, row); }
         }
         await owner.runtime.start();
+        for (const queued of [...sendQueue]) {
+          if (!restoredSendWasAccepted(queued)) continue;
+          detachQueued(queued);
+          state.items = state.items.filter((item: any) => item !== queued.entry.message);
+          try { await queueStore.write(queued.saved.id); } catch { /* Reconciliation will retry after the next load. */ }
+        }
         queueReady = true;
       } catch {
         state.items.push({ kind: 'message', id: `queue-error-${++counter}`, role: 'system', text: '无法恢复本地排队记录，已暂停自动发送。请重新打开页面重试。', streaming: false, timestamp: '', label: 'system', consecutive: false, ...state.currentScene });
@@ -277,7 +319,10 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
     dispose() {
       disposed = true;
       clearTimeout(drainTimer);
-      queueStore.close();
+      for (const queued of [...sendQueue]) detachQueued(queued);
+      state.queued = 0;
+      if (lastActivity) options.onSceneActivity?.({});
+      if (!dispatching) closeQueueStore();
       for (const session of sessions.values()) session.runtime.dispose();
     },
     refreshHistory: () => owner.runtime.refreshHistory(),

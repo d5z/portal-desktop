@@ -60,6 +60,15 @@ export class AppModel extends Store {
     if (this.subagentFromConnection) this.settingsOpen = true;
     this.changed();
   };
+  async enableSubagent() {
+    if (!this.snapshot) throw new Error('请先连接 Being。');
+    const config = await this.api.subagentConfig();
+    if (!config.provider?.trim() || !config.model?.trim()) throw new Error('请先配置 subagent 模型。');
+    const next = await this.api.save({ ...this.snapshot.settings, subagentEnabled: true });
+    const persisted = await this.api.subagentConfig();
+    if (persisted.enabled === false) throw new Error('subagent 未能启动，请重试。');
+    this.applySnapshot(next, true);
+  }
   clientSettingsOpen = false;
   settingsRoute: SettingsRoute = "";
   settingsForwardRoute: SettingsRoute = "";

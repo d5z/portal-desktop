@@ -377,7 +377,7 @@ export function ConnectionSettings({ model }: { model: AppModel }) {
                 id="portal-name-input"
                 required
                 maxLength={80}
-                pattern="[a-zA-Z0-9_-]+"
+                pattern={"[a-zA-Z0-9_\\-]+"}
                 value={form?.portalName || ""}
                 onChange={(event) =>
                   app.editForm("portalName", event.target.value)

@@ -56,6 +56,7 @@ export function ChatSettings({
   onBusy,
   copyPreset,
   catalogHint,
+  onEnableSubagent,
   mobilePage = false,
 }: {
   state: ChatState;
@@ -70,6 +71,7 @@ export function ChatSettings({
   onBusy?: (busy: boolean) => void;
   copyPreset?: Preset;
   catalogHint?: string;
+  onEnableSubagent?: () => Promise<void>;
   mobilePage?: boolean;
 }) {
   useModel(state);
@@ -123,6 +125,24 @@ export function ChatSettings({
   }
   const disabled = busy || state.configLoading;
   useEffect(() => { onBusy?.(busy); }, [busy, onBusy]);
+  async function enableSubagent() {
+    if (disabled || !onEnableSubagent) return;
+    setBusy(true);
+    state.configStatus = '';
+    state.changed();
+    try {
+      await onEnableSubagent();
+      state.config = { ...state.config, enabled: true };
+      state.configStatus = 'subagent 已启动。';
+      state.configStatusClass = 'success';
+    } catch (error) {
+      state.configStatus = error instanceof Error ? error.message : 'subagent 启动失败，请重试。';
+      state.configStatusClass = 'error';
+    } finally {
+      state.changed();
+      setBusy(false);
+    }
+  }
   const Root = contentOnly ? "section" : "aside";
   function select(preset: Preset) {
     if (disabled) return;
@@ -242,7 +262,10 @@ export function ChatSettings({
         </div>}
         {subagent && state.config.enabled === false && <div className="subagent-disabled-notice" role="status">
           <strong>subagent 尚未启用</strong>
-          <p>可先配置模型。请在连接设置中打开「启用 subagent」并保存，启用后 Being 才能委派后台任务。</p>
+          <p>{onEnableSubagent ? '当前模型配置已保留，启动后 Being 即可委派后台任务。' : '可先配置模型。请在连接设置中打开「启用 subagent」并保存，启用后 Being 才能委派后台任务。'}</p>
+          {onEnableSubagent && <button type="button" className="subagent-enable-button" disabled={disabled} onClick={() => { void enableSubagent(); }}>
+            {busy ? '正在启动…' : '启动 subagent'}
+          </button>}
         </div>}
         <div id={fieldId("llm-step1")}  hidden={!!draft}>
           {subagent && <div className="subagent-copy-being">

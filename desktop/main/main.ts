@@ -537,9 +537,18 @@ async function ready() {
   const taskSnapshot = async (tasks: import('../shared/types').SceneTask[]) => {
     const endpoint = store.connection?.endpoint || '';
     const settings = store.settings, phase = portal.state.phase, pid = portal.state.pid;
-    const ready = await subagentReady(directory, settings, portal.state, tasks);
-    return { endpoint, tasks, subagentReady: ready && endpoint === store.connection?.endpoint &&
-      settings.portalConfigPath === store.settings.portalConfigPath && phase === portal.state.phase && pid === portal.state.pid };
+    const [ready, subagent] = await Promise.all([
+      subagentReady(directory, settings, portal.state, tasks),
+      readSubagentConfig(directory, settings).catch(() => undefined),
+    ]);
+    const current = endpoint === store.connection?.endpoint && settings.portalConfigPath === store.settings.portalConfigPath &&
+      phase === portal.state.phase && pid === portal.state.pid;
+    return { endpoint, tasks, subagentReady: ready && current,
+      ...(subagent && current ? {
+        subagentConfigured: Boolean(subagent.provider.trim() && subagent.model.trim()),
+        subagentEnabled: subagent.enabled !== false,
+      } : {}),
+    };
   };
   const sceneTasks = new SceneTaskObserver(tasks => {
     void taskSnapshot(tasks).then(snapshot => {

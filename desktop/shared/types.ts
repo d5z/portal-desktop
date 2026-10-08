@@ -50,7 +50,7 @@ export const CHAT_SCENE_ACTIVITY_LABELS: Record<ChatSceneActivity, string> = {
   done: '已回复', error: '出错了', stopped: '已停止',
 };
 export interface SceneTask { id: string; sceneId: string; status: "queued" | "running" | "done" | "failed" | "cancelled" | "interrupted" | "budget_exhausted" | "timeout"; createdAt: number; endedAt?: number; error?: string }
-export interface SceneTaskSnapshot { endpoint: string; tasks: SceneTask[]; subagentReady?: boolean }
+export interface SceneTaskSnapshot { endpoint: string; tasks: SceneTask[]; subagentReady?: boolean; subagentConfigured?: boolean; subagentEnabled?: boolean }
 export interface Snapshot { settings: Settings; portal: PortalState; background?: BackgroundState; chatScene?: ChatScene; chatSessions?: ChatScene[]; notice?: string }
 export interface ClientStartup { supported: boolean; enabled: boolean; message: string }
 export interface NotificationPreferences { enabled: boolean; mail: boolean; firesides: boolean; bonfire: boolean }
