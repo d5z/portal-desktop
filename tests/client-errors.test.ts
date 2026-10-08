@@ -9,6 +9,11 @@ import { WorkspaceModel } from '../desktop/renderer/app/models/workspace';
 
 const cliXml = 'powershell.exe (1): Error: Config file not found: status\n#< CLIXML\n<Objs><S S="Error">Portal lifecycle command failed_x000D__x000A_</S></Objs>';
 
+it('keeps a safe trace ID copyable when a detailed request error is hidden', () => {
+  const traceId = '0123456789abcdef0123456789abcdef';
+  expect(publicErrorMessage(`internal path C:\\secret\\file\nTrace ID：${traceId}`)).toBe(`操作未完成，请重试或查看日志。\nTrace ID：${traceId}`);
+});
+
 it('exports useful files even before the first error and preserves existing error details', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'portal-log-export-'));
   const log = new ClientErrorLog(root, () => ['private-fixture-token']);

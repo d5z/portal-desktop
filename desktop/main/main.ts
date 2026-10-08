@@ -38,7 +38,7 @@ import { verifyBeingConnection } from './chat/ready';
 import { redact } from './chat/connection';
 import type { ChatScene, NotificationTarget, SaveSettings } from '../shared/types';
 import { TownLive } from './town/live';
-import { TownClient, TownCredentials, TOWN_ORIGIN } from './town/client';
+import { TownClient, TownCredentials, TOWN_ORIGIN, type TownRequestEvent } from './town/client';
 import { registerTownIpc } from './town/ipc';
 import { registerKitsIpc } from './kits/ipc';
 
@@ -197,14 +197,15 @@ async function ready() {
     },
   });
   await notifications.load();
+  const reportTownRequest = (event: TownRequestEvent) => {
+    errorLog.report('town-request', JSON.stringify(event));
+  };
   townLive = new TownLive(() => townCredentials.token, () => townCredentials.beingId, state => {
     notifications.reset(state.generation);
     if (state.phase === 'auth-error' || state.phase === 'unpaired') { notifications.clear(); pendingNotification = undefined; }
     if (window && !window.webContents.isDestroyed()) window.webContents.send('beings:town-live', state);
-  }, net.fetch.bind(net) as typeof fetch, TOWN_ORIGIN, () => townCredentials.display, target => notifications.receive(target));
-  const town = new TownClient(() => townCredentials.token, net.fetch.bind(net) as typeof fetch, TOWN_ORIGIN, () => townLive.state.beingId || '', event => {
-    errorLog.report('town-request', new Error(JSON.stringify(event)));
-  });
+  }, net.fetch.bind(net) as typeof fetch, TOWN_ORIGIN, () => townCredentials.display, target => notifications.receive(target), reportTownRequest);
+  const town = new TownClient(() => townCredentials.token, net.fetch.bind(net) as typeof fetch, TOWN_ORIGIN, () => townLive.state.beingId || '', reportTownRequest);
   townLive.restart();
   kitInstaller = new KitInstaller(directory, net.fetch.bind(net) as typeof fetch);
   portal = new PortalSupervisor(directory);

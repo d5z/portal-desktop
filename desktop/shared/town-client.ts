@@ -3,6 +3,54 @@ import { normalizeTownDisplay, normalizeTownIdentity, validTownIdentity } from '
 
 export const TOWN_ORIGIN = 'https://beings.town';
 const idPattern = /^[a-zA-Z0-9_-]{1,160}$/;
+const traceIdPattern = /^(?!0{32}$)[0-9a-f]{32}$/;
+
+export interface TownRequestEvent {
+  traceId: string;
+  spanId: string;
+  requestedAt: string;
+  method: string;
+  route: string;
+  durationMs: number;
+  status?: number;
+  bytes?: number;
+  failure?: string;
+  error?: string;
+}
+
+function randomNonZeroHex(length: number) {
+  const bytes = new Uint8Array(length);
+  do { globalThis.crypto.getRandomValues(bytes); } while (bytes.every(value => value === 0));
+  return Array.from(bytes, value => value.toString(16).padStart(2, '0')).join('');
+}
+
+export const createTownTraceId = () => randomNonZeroHex(16);
+export const createTownSpanId = () => randomNonZeroHex(8);
+export const validTownTraceId = (value: unknown): value is string => typeof value === 'string' && traceIdPattern.test(value);
+export function townTraceparent(traceId = createTownTraceId()) {
+  if (!validTownTraceId(traceId)) throw new Error('无效的 Town Trace ID。');
+  const spanId = createTownSpanId();
+  return { traceId, spanId, value: `00-${traceId}-${spanId}-01` };
+}
+
+class TownRequestFailure extends Error {
+  constructor(readonly traceId: string, readonly status: number | undefined, readonly reason: unknown) {
+    super(reason instanceof Error ? reason.message : String(reason));
+    this.name = 'TownRequestFailure';
+  }
+}
+
+function tracedFailure(result: TownResult, traceId: string): TownResult {
+  if (result.ok) return result;
+  return { ...result, traceId, message: `${result.message}\nTrace ID：${traceId}` };
+}
+
+function requestFailure(error: unknown, status?: number) {
+  if (status !== undefined && (status < 200 || status >= 300)) return `http-${status}`;
+  if (error instanceof TownReadError) return error.kind;
+  if (isTimeout(error)) return 'timeout';
+  return status === undefined ? 'network' : 'response';
+}
 export function townRoute(query: TownQuery, beingId = ''): { route: string; private: boolean } {
   if (!query || typeof query !== 'object') throw new Error('无效的 Town 请求。');
   const offset = query.offset ?? 0;
@@ -73,34 +121,74 @@ export function townRoute(query: TownQuery, beingId = ''): { route: string; priv
 }
 
 export class TownClient {
-  constructor(private getToken: () => string, private fetcher: typeof fetch = fetch, private origin = TOWN_ORIGIN, private getBeingId: () => string = () => '', private reportRequest?: (event: { route: string; durationMs: number; status?: number; bytes?: number; failure: string }) => void) {}
-  async pair(input: { beingId: string; code: string }, signal?: AbortSignal): Promise<{ token: string; beingId: string; display?: string }> {
+  constructor(private getToken: () => string, private fetcher: typeof fetch = fetch, private origin = TOWN_ORIGIN, private getBeingId: () => string = () => '', private reportRequest?: (event: TownRequestEvent) => void) {}
+  private report(event: TownRequestEvent) {
+    try { this.reportRequest?.(event); } catch { /* Diagnostics must not change request behavior. */ }
+  }
+  private async request<T>(route: string, init: RequestInit, consume: (response: Response) => Promise<T>, traceId = createTownTraceId()) {
+    const trace = townTraceparent(traceId);
+    const requestedAt = new Date().toISOString();
+    const started = Date.now();
+    let status: number | undefined;
+    try {
+      const response = await this.fetcher(this.origin + route, {
+        ...init,
+        headers: { ...(init.headers as Record<string, string> | undefined), traceparent: trace.value },
+      });
+      status = response.status;
+      const value = await consume(response);
+      this.report({
+        traceId: trace.traceId, spanId: trace.spanId, requestedAt,
+        method: init.method || 'GET', route, status, durationMs: Date.now() - started,
+        ...(!response.ok ? { failure: `http-${status}`, error: `HTTP ${status}` } : {}),
+      });
+      return { value, traceId: trace.traceId };
+    } catch (error) {
+      const failure = requestFailure(error, status);
+      this.report({
+        traceId: trace.traceId, spanId: trace.spanId, requestedAt,
+        method: init.method || 'GET', route, ...(status === undefined ? {} : { status }),
+        durationMs: Date.now() - started,
+        ...(error instanceof TownReadError && error.bytes !== undefined ? { bytes: error.bytes } : {}),
+        failure, error: failure,
+      });
+      throw new TownRequestFailure(trace.traceId, status, error);
+    }
+  }
+  async pair(input: { beingId: string; code: string }, signal?: AbortSignal, traceId?: string): Promise<{ token: string; beingId: string; display?: string }> {
     if (!input || typeof input.beingId !== 'string' || typeof input.code !== 'string') throw new Error('请输入 Being 名和配对码。');
     const beingId = normalizeTownIdentity(input.beingId), code = input.code.trim().toUpperCase();
     if (!validTownIdentity(beingId) || !/^[A-Z0-9]{6}$/.test(code)) throw new Error('请输入有效的 Town ID 或 Being 名；配对码须为 6 位字母或数字。');
     const townIdInput = beingId.startsWith('t_');
-    let response: Response;
     try {
-      response = await this.fetcher(this.origin + '/api/client/pair/confirm', {
+      const request = await this.request('/api/client/pair/confirm', {
         method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({ [townIdInput ? 'town_id' : 'being_id']: beingId, code }), credentials: 'omit', redirect: 'error', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000),
-      });
-    } catch { throw new Error('配对请求未完成，请检查网络；若配对码已失效，请获取新码。'); }
-    if (!response.ok) {
-      const detail = await townErrorDetail(response, [this.getToken(), code]);
-      const label = response.status === 429 ? '配对尝试过于频繁，请稍后重试。' : `配对失败（HTTP ${response.status}），请核对 Town ID 或 Being 名与配对码。`;
-      throw new Error(detail ? `${label} ${detail}` : label);
+      }, async response => {
+        if (!response.ok) {
+          const detail = await townErrorDetail(response, [this.getToken(), code]);
+          const label = response.status === 429 ? '配对尝试过于频繁，请稍后重试。' : `配对失败（HTTP ${response.status}），请核对 Town ID 或 Being 名与配对码。`;
+          throw new Error(detail ? `${label} ${detail}` : label);
+        }
+        let data: Record<string, unknown>;
+        try { data = await readTownJson(response); } catch { throw new Error('配对响应格式不正确，请稍后重试。'); }
+        if (data.ok !== true || typeof data.token !== 'string' || !/^[a-zA-Z0-9._~-]{16,2048}$/.test(data.token)) throw new Error('配对未成功，请核对 Being 名与配对码。');
+        if (data.town_id !== undefined && (!validTownIdentity(data.town_id) || !data.town_id.startsWith('t_'))) throw new Error('配对返回的 Town ID 无效。');
+        // The server resolves a unique, case-sensitive Town ID prefix. Store its full ID.
+        if (townIdInput ? typeof data.town_id !== 'string' || !data.town_id.startsWith(beingId) : data.being_id !== undefined && data.being_id !== beingId) throw new Error('配对返回的 Being 身份不匹配。');
+        const display = normalizeTownDisplay(data.display_name || data.speaker_name || data.display);
+        return { token: data.token, beingId: typeof data.town_id === 'string' ? data.town_id : beingId, ...(display ? { display } : {}) };
+      }, traceId);
+      return request.value;
+    } catch (error) {
+      if (!(error instanceof TownRequestFailure)) throw error;
+      const message = error.status === undefined
+        ? '配对请求未完成，请检查网络；若配对码已失效，请获取新码。'
+        : error.reason instanceof Error ? error.reason.message : '配对请求失败。';
+      throw new Error(`${message}\nTrace ID：${error.traceId}`);
     }
-    let data: Record<string, unknown>;
-    try { data = await readTownJson(response); } catch { throw new Error('配对响应格式不正确，请稍后重试。'); }
-    if (data.ok !== true || typeof data.token !== 'string' || !/^[a-zA-Z0-9._~-]{16,2048}$/.test(data.token)) throw new Error('配对未成功，请核对 Being 名与配对码。');
-    if (data.town_id !== undefined && (!validTownIdentity(data.town_id) || !data.town_id.startsWith('t_'))) throw new Error('配对返回的 Town ID 无效。');
-    // The server resolves a unique, case-sensitive Town ID prefix. Store its full ID.
-    if (townIdInput ? typeof data.town_id !== 'string' || !data.town_id.startsWith(beingId) : data.being_id !== undefined && data.being_id !== beingId) throw new Error('配对返回的 Being 身份不匹配。');
-    const display = normalizeTownDisplay(data.display_name || data.speaker_name || data.display);
-    return { token: data.token, beingId: typeof data.town_id === 'string' ? data.town_id : beingId, ...(display ? { display } : {}) };
   }
-  async send(input: TownPost): Promise<TownResult> {
+  async send(input: TownPost, traceId?: string): Promise<TownResult> {
     const token = this.getToken();
     if (!token) return { ok: false, code: 'auth', message: '请先配对 Town。' };
     if (!input || typeof input.content !== 'string' || !input.content.trim()) throw new Error('请输入要发送的内容。');
@@ -121,17 +209,22 @@ export class TownClient {
     } else throw new Error('不支持的发送请求。');
     if (input.replyTo !== undefined) body.reply_to = input.replyTo;
     try {
-      const response = await this.fetcher(this.origin + route, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body), credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(20000) });
-      if (!response.ok) return await townError(response, token);
-      const data = await readTownJson(response);
-      if (data.ok !== true) throw new Error('unconfirmed');
-      const warnings = Array.isArray(data.mention_warnings)
-        ? data.mention_warnings.slice(0, 20).map(value => cleanTownDetail(townWarning(value), [token])).filter(Boolean)
-        : [];
-      return { ok: true, data, fetchedAt: new Date().toISOString(), ...(warnings.length ? { warnings } : {}) };
-    } catch { return { ok: false, code: 'network', message: '未收到发送确认。消息可能已送达，请刷新内容核对后再决定是否重发。' }; }
+      const request = await this.request(route, { method: 'POST', headers: { Accept: 'application/json', 'Content-Type': 'application/json', Authorization: `Bearer ${token}` }, body: JSON.stringify(body), credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(20000) }, async response => {
+        if (!response.ok) return await townError(response, token);
+        const data = await readTownJson(response);
+        if (data.ok !== true) throw new Error('unconfirmed');
+        const warnings = Array.isArray(data.mention_warnings)
+          ? data.mention_warnings.slice(0, 20).map(value => cleanTownDetail(townWarning(value), [token])).filter(Boolean)
+          : [];
+        return { ok: true, data, fetchedAt: new Date().toISOString(), ...(warnings.length ? { warnings } : {}) } as TownResult;
+      }, traceId);
+      return tracedFailure(request.value, request.traceId);
+    } catch (error) {
+      const id = error instanceof TownRequestFailure ? error.traceId : validTownTraceId(traceId) ? traceId : createTownTraceId();
+      return tracedFailure({ ok: false, code: 'network', message: '未收到发送确认。消息可能已送达，请刷新内容核对后再决定是否重发。' }, id);
+    }
   }
-  async query(query: TownQuery): Promise<TownResult> {
+  async query(query: TownQuery, traceId?: string): Promise<TownResult> {
     if (query?.kind === 'my-scrolls' && (!this.getToken() || !this.getBeingId())) return { ok: false, code: 'auth', message: '请先用 Being 名和配对码连接 Town，再查看我的卷轴。' };
     const route = townRoute(query, this.getBeingId());
     const headers: Record<string, string> = { Accept: 'application/json' };
@@ -141,24 +234,20 @@ export class TownClient {
     if (route.private && token) {
       headers.Authorization = `Bearer ${token}`;
     }
-    const started = Date.now();
-    let status: number | undefined;
     try {
-      const response = await this.fetcher(url.href, {
+      const request = await this.request(url.pathname + url.search, {
         headers, method: 'GET', credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(20000),
-      });
-      status = response.status;
-      if (!response.ok) {
-        this.reportRequest?.({ route: route.route, durationMs: Date.now() - started, status, failure: `http-${status}` });
-        return await townError(response, token);
-      }
-      const data = query.kind === 'fireside-members'
-        ? await readTownMembersJson(response)
-        : await readTownJson(response);
-      return { ok: true, data, fetchedAt: new Date().toISOString() };
+      }, async response => {
+        if (!response.ok) return await townError(response, token);
+        const data = query.kind === 'fireside-members'
+          ? await readTownMembersJson(response)
+          : await readTownJson(response);
+        return { ok: true, data, fetchedAt: new Date().toISOString() } as TownResult;
+      }, traceId);
+      return tracedFailure(request.value, request.traceId);
     } catch (error) {
-      const failure = error instanceof TownReadError ? error.kind : isTimeout(error) ? 'timeout' : 'network';
-      this.reportRequest?.({ route: route.route, durationMs: Date.now() - started, ...(status === undefined ? {} : { status }), ...(error instanceof TownReadError && error.bytes === undefined ? {} : { bytes: error instanceof TownReadError ? error.bytes : undefined }), failure });
+      const reason = error instanceof TownRequestFailure ? error.reason : error;
+      const failure = reason instanceof TownReadError ? reason.kind : isTimeout(reason) ? 'timeout' : 'network';
       const message = failure === 'timeout'
         ? '读取 Town 超时（20 秒），请稍后重试。'
         : failure === 'too-large'
@@ -166,7 +255,8 @@ export class TownClient {
           : failure === 'format'
             ? 'Town 返回的数据格式不正确，请稍后重试。'
             : '未能读取 Town。请检查网络后重试。';
-      return { ok: false, code: failure, message };
+      const id = error instanceof TownRequestFailure ? error.traceId : validTownTraceId(traceId) ? traceId : createTownTraceId();
+      return tracedFailure({ ok: false, code: failure, message }, id);
     }
   }
 }

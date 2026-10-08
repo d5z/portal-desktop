@@ -1,5 +1,5 @@
 import type { NotificationTarget, TownChannel, TownLiveState, TownQuery } from './types';
-import { TOWN_ORIGIN } from './town-client';
+import { createTownTraceId, TOWN_ORIGIN, townTraceparent, type TownRequestEvent } from './town-client';
 import { townDisplayName, validTownIdentity } from './town-identity';
 
 type Data = Record<string, unknown>;
@@ -19,21 +19,22 @@ export class TownLive {
   private retry?: ReturnType<typeof setTimeout>;
   private seen = new Set<string>();
   private attempts = 0;
-  constructor(private getToken: () => string, private getExpectedBeing: () => string, private publish: (state: TownLiveState) => void, private fetcher: typeof fetch = fetch, private origin = TOWN_ORIGIN, private getDisplay: () => string = () => '', private notify: (target: NotificationTarget) => void = () => {}) {}
+  private operationTraceId = createTownTraceId();
+  constructor(private getToken: () => string, private getExpectedBeing: () => string, private publish: (state: TownLiveState) => void, private fetcher: typeof fetch = fetch, private origin = TOWN_ORIGIN, private getDisplay: () => string = () => '', private notify: (target: NotificationTarget) => void = () => {}, private reportRequest?: (event: TownRequestEvent) => void) {}
   private update(patch: Partial<TownLiveState>) {
     this.state = { ...this.state, ...patch, revision: this.state.revision + 1 };
     this.publish(this.state);
   }
   dispose() { clearTimeout(this.retry); this.controller?.abort(); this.controller = undefined; }
   restart() {
-    this.dispose(); this.seen.clear(); this.attempts = 0;
+    this.dispose(); this.seen.clear(); this.attempts = 0; this.operationTraceId = createTownTraceId();
     this.update({ generation: this.state.generation + 1, sync: 0, beingId: undefined, display: undefined, versions: { bonfire: 0, mail: 0, firesides: 0 }, firesideVersions: {}, phase: this.getToken() ? 'connecting' : 'unpaired', message: this.getToken() ? '正在确认 Town 身份' : '尚未配对 Town' });
     if (this.getToken()) void this.connect(this.state.generation);
   }
-  rejectAuth() {
+  rejectAuth(traceId?: string) {
     if (this.state.phase === 'auth-error') return;
     this.dispose();
-    this.update({ phase: 'auth-error', beingId: undefined, display: undefined, message: 'Town 凭据无效或已失效；已加载内容仍可阅读，请重新配对后刷新。' });
+    this.update({ phase: 'auth-error', beingId: undefined, display: undefined, message: `Town 凭据无效或已失效；已加载内容仍可阅读，请重新配对后刷新。${traceId ? ` Trace ID：${traceId}` : ''}` });
   }
   private rememberKey(value: string) {
     if (!value || this.seen.has(value)) return false;
@@ -49,17 +50,21 @@ export class TownLive {
   private async connect(generation: number) {
     const controller = new AbortController(); this.controller = controller;
     const current = () => this.controller === controller && this.state.generation === generation && !controller.signal.aborted;
+    const trace = townTraceparent(this.operationTraceId);
+    const requestedAt = new Date().toISOString(), started = Date.now();
     let timeout = setTimeout(() => controller.abort(), 20000);
     let reader: ReadableStreamDefaultReader<Uint8Array> | undefined;
     let fatal = false, hello = false;
     let failure = "网络连接失败";
+    let status: number | undefined;
     try {
       const token = this.getToken();
       const url = new URL('/api/client/stream', this.origin); url.searchParams.set('token', token);
-      const response = await this.fetcher(url.href, { headers: { Accept: 'text/event-stream' }, credentials: 'omit', redirect: 'error', signal: controller.signal });
+      const response = await this.fetcher(url.href, { headers: { Accept: 'text/event-stream', traceparent: trace.value }, credentials: 'omit', redirect: 'error', signal: controller.signal });
+      status = response.status;
       if (!current()) { await response.body?.cancel(); return; }
       if ([401, 403].includes(response.status)) {
-        await response.body?.cancel(); fatal = true; this.rejectAuth(); return;
+        await response.body?.cancel(); fatal = true; this.rejectAuth(trace.traceId); return;
       }
       if (!response.ok) {
         failure = `SSE 请求返回 HTTP ${response.status}`;
@@ -85,7 +90,7 @@ export class TownLive {
           const matchesExpected = !expected || expected === beingId || (!expected.startsWith('t_') && expected === data.being_id);
           if (data.anonymous !== false || data.token_kind !== 'client' || !validTownIdentity(beingId) || data.town_id !== undefined && !beingId.startsWith('t_') || !matchesExpected || this.state.beingId && this.state.beingId !== beingId) {
             failure = expected && expected !== beingId ? 'SSE hello 身份与配对 Being 不一致' : 'SSE hello 未确认 client 身份';
-            fatal = true; this.rejectAuth(); throw new Error('identity');
+            fatal = true; this.rejectAuth(trace.traceId); throw new Error('identity');
           }
           if (!hello) {
             hello = true; this.attempts = 0;
@@ -146,10 +151,22 @@ export class TownLive {
     } catch { /* Network errors may contain the credential URL; never surface them. */ }
     finally {
       clearTimeout(timeout); await reader?.cancel().catch(() => {});
+      const active = this.controller === controller && this.state.generation === generation;
+      const httpFailure = status !== undefined && ![200, 204].includes(status);
+      const requestFailure = httpFailure ? `http-${status}` : fatal ? 'auth' : !active ? 'cancelled' : 'stream-ended';
+      const error = httpFailure ? `HTTP ${status}` : fatal || active ? failure : 'cancelled';
+      try {
+        this.reportRequest?.({
+          traceId: trace.traceId, spanId: trace.spanId, requestedAt, method: 'GET', route: '/api/client/stream',
+          ...(status === undefined ? {} : { status }), durationMs: Date.now() - started,
+          failure: requestFailure,
+          error,
+        });
+      } catch { /* Diagnostics must not interrupt reconnect handling. */ }
       // Timed-out attempts reconnect; superseded and disposed attempts do not.
-      if (!fatal && this.controller === controller && this.state.generation === generation) {
+      if (!fatal && active) {
         controller.abort();
-        this.update({ phase: 'reconnecting', message: `Town SSE ${failure}，正在重连；已加载内容仍可阅读。` });
+        this.update({ phase: 'reconnecting', message: `Town SSE ${failure}，正在重连；已加载内容仍可阅读。 Trace ID：${trace.traceId}` });
         const delay = Math.min(30000, 1000 * 2 ** Math.min(this.attempts++, 5)) + Math.floor(Math.random() * 500);
         this.retry = setTimeout(() => { void this.connect(generation); }, delay);
       }

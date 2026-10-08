@@ -18,16 +18,16 @@ describe('Town reads', () => {
     const fetcher = vi.fn(async () => Response.json({ messages: [] }));
     const client = new TownClient(() => 'town-credential', fetcher as typeof fetch);
     await client.query({ kind: 'home' }); await client.query({ kind: 'inbox' }); await client.query({ kind: 'grove', groveStatus: 'grown' });
-    expect(fetcher.mock.calls[0]).toEqual(['https://beings.town/api', expect.objectContaining({ headers: { Accept: 'application/json' }, credentials: 'omit', redirect: 'error', method: 'GET' })]);
-    expect(fetcher.mock.calls[1]).toEqual(['https://beings.town/api/messages?with=received', expect.objectContaining({ headers: { Accept: 'application/json', Authorization: 'Bearer town-credential' } })]);
-    expect(fetcher.mock.calls[2]).toEqual(['https://beings.town/api/grove?limit=24&offset=0&status=grown', expect.objectContaining({ headers: { Accept: 'application/json' }, credentials: 'omit' })]);
+    expect(fetcher.mock.calls[0]).toEqual(['https://beings.town/api', expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json', traceparent: expect.stringMatching(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/) }), credentials: 'omit', redirect: 'error', method: 'GET' })]);
+    expect(fetcher.mock.calls[1]).toEqual(['https://beings.town/api/messages?with=received', expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json', Authorization: 'Bearer town-credential', traceparent: expect.stringMatching(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/) }) })]);
+    expect(fetcher.mock.calls[2]).toEqual(['https://beings.town/api/grove?limit=24&offset=0&status=grown', expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json', traceparent: expect.stringMatching(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/) }), credentials: 'omit' })]);
   });
   it('normalizes the fireside members array while keeping the route authenticated', async () => {
     const members = [{ town_id: 't_Willow', display_name: '柳树', joined_at: '2026-09-01T12:00:00+08:00' }];
     const fetcher = vi.fn(async () => Response.json(members));
     const client = new TownClient(() => 'town-credential', fetcher as typeof fetch);
     expect(await client.query({ kind: 'fireside-members', id: '10' })).toMatchObject({ ok: true, data: { members } });
-    expect(fetcher).toHaveBeenCalledWith('https://beings.town/api/fireside/members?fireside_id=10', expect.objectContaining({ headers: { Accept: 'application/json', Authorization: 'Bearer town-credential' } }));
+    expect(fetcher).toHaveBeenCalledWith('https://beings.town/api/fireside/members?fireside_id=10', expect.objectContaining({ headers: expect.objectContaining({ Accept: 'application/json', Authorization: 'Bearer town-credential', traceparent: expect.stringMatching(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/) }) }));
   });
   it('distinguishes authorization failure, offline, invalid HTML and upstream error', async () => {
     const fetcher = vi.fn().mockResolvedValueOnce(new Response('secret error text', { status: 401 })).mockRejectedValueOnce(new Error('URL with secret')).mockResolvedValueOnce(new Response('<html>loom</html>', { headers: { 'content-type': 'text/html' } })).mockResolvedValueOnce(new Response('', { status: 503 }));
@@ -46,9 +46,29 @@ describe('Town reads', () => {
   it('classifies timeouts and reports request metrics without exposing credentials', async () => {
     const events: unknown[] = [];
     const client = new TownClient(() => 'secret-token', async () => { throw Object.assign(new Error('deadline'), { name: 'TimeoutError' }); }, 'https://beings.town', () => '', event => events.push(event));
-    expect(await client.query({ kind: 'inbox' })).toMatchObject({ ok: false, code: 'timeout' });
-    expect(events[0]).toMatchObject({ route: '/api/messages?with=received', failure: 'timeout' });
+    const result = await client.query({ kind: 'inbox' });
+    expect(result).toMatchObject({ ok: false, code: 'timeout', traceId: expect.stringMatching(/^[0-9a-f]{32}$/), message: expect.stringMatching(/Trace ID：[0-9a-f]{32}$/) });
+    if (result.ok) throw new Error('request should fail');
+    expect(result.message).toContain(result.traceId);
+    expect(events[0]).toMatchObject({ route: '/api/messages?with=received', method: 'GET', failure: 'timeout', error: 'timeout', requestedAt: expect.any(String), traceId: expect.stringMatching(/^[0-9a-f]{32}$/), spanId: expect.stringMatching(/^[0-9a-f]{16}$/), durationMs: expect.any(Number) });
     expect(JSON.stringify(events)).not.toContain('secret-token');
+  });
+  it('creates a fresh trace by default and can reuse one trace with a new span', async () => {
+    const events: Parameters<NonNullable<ConstructorParameters<typeof TownClient>[4]>>[0][] = [];
+    const fetcher = vi.fn(async () => Response.json({ messages: [] }));
+    const client = new TownClient(() => '', fetcher as typeof fetch, 'https://beings.town', () => '', event => events.push(event));
+    const sharedTrace = '0123456789abcdef0123456789abcdef';
+    await client.query({ kind: 'home' });
+    await client.query({ kind: 'home' });
+    await client.query({ kind: 'home' }, sharedTrace);
+    await client.query({ kind: 'home' }, sharedTrace);
+    const parents = (fetcher.mock.calls as unknown as [string, RequestInit][]).map(([, init]) => (init.headers as Record<string, string>).traceparent);
+    expect(parents[0].slice(3, 35)).not.toBe(parents[1].slice(3, 35));
+    expect(parents.slice(2).map(value => value.slice(3, 35))).toEqual([sharedTrace, sharedTrace]);
+    expect(parents[2].slice(36, 52)).not.toBe(parents[3].slice(36, 52));
+    expect(parents.every(value => /^00-(?!0{32})[0-9a-f]{32}-(?!0{16})[0-9a-f]{16}-01$/.test(value))).toBe(true);
+    expect(events).toHaveLength(4);
+    expect(events.every(event => event.status === 200 && !event.error)).toBe(true);
   });
   it('persists encrypted Town credentials independently and can clear them', async () => {
     const directory = await mkdtemp(path.join(os.tmpdir(), 'town-test-'));
@@ -105,7 +125,7 @@ describe('Town SDK 2769e2f protocol', () => {
     const client = new TownClient(() => 'must-not-send-existing-token', fetcher as typeof fetch);
     expect(await client.pair({ beingId: 'Willow', code: 'ab3xy9' })).toEqual({ token: 'a'.repeat(64), beingId: 'willow' });
     const request = (fetcher.mock.calls as unknown[][])[0][1] as RequestInit;
-    expect(request.headers).toEqual({ Accept: 'application/json', 'Content-Type': 'application/json' });
+    expect(request.headers).toEqual({ Accept: 'application/json', 'Content-Type': 'application/json', traceparent: expect.stringMatching(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/) });
     expect(JSON.parse(request.body as string)).toEqual({ being_id: 'willow', code: 'AB3XY9' });
   });
   it('sends the documented bodies for all three channels without inventing via or identity events', async () => {

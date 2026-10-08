@@ -1,5 +1,6 @@
 import { expect, it, vi } from 'vitest';
 import { TownLive } from '../desktop/main/town/live';
+import type { TownRequestEvent } from '../desktop/shared/town-client';
 
 it('clears the previous display on re-pairing and publishes the new name only after identity confirmation', async () => {
   let expected = 't_First', display = '柳树';
@@ -64,6 +65,23 @@ it('does not connect or request pairing when no Town credential is configured', 
   } finally { live.dispose(); }
 });
 
+it('logs failed SSE requests and exposes the same trace ID in connection status', async () => {
+  const events: TownRequestEvent[] = [];
+  const fetcher = vi.fn(async () => new Response('', { status: 401 }));
+  const live = new TownLive(() => 'fixture-token', () => 't_Willow', () => {}, fetcher as typeof fetch,
+    'https://beings.town', () => '', () => {}, event => events.push(event));
+  try {
+    live.restart();
+    await vi.waitFor(() => expect(live.state.phase).toBe('auth-error'));
+    await vi.waitFor(() => expect(events).toHaveLength(1));
+    const traceId = String(events[0].traceId);
+    expect(live.state.message).toContain(traceId);
+    expect(events[0]).toMatchObject({ route: '/api/client/stream', status: 401, failure: 'http-401', error: 'HTTP 401' });
+    const options = (fetcher.mock.calls as unknown as [string, RequestInit][])[0][1];
+    expect((options.headers as Record<string, string>).traceparent).toMatch(new RegExp(`^00-${traceId}-[0-9a-f]{16}-01$`));
+  } finally { live.dispose(); }
+});
+
 it('accepts documented SSE payloads, decodes split UTF-8 and deduplicates REST/SSE IDs per channel', async () => {
   let stream!: ReadableStreamDefaultController<Uint8Array>;
   const fetcher = vi.fn(async () => new Response(new ReadableStream<Uint8Array>({ start(controller) { stream = controller; } }), { headers: { 'Content-Type': 'text/event-stream' } }));
@@ -91,7 +109,7 @@ it('accepts documented SSE payloads, decodes split UTF-8 and deduplicates REST/S
     expect(live.state).toMatchObject({ phase: 'connected', beingId: 'willow' });
     const [url, options] = (fetcher.mock.calls as unknown[][])[0];
     expect(url).toBe('https://beings.town/api/client/stream?token=private-client-token');
-    expect(options).toMatchObject({ credentials: 'omit', redirect: 'error', headers: { Accept: 'text/event-stream' } });
+    expect(options).toMatchObject({ credentials: 'omit', redirect: 'error', headers: { Accept: 'text/event-stream', traceparent: expect.stringMatching(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/) } });
     expect(JSON.stringify(publish.mock.calls)).not.toMatch(/private-client-token|只供主进程读取|私信|phone/);
   } finally { live.dispose(); }
 });

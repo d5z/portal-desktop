@@ -70,7 +70,7 @@ it("routes custom Town requests without forwarding credentials from another dest
     await town.api.town({ kind: "bonfire" });
     expect(fetcher).toHaveBeenCalledWith(
       "https://custom.test/api/bonfire/hear?limit=100",
-      expect.objectContaining({ headers: { Accept: "application/json" } }),
+      expect.objectContaining({ headers: expect.objectContaining({ Accept: "application/json", traceparent: expect.stringMatching(/^00-[0-9a-f]{32}-[0-9a-f]{16}-01$/) }) }),
     );
     expect(JSON.stringify(fetcher.mock.calls)).not.toContain("old-town-token");
   } finally {

@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { SecretStorage } from '../app/settings';
 import { normalizeTownDisplay, validTownIdentity } from '../../shared/town-identity';
 
-export { TownClient, TOWN_ORIGIN, townRoute } from '../../shared/town-client';
+export { TownClient, TOWN_ORIGIN, townRoute, type TownRequestEvent } from '../../shared/town-client';
 
 export class TownCredentials {
   token = '';
