@@ -94,11 +94,13 @@ function ChatView({
     index = useRef<ChatIndexHandle>(null),
     scrollLock = useRef(true),
     anchoredReplyId = useRef<string | null>(null),
+    trackedReplyId = useRef<string | null>(null),
+    followedTurnId = useRef<string | null>(null),
     wheelAccum = useRef(0);
   const scopeScroll = useRef<Partial<Record<HistoryScope, { top: number; locked: boolean }>>>({});
   function releaseAnchor() {
-    if (!anchoredReplyId.current) return;
     anchoredReplyId.current = null;
+    followedTurnId.current = null;
     wheelAccum.current = 0;
   }
   function sendDraft() {
@@ -230,28 +232,51 @@ function ChatView({
   useLayoutEffect(() => {
     const container = messages.current;
     if (!container) return;
-    const streamingReply = visibleItems.find(
-      (item): item is Message =>
-        item.kind === "message" && item.role === "being" && item.streaming,
-    );
+    let streamingReply: Message | undefined;
+    let streamingTurnId: string | null = null;
+    for (let index = visibleItems.length - 1; index >= 0; index -= 1) {
+      const item = visibleItems[index];
+      if (item.kind !== "message" || item.role !== "being" || !item.streaming) continue;
+      streamingReply = item;
+      for (let previous = index - 1; previous >= 0; previous -= 1) {
+        const candidate = visibleItems[previous];
+        if (candidate.kind === "message" && candidate.role === "user") {
+          streamingTurnId = candidate.turnId ?? candidate.id;
+          break;
+        }
+      }
+      streamingTurnId ??= item.id;
+      break;
+    }
+    if (streamingReply && trackedReplyId.current !== streamingReply.id) {
+      trackedReplyId.current = streamingReply.id;
+      if (scrollLock.current || followedTurnId.current === streamingTurnId) followedTurnId.current = streamingTurnId;
+    }
     if (anchoredReplyId.current && (!streamingReply || streamingReply.id !== anchoredReplyId.current)) {
       anchoredReplyId.current = null;
       wheelAccum.current = 0;
     }
     if (anchoredReplyId.current) {
       const reply = messageElements.current.get(anchoredReplyId.current);
-      if (reply) container.scrollTop = reply.offsetTop - 20;
+      if (reply) {
+        const replyTop = reply.getBoundingClientRect().top;
+        const containerTop = container.getBoundingClientRect().top;
+        container.scrollTop += replyTop - containerTop - 20;
+      }
       return;
     }
-    if (scrollLock.current && streamingReply) {
+    if (streamingReply && followedTurnId.current === streamingTurnId) {
       const reply = messageElements.current.get(streamingReply.id);
       if (reply) {
         const replyTop = reply.getBoundingClientRect().top;
         const containerTop = container.getBoundingClientRect().top;
-        if (replyTop < containerTop + 20) {
+        const replyOffset = replyTop - containerTop;
+        const bottom = Math.max(0, container.scrollHeight - container.clientHeight);
+        const replyOffsetAtBottom = replyOffset + container.scrollTop - bottom;
+        if (replyOffsetAtBottom < 20) {
           anchoredReplyId.current = streamingReply.id;
           scrollLock.current = false;
-          container.scrollTop = reply.offsetTop - 20;
+          container.scrollTop += replyOffset - 20;
           return;
         }
       }
@@ -438,7 +463,10 @@ function ChatView({
               if (wheelAccum.current > 30) releaseAnchor();
               return;
             }
-            if (event.deltaY < 0) scrollLock.current = false;
+            if (event.deltaY < 0) {
+              releaseAnchor();
+              scrollLock.current = false;
+            }
           }}
           onTouchMove={() => {
             if (anchoredReplyId.current) releaseAnchor();
