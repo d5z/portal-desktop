@@ -41,7 +41,7 @@ DOM 引用仅用于焦点、原生 dialog、动画、滚动、选区测量和浏
 高亮代码通过 token emitter 转为 React span，链接限制为 HTTP/HTTPS。
 
 聊天页在隔离 iframe 内使用自己的 React root：`chat/page.tsx` 组合消息、输入、过程记录、
-模型设置、OAuth、隐私说明和 Being 信息。`chat/services/runtime.js` 保留 Loom 的流式协议、
+模型设置、OAuth、隐私说明和 Being 信息。`chat/services/runtime.ts` 保留 Loom 的流式协议、
 断线恢复、watchdog 与历史对账，读写的是消息对象而非 DOM；`chat/models/chat.ts` 和
 `runtime.d.ts` 定义组件与协议间的类型契约。生命周期结束会取消请求并释放计时器与订阅。
 `app/hooks/use-chat-bridge.ts` 校验来源、frame 和 revision；`chat/services/bridge.ts` 处理子页面的状态回传，
@@ -158,7 +158,7 @@ Portal 自身按 60 秒周期刷新 Kit；用户还可以从客户端重启识�
 
 ## 对话过程展示
 
-`chat/services/runtime.js` 更新每轮过程数据，`chat/components/messages.tsx` 通过 React 在聊天阅读区展示每轮过程摘要，展示耗时、服务端返回的思考文本与工具名称/参数摘要/结果。工具仍经原有执行链路运行，停止按钮调用原有停止接口。默认折叠；结束、停止和错误状态分别显示，已收集的记录保留在本次页面中。云端历史接口没有过程事件，重载后不会伪造或补造历史思考记录。
+`chat/services/runtime.ts` 更新每轮过程数据，`chat/components/messages.tsx` 通过 React 在聊天阅读区展示每轮过程摘要，展示耗时、服务端返回的思考文本与工具名称/参数摘要/结果。工具仍经原有执行链路运行，停止按钮调用原有停止接口。默认折叠；结束、停止和错误状态分别显示，已收集的记录保留在本次页面中。云端历史接口没有过程事件，重载后不会伪造或补造历史思考记录。
 
 ## Town 消息阅读
 

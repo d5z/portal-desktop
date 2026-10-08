@@ -216,8 +216,8 @@ Heart / Being 调用 portal_exec(command="@context scene-id")
 | 会话目录 | desktop/main/chat/scene.ts |
 | Heart HTTP / SSE 代理 | desktop/main/chat/proxy.ts |
 | iframe 消息桥 | desktop/renderer/chat/services/bridge.ts |
-| scene runtime 协调器 | desktop/renderer/chat/services/scene-runtime.js |
-| 发送、SSE、恢复、历史对账 | desktop/renderer/chat/services/runtime.js |
+| scene runtime 协调器 | desktop/renderer/chat/services/scene-runtime.ts |
+| 发送、SSE、恢复、历史对账 | desktop/renderer/chat/services/runtime.ts |
 | 场景解释 / 过滤 | desktop/renderer/chat/models/scenes.ts |
 | IndexedDB 历史缓存 | desktop/renderer/chat/services/history-cache.ts |
 | @context / @scenes 格式化 | desktop/renderer/chat/services/client-commands.ts |

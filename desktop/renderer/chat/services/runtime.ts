@@ -1,24 +1,25 @@
 import { createSceneRuntime } from "./scene-runtime";
 import { HistoryCache } from "./history-cache";
 import { inCurrentScene, messageScene, sceneTransitionNotice, stripSceneTransition } from "../models/scenes";
+import type { ChatRuntime, ChatState, RuntimeOptions } from "../models/chat";
 
 /**
  * Loom's streaming, replay and history protocol, independent of rendering.
  * Message references below are domain objects. React is the sole owner of their DOM.
  * Each mounted chat owns one runtime; disposal aborts requests and releases all timers.
  */
-export function createChatRuntime(state, options = {}) {
+export function createChatRuntime(state: ChatState, options: RuntimeOptions = {}): ChatRuntime {
   return createSceneRuntime(state, options, createStreamRuntime);
 }
 
-function createStreamRuntime(state, options) {
+function createStreamRuntime(state: any, options: any): any {
   const lifetime = new AbortController();
   let disposed = false;
-  const timeouts = new Set(),
-    intervals = new Set(),
-    frames = new Set(),
-    cleanups = [];
-  const setTimeout = (fn, ms) => {
+  const timeouts = new Set<ReturnType<typeof globalThis.setTimeout>>(),
+    intervals = new Set<ReturnType<typeof globalThis.setInterval>>(),
+    frames = new Set<number>(),
+    cleanups: any[] = [];
+  const setTimeout = (fn: any, ms: any) => {
     if (disposed) return null;
     const id = globalThis.setTimeout(() => {
       timeouts.delete(id);
@@ -27,11 +28,11 @@ function createStreamRuntime(state, options) {
     timeouts.add(id);
     return id;
   };
-  const clearTimeout = (id) => {
+  const clearTimeout = (id: any) => {
     globalThis.clearTimeout(id);
     timeouts.delete(id);
   };
-  const setInterval = (fn, ms) => {
+  const setInterval = (fn: any, ms: any) => {
     if (disposed) return null;
     const id = globalThis.setInterval(() => {
       if (!disposed) fn();
@@ -39,11 +40,11 @@ function createStreamRuntime(state, options) {
     intervals.add(id);
     return id;
   };
-  const clearInterval = (id) => {
+  const clearInterval = (id: any) => {
     globalThis.clearInterval(id);
     intervals.delete(id);
   };
-  const requestAnimationFrame = (fn) => {
+  const requestAnimationFrame = (fn: any) => {
     if (disposed) return null;
     const id = globalThis.requestAnimationFrame(() => {
       frames.delete(id);
@@ -52,11 +53,11 @@ function createStreamRuntime(state, options) {
     frames.add(id);
     return id;
   };
-  const cancelAnimationFrame = (id) => {
+  const cancelAnimationFrame = (id: any) => {
     globalThis.cancelAnimationFrame(id);
     frames.delete(id);
   };
-  function listen(target, event, handler) {
+  function listen(target: any, event: any, handler: any) {
     if (!target?.addEventListener) return;
     target.addEventListener(event, handler);
     cleanups.push(() => target.removeEventListener(event, handler));
@@ -87,10 +88,10 @@ function createStreamRuntime(state, options) {
     location.protocol === "beings:"
       ? ""
       : options.connection?.relaySecret || params.get("relay_secret") || params.get("secret") || LOOM_TOKEN;
-  function apiUrl(path) {
+  function apiUrl(path: any) {
     return `${API_URL}${path}${LOOM_TOKEN ? (path.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(LOOM_TOKEN) : ""}`;
   }
-  const fetch = async (input, init = {}) => {
+  const fetch = async (input: any, init: any = {}) => {
     lifetime.signal.throwIfAborted();
     const signal = init.signal
       ? AbortSignal.any([init.signal, lifetime.signal])
@@ -105,7 +106,7 @@ function createStreamRuntime(state, options) {
     // it reaches the main-process proxy (including diagnostic sends).
     if (location.protocol === "beings:" && init.method === "POST" && params.get("history_scope")) {
       const headers = new Headers(init.headers);
-      headers.set("X-Portal-Being-Endpoint", params.get("history_scope"));
+      headers.set("X-Portal-Being-Endpoint", params.get("history_scope")!);
       if (new URL(input, location.href).pathname === "/api/chat/stream" && requestScene)
         headers.set("X-Portal-Scene-Id", requestScene);
       init = { ...init, headers };
@@ -114,13 +115,13 @@ function createStreamRuntime(state, options) {
       const response = await globalThis.fetch(input, { ...init, signal });
       report?.(response.ok);
       return response;
-    } catch (error) {
+    } catch (error: any) {
       report?.(false);
       throw error;
     }
   };
-  const prefetch = {};
-  async function takePrefetch(key) {
+  const prefetch: Record<string, any> = {};
+  async function takePrefetch(key: any) {
     const pending = prefetch[key];
     delete prefetch[key];
     try {
@@ -135,7 +136,7 @@ function createStreamRuntime(state, options) {
       ...(RELAY_SECRET ? { "X-Relay-Secret": RELAY_SECRET } : {}),
     };
   }
-  async function readJsonResponse(res) {
+  async function readJsonResponse(res: any) {
     const text = await res.text();
     try {
       return text ? JSON.parse(text) : {};
@@ -143,9 +144,9 @@ function createStreamRuntime(state, options) {
       return { error: text };
     }
   }
-  let configStatusTimer = null,
+  let configStatusTimer: any = null,
     configReadRevision = 0;
-  function setConfigStatus(text, className = "") {
+  function setConfigStatus(text: any, className = "") {
     clearTimeout(configStatusTimer);
     state.configStatus = text;
     state.configStatusClass = className;
@@ -167,7 +168,7 @@ function createStreamRuntime(state, options) {
         typeof cfg.sbs_enabled === "boolean"
       )
         setSbsEnabled(cfg.sbs_enabled, false);
-    } catch (e) {
+    } catch (e: any) {
       if (!disposed && revision === configReadRevision)
         setConfigStatus(e.message, "error");
     } finally {
@@ -177,7 +178,7 @@ function createStreamRuntime(state, options) {
       }
     }
   }
-  async function applyConfigChange(patch) {
+  async function applyConfigChange(patch: any) {
     ++configReadRevision;
     state.configLoading = false;
     setConfigStatus("正在应用设置…", "applying");
@@ -200,40 +201,40 @@ function createStreamRuntime(state, options) {
       );
       configStatusTimer = setTimeout(() => setConfigStatus(""), 3000);
       return data;
-    } catch (e) {
+    } catch (e: any) {
       if (!disposed) setConfigStatus(e.message, "error");
       return null;
     }
   }
-  let currentRun = null;
-  let pendingReply = null;
+  let currentRun: any = null;
+  let pendingReply: any = null;
   let replyRunSettled = false;
   let replayTransportOnly = false;
-  function setStreamScene(scene) {
+  function setStreamScene(scene: any) {
     state.activeScene = {
       ...scene,
       sceneLabel: scene.sceneLabel || (scene.sceneId === state.currentScene.sceneId ? state.currentScene.sceneLabel : undefined),
     };
     changed();
   }
-  function updateMessage(message, text) {
+  function updateMessage(message: any, text: any) {
     if (!message) return;
     message.text = text;
     changed();
   }
-  function setMessageStreaming(message, streaming) {
+  function setMessageStreaming(message: any, streaming: any) {
     if (!message) return;
     message.streaming = streaming;
     changed();
   }
-  function removeMessage(message) {
+  function removeMessage(message: any) {
     if (!message) return;
-    state.items = state.items.filter((item) => item !== message);
+    state.items = state.items.filter((item: any) => item !== message);
     changed();
   }
   function moveRun() {
     if (currentRun && !currentRun.end && state.items.at(-1) !== currentRun) {
-      state.items = state.items.filter((item) => item !== currentRun);
+      state.items = state.items.filter((item: any) => item !== currentRun);
       state.items.push(currentRun);
     }
   }
@@ -294,11 +295,11 @@ function createStreamRuntime(state, options) {
     }
   }
   // Config（_pathBase / API_URL / LOOM_TOKEN / RELAY_SECRET / apiUrl 见文件顶部预取 script）
-  let sessionId = null;
+  let sessionId: any = null;
   let isStreaming = false,
-    streamMessage = null,
+    streamMessage: any = null,
     streamText = "";
-  let renderTimer = null;
+  let renderTimer: any = null;
   let beingName = state.name;
 
   // ---- Connection state machine (P1-4) ----
@@ -306,22 +307,22 @@ function createStreamRuntime(state, options) {
   // 'connecting' | 'online' | 'degraded' | 'reconnecting' | 'offline'
   let connState = state.connection || "connecting";
   let streamStatus = "connected"; // 由 setStatus 维护的"流状态"：connected / thinking / error
-  let healthTimer = null;
+  let healthTimer: any = null;
   let healthBackoff = 0;
   let healthInFlight = false;
-  let serverCommit = null;
+  let serverCommit: any = null;
   const HEALTH_BACKOFF_MS = [1000, 2000, 4000, 8000, 15000, 30000, 60000];
   const HEALTH_OK_INTERVAL_MS = 15000;
-  const jitter = (ms) => Math.round(ms * (0.75 + Math.random() * 0.5)); // ±25%，防惊群
-  let pendingFiles = [];
+  const jitter = (ms: any) => Math.round(ms * (0.75 + Math.random() * 0.5)); // ±25%，防惊群
+  let pendingFiles: any[] = [];
   const pendingFileReads = new Set();
   let preparingSend = false;
   let toolCount = 0,
-    connectTime = null;
-  let lastMessageTime = null;
-  let currentAbortController = null;
-  let currentStreamId = null;
-  let lastStreamId = null; // 断线恢复需要它——currentStreamId 会在收尾时被清掉
+    connectTime: any = null;
+  let lastMessageTime: any = null;
+  let currentAbortController: any = null;
+  let currentStreamId: any = null;
+  let lastStreamId: any = null; // 断线恢复需要它——currentStreamId 会在收尾时被清掉
   // F1: 外部（非 watchdog）发起的 cutover 会 abort 正在跑的 live reader。
   // reader 的 catch 靠这个槽把 AbortError 认成"已经交接给 replay 通道"，
   // 而不是走 handleStreamError → finalizeSendCleanup（那会把 isStreaming 打回 false，
@@ -331,9 +332,9 @@ function createStreamRuntime(state, options) {
   // 每个 reader / poller 启动时 ++writerEpoch 并记住自己的号；写之前对一次号，
   // 对不上就静默丢弃。任何路径上的重叠都因此变得无害。
   let writerEpoch = 0;
-  let sendQueue = [];
+  let sendQueue: any[] = [];
 
-  let activeStreamPollTimer = null;
+  let activeStreamPollTimer: any = null;
 
   // ---- Live stream progress (P1-2) ----
   // liveSeq counts replayed events, including continuation meta but excluding initial transport meta.
@@ -362,10 +363,10 @@ function createStreamRuntime(state, options) {
   // when it only wakes for you. applyDotClass publishes both layers together.
   let sbsEnabled = state.sbsEnabled;
   let sbsTransition = ""; // '' | 'waking' | 'sleeping'
-  let sbsTransitionTimer = null;
+  let sbsTransitionTimer: any = null;
   let sbsToggling = false;
   let sbsConfigRevision = 0;
-  let sbsLoading = null;
+  let sbsLoading: any = null;
 
   function applyDotClass() {
     if (options.historyOwner?.()) sbsEnabled = state.sbsEnabled;
@@ -382,7 +383,7 @@ function createStreamRuntime(state, options) {
 
   // `animate` is false on load — a dot that ripples every time you open Loom
   // would be announcing a state change that did not happen.
-  function setSbsEnabled(enabled, animate) {
+  function setSbsEnabled(enabled: any, animate: any) {
     const changed = enabled !== sbsEnabled;
     sbsEnabled = enabled;
     sbsConfigRevision++;
@@ -443,7 +444,7 @@ function createStreamRuntime(state, options) {
         if (typeof cfg.sbs_enabled !== "boolean") return;
         setSbsEnabled(cfg.sbs_enabled, false);
         return cfg.sbs_enabled;
-      } catch (_) {
+      } catch (_: any) {
         return undefined;
       } finally {
         sbsLoading = null;
@@ -452,13 +453,13 @@ function createStreamRuntime(state, options) {
     return sbsLoading;
   }
 
-  function setStatus(state) {
+  function setStatus(state: any) {
     streamStatus = state;
     applyDotClass();
     updateSendButton();
   }
 
-  const CONN_BANNER = {
+  const CONN_BANNER: Record<string, string | null> = {
     connecting: null,
     online: null,
     degraded: "连接不稳定，正在重试…",
@@ -466,7 +467,7 @@ function createStreamRuntime(state, options) {
     offline: "已离线，恢复网络后会自动继续",
   };
 
-  function setConnState(next, detail) {
+  function setConnState(next: any, detail: any = null) {
     if (connState === next) return;
     connState = next;
     state.connection = next;
@@ -479,11 +480,11 @@ function createStreamRuntime(state, options) {
   }
 
   // ═══ TUI Activity Bar ═══
-  let tuiTimer = null;
+  let tuiTimer: any = null;
   let tuiStartTime = null;
-  let tuiElapsedTimer = null;
+  let tuiElapsedTimer: any = null;
 
-  const tuiLabels = {
+  const tuiLabels: Record<string, string> = {
     thinking: "在思考",
     remember: "在回忆",
     learn: "在反思",
@@ -497,7 +498,7 @@ function createStreamRuntime(state, options) {
     act: "在行动",
   };
 
-  let tuiCurrentState = null;
+  let tuiCurrentState: any = null;
   let tuiCurrentArg = "";
   let tuiCurrentPreview = "";
   let turnContext = "";
@@ -506,26 +507,26 @@ function createStreamRuntime(state, options) {
   // Entries:
   //   { type: 'think', preview: string, ts: number, done?: boolean, duration?: number }
   //   { type: 'tool',  name, label, arg, ts, result?, error?, done? }
-  let actionLog = [];
+  let actionLog: any[] = [];
   const ACTION_LOG_MAX = 50;
-  let activityLogClearTimer = null;
-  let renderActivityLogTimer = null;
+  let activityLogClearTimer: any = null;
+  let renderActivityLogTimer: any = null;
   let renderActivityLogPending = false;
 
-  function truncate(s, n) {
+  function truncate(s: any, n: any) {
     if (!s) return "";
     s = String(s);
     return s.length > n ? s.slice(0, n - 1) + "…" : s;
   }
 
-  function basename(p) {
+  function basename(p: any) {
     if (!p) return "";
     const s = String(p);
     const idx = Math.max(s.lastIndexOf("/"), s.lastIndexOf("\\"));
     return idx >= 0 ? s.slice(idx + 1) : s;
   }
 
-  function extractKeyArg(input) {
+  function extractKeyArg(input: any) {
     if (!input || typeof input !== "object") return "";
     // Prefer well-known keys per tool shape; fall back to first string value.
     if (typeof input.query === "string") return truncate(input.query, 60);
@@ -535,7 +536,7 @@ function createStreamRuntime(state, options) {
     if (typeof input.url === "string") {
       try {
         return new URL(input.url).hostname;
-      } catch (_) {
+      } catch (_: any) {
         return truncate(input.url, 40);
       }
     }
@@ -548,7 +549,7 @@ function createStreamRuntime(state, options) {
     return "";
   }
 
-  function summarizeToolResult(data) {
+  function summarizeToolResult(data: any) {
     // data = tool_result event payload. Keep it VERY brief.
     if (!data) return "";
     if (data.is_error) return "出错了";
@@ -564,18 +565,18 @@ function createStreamRuntime(state, options) {
     return truncate(oneLine, 60);
   }
 
-  function parseToolInput(raw) {
+  function parseToolInput(raw: any) {
     if (raw == null) return {};
     if (typeof raw === "object") return raw;
     if (typeof raw !== "string") return {};
     try {
       return JSON.parse(raw);
-    } catch (_) {
+    } catch (_: any) {
       return {};
     }
   }
 
-  function actionLogPush(entry) {
+  function actionLogPush(entry: any) {
     entry.ts = entry.ts || Date.now();
     actionLog.push(entry);
     if (actionLog.length > ACTION_LOG_MAX) {
@@ -632,7 +633,7 @@ function createStreamRuntime(state, options) {
     changed();
   }
 
-  function tuiSet(stateName, label, opts = {}) {
+  function tuiSet(stateName: any, label: any = null, opts: any = {}) {
     tuiCurrentState = label || tuiLabels[stateName] || "在行动";
     tuiCurrentArg = opts.arg || "";
     tuiCurrentPreview = opts.preview || "";
@@ -651,7 +652,7 @@ function createStreamRuntime(state, options) {
   // 分级提示：先什么都不说，超过预算 60% 才轻声解释，probe 判定 stalled 才明确告知在做什么。
   let tuiHintText = "";
 
-  function setTuiHint(text) {
+  function setTuiHint(text: any) {
     tuiHintText = text || "";
     updateRun();
     changed();
@@ -662,7 +663,7 @@ function createStreamRuntime(state, options) {
   }
 
   // 由 watchdog 和 tui 计时器共同驱动的"温和升级"提示
-  function updateStallHint(stalledFor) {
+  function updateStallHint(stalledFor: any) {
     if (!isStreaming) return;
     const budget = stallBudgetMs();
     if (stalledFor < budget * 0.6) {
@@ -679,7 +680,7 @@ function createStreamRuntime(state, options) {
     }
   }
 
-  function updateTuiPreviewInline(preview) {
+  function updateTuiPreviewInline(preview: any) {
     tuiCurrentPreview = preview;
     changed();
   }
@@ -710,15 +711,15 @@ function createStreamRuntime(state, options) {
   }
 
   // ---- Messages ----
-  let lastRole = null;
-  let lastSceneId;
+  let lastRole: any = null;
+  let lastSceneId: any;
   function addMessage(
-    role,
-    text,
+    role: any,
+    text: any,
     streaming = false,
-    timestamp = null,
-    isoTime = null,
-    scene = role === "being" ? state.activeScene : state.currentScene,
+    timestamp: any = null,
+    isoTime: any = null,
+    scene: any = role === "being" ? state.activeScene : state.currentScene,
   ) {
     if (!streaming && role !== "system") text = cleanContent(role === "user" ? stripSceneTransition(text) : text);
     if (!text && !streaming) return null; // skip empty after cleaning
@@ -773,7 +774,7 @@ function createStreamRuntime(state, options) {
     return message;
   }
 
-  function addTimeGap(text, scene) {
+  function addTimeGap(text: any, scene: any) {
     state.items.push({
       ...scene,
       kind: "separator",
@@ -785,21 +786,21 @@ function createStreamRuntime(state, options) {
 
   // History markers describe an autonomous breath transition; render them as a
   // separator so SBS activity is visible without pretending it was a chat bubble.
-  function isHistoryMarker(m) {
+  function isHistoryMarker(m: any) {
     return !!m && (m.from === "system" || m.type === "marker");
   }
-  const BREATH_MARKER_LABELS = [
+  const BREATH_MARKER_LABELS: Array<[RegExp, string]> = [
     [/^\[breath yielded/i, "放下手头的事，转向你"],
     [/^\[breath interrupted/i, "已停止"],
     [/^\[breath superseded/i, "被新的对话取代"],
   ];
-  function breathMarkerLabel(text) {
+  function breathMarkerLabel(text: any) {
     const raw = (text || "").trim();
     for (const [re, label] of BREATH_MARKER_LABELS)
       if (re.test(raw)) return label;
     return raw.replace(/^\[|\]$/g, "");
   }
-  function addBreathMarker(text, timestamp = null, scene = {}) {
+  function addBreathMarker(text: any, timestamp: any = null, scene: any = {}) {
     state.items.push({
       ...scene,
       kind: "separator",
@@ -824,12 +825,12 @@ function createStreamRuntime(state, options) {
   function formatTime() {
     return formatMessageTime(new Date());
   }
-  function formatHistoryTime(iso) {
+  function formatHistoryTime(iso: any) {
     return formatMessageTime(new Date(iso), iso);
   }
-  function formatMessageTime(date, fallback = "") {
+  function formatMessageTime(date: any, fallback = "") {
     if (!(date instanceof Date) || !Number.isFinite(date.getTime())) return fallback;
-    const pad = (value) => String(value).padStart(2, "0");
+    const pad = (value: any) => String(value).padStart(2, "0");
     const time = `${pad(date.getHours())}:${pad(date.getMinutes())}:${pad(date.getSeconds())}`;
     const today = new Date();
     if (date.getFullYear() === today.getFullYear() &&
@@ -837,7 +838,7 @@ function createStreamRuntime(state, options) {
         date.getDate() === today.getDate()) return time;
     return `${date.getFullYear()}年${pad(date.getMonth() + 1)}月${pad(date.getDate())}日 ${time}`;
   }
-  function formatSize(bytes) {
+  function formatSize(bytes: any) {
     return bytes < 1024
       ? bytes + "B"
       : bytes < 1048576
@@ -845,10 +846,10 @@ function createStreamRuntime(state, options) {
         : (bytes / 1048576).toFixed(1) + "MB";
   }
   // Filter out DSML/tool_call raw content
-  function cleanContent(text) {
+  function cleanContent(text: any) {
     if (!text) return "";
-    const fences = [];
-    text = text.replace(/```[\s\S]*?```/g, (block) => {
+    const fences: any[] = [];
+    text = text.replace(/```[\s\S]*?```/g, (block: any) => {
       const key = `@@FENCE_${fences.length}@@`;
       fences.push(block);
       return key;
@@ -879,14 +880,14 @@ function createStreamRuntime(state, options) {
       /^\s*(?:\[system\]|system:)\s*(?:internal|debug|tool|prompt|instruction).*/gim,
       "",
     );
-    text = text.replace(/@@FENCE_(\d+)@@/g, (_, i) => fences[Number(i)] || "");
+    text = text.replace(/@@FENCE_(\d+)@@/g, (_: any, i: any) => fences[Number(i)] || "");
     // Clean up excessive blank lines left behind
     text = text.replace(/\n{3,}/g, "\n\n").trim();
     return text;
   }
 
   // ---- Files ----
-  function handleFiles(fileList) {
+  function handleFiles(fileList: any) {
     for (const file of fileList) {
       if (file.size > 10 * 1024 * 1024) {
         addMessage("system", "⚠ File too large: " + file.name);
@@ -902,7 +903,8 @@ function createStreamRuntime(state, options) {
       pendingFiles.push(pending);
       renderPendingFiles();
       const reader = new FileReader();
-      const reading = new Promise((resolve) => {
+      let fail = () => {};
+      const reading = new Promise<void>((resolve) => {
         let settled = false;
         const finish = () => {
           if (settled) return;
@@ -911,13 +913,14 @@ function createStreamRuntime(state, options) {
         };
         reader.onload = () => {
           if (!disposed && pendingFiles.includes(pending)) {
-            pending.base64 = reader.result.split(",")[1] || reader.result;
+            const result = typeof reader.result === "string" ? reader.result : "";
+            pending.base64 = result.split(",")[1] || result;
             pending.loading = false;
             renderPendingFiles();
           }
           finish();
         };
-        reader.onerror = () => {
+        fail = () => {
           if (!disposed) {
             pendingFiles = pendingFiles.filter((item) => item !== pending);
             renderPendingFiles();
@@ -925,6 +928,7 @@ function createStreamRuntime(state, options) {
           }
           finish();
         };
+        reader.onerror = fail;
         reader.onabort = finish;
       });
       pendingFileReads.add(reading);
@@ -933,20 +937,20 @@ function createStreamRuntime(state, options) {
         if (reader.readyState === FileReader.LOADING) reader.abort();
       });
       try { reader.readAsDataURL(file); }
-      catch { reader.onerror(); }
+      catch { fail(); }
     }
   }
   async function waitForPendingFiles() {
     while (pendingFileReads.size)
       await Promise.allSettled([...pendingFileReads]);
   }
-  async function prepareSend(filesOverride, snapshot = null) {
+  async function prepareSend(filesOverride: any, snapshot: any = null) {
     if (Array.isArray(filesOverride) || !pendingFileReads.size) return true;
     const draftBeforeRead = snapshot?.draft ?? state.draft;
     const filesBeforeRead = snapshot?.files ?? [...pendingFiles];
     await waitForPendingFiles();
     if (state.draft !== draftBeforeRead || pendingFiles.length !== filesBeforeRead.length ||
-        filesBeforeRead.some((file, index) => pendingFiles[index] !== file)) {
+        filesBeforeRead.some((file: any, index: any) => pendingFiles[index] !== file)) {
       addMessage("system", "草稿或附件已变更，请确认后重新发送。");
       return false;
     }
@@ -956,7 +960,7 @@ function createStreamRuntime(state, options) {
     state.files = [...pendingFiles];
     updateSendButton();
   }
-  function removePending(idx) {
+  function removePending(idx: any) {
     pendingFiles.splice(idx, 1);
     renderPendingFiles();
   }
@@ -1001,7 +1005,7 @@ function createStreamRuntime(state, options) {
     }
   }
 
-  function sleepAbortable(ms, signal) {
+  function sleepAbortable(ms: any, signal: any) {
     if (signal?.aborted)
       return Promise.reject(new DOMException("Aborted", "AbortError"));
     return new Promise((resolve, reject) => {
@@ -1019,10 +1023,15 @@ function createStreamRuntime(state, options) {
     });
   }
 
+  /**
+   * @param {string | URL | Request} url
+   * @param {() => RequestInit} makeOptions
+   * @param {{ maxNetworkRetries?: number; maxServerRetries?: number; onRetry?: (details: { attempt: number; type: "server" | "network"; status?: number; error?: unknown }) => void | Promise<void> }} retryOptions
+   */
   async function fetchWithRetry(
-    url,
-    makeOptions,
-    { maxNetworkRetries = 3, maxServerRetries = 1, onRetry } = {},
+    url: any,
+    makeOptions: any,
+    { maxNetworkRetries = 3, maxServerRetries = 1, onRetry }: any = {},
   ) {
     let networkRetries = 0;
     let serverRetries = 0;
@@ -1046,7 +1055,7 @@ function createStreamRuntime(state, options) {
           continue;
         }
         return res;
-      } catch (e) {
+      } catch (e: any) {
         if (e.name === "AbortError") throw e;
         if (!(e instanceof TypeError) || networkRetries >= maxNetworkRetries)
           throw e;
@@ -1061,7 +1070,7 @@ function createStreamRuntime(state, options) {
     }
   }
 
-  let fetchRetryMessage = null;
+  let fetchRetryMessage: any = null;
 
   function showFetchRetryStatus() {
     setStatus("reconnecting");
@@ -1078,7 +1087,7 @@ function createStreamRuntime(state, options) {
     }
   }
 
-  function addNetworkFailureMessage(text, files, requestMessage) {
+  function addNetworkFailureMessage(text: any, files: any, requestMessage: any) {
     const scene = { ...state.activeScene };
     const message = addMessage("system", "⚠ 网络连接失败，请检查网络后重试", false, undefined, undefined, scene);
     message.retry = () => {
@@ -1136,7 +1145,7 @@ function createStreamRuntime(state, options) {
   // 'usage' 故意不算进展——它可能在流末尾单独出现
 
   // 按相位分档的静默预算。宁可慢一点也不要误杀正常的慢工具。
-  const STALL_MS = {
+  const STALL_MS: Record<string, number> = {
     awaiting_first: 75000, // POST 已 200，但一个 SSE 事件都没有（TTFT 上限 + 余量）
     reasoning: 90000, // reasoning delta 之间；部分 provider 只给汇总
     text: 45000, // 文本 delta 之间断 45s = 几乎必然异常
@@ -1147,9 +1156,9 @@ function createStreamRuntime(state, options) {
   const STALL_GIVEUP_MS = 900000; // 15 min
 
   let livePhase = "awaiting_first"; // awaiting_first | text | tool | reasoning
-  let livePendingTool = null;
+  let livePendingTool: any = null;
   let lastProgressTime = Date.now();
-  let hiddenAt = null; // 页面转入后台的时刻，用于"暂停计时"而不是"续命"
+  let hiddenAt: any = null; // 页面转入后台的时刻，用于"暂停计时"而不是"续命"
 
   function resetLiveProgress() {
     liveSeq = 0;
@@ -1160,7 +1169,7 @@ function createStreamRuntime(state, options) {
     clearTuiHint();
   }
 
-  function markProgress(type, data) {
+  function markProgress(type: any, data: any) {
     if (!PROGRESS_EVENTS.has(type)) return;
     const active = type !== "message_stop" && type !== "error";
     if (active) {
@@ -1232,11 +1241,11 @@ function createStreamRuntime(state, options) {
         this.nextProbeAt = now + delay;
         return { totalMs: now - this.firstStalledAt, nextInMs: delay };
       },
-    };
+    } as any;
   }
 
   // AbortSignal.timeout 在老 Safari 上没有，做个降级
-  function timeoutSignal(ms) {
+  function timeoutSignal(ms: any) {
     if (
       typeof AbortSignal !== "undefined" &&
       typeof AbortSignal.timeout === "function"
@@ -1265,7 +1274,7 @@ function createStreamRuntime(state, options) {
   // 而是先问一句服务端到底有没有进展，再决定换哪条路继续读。
   //
   // 返回 { verdict: 'progressing'|'finished'|'gone'|'superseded'|'stalled'|'unreachable', serverSeq? }
-  async function probeStream(streamId, localSeq) {
+  async function probeStream(streamId: any, localSeq: any) {
     try {
       const r = await fetch(apiUrl("/api/stream/active"), {
         cache: "no-store",
@@ -1281,7 +1290,7 @@ function createStreamRuntime(state, options) {
       if (serverSeq > localSeq)
         return { verdict: "progressing", serverSeq, data: d };
       return { verdict: "stalled", serverSeq, data: d };
-    } catch (_) {
+    } catch (_: any) {
       return { verdict: "unreachable" };
     }
   }
@@ -1289,7 +1298,7 @@ function createStreamRuntime(state, options) {
   // 无缝 cutover：**不能**走 replayStream()，它会把 streamText 清空重来。
   // processReplayEvent 是追加语义，会复用现有的 streamMessage / streamText，
   // 从 after=localSeq 接上去文字严丝合缝，一个字不重不漏。
-  function cutoverToReplay(streamId, fromSeq) {
+  function cutoverToReplay(streamId: any, fromSeq: any) {
     if (activeStreamPollTimer) {
       clearTimeout(activeStreamPollTimer);
       activeStreamPollTimer = null;
@@ -1305,7 +1314,7 @@ function createStreamRuntime(state, options) {
       externalCutover = { streamId, localSeq: fromSeq };
       try {
         liveReader.abort();
-      } catch (_) {}
+      } catch (_: any) {}
     }
     pendingRecovery = null;
     isStreaming = true;
@@ -1340,7 +1349,7 @@ function createStreamRuntime(state, options) {
 
     const previousItems = new Set(state.items);
     await reconcileHistory();
-    const recovered = state.items.some(item => item.kind === "message" && item.role === "being"
+    const recovered = state.items.some((item: any) => item.kind === "message" && item.role === "being"
       && !previousItems.has(item) && inCurrentScene(item, partialMessage || state.activeScene));
     if (recovered) {
       // 历史里已有权威版本 → 扔掉屏幕上的半截内容，避免重复
@@ -1362,7 +1371,7 @@ function createStreamRuntime(state, options) {
   }
 
   // 非 SSE 上下文（重连后、replay 轮询中）复用的决策表
-  async function applyProbeVerdict(p, streamId, localSeq) {
+  async function applyProbeVerdict(p: any, streamId: any, localSeq: any) {
     switch (p.verdict) {
       case "progressing":
       case "finished":
@@ -1383,9 +1392,9 @@ function createStreamRuntime(state, options) {
   }
 
   // 断线时记下恢复意图，由连接状态机在重连后兑现（P1-E：不再弹按钮让用户点）
-  let pendingRecovery = null;
+  let pendingRecovery: any = null;
 
-  function queueDisconnectRecovery(streamId, localSeq) {
+  function queueDisconnectRecovery(streamId: any, localSeq: any) {
     pendingRecovery = { streamId, localSeq };
     setConnState(navigator.onLine === false ? "offline" : "reconnecting");
     setTuiHint("连接中断了，正在自动恢复…");
@@ -1413,15 +1422,15 @@ function createStreamRuntime(state, options) {
   // 也是 watchdog probe 热切换到 replay 通道的落点。
   // 返回 { outcome: 'done' | 'switch_to_replay' | 'aborted' | 'server_error', streamId, localSeq }
   // 异常（AbortError / TypeError / 其它）向上抛给调用方统一处理。
-  async function consumeChatStream(res, msg, filesToSend) {
+  async function consumeChatStream(res: any, msg: any, filesToSend: any) {
     routedStreaming = false;
-    let streamTimeoutId = null;
+    let streamTimeoutId: any = null;
     let watchdogAborted = false;
     streamWatchdogAborted = false;
     userStoppedStream = false;
     let sawServerError = false;
     let sawSceneEvent = false;
-    let cutoverRequest = null; // probe 判定 progressing/finished → 热切换到 replay
+    let cutoverRequest: any = null; // probe 判定 progressing/finished → 热切换到 replay
     let historyRecoveryRequested = false; // probe 判定 gone/superseded → 回落历史对账
     externalCutover = null; // 新流开始，清掉上一条流可能残留的交接意图
 
@@ -1435,7 +1444,7 @@ function createStreamRuntime(state, options) {
       killWatchdog();
       try {
         currentAbortController?.abort();
-      } catch (_) {}
+      } catch (_: any) {}
     };
     const hardTimeout = () => {
       watchdogAborted = true;
@@ -1445,7 +1454,7 @@ function createStreamRuntime(state, options) {
 
     // watchdog 到期 → **不直接 abort**，先 probe 服务端有没有进展。
     // 决策表见 probeStream 上方注释。
-    async function onWatchdogExpired(tracker) {
+    async function onWatchdogExpired(tracker: any) {
       const sid = currentStreamId || lastStreamId;
       if (!sid) {
         hardTimeout();
@@ -1530,7 +1539,7 @@ function createStreamRuntime(state, options) {
 
         buffer += decoder.decode(value, { stream: true });
         const lines = buffer.split("\n");
-        buffer = lines.pop();
+        buffer = lines.pop() || "";
 
         for (const line of lines) {
           if (line.startsWith("event: ")) {
@@ -1700,7 +1709,7 @@ function createStreamRuntime(state, options) {
               actionLogClear();
               lastSendFailed = true;
             }
-          } catch (parseErr) {
+          } catch (parseErr: any) {
             // data 行以 { 或 [ 开头说明是真的 JSON 格式错误，值得记录
             const rawData = line.slice(6).trim();
             if (rawData.startsWith("{") || rawData.startsWith("[")) {
@@ -1756,7 +1765,7 @@ function createStreamRuntime(state, options) {
         streamId: currentStreamId || lastStreamId,
         localSeq: liveSeq,
       };
-    } catch (e) {
+    } catch (e: any) {
       // F1: cutoverToReplay 从外部（重连 probe / 超时按钮）把我 abort 掉了。
       // 那边已经起好 poller 并把 isStreaming 置 true，这里只需要安静退场：
       // handled:true 让 driveChatStream 跳过 finalizeSendCleanup。
@@ -1830,7 +1839,7 @@ function createStreamRuntime(state, options) {
     };
   }
 
-  async function spliceSend(text, files = pendingFiles) {
+  async function spliceSend(text: any, files = pendingFiles) {
     const replyBaseline = new Set(state.items);
     let spliceMsg = (text || "").trim();
     if (!spliceMsg && !files.length) return;
@@ -1857,7 +1866,7 @@ function createStreamRuntime(state, options) {
             : {}),
         }),
       });
-    } catch (e) {
+    } catch (e: any) {
       console.warn("splice send failed:", e);
       addMessage("system", "⚠️ 发送失败，稍后重试");
       return;
@@ -1887,7 +1896,7 @@ function createStreamRuntime(state, options) {
     addMessage("system", "⚠️ 发送失败，稍后重试");
   }
 
-  async function send(text, filesOverride = null, sendOptions = {}) {
+  async function send(text: any, filesOverride: any = null, sendOptions: any = {}) {
     if (disposed || preparingSend) return;
     if (!Array.isArray(filesOverride) && pendingFileReads.size) {
       preparingSend = true;
@@ -1938,7 +1947,7 @@ function createStreamRuntime(state, options) {
     stopAutonomousWatch();
     updateSendButton();
 
-    const body = { message: requestMessage || `[Sent ${filesToSend.length} file(s)]`, ...browserScenePayload(sendingScene) };
+    const body: any = { message: requestMessage || `[Sent ${filesToSend.length} file(s)]`, ...browserScenePayload(sendingScene) };
     if (sessionId) body.session_id = sessionId;
     if (filesToSend.length) {
       body.attachments = filesToSend.map((f) => ({
@@ -1969,7 +1978,7 @@ function createStreamRuntime(state, options) {
           },
         },
       );
-    } catch (e) {
+    } catch (e: any) {
       handleStreamError(e, msg, filesToSend, requestMessage);
       finalizeSendCleanup();
       return;
@@ -1979,7 +1988,7 @@ function createStreamRuntime(state, options) {
     setStatus("thinking");
 
     if (res.status === 202) {
-      try { await res.json(); } catch (_) {}
+      try { await res.json(); } catch (_: any) {}
       // Accepted is not completed: release the POST reader, retain this scene's run.
       pendingReply = { baseline: replyBaseline, label: "已排队，等待回复" };
       removeThinkingIndicator();
@@ -2006,7 +2015,7 @@ function createStreamRuntime(state, options) {
 
   // 读取循环 + 统一的异常处理 + 统一的收尾。
   // send() 和 spliceSend() 都走这里，保证 isStreaming / 队列 / 按钮在任何路径上都能复位。
-  async function driveChatStream(res, msg, filesToSend, replyBaseline = new Set(state.items), requestMessage = msg) {
+  async function driveChatStream(res: any, msg: any, filesToSend: any, replyBaseline = new Set(state.items), requestMessage = msg) {
     let handedOff = false;
     try {
       const result = await consumeChatStream(res, msg, filesToSend);
@@ -2026,7 +2035,7 @@ function createStreamRuntime(state, options) {
         handedOff = true; // gone / superseded：recoverViaHistory 已经做完收尾
       }
       return result;
-    } catch (e) {
+    } catch (e: any) {
       handleStreamError(e, msg, filesToSend, requestMessage);
       return { outcome: "aborted", streamId: lastStreamId, localSeq: liveSeq };
     } finally {
@@ -2056,7 +2065,7 @@ function createStreamRuntime(state, options) {
   // 统一的流异常处理。注意它**总是**让调用方走 finalizeSendCleanup()：
   // 断线恢复路径靠 pendingRecovery 让 finalizeSendCleanup 跳过队列 flush，
   // 而不是靠"不收尾"——isStreaming 卡在 true 是这次修复要根除的东西。
-  function handleStreamError(e, msg, filesToSend, requestMessage = msg) {
+  function handleStreamError(e: any, msg: any, filesToSend: any, requestMessage = msg) {
     pendingReply = null;
     stopCatchUpWatcher();
     clearFetchRetryStatus();
@@ -2065,7 +2074,7 @@ function createStreamRuntime(state, options) {
       const wasTimeout = streamWatchdogAborted;
       finalizePartialBubble();
       if (wasTimeout) {
-        addTimeoutRetryMessage(msg, filesToSend);
+        addTimeoutRetryMessage();
         setStatus("error");
         lastSendFailed = true;
       } else if (userStoppedStream) {
@@ -2126,7 +2135,7 @@ function createStreamRuntime(state, options) {
       let commit = "";
       try {
         commit = (await r.text()).trim().split(/\s+/)[1] || "";
-      } catch (_) {}
+      } catch (_: any) {}
       const restarted = !!(serverCommit && commit && commit !== serverCommit);
       if (commit) serverCommit = commit;
 
@@ -2139,11 +2148,11 @@ function createStreamRuntime(state, options) {
         try {
           await options.recoverScenes?.({ restarted });
           await onReconnected({ restarted });
-        } catch (err) {
+        } catch (err: any) {
           console.warn("onReconnected failed:", err);
         }
       }
-    } catch (_) {
+    } catch (_: any) {
       setConnState(
         navigator.onLine === false
           ? "offline"
@@ -2217,7 +2226,7 @@ function createStreamRuntime(state, options) {
     }
     try {
       currentAbortController?.abort();
-    } catch (_) {}
+    } catch (_: any) {}
     currentAbortController = null;
     externalCutover = null;
     writerEpoch++; // F2: 作废在途写者
@@ -2265,7 +2274,7 @@ function createStreamRuntime(state, options) {
       checkHealth({ force: true });
     });
     listen(globalThis.window, "offline", () => setConnState("offline"));
-    listen(globalThis.window, "pageshow", (e) => {
+    listen(globalThis.window, "pageshow", (e: any) => {
       // iOS Safari 从 bfcache 恢复时 visibilitychange 不保证触发
       if (e.persisted) {
         healthBackoff = 0;
@@ -2319,7 +2328,7 @@ function createStreamRuntime(state, options) {
         tuiDone();
         updateSendButton();
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn("stop failed:", e);
     } finally {
       state.stopping = false;
@@ -2329,7 +2338,7 @@ function createStreamRuntime(state, options) {
 
   // ---- History ----
   function resetMessages() {
-    state.items = state.items.filter(item => item.queued);
+    state.items = state.items.filter((item: any) => item.queued);
     currentRun = null;
     state.thinking = false;
     lastRole = null;
@@ -2345,15 +2354,15 @@ function createStreamRuntime(state, options) {
   // /api/history 的 HistoryMessage 是带 seq 的（http.rs:419-425），有 seq 就能增量对账。
   let lastHistorySeq = 0;
   let lastReconcileSawBeing = false;
-  let lastHistoryReplyScenes = [];
-  let reconcileInFlight = null;
+  let lastHistoryReplyScenes: any[] = [];
+  let reconcileInFlight: any = null;
   const cacheEndpoint = location.protocol === "beings:"
     ? params.get("history_scope") || ""
     : params.get("history_scope") || API_URL;
   const historyCache = new HistoryCache(cacheEndpoint);
   let historyCacheSeeded = false;
-  let historyCachePending = [];
-  function cacheHistory(messages, cursor) {
+  let historyCachePending: any[] = [];
+  function cacheHistory(messages: any, cursor: any) {
     if (disposed) return;
     if (!historyCacheSeeded) {
       if (historyCachePending.length >= 200) historyCachePending.shift();
@@ -2366,25 +2375,25 @@ function createStreamRuntime(state, options) {
   }
 
   // 本地已经渲染、但还没被历史游标覆盖的消息。用于避免"本地回显 + 历史对账"渲染两遍。
-  let localEchoes = [];
+  let localEchoes: any[] = [];
   const ECHO_SCENE_FALLBACK_MS = 2 * 60 * 1000;
-  function normalizeEcho(text) {
+  function normalizeEcho(text: any) {
     return (cleanContent(text || "") || "").replace(/\s+/g, " ").trim();
   }
-  function echoScene(echo) {
+  function echoScene(echo: any) {
     return echo.message || echo.scene || {};
   }
-  function echoTimesMatch(message, history) {
+  function echoTimesMatch(message: any, history: any) {
     const localTime = Number(message?.createdAt);
     const historyTime = Number(history?.createdAt);
     return !Number.isFinite(localTime) || !Number.isFinite(historyTime) ||
       Math.abs(localTime - historyTime) <= ECHO_SCENE_FALLBACK_MS;
   }
-  function historyEchoFor(role, text, scene, message) {
-    const candidates = state.items.map((item, index) => ({ item, index })).filter(({ item }) =>
+  function historyEchoFor(role: any, text: any, scene: any, message: any) {
+    const candidates = state.items.map((item: any, index: any) => ({ item, index })).filter(({ item }: any) =>
       item !== message && item.kind === "message" && item.historySeq &&
       item.role === role && normalizeEcho(item.text) === text);
-    const exact = [...candidates].reverse().find(({ item }) => echoScenesMatch(item, message || scene));
+    const exact = [...candidates].reverse().find(({ item }: any) => echoScenesMatch(item, message || scene));
     if (exact) return exact.item;
     if (role !== "being" || !message) return null;
 
@@ -2392,11 +2401,11 @@ function createStreamRuntime(state, options) {
     // Only relax scene matching for the one persisted row appended after this
     // exact recent bubble; never collapse arbitrary equal text across scenes.
     const localIndex = state.items.indexOf(message);
-    const fallback = candidates.filter(({ item, index }) =>
+    const fallback = candidates.filter(({ item, index }: any) =>
       index > localIndex && echoTimesMatch(message, item));
     return fallback.length === 1 ? fallback[0].item : null;
   }
-  function noteLocalEcho(role, text, scene = state.activeScene, localMessage) {
+  function noteLocalEcho(role: any, text: any, scene: any = state.activeScene, localMessage: any = null) {
     const owner = options.historyOwner?.();
     if (owner) return owner.noteLocalEcho(role, text, scene, localMessage);
     const t = normalizeEcho(text);
@@ -2408,18 +2417,18 @@ function createStreamRuntime(state, options) {
     const history = historyEchoFor(role, t, scene, message);
     if (history && message) {
       applyHistoryIdentity(message, history);
-      state.items = state.items.filter(item => item !== history);
+      state.items = state.items.filter((item: any) => item !== history);
       changed();
       return;
     }
     localEchoes.push({ role, text: t, scene: { ...scene }, message, notedAt: Date.now() });
     if (localEchoes.length > 40) localEchoes.shift();
   }
-  function echoScenesMatch(a = {}, b = {}) {
+  function echoScenesMatch(a: any = {}, b: any = {}) {
     if (!a.sceneId || !b.sceneId || a.sceneId === b.sceneId) return true;
     return a.legacySceneId === b.sceneId || b.legacySceneId === a.sceneId;
   }
-  function applyHistoryIdentity(message, history) {
+  function applyHistoryIdentity(message: any, history: any) {
     if (!message || !history) return;
     if (history.historySeq) message.historySeq = history.historySeq;
     if (history.timestamp) message.timestamp = history.timestamp;
@@ -2433,7 +2442,7 @@ function createStreamRuntime(state, options) {
       message.legacySceneId = history.sceneId;
     }
   }
-  function consumeLocalEcho(role, text, scene, history) {
+  function consumeLocalEcho(role: any, text: any, scene: any, history: any) {
     const t = normalizeEcho(text);
     if (!t) return false;
     const candidates = localEchoes.map((echo, index) => ({ echo, index })).filter(({ echo }) =>
@@ -2458,7 +2467,7 @@ function createStreamRuntime(state, options) {
     return true;
   }
 
-  function historyIdentity(message, scene = messageScene(message)) {
+  function historyIdentity(message: any, scene = messageScene(message)) {
     const time = message.at ? new Date(message.at).getTime() : undefined;
     return {
       ...scene,
@@ -2468,7 +2477,7 @@ function createStreamRuntime(state, options) {
     };
   }
 
-  function addHistoryMessage(message) {
+  function addHistoryMessage(message: any) {
     const scene = messageScene(message);
     const rendered = addMessage(
       message.role === "user" ? "user" : "being",
@@ -2483,8 +2492,8 @@ function createStreamRuntime(state, options) {
   }
 
   // 返回一个在**最后一批渲染完成时**才 resolve 的 Promise（修初始化竞态 P1-G / P2-H）
-  function renderHistoryBatched(messages) {
-    return new Promise((resolve) => {
+  function renderHistoryBatched(messages: any) {
+    return new Promise<void>((resolve) => {
       if (!messages || !messages.length) {
         resolve();
         return;
@@ -2521,11 +2530,11 @@ function createStreamRuntime(state, options) {
   }
 
   // 返回新追加的消息条数。full=true 才清屏（首次加载 / 服务端重启）。
-  function reconcileHistory(opts = {}) {
+  function reconcileHistory(opts: any = {}) {
     // Ordinary refreshes must retain pending runs even before the first history seq.
     opts = { ...opts, preserve: opts.preserve ?? !opts.full };
     const owner = options.historyOwner?.();
-    if (owner) return owner.reconcileHistory({ ...opts, preserve: true }).then(added => {
+    if (owner) return owner.reconcileHistory({ ...opts, preserve: true }).then((added: any) => {
       lastReconcileSawBeing = owner.lastHistoryReplyIn(state.currentScene);
       return added;
     });
@@ -2548,7 +2557,7 @@ function createStreamRuntime(state, options) {
     if (!disposed) await reconcileHistory({ preserve: true });
   }
 
-  async function fetchHistory(incremental, prefetched = null) {
+  async function fetchHistory(incremental: any, prefetched = null) {
     let cursor = lastHistorySeq;
     const messages = [];
     while (!disposed) {
@@ -2558,8 +2567,8 @@ function createStreamRuntime(state, options) {
       if (!res.ok) return messages.length ? messages : null;
       const data = await res.json();
       const page = Array.isArray(data.messages) ? data.messages : [];
-      messages.push(...page.filter(m => !incremental || (Number(m.seq) || 0) > cursor));
-      const next = Math.max(cursor, ...page.map(m => Number(m.seq) || 0));
+      messages.push(...page.filter((m: any) => !incremental || (Number(m.seq) || 0) > cursor));
+      const next = Math.max(cursor, ...page.map((m: any) => Number(m.seq) || 0));
       // Servers that ignore after= cannot cause an endless pagination loop.
       if (!incremental || page.length < 100 || next <= cursor) return messages;
       cursor = next;
@@ -2588,7 +2597,7 @@ function createStreamRuntime(state, options) {
       // A cached cursor needs after=, not the prefetched latest 100: an offline
       // gap may contain more than 100 messages.
       if (hydrated) {
-        prefetch.history?.then(res => res.body?.cancel()).catch(() => {});
+        prefetch.history?.then((res: any) => res.body?.cancel()).catch(() => {});
         delete prefetch.history;
       }
       const msgs = await fetchHistory(incremental, await takePrefetch("history"));
@@ -2639,14 +2648,14 @@ function createStreamRuntime(state, options) {
       if (!incremental) historyCacheSeeded = true;
       cacheHistory(toCache, lastHistorySeq);
       return added;
-    } catch (e) {
+    } catch (e: any) {
       console.warn("reconcileHistory failed:", e);
       return 0;
     }
   }
 
   // Reconcile persisted local echoes and retain simultaneous messages from other scenes.
-  let cursorSyncInFlight = null;
+  let cursorSyncInFlight: any = null;
   function syncHistoryCursor() {
     const owner = options.historyOwner?.();
     if (owner) return owner.syncHistoryCursor();
@@ -2686,7 +2695,7 @@ function createStreamRuntime(state, options) {
         changed();
         cacheHistory(msgs, lastHistorySeq);
       }
-    } catch (_) {}
+    } catch (_: any) {}
   }
 
   // A 202 response means the message was queued for a later SBS breath. Poll
@@ -2694,7 +2703,7 @@ function createStreamRuntime(state, options) {
   const CATCH_UP_INITIAL_MS = 2000;
   const CATCH_UP_MAX_INTERVAL_MS = 30000;
   const CATCH_UP_ABSOLUTE_MAX_MS = 5 * 60 * 1000;
-  let catchUpTimer = null;
+  let catchUpTimer: any = null;
   function stopCatchUpWatcher() {
     if (catchUpTimer) {
       clearTimeout(catchUpTimer);
@@ -2728,7 +2737,7 @@ function createStreamRuntime(state, options) {
     changed();
   }
   function pendingReplyArrived() {
-    return pendingReply && state.items.some(item => item.kind === "message" && item.role === "being"
+    return pendingReply && state.items.some((item: any) => item.kind === "message" && item.role === "being"
       && inCurrentScene(item, state.currentScene) && !item.streaming && !pendingReply.baseline.has(item));
   }
   function startCatchUpWatcher() {
@@ -2750,23 +2759,23 @@ function createStreamRuntime(state, options) {
     checkActiveStream({ autonomousOnly: true });
   }
 
-  const AUTONOMOUS_ORIGIN_LABELS = {
+  const AUTONOMOUS_ORIGIN_LABELS: Record<string, string> = {
     beating: "being 正在自己想事情…",
     callback: "being 正在处理一条回调…",
     leftover: "being 正在回答排队的消息…",
   };
-  let autonomousWatch = null;
+  let autonomousWatch: any = null;
   function stopAutonomousWatch() {
     if (!autonomousWatch) return;
     if (autonomousWatch.timer) clearTimeout(autonomousWatch.timer);
     autonomousWatch = null;
     clearTuiHint();
   }
-  function watchAutonomousStream(data) {
+  function watchAutonomousStream(data: any) {
     if (isStreaming || !data?.stream_id) return;
     if (autonomousWatch?.streamId === data.stream_id) return;
     stopAutonomousWatch();
-    const watch = { streamId: data.stream_id, timer: null };
+    const watch: any = { streamId: data.stream_id, timer: null };
     autonomousWatch = watch;
     let interval = 2000;
     const deadline = Date.now() + POLL_ABSOLUTE_MAX_MS;
@@ -2817,7 +2826,7 @@ function createStreamRuntime(state, options) {
             return;
           }
         }
-      } catch (e) {
+      } catch (e: any) {
         console.warn("autonomous stream watch failed:", e);
       }
       interval = Math.min(interval * 1.5, 5000);
@@ -2852,12 +2861,12 @@ function createStreamRuntime(state, options) {
       }
       if (autonomousOnly) return;
       replayStream(data);
-    } catch (e) {
+    } catch (e: any) {
       console.warn("checkActiveStream failed:", e);
     }
   }
 
-  function replayStream(data) {
+  function replayStream(data: any) {
     if (options.routeReplay?.(data)) return;
     if (isStreaming && currentStreamId === data.stream_id) return;
     // If the stream already finished, its content is in history — skip replay to avoid duplicates
@@ -2923,7 +2932,7 @@ function createStreamRuntime(state, options) {
   const POLL_ABSOLUTE_MAX_MS = 1800000; // 30 min — 兜底硬截止
   const POLL_MAX_NET_FAILS = 6;
 
-  function pollActiveStream(streamId, lastSeq) {
+  function pollActiveStream(streamId: any, lastSeq: any) {
     let interval = 500;
     const MAX_INTERVAL = 5000;
     let cursor = lastSeq;
@@ -2997,7 +3006,7 @@ function createStreamRuntime(state, options) {
           finalizeReplayStream();
           return;
         }
-      } catch (e) {
+      } catch (e: any) {
         netFails++;
         console.warn("pollActiveStream error:", e);
         if (netFails >= 2) {
@@ -3047,7 +3056,7 @@ function createStreamRuntime(state, options) {
     activeStreamPollTimer = setTimeout(poll, interval);
   }
 
-  function processReplayEvent(eventType, eventData) {
+  function processReplayEvent(eventType: any, eventData: any) {
     if (options.routeEvent?.(eventType, eventData)) return;
     markProgress(eventType, eventData);
     switch (eventType) {
@@ -3292,7 +3301,7 @@ function createStreamRuntime(state, options) {
     captureSendSnapshot: () => ({ draft: state.draft, files: [...pendingFiles] }),
     prepareSend,
     isBusy: () => isStreaming || !!pendingReply || !!pendingRecovery || preparingSend,
-    stageQueuedSend(text, filesOverride = null) {
+    stageQueuedSend(text: any, filesOverride = null) {
       const msg = (text || "").trim();
       const files = Array.isArray(filesOverride) ? [...filesOverride] : [...pendingFiles];
       if (!msg && !files.length) return null;
@@ -3304,7 +3313,7 @@ function createStreamRuntime(state, options) {
     noteLocalEcho,
     reconcileHistory,
     syncHistoryCursor,
-    lastHistoryReplyIn: scene => lastHistoryReplyScenes.some(reply => inCurrentScene(reply, scene)),
+    lastHistoryReplyIn: (scene: any) => lastHistoryReplyScenes.some(reply => inCurrentScene(reply, scene)),
     replyCompletedAt: () => currentRun?.label === "已回复" ? currentRun.end || 0 : 0,
     sceneActivity: () => {
       if (replayTransportOnly && !pendingReply) return null;
@@ -3319,12 +3328,12 @@ function createStreamRuntime(state, options) {
       }
       return null;
     },
-    hasStream: id => isStreaming && currentStreamId === id,
+    hasStream: (id: any) => isStreaming && currentStreamId === id,
     recoverConnection: onReconnected,
-    syncConnection: next => { connState = next; applyDotClass(); },
-    ownsLiveScene: scene => isStreaming && !pendingReply?.waiting && inCurrentScene(scene, state.activeScene),
+    syncConnection: (next: any) => { connState = next; applyDotClass(); },
+    ownsLiveScene: (scene: any) => isStreaming && !pendingReply?.waiting && inCurrentScene(scene, state.activeScene),
     acceptReplay: replayStream,
-    acceptSceneEvent: (type, data) => {
+    acceptSceneEvent: (type: any, data: any) => {
       if (type === "meta" || type === "usage") return;
       // A boundary is not the start of another run. Shared streams may replay
       // stops for idle scenes; opening a run here creates a phantom "已结束 0 秒".
@@ -3357,7 +3366,7 @@ function createStreamRuntime(state, options) {
     loadSbsState,
     refreshHistory,
     refreshOnRegainedAttention,
-    request: (path, init = {}) =>
+    request: (path: any, init: any = {}) =>
       fetch(apiUrl(path), {
         ...init,
         headers: { ...configHeaders(), ...init.headers },

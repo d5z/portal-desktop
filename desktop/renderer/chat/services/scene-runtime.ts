@@ -1,21 +1,23 @@
 import { SceneQueueStore } from "./scene-queue";
+import type { SavedSceneSend } from "./scene-queue";
 import { inCurrentScene, messageScene, withSceneTransition } from "../models/scenes";
+import type { ChatRuntime, ChatState, RuntimeOptions } from "../models/chat";
 
 /** One Being coordinator; scene-local state is not a separate agent or breath. */
-export function createSceneRuntime(state, options, createRuntime) {
-  const sessions = new Map();
-  let selected, owner, disposed = false, counter = 0;
+export function createSceneRuntime(state: ChatState, options: RuntimeOptions, createRuntime: any): ChatRuntime {
+  const sessions = new Map<any, any>();
+  let selected: any, owner: any, disposed = false, counter = 0;
   let lastActivity = "";
-  const sendQueue = [];
+  const sendQueue: any[] = [];
   let drainScheduled = false, dispatching = false;
   let submission = Promise.resolve();
-  let queueReady = false, drainTimer;
+  let queueReady = false, drainTimer: any;
   const pageLocation = typeof location === 'undefined' ? { search: '', origin: '' } : location;
   const queueStore = new SceneQueueStore(new URLSearchParams(pageLocation.search).get('history_scope') || pageLocation.origin);
   function retryDrain() {
     if (!disposed && !drainTimer) drainTimer = setTimeout(() => { drainTimer = null; scheduleDrain(); }, 2000);
   }
-  function attachQueued(target, entry, saved, persisted = true) {
+  function attachQueued(target: any, entry: any, saved: any, persisted = true) {
     const queued = { session: target, entry, saved, persisted };
     sendQueue.push(queued);
     target.local.queued++;
@@ -28,12 +30,12 @@ export function createSceneRuntime(state, options, createRuntime) {
       if (index < 0) return;
       sendQueue.splice(index, 1);
       target.local.queued--;
-      state.items = state.items.filter(item => item !== entry.message);
+      state.items = state.items.filter((item: any) => item !== entry.message);
       publish();
     };
     return queued;
   }
-  const busy = session => session.runtime?.isBusy?.() ||
+  const busy = (session: any) => session.runtime?.isBusy?.() ||
     ["thinking", "replying", "working", "waiting"].includes(sceneStatus(session));
   function scheduleDrain() {
     if (disposed || !queueReady || drainTimer || drainScheduled || dispatching || !sendQueue.length) return;
@@ -70,19 +72,19 @@ export function createSceneRuntime(state, options, createRuntime) {
       } finally { dispatching = false; publish(); }
     });
   }
-  const localKeys = new Set(["currentScene", "activeScene", "draft", "files", "queued", "thinking", "streaming", "stopping", "dotClass"]);
-  const sceneStatus = session => {
+  const localKeys = new Set<PropertyKey>(["currentScene", "activeScene", "draft", "files", "queued", "thinking", "streaming", "stopping", "dotClass"]);
+  const sceneStatus = (session: any) => {
     const status = session.runtime?.sceneActivity();
-    const tasks = (state.sceneTasks || []).filter(t => t.sceneId === session.local.currentScene.sceneId);
-    if (tasks.some(t => t.status === 'running' || t.status === 'queued')) return 'working';
+    const tasks = (state.sceneTasks || []).filter((t: any) => t.sceneId === session.local.currentScene.sceneId);
+    if (tasks.some((t: any) => t.status === 'running' || t.status === 'queued')) return 'working';
     if (status === 'error' || status === 'stopped') return session.local.queued ? 'queued' : status;
     // Creation order is not completion order: an earlier slow task can finish
     // after a stage reply for a later fast task. Inspect every pending result.
-    const currentTasks = tasks.filter(t => !session.submittedAt || t.createdAt >= session.submittedAt);
+    const currentTasks = tasks.filter((t: any) => !session.submittedAt || t.createdAt >= session.submittedAt);
     const repliedAt = session.runtime?.replyCompletedAt?.() || 0;
     if (!['thinking','replying'].includes(status)) {
-      if (session.submittedAt && currentTasks.some(t => t.status === 'done' && t.endedAt > repliedAt)) return 'waiting';
-      if (currentTasks.some(t => ['failed','interrupted','budget_exhausted','timeout'].includes(t.status) &&
+      if (session.submittedAt && currentTasks.some((t: any) => t.status === 'done' && t.endedAt > repliedAt)) return 'waiting';
+      if (currentTasks.some((t: any) => ['failed','interrupted','budget_exhausted','timeout'].includes(t.status) &&
           (!t.endedAt || t.endedAt > repliedAt))) return 'error';
     }
     return status && ["thinking", "replying", "working", "waiting"].includes(status) ? status :
@@ -91,7 +93,7 @@ export function createSceneRuntime(state, options, createRuntime) {
   function publish() {
     if (disposed || !selected) return;
     for (const key of localKeys) {
-      if (key !== "currentScene" && key !== "draft") state[key] = selected.local[key];
+      if (key !== "currentScene" && key !== "draft") (state as any)[key] = selected.local[key];
     }
     // The transcript may contain an active background run in the all-scenes view.
     state.streaming = [...sessions.values()].some(session => session.local.streaming);
@@ -107,23 +109,23 @@ export function createSceneRuntime(state, options, createRuntime) {
     state.changed();
     scheduleDrain();
   }
-  function sessionFor(scene) {
+  function sessionFor(scene: any) {
     let session = sessions.get(scene.sceneId);
     if (session) return session;
-    const local = { currentScene: { ...scene }, activeScene: { ...scene }, draft: "", files: [], queued: 0,
+    const local: any = { currentScene: { ...scene }, activeScene: { ...scene }, draft: "", files: [], queued: 0,
       thinking: false, streaming: false, stopping: false, dotClass: state.dotClass };
-    const routed = new Set();
+    const routed = new Set<any>();
     const proxy = new Proxy(state, {
       get(target, key) {
         if (key === "changed") return publish;
         if (key === "draft" && selected === session) return state.draft;
-        return localKeys.has(key) ? local[key] : target[key];
+        return localKeys.has(key) ? local[key] : (target as any)[key];
       },
       set(target, key, value) {
         if (localKeys.has(key)) {
           local[key] = value;
           if (key === "draft" && selected === session) state.draft = value;
-        } else target[key] = value;
+        } else (target as any)[key] = value;
         return true;
       },
     });
@@ -132,7 +134,7 @@ export function createSceneRuntime(state, options, createRuntime) {
     session.runtime = createRuntime(proxy, {
       ...options,
       nextId: () => ++counter,
-      resolveDefaultScene(scene) {
+      resolveDefaultScene(scene: any) {
         if (local.currentScene.sceneId || !scene.sceneId) return;
         // Resolve the existing room in place so replies carrying the new Loom
         // identity do not create a second, background session.
@@ -142,28 +144,28 @@ export function createSceneRuntime(state, options, createRuntime) {
         sessions.set(scene.sceneId, session);
         if (selected === session) state.currentScene = { ...scene };
       },
-      prepareMessage(text) {
+      prepareMessage(text: any) {
         // Track submission without changing the editable or locally rendered body.
         session.submittedAt = Date.now();
         return text;
       },
-      prepareRequestMessage(text, scene, sendOptions = {}) {
+      prepareRequestMessage(text: any, scene: any, sendOptions: any = {}) {
         const previous = [...state.items].reverse().find(item =>
           item !== sendOptions.queuedMessage && item.kind === "message" &&
           (item.role === "user" || item.role === "being") && !item.queued);
         return withSceneTransition(text, scene, previous);
       },
-      onConnection(next) {
+      onConnection(next: any) {
         for (const other of sessions.values()) if (other !== session) other.runtime?.syncConnection(next);
         options.onConnection?.(next);
       },
-      recoverScenes: async details => {
+      recoverScenes: async (details: any) => {
         if (session !== owner) return;
         await Promise.all([...sessions.values()].filter(s => s !== owner).map(s => s.runtime.recoverConnection(details)));
       },
       historyOwner: () => owner && owner !== session ? owner.runtime : null,
-      isLiveScene: scene => [...sessions.values()].some(s => s.runtime?.ownsLiveScene(scene)),
-      routeEvent(type, data) {
+      isLiveScene: (scene: any) => [...sessions.values()].some(s => s.runtime?.ownsLiveScene(scene)),
+      routeEvent(type: any, data: any) {
         if (!Object.hasOwn(data, "scene_id")) return false;
         const scene = messageScene(data);
         if (scene.sceneId === local.currentScene.sceneId ||
@@ -177,7 +179,7 @@ export function createSceneRuntime(state, options, createRuntime) {
         for (const target of routed) target.runtime.finishRoutedStream();
         routed.clear();
       },
-      routeReplay(data) {
+      routeReplay(data: any) {
         if (data.stream_id && [...sessions.values()].some(s => s !== session && s.runtime?.hasStream(data.stream_id))) return true;
         if (!Object.hasOwn(data, "scene_id")) return false;
         const scene = messageScene(data);
@@ -193,8 +195,8 @@ export function createSceneRuntime(state, options, createRuntime) {
   owner = selected = sessionFor(state.currentScene);
   selected.local.draft = state.draft;
   let selection = Promise.resolve();
-  const runtime = {
-    updateSceneTasks(tasks, subagentReady = state.subagentReady) {
+  const runtime: any = {
+    updateSceneTasks(tasks: any, subagentReady = state.subagentReady) {
       state.subagentReady = subagentReady === true;
       state.sceneTasks = tasks;
       for (const task of tasks) sessionFor({ sceneId: task.sceneId, sceneLabel: state.sceneNames?.[task.sceneId] || '' });
@@ -212,12 +214,12 @@ export function createSceneRuntime(state, options, createRuntime) {
         await owner.runtime.start();
         queueReady = true;
       } catch {
-        state.items.push({ kind: 'message', id: `queue-error-${++counter}`, role: 'system', text: '无法恢复本地排队记录，已暂停自动发送。请重新打开页面重试。', ...state.currentScene });
+        state.items.push({ kind: 'message', id: `queue-error-${++counter}`, role: 'system', text: '无法恢复本地排队记录，已暂停自动发送。请重新打开页面重试。', streaming: false, timestamp: '', label: 'system', consecutive: false, ...state.currentScene });
         await owner.runtime.start();
       }
       publish();
     },
-    send(...args) {
+    send(...args: any[]) {
       const target = selected;
       const sendSnapshot = !Array.isArray(args[1])
         ? (typeof target.runtime.captureSendSnapshot === 'function'
@@ -242,7 +244,7 @@ export function createSceneRuntime(state, options, createRuntime) {
           }
           const entry = target.runtime.stageQueuedSend(...args);
           if (!entry) return;
-          const saved = { id: crypto.randomUUID(), endpoint: queueStore.endpoint,
+          const saved: SavedSceneSend = { id: crypto.randomUUID(), endpoint: queueStore.endpoint,
             scene: { ...target.local.currentScene }, text: entry.text, files: entry.files,
             createdAt: entry.message.createdAt || Date.now(), phase: 'queued' };
           const queued = attachQueued(target, entry, saved, false);
@@ -255,7 +257,7 @@ export function createSceneRuntime(state, options, createRuntime) {
       });
       return submission;
     },
-    selectScene(scene) {
+    selectScene(scene: any) {
       selection = selection.then(async () => {
         await selected.runtime.waitForPendingFiles();
         if (disposed) return;
@@ -282,11 +284,11 @@ export function createSceneRuntime(state, options, createRuntime) {
     refreshOnRegainedAttention: () => Promise.all([...sessions.values()].map(s => s.runtime.refreshOnRegainedAttention())),
   };
   for (const method of ["stopCurrentTurn", "handleFiles", "removePending"])
-    runtime[method] = (...args) => {
+    runtime[method] = (...args: any[]) => {
       selected.local.files = state.files;
       return selected.runtime[method](...args);
     };
   for (const method of ["loadLlmConfig", "applyConfigChange", "toggleSbs", "loadSbsState", "request"])
-    runtime[method] = (...args) => owner.runtime[method](...args);
-  return runtime;
+    runtime[method] = (...args: any[]) => owner.runtime[method](...args);
+  return runtime as ChatRuntime;
 }

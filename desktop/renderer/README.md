@@ -52,7 +52,7 @@ renderer/
 根目录 `loom.html` 只包含挂载点和本地资源引用。`chat/main.tsx` 挂载 React，
 `scripts/build-chat.mjs` 编译聊天资源，桌面准备脚本将它们纳入安装包。
 
-`chat/services/runtime.js` 保留 Loom 流式、重试、重放、watchdog 和历史对账协议，
+`chat/services/runtime.ts` 保留 Loom 流式、重试、重放、watchdog 和历史对账协议，
 更新领域对象，不创建或修改界面节点。`chat/models/chat.ts` 与 `runtime.d.ts`
 定义 UI 契约，`hooks/use-chat-session.ts` 统一释放请求、计时器和订阅。
 
