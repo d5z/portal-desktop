@@ -23,6 +23,10 @@ export interface Message extends MessageScene {
   timestamp: string;
   createdAt?: number;
   historySeq?: number;
+  persistedFrom?: "final" | "act_talk" | "partial";
+  persistedStreamId?: string;
+  /** Authoritative history content, applied after live rendering finishes. */
+  persistedText?: string;
   label: string;
   consecutive: boolean;
   retry?: () => void | Promise<void>;

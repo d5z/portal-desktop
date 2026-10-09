@@ -1216,3 +1216,6 @@ button.llm-custom-link, button.step2-back { border: 0; cursor: pointer; }
 
 label.chat-scope-switch{align-items:center;gap:8px;font-size:12px;color:var(--text-muted);cursor:pointer}
 label.chat-scope-switch input{margin:0;accent-color:var(--accent)}
+
+/* Retain interrupted speech while distinguishing it from the final reply. */
+.message.message-partial { opacity: 0.65; }

@@ -220,14 +220,19 @@ function createStreamRuntime(state: any, options: any): any {
   }
   function updateMessage(message: any, text: any) {
     if (!message) return;
-    message.text = text;
+    message.text = !message.streaming && message.persistedText !== undefined ? message.persistedText : text;
     changed();
   }
   function setMessageStreaming(message: any, streaming: any) {
     if (!message) return;
     message.streaming = streaming;
+    if (!streaming && message.persistedText !== undefined) message.text = message.persistedText;
     changed();
   }
+  type SpeechFragment = { message: any; text: string };
+  let progressBubbles: SpeechFragment[] = [];
+  const handledPersisted = new Set<number>();
+  const pendingPersistedGroups = new Map<number, { fragments: SpeechFragment[]; persisted: any }>();
   function splitStreamProgress(type: string, data: any) {
     const reasoning = (type === "thinking" || type === "reasoning") &&
       typeof (data.text || data.delta?.text || data.delta) === "string" &&
@@ -241,6 +246,7 @@ function createStreamRuntime(state: any, options: any): any {
     if (visible) {
       updateMessage(streamMessage, visible);
       streamMessage.interim = true;
+      progressBubbles.push({ message: streamMessage, text: streamText });
       setMessageStreaming(streamMessage, false);
       noteLocalEcho("being", streamText, state.activeScene, streamMessage);
     } else removeMessage(streamMessage);
@@ -252,6 +258,7 @@ function createStreamRuntime(state: any, options: any): any {
     noteLocalEcho("being", streamText, state.activeScene, streamMessage,
       streamReplyPrefix ? [streamReplyPrefix + streamText] : []);
     streamReplyPrefix = "";
+    progressBubbles = [];
   }
   function removeMessage(message: any) {
     if (!message) return;
@@ -366,7 +373,7 @@ function createStreamRuntime(state: any, options: any): any {
   let activeStreamPollTimer: any = null;
 
   // ---- Live stream progress (P1-2) ----
-  // liveSeq counts replayed events, including continuation meta but excluding initial transport meta.
+  // liveSeq counts replay events, including continuation/persisted meta, excluding transport meta.
   let liveSeq = 0;
   let streamWatchdogAborted = false;
   let userStoppedStream = false;
@@ -1370,6 +1377,7 @@ function createStreamRuntime(state: any, options: any): any {
     streamMessage = null;
     streamText = "";
     streamReplyPrefix = "";
+    progressBubbles = [];
     isStreaming = false;
     if (currentStreamId) lastStreamId = currentStreamId;
     currentStreamId = null;
@@ -1534,6 +1542,7 @@ function createStreamRuntime(state: any, options: any): any {
       streamMessage = null;
       streamText = "";
       streamReplyPrefix = "";
+      progressBubbles = [];
       toolCount = 0;
       let eventType = "";
       resetLiveProgress();
@@ -1581,9 +1590,9 @@ function createStreamRuntime(state: any, options: any): any {
           try {
             const data = JSON.parse(line.slice(6));
 
-            // Initial transport meta is not persisted, but scene continuation
-            // meta is a sequenced replay event (observed on the deployed Heart).
-            if (eventType && (eventType !== "meta" || data.continuation === true)) {
+            // Initial transport meta has no replay sequence. Continuation and
+            // persistence acknowledgements belong to the replay event log.
+            if (eventType && (eventType !== "meta" || data.continuation === true || data.persisted)) {
               liveSeq++;
               if (PROGRESS_EVENTS.has(eventType)) lastProgressTime = Date.now();
             }
@@ -1595,6 +1604,7 @@ function createStreamRuntime(state: any, options: any): any {
             if (["content_block_delta", "thinking", "reasoning", "tool_use", "tool_result", "message_stop", "error"].includes(eventType)) sawSceneEvent = true;
 
             if (eventType === "meta") {
+              acceptPersisted(data);
               if (data.stream_id) {
                 currentStreamId = data.stream_id;
                 lastStreamId = data.stream_id;
@@ -2269,6 +2279,7 @@ function createStreamRuntime(state: any, options: any): any {
     streamMessage = null;
     streamText = "";
     streamReplyPrefix = "";
+    progressBubbles = [];
     removeThinkingIndicator();
     tuiClear();
     clearTuiHint();
@@ -2396,7 +2407,10 @@ function createStreamRuntime(state: any, options: any): any {
   const historyCache = new HistoryCache(cacheEndpoint);
   let historyCacheSeeded = false;
   let historyCachePending: any[] = [];
+  const recentHistory = new Map<number, any>();
   function cacheHistory(messages: any, cursor: any) {
+    for (const message of messages) recentHistory.set(Number(message.seq), message);
+    while (recentHistory.size > 1000) recentHistory.delete(recentHistory.keys().next().value!);
     if (disposed) return;
     if (!historyCacheSeeded) {
       if (historyCachePending.length >= 200) historyCachePending.shift();
@@ -2423,9 +2437,127 @@ function createStreamRuntime(state: any, options: any): any {
     return !Number.isFinite(localTime) || !Number.isFinite(historyTime) ||
       Math.abs(localTime - historyTime) <= ECHO_SCENE_FALLBACK_MS;
   }
+  // A persistence acknowledgement identifies a row, not the whole breath.
+  // Ambiguous progress boundaries deliberately retain the legacy text fallback.
+  function acceptPersisted(data: any) {
+    const p = data.persisted;
+    if (!p || p.kind !== "self" || !Number.isSafeInteger(p.seq) || p.seq <= 0 ||
+        typeof p.stream_id !== "string" || !p.stream_id ||
+        !["final", "act_talk", "partial"].includes(p.from) || handledPersisted.has(p.seq)) return;
+    if (currentStreamId && currentStreamId !== p.stream_id) return;
+    const progress = progressBubbles.filter(({ message }) =>
+      (!message.historySeq || message.historySeq === p.seq) && state.items.includes(message));
+    const current = streamMessage && (!streamMessage.historySeq || streamMessage.historySeq === p.seq) ? streamMessage : null;
+    const fragments = [...progress, ...(current ? [{ message: current, text: streamText }] : [])];
+    // A yielded partial can contain every speech fragment since the preceding
+    // stop, even when the last tool/reasoning event already released the bubble.
+    // Keep the exact raw fragments until history verifies this seq's coverage.
+    if (p.from === "partial" && fragments.length > 1) {
+      registerPersistedGroup(fragments, p);
+      rememberPersisted(p.seq);
+      return;
+    }
+    const candidates = p.from === "final" ? [current].filter(Boolean) : fragments.map(fragment => fragment.message);
+    if (candidates.length !== 1) return;
+    const message = candidates[0];
+    message.persistedFrom = p.from;
+    message.persistedStreamId = p.stream_id;
+    if (p.from !== "final") message.interim = true;
+    bindPersisted(message, p.seq);
+    rememberPersisted(p.seq);
+  }
+  function rememberPersisted(seq: number) {
+    handledPersisted.add(seq);
+    while (handledPersisted.size > 1000) handledPersisted.delete(handledPersisted.values().next().value!);
+  }
+  function registerPersistedGroup(fragments: SpeechFragment[], persisted: any) {
+    const owner = options.historyOwner?.();
+    if (owner) return owner.registerPersistedGroup(fragments, persisted);
+    pendingPersistedGroups.set(persisted.seq, { fragments, persisted });
+    while (pendingPersistedGroups.size > 40) pendingPersistedGroups.delete(pendingPersistedGroups.keys().next().value!);
+    // History may already have advanced past this seq, including rows skipped
+    // while the scene was live. Resolve now rather than waiting for another page.
+    const existing = state.items.find((item: any) => item.kind === "message" && item.historySeq === persisted.seq);
+    const row = recentHistory.get(persisted.seq) || (existing && {
+      seq: persisted.seq, role: "assistant", content: existing.text,
+    });
+    if (row) mergePersistedHistory(row);
+  }
+  function persistedGroupTextMatches(fragments: SpeechFragment[], content: string) {
+    const body = normalizeEcho(content);
+    const texts = fragments.map(fragment => normalizeEcho(fragment.text));
+    if (!texts.length || texts.some(text => !text)) return false;
+    // Active-stream replay can start halfway through a reply (even halfway
+    // through its first visible paragraph). The acknowledgement already pins
+    // this group to one durable seq: verify the visible suffix, not an absent
+    // prefix. Still require every fragment, in order, through the end of the row.
+    for (let start = body.indexOf(texts[0]); start >= 0; start = body.indexOf(texts[0], start + 1)) {
+      let remaining = body.slice(start);
+      let matches = true;
+      for (const text of texts) {
+        remaining = remaining.trimStart();
+        if (!remaining.startsWith(text)) { matches = false; break; }
+        remaining = remaining.slice(text.length);
+      }
+      if (matches && !remaining.trim()) return true;
+    }
+    return false;
+  }
+  function resolvePersistedGroup(row: any) {
+    const group = pendingPersistedGroups.get(Number(row.seq));
+    if (!group || row.role === "user") return;
+    const { fragments, persisted } = group;
+    // Do not erase independently persisted speech, other scenes, or a group
+    // whose boundaries cannot be confirmed from this exact history row.
+    if (fragments.some(({ message }) => !state.items.includes(message) ||
+        (message.historySeq && message.historySeq !== persisted.seq)) ||
+        !persistedGroupTextMatches(fragments, row.content)) return;
+    pendingPersistedGroups.delete(persisted.seq);
+    const first = fragments[0].message;
+    const members = new Set(fragments.map(fragment => fragment.message));
+    for (const message of members) {
+      // Detached references can still be touched by the pending animation/stop;
+      // give them their identity too so they cannot register another local echo.
+      message.historySeq = persisted.seq;
+      message.persistedStreamId = persisted.stream_id;
+      message.persistedFrom = persisted.from;
+      message.interim = true;
+      message.streaming = false;
+    }
+    state.items = state.items.filter((item: any) => item === first ||
+      (!members.has(item) && item.historySeq !== persisted.seq));
+    localEchoes = localEchoes.filter(echo => !members.has(echo.message));
+  }
+  function bindPersisted(message: any, seq: number) {
+    const owner = options.historyOwner?.();
+    if (owner) return owner.bindPersisted(message, seq);
+    const existing = state.items.find((item: any) => item !== message && item.kind === "message" && item.historySeq === seq);
+    message.historySeq = seq;
+    if (existing) state.items = state.items.filter((item: any) => item !== existing);
+    const row = recentHistory.get(seq);
+    if (row) mergePersistedHistory(row);
+    else if (existing) {
+      applyHistoryIdentity(message, existing);
+      message.persistedText = existing.text;
+      if (!message.streaming) message.text = existing.text;
+    }
+    localEchoes = localEchoes.filter(echo => echo.message !== message && echo.message !== existing);
+    changed();
+  }
+  function mergePersistedHistory(row: any) {
+    resolvePersistedGroup(row);
+    const message = state.items.find((item: any) => item.kind === "message" &&
+      item.historySeq === Number(row.seq) && item.role === (row.role === "user" ? "user" : "being"));
+    if (!message) return false;
+    applyHistoryIdentity(message, historyIdentity(row));
+    message.persistedText = cleanContent(row.role === "user" ? stripSceneTransition(row.content) : row.content);
+    if (!message.streaming) message.text = message.persistedText;
+    changed();
+    return true;
+  }
   function historyEchoFor(role: any, texts: string[], scene: any, message: any) {
     const candidates = state.items.map((item: any, index: any) => ({ item, index })).filter(({ item }: any) =>
-      item !== message && item.kind === "message" && item.historySeq &&
+      item !== message && item.kind === "message" && item.historySeq && !item.persistedStreamId &&
       item.role === role && texts.includes(normalizeEcho(item.text)));
     const exact = [...candidates].reverse().find(({ item }: any) => echoScenesMatch(item, message || scene));
     if (exact) return exact.item;
@@ -2442,6 +2574,7 @@ function createStreamRuntime(state: any, options: any): any {
   function noteLocalEcho(role: any, text: any, scene: any = state.activeScene, localMessage: any = null, aliases: string[] = []) {
     const owner = options.historyOwner?.();
     if (owner) return owner.noteLocalEcho(role, text, scene, localMessage, aliases);
+    if (localMessage?.historySeq) return;
     const t = normalizeEcho(text);
     if (!t) return;
     const texts = [t, ...aliases.map(normalizeEcho).filter(Boolean)];
@@ -2481,7 +2614,7 @@ function createStreamRuntime(state: any, options: any): any {
     const t = normalizeEcho(text);
     if (!t) return false;
     const candidates = localEchoes.map((echo, index) => ({ echo, index })).filter(({ echo }) =>
-      echo.role === role && echo.texts.includes(t));
+      !echo.message?.historySeq && echo.role === role && echo.texts.includes(t));
     // A progress update and the final answer can legitimately have equal text.
     candidates.sort((a, b) => Number(!!a.echo.message?.interim) - Number(!!b.echo.message?.interim));
     const exact = candidates.find(({ echo }) => echoScenesMatch(scene, echoScene(echo)));
@@ -2727,7 +2860,7 @@ function createStreamRuntime(state: any, options: any): any {
           }
           const role = m.role === "user" ? "user" : "being";
           const scene = messageScene(m);
-          if (consumeLocalEcho(role, m.content, scene, historyIdentity(m, scene)) || (role === "being" && options.isLiveScene?.(scene))) continue; // 本地已经渲染过了
+          if (mergePersistedHistory(m) || consumeLocalEcho(role, m.content, scene, historyIdentity(m, scene)) || (role === "being" && options.isLiveScene?.(scene))) continue; // 本地已经渲染过了
           addHistoryMessage(m);
           if (role === "being") {
             lastHistoryReplyScenes.push(scene);
@@ -2786,7 +2919,7 @@ function createStreamRuntime(state: any, options: any): any {
             const role = m.role === "user" ? "user" : "being";
             // Current-room replies are already drawn by live/replay, including
             // continuations that older servers persist as a single combined row.
-            if (!consumeLocalEcho(role, m.content, scene, historyIdentity(m, scene)) && !options.isLiveScene?.(scene)) {
+            if (!mergePersistedHistory(m) && !consumeLocalEcho(role, m.content, scene, historyIdentity(m, scene)) && !options.isLiveScene?.(scene)) {
               addHistoryMessage(m);
             }
           }
@@ -2989,6 +3122,7 @@ function createStreamRuntime(state: any, options: any): any {
     streamMessage = null;
     streamText = "";
     streamReplyPrefix = "";
+    progressBubbles = [];
     toolCount = 0;
     actionLogClear();
     removeThinkingIndicator();
@@ -3162,6 +3296,9 @@ function createStreamRuntime(state: any, options: any): any {
     splitStreamProgress(eventType, eventData);
     markProgress(eventType, eventData);
     switch (eventType) {
+      case "meta":
+        acceptPersisted(eventData);
+        break;
       case "content_block_delta": {
         const text = eventData.delta?.text || "";
         if (!text) break;
@@ -3413,6 +3550,8 @@ function createStreamRuntime(state: any, options: any): any {
       return { text: msg, files, message };
     },
     noteLocalEcho,
+    bindPersisted,
+    registerPersistedGroup,
     restoreSceneHistory,
     reconcileHistory,
     syncHistoryCursor,
@@ -3437,7 +3576,7 @@ function createStreamRuntime(state: any, options: any): any {
     ownsLiveScene: (scene: any) => isStreaming && !pendingReply?.waiting && inCurrentScene(scene, state.activeScene),
     acceptReplay: replayStream,
     acceptSceneEvent: (type: any, data: any) => {
-      if (type === "meta" || type === "usage") return;
+      if ((type === "meta" && !data.persisted) || type === "usage") return;
       // A boundary is not the start of another run. Shared streams may replay
       // stops for idle scenes; opening a run here creates a phantom "已结束 0 秒".
       if (!isStreaming && PROGRESS_EVENTS.has(type) && type !== "message_stop" && type !== "error") {

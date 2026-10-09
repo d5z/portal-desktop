@@ -528,7 +528,7 @@ function ChatView({
                   else messageElements.current.delete(item.id);
                 }}
                 data-message-id={item.id}
-                className={`message ${item.role}${item.consecutive ? " consecutive" : ""}${highlighted === item.id ? " index-target" : ""}`}
+                className={`message ${item.role}${item.persistedFrom === "partial" ? " message-partial" : ""}${item.consecutive ? " consecutive" : ""}${highlighted === item.id ? " index-target" : ""}`}
               >
                 <div className={`meta${item.consecutive ? " time-only" : ""}`}>
                   {item.role === "user" && <CopyMessage text={splitSchedulingHint(item.text).text} copy={bridge.copyText} />}
@@ -537,6 +537,7 @@ function ChatView({
                     <time>{item.timestamp}</time>
                     {item.role !== "user" && <CopyMessage text={splitSchedulingHint(item.text).text} copy={bridge.copyText} />}
                   </span>
+                  {item.persistedFrom === "partial" && <span className="message-scene">已中断</span>}
                   {state.historyScope === "all" && <span className="message-scene" title={item.sceneId || "这条历史消息未提供场景标记"}>{sceneName(item, state.currentScene, state.sceneNames)}</span>}
                 </div>
                 <ScheduledMessage
