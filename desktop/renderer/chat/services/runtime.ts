@@ -227,6 +227,31 @@ function createStreamRuntime(state: any, options: any): any {
     message.streaming = streaming;
     changed();
   }
+  function splitStreamProgress(type: string, data: any) {
+    const reasoning = (type === "thinking" || type === "reasoning") &&
+      typeof (data.text || data.delta?.text || data.delta) === "string" &&
+      (data.text || data.delta?.text || data.delta).trim();
+    if (!streamMessage || !streamText || (type !== "tool_use" && !reasoning)) return;
+    if (renderTimer) {
+      cancelAnimationFrame(renderTimer);
+      renderTimer = null;
+    }
+    const visible = cleanContent(streamText);
+    if (visible) {
+      updateMessage(streamMessage, visible);
+      streamMessage.interim = true;
+      setMessageStreaming(streamMessage, false);
+      noteLocalEcho("being", streamText, state.activeScene, streamMessage);
+    } else removeMessage(streamMessage);
+    streamReplyPrefix += streamText;
+    streamMessage = null;
+    streamText = "";
+  }
+  function noteStreamEcho() {
+    noteLocalEcho("being", streamText, state.activeScene, streamMessage,
+      streamReplyPrefix ? [streamReplyPrefix + streamText] : []);
+    streamReplyPrefix = "";
+  }
   function removeMessage(message: any) {
     if (!message) return;
     state.items = state.items.filter((item: any) => item !== message);
@@ -299,6 +324,9 @@ function createStreamRuntime(state: any, options: any): any {
   let isStreaming = false,
     streamMessage: any = null,
     streamText = "";
+  // Exact text of completed progress segments in this reply, used only to
+  // reconcile servers that persist progress and the final answer as one row.
+  let streamReplyPrefix = "";
   let renderTimer: any = null;
   let beingName = state.name;
 
@@ -1340,6 +1368,7 @@ function createStreamRuntime(state: any, options: any): any {
     const partialText = streamText;
     streamMessage = null;
     streamText = "";
+    streamReplyPrefix = "";
     isStreaming = false;
     if (currentStreamId) lastStreamId = currentStreamId;
     currentStreamId = null;
@@ -1503,6 +1532,7 @@ function createStreamRuntime(state: any, options: any): any {
       const myEpoch = ++writerEpoch; // F2: 我是当前唯一合法写者
       streamMessage = null;
       streamText = "";
+      streamReplyPrefix = "";
       toolCount = 0;
       let eventType = "";
       resetLiveProgress();
@@ -1559,6 +1589,7 @@ function createStreamRuntime(state: any, options: any): any {
 
             if (myEpoch !== writerEpoch) continue;
             if (options.routeEvent?.(eventType, data)) continue;
+            splitStreamProgress(eventType, data);
             markProgress(eventType, data);
             if (["content_block_delta", "thinking", "reasoning", "tool_use", "tool_result", "message_stop", "error"].includes(eventType)) sawSceneEvent = true;
 
@@ -1684,7 +1715,7 @@ function createStreamRuntime(state: any, options: any): any {
                 if (visibleText) updateMessage(streamMessage, visibleText);
                 else removeMessage(streamMessage);
               }
-              noteLocalEcho("being", streamText, state.activeScene, streamMessage);
+              noteStreamEcho();
               settleReplyBoundary();
               streamMessage = null;
               streamText = "";
@@ -1747,7 +1778,7 @@ function createStreamRuntime(state: any, options: any): any {
         }
         // EOF can finalize a reply without message_stop. Retain its echo before
         // releasing the live scene so a later history read does not append it again.
-        noteLocalEcho("being", streamText, state.activeScene, streamMessage);
+        noteStreamEcho();
         setStatus("connected");
         tuiDone();
       }
@@ -2079,7 +2110,7 @@ function createStreamRuntime(state: any, options: any): any {
         lastSendFailed = true;
       } else if (userStoppedStream) {
         // 用户手动停止：内容已在屏幕上，只需推进历史游标避免下次对账重复渲染
-        noteLocalEcho("being", streamText, state.activeScene, streamMessage);
+        noteStreamEcho();
         syncHistoryCursor();
         setStatus("connected");
       }
@@ -2236,6 +2267,7 @@ function createStreamRuntime(state: any, options: any): any {
     isStreaming = false;
     streamMessage = null;
     streamText = "";
+    streamReplyPrefix = "";
     removeThinkingIndicator();
     tuiClear();
     clearTuiHint();
@@ -2389,10 +2421,10 @@ function createStreamRuntime(state: any, options: any): any {
     return !Number.isFinite(localTime) || !Number.isFinite(historyTime) ||
       Math.abs(localTime - historyTime) <= ECHO_SCENE_FALLBACK_MS;
   }
-  function historyEchoFor(role: any, text: any, scene: any, message: any) {
+  function historyEchoFor(role: any, texts: string[], scene: any, message: any) {
     const candidates = state.items.map((item: any, index: any) => ({ item, index })).filter(({ item }: any) =>
       item !== message && item.kind === "message" && item.historySeq &&
-      item.role === role && normalizeEcho(item.text) === text);
+      item.role === role && texts.includes(normalizeEcho(item.text)));
     const exact = [...candidates].reverse().find(({ item }: any) => echoScenesMatch(item, message || scene));
     if (exact) return exact.item;
     if (role !== "being" || !message) return null;
@@ -2405,23 +2437,24 @@ function createStreamRuntime(state: any, options: any): any {
       index > localIndex && echoTimesMatch(message, item));
     return fallback.length === 1 ? fallback[0].item : null;
   }
-  function noteLocalEcho(role: any, text: any, scene: any = state.activeScene, localMessage: any = null) {
+  function noteLocalEcho(role: any, text: any, scene: any = state.activeScene, localMessage: any = null, aliases: string[] = []) {
     const owner = options.historyOwner?.();
-    if (owner) return owner.noteLocalEcho(role, text, scene, localMessage);
+    if (owner) return owner.noteLocalEcho(role, text, scene, localMessage, aliases);
     const t = normalizeEcho(text);
     if (!t) return;
+    const texts = [t, ...aliases.map(normalizeEcho).filter(Boolean)];
     const message = localMessage || [...state.items].reverse().find(item => item.kind === "message" && item.role === role && item.sceneId === scene.sceneId && normalizeEcho(item.text) === t);
     // History can win the race against message_stop. In that order the normal
     // history -> local echo matcher has not been registered yet, so reconcile
     // the already-rendered persisted row back into the live bubble here.
-    const history = historyEchoFor(role, t, scene, message);
+    const history = historyEchoFor(role, texts, scene, message);
     if (history && message) {
       applyHistoryIdentity(message, history);
       state.items = state.items.filter((item: any) => item !== history);
       changed();
       return;
     }
-    localEchoes.push({ role, text: t, scene: { ...scene }, message, notedAt: Date.now() });
+    localEchoes.push({ role, texts, scene: { ...scene }, message, notedAt: Date.now() });
     if (localEchoes.length > 40) localEchoes.shift();
   }
   function echoScenesMatch(a: any = {}, b: any = {}) {
@@ -2446,7 +2479,9 @@ function createStreamRuntime(state: any, options: any): any {
     const t = normalizeEcho(text);
     if (!t) return false;
     const candidates = localEchoes.map((echo, index) => ({ echo, index })).filter(({ echo }) =>
-      echo.role === role && echo.text === t);
+      echo.role === role && echo.texts.includes(t));
+    // A progress update and the final answer can legitimately have equal text.
+    candidates.sort((a, b) => Number(!!a.echo.message?.interim) - Number(!!b.echo.message?.interim));
     const exact = candidates.find(({ echo }) => echoScenesMatch(scene, echoScene(echo)));
     let match = exact;
     if (!match && role === "being") {
@@ -2738,7 +2773,7 @@ function createStreamRuntime(state: any, options: any): any {
   }
   function pendingReplyArrived() {
     return pendingReply && state.items.some((item: any) => item.kind === "message" && item.role === "being"
-      && inCurrentScene(item, state.currentScene) && !item.streaming && !pendingReply.baseline.has(item));
+      && inCurrentScene(item, state.currentScene) && !item.streaming && !item.interim && !pendingReply.baseline.has(item));
   }
   function startCatchUpWatcher() {
     stopCatchUpWatcher();
@@ -2888,6 +2923,7 @@ function createStreamRuntime(state: any, options: any): any {
     writerEpoch++; // F2: 接管写权
     streamMessage = null;
     streamText = "";
+    streamReplyPrefix = "";
     toolCount = 0;
     actionLogClear();
     removeThinkingIndicator();
@@ -3058,6 +3094,7 @@ function createStreamRuntime(state: any, options: any): any {
 
   function processReplayEvent(eventType: any, eventData: any) {
     if (options.routeEvent?.(eventType, eventData)) return;
+    splitStreamProgress(eventType, eventData);
     markProgress(eventType, eventData);
     switch (eventType) {
       case "content_block_delta": {
@@ -3181,7 +3218,7 @@ function createStreamRuntime(state: any, options: any): any {
     }
     solidifyReplayBubble();
     settleReplyBoundary();
-    noteLocalEcho("being", streamText, state.activeScene, streamMessage);
+    noteStreamEcho();
     streamMessage = null;
     streamText = "";
     removeThinkingIndicator();
@@ -3207,7 +3244,7 @@ function createStreamRuntime(state: any, options: any): any {
 
     // 先把 streamText 固化为正式消息（如果还没渲染）
     solidifyReplayBubble();
-    noteLocalEcho("being", streamText, state.activeScene, streamMessage);
+    noteStreamEcho();
     settleReplyBoundary();
 
     isStreaming = false;

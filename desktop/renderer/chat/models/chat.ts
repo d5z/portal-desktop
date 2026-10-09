@@ -17,6 +17,8 @@ export interface Message extends MessageScene {
   role: "user" | "being" | "system";
   text: string;
   streaming: boolean;
+  /** Text emitted before the same reply resumes reasoning or tool work. */
+  interim?: boolean;
   timestamp: string;
   createdAt?: number;
   historySeq?: number;
