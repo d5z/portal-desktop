@@ -41,7 +41,9 @@ export class PortalSupervisor extends EventEmitter {
     this.emit('state', this.state);
   }
   private line(raw: string) {
-    const line = redact(raw, this.secrets).slice(0, 4000);
+    const output = redact(raw, this.secrets);
+    this.emit('log', output);
+    const line = output.slice(0, 4000);
     this.state.logs = [...this.state.logs.slice(-299), line];
     this.publish({});
   }

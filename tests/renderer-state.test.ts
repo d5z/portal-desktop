@@ -103,6 +103,32 @@ const settle = async () => {
 };
 afterEach(() => vi.useRealTimers());
 describe("React desktop state lifecycle", () => {
+  it('persists the history limit and sends it to the current and next chat frames without reloading drafts', async () => {
+    const saved = new Map<string, string>();
+    vi.stubGlobal('localStorage', { getItem: (key: string) => saved.get(key) ?? null, setItem: (key: string, value: string) => saved.set(key, value) });
+    const app = new AppModel(api().value);
+    const post = vi.fn();
+    app.post = post;
+    try {
+      app.applySnapshot(state());
+      const source = app.chatSource;
+      app.setChatHistoryLimit(500);
+      expect(app.chatSource).toBe(source);
+      expect(saved.get('beings:chat-history-limit')).toBe('500');
+      expect(post).toHaveBeenCalledWith({ type: 'beings:history-limit', limit: 500, revision: new URL(source).searchParams.get('revision') });
+      app.setChatHistoryLimit(0);
+      app.setChatHistoryLimit(1001);
+      app.setChatHistoryLimit(2.5);
+      expect(app.chatHistoryLimit).toBe(500);
+      const restored = new AppModel(api().value);
+      const stop = restored.start();
+      try {
+        await settle();
+        expect(restored.chatHistoryLimit).toBe(500);
+        expect(new URL(restored.chatSource).searchParams.get('history_limit')).toBe('500');
+      } finally { stop(); }
+    } finally { vi.unstubAllGlobals(); }
+  });
   it("loads the saved Town name at startup without opening pairing or querying public pages", async () => {
     let receive!: (state: TownLiveState) => void;
     const townQuery = vi.fn(), autoPairTown = vi.fn();

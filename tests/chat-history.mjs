@@ -20,7 +20,8 @@ const server = createServer(async (request, response) => {
     if (offline) return json({ error: 'offline fixture' }, 503);
     if (url.pathname === '/api/history') {
       const after = url.searchParams.get('after'); queries.push(after);
-      return json({ messages: after === null ? history.slice(-100) : history.filter(m => m.seq > Number(after)).slice(0, 100) });
+      const limit = Number(url.searchParams.get('limit') || 100);
+      return json({ messages: after === null ? history.slice(-limit) : history.filter(m => m.seq > Number(after)).slice(0, limit) });
     }
     if (url.pathname === '/api/status') return json({ being_id: 'willow-id', being_name: 'Willow' });
     if (url.pathname === '/api/stream/active') { response.writeHead(204); response.end(); return; }
@@ -236,6 +237,23 @@ try {
   await clearCache(); await open();
   assert.equal(await page.locator('#messages .message').count(), 5);
   await waitCache(5);
+
+  // Increasing the initial page fills older uncached rows, without resetting
+  // the incremental cursor or applying the former 300-row restore window.
+  await clearCache();
+  history = []; seq = 0;
+  for (let i = 1; i <= 450; i++) append('being', `可配置历史 ${i}`, 'configurable-room');
+  await open('&history_limit=50');
+  assert.equal(await page.locator('#messages .message').count(), 50);
+  await waitCache(50);
+  queries.length = 0;
+  await open('&history_limit=500');
+  assert.equal(await page.locator('#messages .message').count(), 450);
+  await waitCache(450);
+  assert.ok(queries.includes('450'), 'Larger initial pages preserve the incremental cursor');
+  await open('&history_limit=500');
+  assert.equal(await page.locator('#messages .message').count(), 450);
+  history = history.slice(-5);
 
   // Failed writes leave no advanced cursor; rendering still uses the network.
   await clearCache();

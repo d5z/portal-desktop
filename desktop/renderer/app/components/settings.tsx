@@ -3,9 +3,12 @@ import type { AppModel } from "../models/app";
 import { useModel } from "../../shared/hooks/use-model";
 import { Dialog } from "../../shared/components/dialog";
 import { NavigationControls } from "../../shared/components/navigation-controls";
+import { MAX_CHAT_HISTORY_LIMIT, validChatHistoryLimit } from '../../../shared/chat-history';
 export function ClientSettings({ model }: { model: AppModel }) {
   const app = useModel(model);
   const [tab, setTab] = useState("connections");
+  const [historyLimit, setHistoryLimit] = useState(String(app.chatHistoryLimit));
+  useEffect(() => { setHistoryLimit(String(app.chatHistoryLimit)); }, [app.chatHistoryLimit, app.clientSettingsOpen]);
   useEffect(() => {
     if (app.clientSettingsOpen) setTab("connections");
   }, [app.clientSettingsOpen]);
@@ -225,6 +228,20 @@ export function ClientSettings({ model }: { model: AppModel }) {
                 </button>
               </div>
             </div>
+            <form className="reading-setting history-setting" onSubmit={event => { event.preventDefault(); app.setChatHistoryLimit(Number(historyLimit)); }}>
+              <div className="history-setting-row">
+                <label htmlFor="chat-history-limit">每次加载的历史消息数</label>
+                <div className="history-setting-input">
+                  <input id="chat-history-limit" type="number" min="1" max={MAX_CHAT_HISTORY_LIMIT} step="1" required
+                    value={historyLimit} aria-describedby="chat-history-limit-help" onChange={event => setHistoryLimit(event.target.value)} />
+                  <span aria-hidden="true">条</span>
+                </div>
+              </div>
+              <div className="reading-setting-footer">
+                <p id="chat-history-limit-help">可设为 1–{MAX_CHAT_HISTORY_LIMIT} 条，默认 100 条。<br />保存后用于后续加载，已有记录会保留。</p>
+                <button type="submit" disabled={!validChatHistoryLimit(Number(historyLimit)) || Number(historyLimit) === app.chatHistoryLimit}>保存</button>
+              </div>
+            </form>
           </section>
         </div>
         <div

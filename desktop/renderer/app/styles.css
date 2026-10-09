@@ -472,6 +472,13 @@ body[data-view=chat].has-topic .scene-ribbon{display:flex!important;min-height:0
 .reading-setting-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:32px}
 .reading-setting-footer p{margin:0;font-size:11px;line-height:1.6;color:var(--muted)}
 .reading-setting-footer button{flex-shrink:0;padding:6px 8px;border-radius:7px;font-size:12px;color:var(--secondary)}
+.history-setting-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px}
+.history-setting-row label{margin:0;color:var(--text)}
+.history-setting-input{display:flex;align-items:center;gap:8px;color:var(--secondary);font-size:12px}
+#chat-history-limit{width:96px;height:36px;padding:8px 10px;font-size:13px;font-variant-numeric:tabular-nums}
+.history-setting .reading-setting-footer{margin-top:12px}
+.history-setting button[type=submit]{padding:7px 14px;background:var(--surface);color:var(--text)}
+.history-setting button[type=submit]:disabled{color:var(--muted);opacity:.65}
 .general-settings-group{padding:12px 0;border-bottom:1px solid var(--line)}
 .general-setting-row{display:flex;align-items:center;justify-content:space-between;gap:16px;min-height:40px;padding:8px 12px;font-size:13px;cursor:pointer}
 .general-setting-help{margin:0 12px 12px;font-size:11px;line-height:1.6;color:var(--muted)}

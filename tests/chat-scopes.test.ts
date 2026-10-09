@@ -778,12 +778,20 @@ describe("scene history refresh", () => {
       expect(reads.map(read => read.after)).toEqual([0, 1]);
       state.historyScope = "current";
       const secondSwitch = runtime.refreshHistory();
-      history.push({ seq: 3, role: "being", content: "桌面最新记录", scene_id: "desktop-test" });
       reads[1].finish();
-      await firstSwitch;
       await vi.advanceTimersByTimeAsync(0);
       expect(reads.map(read => read.after)).toEqual([0, 1, 2]);
+      // The first refresh must consume its terminal empty page. A message
+      // arriving after that snapshot belongs to the queued fresh read.
+      history.push({ seq: 3, role: "being", content: "桌面最新记录", scene_id: "desktop-test" });
       reads[2].finish();
+      await firstSwitch;
+      await vi.advanceTimersByTimeAsync(0);
+      expect(reads.map(read => read.after)).toEqual([0, 1, 2, 2]);
+      reads[3].finish();
+      await vi.advanceTimersByTimeAsync(0);
+      expect(reads.map(read => read.after)).toEqual([0, 1, 2, 2, 3]);
+      reads[4].finish();
       await secondSwitch;
       expect(state.items.filter(item => item.kind === "message").map(item => item.text)).toEqual(["初始记录", "网页最新记录", "桌面最新记录"]);
       expect(sceneItems(state.items, state.historyScope, current).filter(item => item.kind === "message").map(item => item.text)).toEqual(["初始记录", "桌面最新记录"]);

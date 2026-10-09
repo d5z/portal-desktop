@@ -6,11 +6,31 @@ import { publicErrorMessage } from '../../shared/errors';
 export class ClientErrorLog {
   readonly directory: string;
   readonly file: string;
+  readonly runtimeFile: string;
   private writing = Promise.resolve();
   private recent = new Map<string, number>();
   constructor(directory: string, private secrets: () => string[] = () => []) {
     this.directory = path.join(directory, 'logs');
     this.file = path.join(this.directory, 'client-errors.log');
+    this.runtimeFile = path.join(this.directory, 'client-runtime.log');
+  }
+  private append(file: string, entry: string, maxBytes: number) {
+    this.writing = this.writing.then(async () => {
+      await mkdir(this.directory, { recursive: true, mode: 0o700 });
+      const size = await stat(file).then(info => info.size, error => {
+        if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 0;
+        throw error;
+      });
+      if (size + Buffer.byteLength(entry) > maxBytes) {
+        await rm(file + '.previous', { force: true });
+        if (size) await rename(file, file + '.previous');
+      }
+      await appendFile(file, entry, { mode: 0o600 });
+    }).catch(error => { console.error('Client log unavailable:', redact(String(error), this.secrets())); });
+  }
+  info(context: string, detail: unknown) {
+    const text = redact(String(detail), this.secrets());
+    this.append(this.runtimeFile, `${new Date().toISOString()} [${context}]\n${text}\n\n`, 10 * 1024 * 1024);
   }
   report(context: string, error: unknown, fallback?: string): string {
     const raw = error instanceof Error ? error.stack || error.message : String(error);
@@ -21,18 +41,7 @@ export class ClientErrorLog {
       if (this.recent.size >= 100) this.recent.delete(this.recent.keys().next().value!);
       this.recent.set(key, now);
       const entry = `${new Date(now).toISOString()} [${context}]\n${detail}\n\n`;
-      this.writing = this.writing.then(async () => {
-        await mkdir(this.directory, { recursive: true, mode: 0o700 });
-        const size = await stat(this.file).then(info => info.size, error => {
-          if ((error as NodeJS.ErrnoException).code === 'ENOENT') return 0;
-          throw error;
-        });
-        if (size + Buffer.byteLength(entry) > 1024 * 1024) {
-          await rm(this.file + '.previous', { force: true });
-          if (size) await rename(this.file, this.file + '.previous');
-        }
-        await appendFile(this.file, entry, { mode: 0o600 });
-      }).catch(error => { console.error('Client error log unavailable:', redact(String(error), this.secrets())); });
+      this.append(this.file, entry, 1024 * 1024);
     }
     return publicErrorMessage(error, fallback);
   }

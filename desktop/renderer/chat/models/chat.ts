@@ -1,5 +1,6 @@
 import { Store } from "../../shared/models/store";
 import { messageScene, type HistoryScope, type MessageScene } from "./scenes";
+import { chatHistoryLimit } from '../../../shared/chat-history';
 
 export type ChatPanel = "model" | "being" | "privacy" | null;
 
@@ -99,6 +100,7 @@ export interface Soul {
 }
 export class ChatState extends Store {
   items: ChatItem[] = [];
+  historyLimit = chatHistoryLimit(Number(new URLSearchParams(location.search).get('history_limit')));
   subagentReady = false;
   subagentConfigured?: boolean;
   subagentEnabled?: boolean;

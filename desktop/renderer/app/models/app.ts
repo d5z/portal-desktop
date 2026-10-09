@@ -15,6 +15,7 @@ import { hostPluginContext } from '../../plugins/context';
 import { WorkspaceModel } from "./workspace";
 import { TownModel } from "../../town/models/town";
 import type { HistoryScope } from "../../chat/models/scenes";
+import { CHAT_HISTORY_LIMIT_KEY, DEFAULT_CHAT_HISTORY_LIMIT, chatHistoryLimit, validChatHistoryLimit } from '../../../shared/chat-history';
 
 type SettingsRoute = "" | "connection" | "town" | "model" | "portal" | "diagnostics";
 
@@ -79,6 +80,7 @@ export class AppModel extends Store {
   search = "";
   searchEntries: { id: string; text: string }[] = [];
   readingSize = 15;
+  chatHistoryLimit = DEFAULT_CHAT_HISTORY_LIMIT;
   update?: UpdateState;
   updateChecking = false;
   async checkClientUpdates() {
@@ -186,6 +188,7 @@ export class AppModel extends Store {
       };
     }
     try {
+      this.chatHistoryLimit = chatHistoryLimit(Number(localStorage.getItem(CHAT_HISTORY_LIMIT_KEY)));
       const size = Number(localStorage.getItem("beings:reading-size"));
       if (Number.isInteger(size) && size >= 13 && size <= 21)
         this.readingSize = size;
@@ -338,7 +341,7 @@ export class AppModel extends Store {
       if (!sameChat) this.chatHistoryScope = next.chatScene ? "current" : "all";
       this.chatHistoryScopeKnown = false;
       this.connection = "connecting";
-      this.chatSource = `beings://chat/?name=${encodeURIComponent(next.settings.being)}&history_scope=${encodeURIComponent(next.settings.endpoint)}&scene_scope=${this.chatHistoryScope}&scene_strict=1&theme=${this.theme}&revision=${crypto.randomUUID()}`;
+      this.chatSource = `beings://chat/?name=${encodeURIComponent(next.settings.being)}&history_scope=${encodeURIComponent(next.settings.endpoint)}&history_limit=${this.chatHistoryLimit}&scene_scope=${this.chatHistoryScope}&scene_strict=1&theme=${this.theme}&revision=${crypto.randomUUID()}`;
       if (next.chatScene) {
         this.chatSource += `&scene_id=${encodeURIComponent(next.chatScene.scene_id)}&scene_label=${encodeURIComponent(next.chatScene.scene_meta.scene_label)}`;
       }
@@ -416,6 +419,16 @@ export class AppModel extends Store {
   postAppearance() {
     this.post({ type: "beings:appearance", theme: this.theme });
     this.post({ type: "beings:reading", size: this.readingSize });
+    if (this.chatSource) this.post({ type: 'beings:history-limit', limit: this.chatHistoryLimit, revision: new URL(this.chatSource).searchParams.get('revision') });
+  }
+  setChatHistoryLimit(limit: number) {
+    if (!validChatHistoryLimit(limit)) return;
+    try { localStorage.setItem(CHAT_HISTORY_LIMIT_KEY, String(limit)); }
+    catch { this.toast('无法保存历史消息设置，请重试。'); return; }
+    this.chatHistoryLimit = limit;
+    this.postAppearance();
+    this.changed();
+    this.toast('历史消息条数已保存，将用于后续加载。');
   }
   async toggleTheme() {
     await this.run(async () => {

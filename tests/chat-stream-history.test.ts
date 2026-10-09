@@ -35,6 +35,39 @@ describe("stream progress and persisted replies", () => {
     };
   }
 
+  it('uses the selected history limit and fills gaps even when the server caps pages', async () => {
+    const history = [{ seq: 1, role: 'user', content: 'initial', scene_id: 'desktop-test' }];
+    const queries: URL[] = [];
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname === '/api/history') {
+        queries.push(url);
+        const after = url.searchParams.get('after');
+        return Response.json({ messages: after === null ? history.slice(-Number(url.searchParams.get('limit'))) :
+          history.filter(m => m.seq > Number(after)).slice(0, 10) });
+      }
+      if (url.pathname === '/api/stream/active') return new Response(null, { status: 204 });
+      if (url.pathname === '/health') return new Response('OK fixture');
+      return Response.json({ sbs_enabled: false });
+    }));
+    const state = new ChatState();
+    state.historyLimit = 500;
+    const runtime = createChatRuntime(state);
+    try {
+      const started = runtime.start();
+      await vi.advanceTimersByTimeAsync(100);
+      await started;
+      expect(queries[0].searchParams.get('limit')).toBe('500');
+      state.historyLimit = 25;
+      for (let seq = 2; seq <= 81; seq++) history.push({ seq, role: 'user', content: `row ${seq}`, scene_id: 'desktop-test' });
+      await runtime.refreshHistory();
+      const incremental = queries.filter(url => url.searchParams.has('after'));
+      expect(incremental.every(url => url.searchParams.get('limit') === '25')).toBe(true);
+      expect(incremental.map(url => url.searchParams.get('after'))).toContain('71');
+      expect(state.items.filter(item => item.kind === 'message')).toHaveLength(81);
+    } finally { runtime.dispose(); }
+  });
+
   it.each([
     ["message_stop", "final"], ["eof", "final"],
     ["message_stop", "combined"], ["eof", "combined"],

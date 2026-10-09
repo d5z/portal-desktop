@@ -1,5 +1,6 @@
 import { createSceneRuntime } from "./scene-runtime";
 import { HistoryCache } from "./history-cache";
+import { chatHistoryLimit } from '../../../shared/chat-history';
 import { inCurrentScene, messageScene, sceneTransitionNotice, stripSceneTransition, type MessageScene } from "../models/scenes";
 import type { ChatRuntime, ChatState, RuntimeOptions } from "../models/chat";
 
@@ -2530,15 +2531,19 @@ function createStreamRuntime(state: any, options: any): any {
   async function restoreSceneHistory(scene: MessageScene) {
     if (!scene.sceneId || !historyCacheSeeded || disposed) return;
     const ids = [scene.sceneId, ...(!scene.strict && scene.legacySceneId ? [scene.legacySceneId] : [])];
-    const cached = (await Promise.all(ids.map(id => historyCache.readScene(id)))).flat().sort((a, b) => a.seq - b.seq);
+    const cached = (await Promise.all(ids.map(id => historyCache.readScene(id, Math.max(300, chatHistoryLimit(state.historyLimit)))))).flat().sort((a, b) => a.seq - b.seq);
     if (disposed) return;
+    insertCachedHistory(cached);
+  }
+
+  function insertCachedHistory(cached: any[], beforeWindowOnly = true) {
     const present = new Set(state.items.map((item: any) => item.historySeq).filter(Boolean));
     let added = false;
     for (const message of cached) {
       // Only backfill rows preceding the initial history window. Newer cached
       // rows may belong to a live reply deliberately skipped by reconciliation.
       // Reading an older room must never advance or rewind the global cursor.
-      if (message.seq >= historyWindowStart || present.has(message.seq)) continue;
+      if ((beforeWindowOnly && message.seq >= historyWindowStart) || present.has(message.seq)) continue;
       const identity = historyIdentity(message);
       const role = message.role === "user" ? "user" : "being";
       const text = isHistoryMarker(message)
@@ -2631,9 +2636,10 @@ function createStreamRuntime(state: any, options: any): any {
 
   async function fetchHistory(incremental: any, prefetched = null) {
     let cursor = lastHistorySeq;
+    const limit = chatHistoryLimit(state.historyLimit);
     const messages = [];
     while (!disposed) {
-      const path = incremental ? `/api/history?limit=100&after=${cursor}` : "/api/history?limit=100";
+      const path = `/api/history?limit=${limit}${incremental ? `&after=${cursor}` : ''}`;
       const res = prefetched || await fetch(apiUrl(path), { cache: "no-store", signal: timeoutSignal(8000) });
       prefetched = null;
       if (!res.ok) return messages.length ? messages : null;
@@ -2642,7 +2648,9 @@ function createStreamRuntime(state: any, options: any): any {
       messages.push(...page.filter((m: any) => !incremental || (Number(m.seq) || 0) > cursor));
       const next = Math.max(cursor, ...page.map((m: any) => Number(m.seq) || 0));
       // Servers that ignore after= cannot cause an endless pagination loop.
-      if (!incremental || page.length < 100 || next <= cursor) return messages;
+      // The server may cap a page below the requested limit. Continue until
+      // the cursor stops advancing so a larger preference cannot skip a gap.
+      if (!incremental || next <= cursor) return messages;
       cursor = next;
     }
     return null;
@@ -2654,7 +2662,7 @@ function createStreamRuntime(state: any, options: any): any {
     try {
       let hydrated = false;
       if (!preserve && (full || lastHistorySeq === 0)) {
-        const cached = await historyCache.read();
+        const cached = await historyCache.read(Math.max(300, chatHistoryLimit(state.historyLimit)));
         if (disposed) return 0;
         if (cached) {
           resetMessages();
@@ -2664,12 +2672,28 @@ function createStreamRuntime(state: any, options: any): any {
           lastHistorySeq = Math.max(lastHistorySeq, cached.lastSeq);
           historyCacheSeeded = true;
           hydrated = true;
+          // A larger initial page can recover older rows not yet cached. Do not
+          // advance the saved cursor: after= must still fill any offline gap.
+          // Render the cache first so a slow network cannot hide offline history.
+          const recent = await takePrefetch('history');
+          try {
+            if (recent?.ok) {
+              const data = await recent.json();
+              const older = Array.isArray(data.messages) ? data.messages.filter((m: any) =>
+                Number.isSafeInteger(m?.seq) && m.seq > 0 && m.seq <= cached.lastSeq) : [];
+              if (older.length) {
+                await historyCache.write(older, cached.lastSeq);
+                if (!disposed) insertCachedHistory(older.sort((a: any, b: any) => a.seq - b.seq), false);
+              }
+            } else await recent?.body?.cancel();
+          } catch { /* A failed recent-page read must not hide cached history. */ }
+          if (disposed) return 0;
         }
       }
       if (state.historyScope === "current") await restoreSceneHistory(options.selectedScene?.() || state.currentScene);
       const incremental = hydrated || (!full && lastHistorySeq > 0);
-      // A cached cursor needs after=, not the prefetched latest 100: an offline
-      // gap may contain more than 100 messages.
+      // A cached cursor needs after=, not only the prefetched latest page:
+      // an offline gap may contain more than one page of messages.
       if (hydrated) {
         prefetch.history?.then((res: any) => res.body?.cancel()).catch(() => {});
         delete prefetch.history;
@@ -3312,11 +3336,11 @@ function createStreamRuntime(state: any, options: any): any {
     if (started || disposed) return;
     started = true;
     for (const [key, path] of Object.entries({
-      history: "/api/history?limit=100",
+      history: `/api/history?limit=${chatHistoryLimit(state.historyLimit)}`,
       status: "/api/status",
       active: "/api/stream/active",
     })) {
-      prefetch[key] = fetch(apiUrl(path), { cache: "no-store" });
+      prefetch[key] = fetch(apiUrl(path), { cache: "no-store", signal: timeoutSignal(8000) });
       prefetch[key].catch(() => {});
     }
     void (async () => {

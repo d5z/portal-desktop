@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { strFromU8, unzipSync } from 'fflate';
 import { ClientErrorLog } from '../desktop/main/app/error-log';
-import { createLogArchive, MAX_LOG_BYTES } from '../desktop/main/app/log-archive';
+import { createLogArchive } from '../desktop/main/app/log-archive';
 
 it('packages client, rotated and Portal logs without configs or credentials', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'log-archive-'));
@@ -12,6 +12,9 @@ it('packages client, rotated and Portal logs without configs or credentials', as
     const log = new ClientErrorLog(root);
     await log.exportSnapshot(['foreground Portal output'], { phase: 'connected' });
     log.report('client', 'client failure'); await log.flush();
+    log.info('client-start', 'client started successfully'); await log.flush();
+    await mkdir(path.join(log.directory, 'renderer'));
+    await writeFile(path.join(log.directory, 'renderer', 'activity.log.1'), 'previous renderer activity');
     await writeFile(log.file + '.previous', 'previous client failure');
     const runtime = path.join(root, 'runtime'), destination = path.join(root, 'downloads');
     await mkdir(runtime);
@@ -27,22 +30,24 @@ it('packages client, rotated and Portal logs without configs or credentials', as
     expect(Object.keys(files)).toContain('portal/runtime-1/portal.err.log.previous');
     expect(Object.keys(files).some(name => name.includes('runtime-2'))).toBe(false);
     expect(text).toContain('client failure'); expect(text).toContain('foreground Portal output');
+    expect(text).toContain('client started successfully');
+    expect(Object.keys(files)).toContain('client/renderer/activity.log.1');
     expect(text).toContain('background output'); expect(text).toContain('runner failed');
     expect(text).not.toMatch(/known-private-token|bearer-value|key-value|must-not-export/);
     expect((await readdir(destination))).toEqual([path.basename(file)]);
   } finally { await rm(root, { recursive: true, force: true }); }
 });
 
-it('keeps recent lines of oversized logs and records missing sources in the archive', async () => {
+it('exports complete logs larger than 4 MiB and records missing sources in the archive', async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), 'log-archive-tail-'));
   try {
-    await writeFile(path.join(root, 'client-errors.log'), 'x'.repeat(MAX_LOG_BYTES + 5) + '\nlatest failure\n');
+    const source = 'first startup\n' + 'normal runtime output\n'.repeat(220000) + 'latest activity\n';
+    await writeFile(path.join(root, 'client-runtime.log'), source);
     const file = await createLogArchive({ logsDirectory: root, runtimeDirectories: [], destination: path.join(root, 'out'), secrets: [] });
     const files = unzipSync(await readFile(file));
-    expect(strFromU8(files['client/client-errors.log'])).toContain('latest failure');
-    expect(files['client/client-errors.log'].length).toBeLessThan(300);
+    expect(strFromU8(files['client/client-runtime.log'])).toBe(source);
     const report = JSON.parse(strFromU8(files['collection.json']));
-    expect(report.entries).toContainEqual(expect.objectContaining({ file: 'client/client-errors.log', status: 'truncated' }));
+    expect(report.entries).toContainEqual(expect.objectContaining({ file: 'client/client-runtime.log', status: 'included', sourceBytes: Buffer.byteLength(source) }));
     expect(report.entries).toContainEqual({ file: 'portal/portal-runtime.log', status: 'missing' });
     await expect(createLogArchive({ logsDirectory: path.join(root, 'absent'), runtimeDirectories: [], destination: root, secrets: [] })).rejects.toThrow('未能读取日志');
   } finally { await rm(root, { recursive: true, force: true }); }

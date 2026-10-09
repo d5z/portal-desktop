@@ -1,6 +1,7 @@
 import type { ChatRuntime, ChatState, ChatPanel } from "../models/chat";
 import type { HistoryScope } from "../models/scenes";
 import type { ChatEditCommand } from "../../../shared/types";
+import { validChatHistoryLimit } from '../../../shared/chat-history';
 
 /** Source-checked desktop transport. It never reads or mutates rendered UI. */
 export function createChatBridge(state: ChatState) {
@@ -119,6 +120,11 @@ export function createChatBridge(state: ChatState) {
       const data = event.data;
       if (!data || typeof data !== "object") return;
       switch (data.type) {
+        case 'beings:history-limit':
+          if (data.revision !== revision || !validChatHistoryLimit(data.limit)) return;
+          state.historyLimit = data.limit;
+          state.changed();
+          return;
         case "beings:chat-refresh":
           if (data.revision !== revision || typeof data.id !== "string" || data.id.length > 64) return;
           void runtime.refreshHistory().then(

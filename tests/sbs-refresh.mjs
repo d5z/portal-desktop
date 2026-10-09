@@ -11,6 +11,7 @@ const { outputFiles } = await build({ stdin: { resolveDir: process.cwd(), loader
   import { AppModel } from './desktop/renderer/app/models/app';
   import { useModel } from './desktop/renderer/shared/hooks/use-model';
   import { Topbar } from './desktop/renderer/app/components/topbar';
+  import { ClientSettings } from './desktop/renderer/app/components/settings';
   const app = new AppModel({ copyText: async text => { window.copiedScene = text; }, appearance: async theme => theme,
     changeChatSession: async () => snapshot });
   window.sbsApp = app;
@@ -38,12 +39,12 @@ const { outputFiles } = await build({ stdin: { resolveDir: process.cwd(), loader
   });
   function Fixture() {
     useModel(app);
-    return <><Topbar model={app} /><iframe id="chat-frame" title="Loom fixture"
+    return <><Topbar model={app} /><ClientSettings model={app} /><iframe id="chat-frame" title="Loom fixture"
       src={'/loom' + new URL(app.chatSource).search} onLoad={() => app.frameLoaded()} /></>;
   }
   app.applySnapshot(snapshot);
   createRoot(document.getElementById('root')).render(<Fixture />);
-` }, bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic' });
+` }, bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', define: { 'import.meta.env.DEV': 'false' } });
 const css = await readFile('desktop/renderer/app/styles.css', 'utf8');
 const loom = await readFile('desktop/generated/loom.html', 'utf8');
 const assets = new Map(await Promise.all(['chat.js', 'chat.css', 'highlight.css'].map(async file => [ '/' + file, await readFile('desktop/generated/' + file) ])));
@@ -55,6 +56,7 @@ const history = [
   { seq: 3, role: 'being', content: '共享的历史消息', at: '2026-09-15T08:00:02Z' },
 ];
 const historyReads = [];
+const historyLimits = [];
 const release = queue => { for (const finish of queue.splice(0)) finish(); };
 const server = createServer(async (request, response) => {
   const url = new URL(request.url, 'http://localhost');
@@ -81,6 +83,7 @@ const server = createServer(async (request, response) => {
   if (url.pathname === '/api/history') {
     const after = Number(url.searchParams.get('after') || 0);
     historyReads.push(after);
+    historyLimits.push(Number(url.searchParams.get('limit')));
     return json({ messages: history.filter(row => row.seq > after) });
   }
   if (url.pathname === '/api/stream/active') { response.writeHead(204); response.end(); return; }
@@ -152,6 +155,28 @@ try {
   assert.equal(await chat.locator('.chat-history-scope').count(), 0, 'Embedded chat has no duplicate scope toolbar');
   assert.equal(await chat.getByText('这是来自 Loom 网页的对话', { exact: true }).count(), 0);
   await chat.locator('#input').fill('切换时保留的草稿');
+  await page.evaluate(() => { window.sbsApp.clientSettingsOpen = true; window.sbsApp.changed(); });
+  await page.getByRole('tab', { name: '外观与阅读' }).click();
+  const historyLimit = page.getByLabel('每次加载的历史消息数');
+  assert.equal(await historyLimit.inputValue(), '100');
+  await historyLimit.fill('1001');
+  assert.equal(await page.locator('#client-settings-dialog').getByRole('button', { name: '保存', exact: true }).isDisabled(), true);
+  await historyLimit.fill('250');
+  await page.locator('#client-settings-dialog').getByRole('button', { name: '保存', exact: true }).click();
+  assert.equal(await page.evaluate(() => localStorage.getItem('beings:chat-history-limit')), '250');
+  await mkdir('test-results', { recursive: true });
+  await page.screenshot({ path: 'test-results/chat-history-settings.png' });
+  const viewport = page.viewportSize();
+  await page.setViewportSize({ width: 420, height: 820 });
+  await page.evaluate(async () => { await window.sbsApp.toggleTheme(); document.documentElement.dataset.theme = window.sbsApp.theme; });
+  await page.waitForFunction(() => document.querySelector('#theme-dark')?.getAttribute('aria-pressed') === 'true');
+  assert.equal(await historyLimit.evaluate(el => { const box = el.getBoundingClientRect(); return box.left >= 0 && box.right <= innerWidth; }), true);
+  await page.screenshot({ path: 'test-results/chat-history-settings-dark-narrow.png' });
+  await page.setViewportSize(viewport);
+  await page.evaluate(async () => { await window.sbsApp.toggleTheme(); document.documentElement.dataset.theme = window.sbsApp.theme; });
+  await page.getByRole('button', { name: '关闭客户端设置' }).click();
+  assert.equal(await chat.locator('#input').inputValue(), '切换时保留的草稿');
+  await page.evaluate(() => window.sbsApp.post({ type: 'beings:history-limit', limit: 5, revision: 'stale' }));
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/chat-scene-panel-light.png' });
   const beforeAll = historyReads.length;
@@ -160,6 +185,7 @@ try {
   await chat.getByText('这是来自 Loom 网页的对话', { exact: true }).waitFor();
   await chat.getByText('切换后从服务器取回的网页对话', { exact: true }).waitFor();
   assert.ok(historyReads.length > beforeAll, 'Switching to all scenes fetches the latest history');
+  assert.equal(historyLimits.at(-1), 250, 'Saved limit reaches the live chat; stale messages cannot change it');
   await page.waitForFunction(() => document.querySelector('#chat-scene-indicator .chat-scene-label').textContent === '桌面·测试电脑');
   assert.equal(await chat.locator('#input').inputValue(), '切换时保留的草稿');
   assert.equal(await chat.locator('#input').isDisabled(), false, '全部场景上下文仍向当前场景发送');

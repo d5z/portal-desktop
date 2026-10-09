@@ -135,12 +135,17 @@ function createWindow() {
   });
   window = created.window;
   browser = created.browser;
+  errorLog.info('client-window', '主窗口已创建');
+  window.webContents.on('console-message', (_event, level, message) => {
+    errorLog.info(`renderer-${level}`, message);
+  });
   window.webContents.on('did-start-navigation', (_event, _url, inPlace, isMainFrame) => { if (isMainFrame && !inPlace) closePluginSessions(); });
   window.webContents.on('render-process-gone', () => closePluginSessions());
   window.webContents.on('destroyed', () => closePluginSessions());
 }
 
 async function ready() {
+  errorLog.info('client-start', `version=${app.getVersion()} platform=${process.platform}/${process.arch} pid=${process.pid}`);
   if (process.platform === 'win32') {
     try { repairDevelopmentShortcut(app.getPath('appData'), shell); }
     catch (error) { errorLog.report('notification-identity', error); }
@@ -211,7 +216,8 @@ async function ready() {
   });
   await notifications.load();
   const reportTownRequest = (event: TownRequestEvent) => {
-    errorLog.report('town-request', JSON.stringify(event));
+    errorLog.info('town-request', JSON.stringify(event));
+    if (event.failure) errorLog.report('town-request', JSON.stringify(event));
   };
   let publishPluginEvent: (topic: PluginEventTopic) => void = () => {};
   let pluginTownGeneration = 0;
@@ -229,6 +235,7 @@ async function ready() {
   townLive.restart();
   kitInstaller = new KitInstaller(directory, downloadFetch);
   portal = new PortalSupervisor(directory);
+  portal.on('log', line => errorLog.info('portal-output', line));
   background = new BackgroundPortal(directory);
   try { await background.discover(store.settings, store.connection); }
   catch (error) {

@@ -17,6 +17,7 @@ try {
   await mkdir(path.join(profile, 'logs'), { recursive: true });
   await mkdir(downloads);
   await writeFile(path.join(profile, 'logs/client-errors.log'), 'fixture client failure\n');
+  await writeFile(path.join(profile, 'logs/client-runtime.log.previous'), 'first client startup\n' + 'normal client output\n'.repeat(220000) + 'last client event\n');
   await writeFile(path.join(profile, 'portal.log'), 'fixture Portal output\n'.repeat(12000) + 'Authorization: Bearer private-fixture\n');
   await writeFile(path.join(profile, 'connection.url'), 'private connection file');
   await buildRenderer({ configFile: path.resolve('vite.renderer.config.ts'), build: { outDir: assets } });
@@ -48,6 +49,11 @@ try {
   assert.match(file, /Portal-Desktop-logs-.*\.zip$/);
   const files = unzipSync(await readFile(file));
   assert.match(strFromU8(files['client/client-errors.log']), /fixture client failure/);
+  assert.match(strFromU8(files['client/client-runtime.log']), /\[client-start\]/);
+  const completeLog = strFromU8(files['client/client-runtime.log.previous']);
+  assert(completeLog.startsWith('first client startup\n'));
+  assert(completeLog.endsWith('last client event\n'));
+  assert(completeLog.length > 4 * 1024 * 1024);
   assert.match(strFromU8(files['portal/runtime-1/portal.log']), /fixture Portal output/);
   assert(!strFromU8(files['portal/runtime-1/portal.log']).includes('private-fixture'));
   assert(files['portal/portal-runtime.log']); assert(files['portal/portal-status.json']);
