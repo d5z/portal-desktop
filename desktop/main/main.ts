@@ -12,6 +12,7 @@ import { clientStartup } from './app/startup';
 import { clientUserData } from './app/profile';
 import type { ClientBrowser } from './browser/browser';
 import { createMainWindow } from './app/window';
+import { LocalApps } from './app/local-apps';
 import { editChat } from './app/context-menu';
 import { configureLocalSession, registerLocalProtocol } from './app/protocol';
 import { createApplicationTray, installApplicationMenu } from './app/tray';
@@ -20,6 +21,7 @@ import os from 'node:os';
 import { access, mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import { SettingsStore } from './app/settings';
 import { ClientErrorLog } from './app/error-log';
+import { createLogArchive } from './app/log-archive';
 import { portalLogText } from './portal/diagnostics';
 import { PortalSupervisor } from './portal/supervisor';
 import { ExternalPortalObserver } from './portal/external';
@@ -41,6 +43,13 @@ import { TownLive } from './town/live';
 import { TownClient, TownCredentials, TOWN_ORIGIN, type TownRequestEvent } from './town/client';
 import { registerTownIpc } from './town/ipc';
 import { registerKitsIpc } from './kits/ipc';
+import { downloadFetch } from './kits/download-fetch';
+import { PluginWindows } from './plugins/windows';
+import { PluginRegistry } from './plugins/registry';
+import { registerPluginsIpc } from './plugins/ipc';
+import { createPluginServices } from './plugins/services';
+import { PluginWorkspace } from './plugins/workspace';
+import type { PluginEventTopic } from '../../plugins/sdk';
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
@@ -69,6 +78,7 @@ try {
   userData = path.join(os.tmpdir(), 'portal-desktop-startup');
 }
 let window: BrowserWindow | null = null;
+let closePluginSessions = () => {};
 let windowReady = false;
 let browser: ClientBrowser | undefined;
 let portal: PortalSupervisor;
@@ -125,6 +135,9 @@ function createWindow() {
   });
   window = created.window;
   browser = created.browser;
+  window.webContents.on('did-start-navigation', (_event, _url, inPlace, isMainFrame) => { if (isMainFrame && !inPlace) closePluginSessions(); });
+  window.webContents.on('render-process-gone', () => closePluginSessions());
+  window.webContents.on('destroyed', () => closePluginSessions());
 }
 
 async function ready() {
@@ -200,14 +213,21 @@ async function ready() {
   const reportTownRequest = (event: TownRequestEvent) => {
     errorLog.report('town-request', JSON.stringify(event));
   };
+  let publishPluginEvent: (topic: PluginEventTopic) => void = () => {};
+  let pluginTownGeneration = 0;
   townLive = new TownLive(() => townCredentials.token, () => townCredentials.beingId, state => {
+    if (state.generation !== pluginTownGeneration) {
+      pluginTownGeneration = state.generation;
+      closePluginSessions();
+    }
+    publishPluginEvent('town.changed');
     notifications.reset(state.generation);
     if (state.phase === 'auth-error' || state.phase === 'unpaired') { notifications.clear(); pendingNotification = undefined; }
     if (window && !window.webContents.isDestroyed()) window.webContents.send('beings:town-live', state);
   }, net.fetch.bind(net) as typeof fetch, TOWN_ORIGIN, () => townCredentials.display, target => notifications.receive(target), reportTownRequest);
   const town = new TownClient(() => townCredentials.token, net.fetch.bind(net) as typeof fetch, TOWN_ORIGIN, () => townLive.state.beingId || '', reportTownRequest);
   townLive.restart();
-  kitInstaller = new KitInstaller(directory, net.fetch.bind(net) as typeof fetch);
+  kitInstaller = new KitInstaller(directory, downloadFetch);
   portal = new PortalSupervisor(directory);
   background = new BackgroundPortal(directory);
   try { await background.discover(store.settings, store.connection); }
@@ -228,7 +248,29 @@ async function ready() {
   catch { chatSceneNotice = '桌面场景标识未能读取或保存，暂时无法发送消息。请检查客户端配置目录后重启。'; }
   proxy = new ChatProxy(() => store.connection, net.fetch.bind(net) as typeof fetch, () => chatSessions?.current(store.connection?.endpoint) || chatScene, id => chatSessions?.list(store.connection?.endpoint).find(scene => scene.scene_id === id));
   const assets = app.isPackaged ? path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}`) : path.resolve('desktop/generated');
-  registerLocalProtocol(assets, proxy);
+  const currentPluginScene = () => chatSessions?.current(store.connection?.endpoint) || chatScene;
+  const pluginContextKey = () => JSON.stringify([store.connection?.endpoint, store.connection?.token, townLive.state.generation, currentPluginScene()]);
+  const pluginWorkspace = new PluginWorkspace(() => ({ key: pluginContextKey(), endpoint: store.connection?.endpoint || '', sceneId: currentPluginScene()?.scene_id || '', townGeneration: townLive.state.generation }), () => publishPluginEvent('workspace.changed'));
+  let pluginWindows: PluginWindows | undefined;
+  const plugins = new PluginRegistry(path.join(directory, 'plugins'), createPluginServices({
+    contextKey: pluginContextKey,
+    workspace: manifest => pluginWorkspace.read(manifest),
+    tasks: () => taskSnapshotFromObserver(),
+    being: () => ({ connected: Boolean(store.connection), name: store.settings.being, sceneId: currentPluginScene()?.scene_id || '', sceneLabel: currentPluginScene()?.scene_meta.scene_label || '' }),
+    endpoint: () => store.connection?.endpoint || '',
+    town: (query, signal) => town.query(query, undefined, signal), proxy,
+    confirmChat: async (name, being, message) => {
+      if (!window) return false;
+      return (await dialog.showMessageBox(window, { type: 'question', title: '插件发起 Being 对话',
+        message: `${name} 请求向 ${being.name} 发送消息`, detail: `场景：${being.sceneLabel}\n\n${message}`,
+        buttons: ['取消', '发送'], defaultId: 0, cancelId: 0 })).response === 1;
+    },
+  }), event => { pluginWindows?.emit(event); if (window && !window.webContents.isDestroyed()) window.webContents.send('beings:plugin-event', event); });
+  pluginWindows = new PluginWindows(plugins, shellURL, () => window, () => appearance);
+  closePluginSessions = () => { pluginWindows?.close(); plugins.invalidate(); };
+  app.once('before-quit', () => pluginWindows?.close());
+  publishPluginEvent = topic => plugins.publish(topic);
+  registerLocalProtocol(assets, proxy, plugins);
   configureLocalSession();
   const clientContext = new ClientContextReader(shellURL());
   const clientCommands = new ClientCommandServer(path.join(directory, '.portal-client.json'),
@@ -276,7 +318,18 @@ async function ready() {
       catch (error) { throw new Error(errorLog.report(channel, error)); }
     });
   };
+  handle('beings:plugins-window-open', (id, view, command) => pluginWindows!.open(id, view, command));
+  handle('beings:plugins-host-reply', (id, value, error) => pluginWindows!.reply(id, value, error));
   handle('beings:client-startup', (enabled?: boolean) => clientStartup(app, process.platform, process.execPath, enabled));
+  const localApps = new LocalApps(path.join(directory, 'local-apps.json'));
+  handle('beings:local-apps', () => localApps.list());
+  handle('beings:associate-app', (entry: unknown) => exclusive(async () => {
+    const selection = await dialog.showOpenDialog(window!, { title: '关联已安装的 App', properties: ['openFile'],
+      ...(process.platform === 'win32' ? { filters: [{ name: '应用程序', extensions: ['exe'] }] } : {}) });
+    if (selection.canceled || !selection.filePaths[0]) return false;
+    await localApps.associate(entry, selection.filePaths[0]); return true;
+  }));
+  handle('beings:unlink-app', (id: string) => exclusive(() => localApps.remove(id)));
   handle('beings:notifications', (patch?: unknown) => exclusive(async () => {
     const state = patch === undefined ? notifications.state : await notifications.save(patch);
     if (pendingNotification && (!state.preferences.enabled || !state.preferences[pendingNotification.target.channel])) pendingNotification = undefined;
@@ -338,6 +391,19 @@ async function ready() {
     await capturePortalLogs();
     const error = await shell.openPath(errorLog.directory);
     if (error) throw new Error(error);
+  });
+  let collectingLogs: Promise<string> | undefined;
+  handle('beings:collect-logs', () => {
+    if (!collectingLogs) collectingLogs = (async () => {
+      const secrets = [store.connection?.token || '', store.connection?.relaySecret || '', townCredentials.token];
+      const runtimeDirectories = [background.installedService?.root || '', portal.state.runtimePath || '', directory];
+      await capturePortalLogs();
+      const file = await createLogArchive({ logsDirectory: errorLog.directory, runtimeDirectories,
+        destination: app.getPath('downloads'), secrets });
+      shell.showItemInFolder(file);
+      return file;
+    })().finally(() => { collectingLogs = undefined; });
+    return collectingLogs;
   });
   handle('beings:diagnostics-export', async () => {
     const report = await diagnose();
@@ -429,7 +495,9 @@ async function ready() {
     if (!chatSessions || !store.connection) throw new Error('请先连接 Being，或检查场景目录。');
     if (endpoint !== store.connection.endpoint) throw new Error('Being 连接已切换，请重试。');
     if (!['create', 'bind', 'select', 'rename', 'delete'].includes(operation)) throw new Error('无效的场景操作。');
+    const previousPluginScene = JSON.stringify(currentPluginScene());
     await chatSessions.change(endpoint, operation as 'create' | 'bind' | 'select' | 'rename' | 'delete', value, sceneId);
+    if (JSON.stringify(currentPluginScene()) !== previousPluginScene) closePluginSessions();
     return snapshot();
   }));
   const verifyConnection = async () => {
@@ -510,7 +578,7 @@ async function ready() {
     await mkdir(directory, { recursive: true });
     const file = path.join(directory, 'appearance.json');
     await writeFile(file + '.tmp', JSON.stringify({ theme })); await rename(file + '.tmp', file);
-    nativeTheme.themeSource = theme; appearance = theme;
+    nativeTheme.themeSource = theme; appearance = theme; pluginWindows?.updateTheme(theme);
     if (!(process.platform === 'win32' && Number(os.release().split('.')[2]) >= 22621)) window?.setBackgroundColor(theme === 'dark' ? '#212121' : '#ffffff');
     return appearance;
   }));
@@ -522,6 +590,8 @@ async function ready() {
     open: url => browser?.open(url),
   });
   registerKitsIpc({ handle, exclusive, window: () => window, store, kitInstaller });
+  registerPluginsIpc({ handle, exclusive, window: () => window, registry: plugins, closeWindows: id => pluginWindows?.close(id), fetcher: downloadFetch });
+  handle('beings:plugins-context', context => pluginWorkspace.update(context));
   handle('beings:model-config', async (patch?: Record<string, unknown>) => {
     if (patch !== undefined && (!patch || Array.isArray(patch) || typeof patch !== 'object' ||
       Object.entries(patch).some(([key, value]) => !['model', 'provider', 'base_url', 'api_key', 'thinking', 'temperature', 'rollback'].includes(key) || !['string', 'number', 'boolean'].includes(typeof value)) || JSON.stringify(patch).length > 16384))
@@ -552,11 +622,13 @@ async function ready() {
     };
   };
   const sceneTasks = new SceneTaskObserver(tasks => {
+    publishPluginEvent('tasks.changed');
     void taskSnapshot(tasks).then(snapshot => {
       if (snapshot.endpoint === store.connection?.endpoint && window && !window.isDestroyed()) window.webContents.send('beings:scene-tasks', snapshot);
     });
   }, () => new Set((chatSessions?.list(store.connection?.endpoint) || []).map(scene => scene.scene_id)));
   app.once('will-quit', () => sceneTasks.close());
+  const taskSnapshotFromObserver = async () => taskSnapshot(await sceneTasks.configure(store.settings.portalConfigPath));
   handle('beings:scene-tasks', async () => taskSnapshot(await sceneTasks.configure(store.settings.portalConfigPath)));
   handle('beings:subagent-config', () => readSubagentConfig(directory, store.settings));
   handle('beings:save', (input: SaveSettings) => exclusive(async () => {
@@ -590,7 +662,7 @@ async function ready() {
       if (previousConnection) await store.save({ ...previous, connectionLink: previousConnection.link + '&relay_secret=' + encodeURIComponent(previousConnection.relaySecret) });
       throw error;
     }
-    proxy.abortAll(); return snapshot();
+    closePluginSessions(); proxy.abortAll(); return snapshot();
   }));
   handle('beings:choose', async (kind: string) => {
     if (kind !== 'workspace') throw new Error('Invalid dialog');

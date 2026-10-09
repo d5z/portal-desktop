@@ -176,15 +176,17 @@ loom.html          React 聊天页挂载入口
 - [ ] 完善 Kit 作者、来源、依赖、配置缺项和认证说明；区分客户端管理与外部管理的 Kit，准确展示可用状态。
 - [ ] 完善正式发布的代码签名、公证、平台验证记录与贡献者文档。
 
-### 社区插件：已形成设计，尚未实现通用加载器
+### 社区插件：Plugin API v1
 
-- [ ] 在 Grove / Portal Kit 基础上统一插件发现、配置和管理体验，保持已有 Kit 兼容。
-- [ ] 实现声明式界面插件：面板、列表、卡片与设置表单，通过受限接口呈现现有服务数据。
-- [ ] 发布版本化 manifest、JSON Schema、TypeScript SDK、示例插件和离线校验工具。
-- [ ] 实现版本锁定、依赖检查、停用、升级回退和来源记录；共享或外部管理的 Kit 不由客户端擅自接管。
-- [ ] 验证插件故障隔离、身份切换和权限撤销；插件失败只影响对应扩展，不触发整个客户端重启。
+- [x] Grove 增加 Plugin 标签与筛选，保留 Kit/App 路径；支持本地导入和 Grove 下载。
+- [x] 版本化清单、动态页面入口、隔离 HTML 加载、主题同步和插件私有存储。
+- [x] [SDK 1.3](DEVELOPER-API-SDK.md#part-3--客户端插件-api--sdk)：独立 TypeScript 类型包、Town 读取、Being 历史/草稿/确认发送与流式回复、命令面板、插件设置和原子存储更新。
+- [x] 插件工作区上下文、侧栏与资源菜单、可取消领域事件，以及当前场景任务状态；流程看板支持资源协作和节点关联任务。
+- [x] 启用、停用、卸载、来源记录与会话撤销，无需修改客户端源码。
+- [x] 社区星图流程看板已迁移成独立插件，实测覆盖画布、拖拽、评论与数据恢复。
+- [ ] 自动更新与回退、签名、全库检索、更多界面贡献和受控工具调用。
 
-首个界面示例拟采用公开卷轴阅读面板。当前不支持直接安装 Codex 插件包；复杂网页组件需要额外的隔离与协议适配。详细契约和实施顺序见 [社区插件扩展方案](desktop/EXTENSIONS.md)。
+单独克隆 [starmap](https://github.com/chunqing-liu/starmap)，在该仓库执行 `npm ci` 和 `npm run check`，在「工具库」→「Plugin」导入它的 `dist` 目录即可打开流程看板。插件拥有独立 CI 产物和 tag 发版流程，客户端仓库不包含其实现。详见 [Plugin API v1](DEVELOPER-API-SDK.md#part-3--客户端插件-api--sdk) 和 [看板插件](https://github.com/chunqing-liu/starmap)。Grove 使用现有 App + plugin 标签及固定 Release asset 分发，未向线上发布条目；不直接兼容 Obsidian 或 Codex 插件包。
 
 ### 单会话编排：待定方案
 
@@ -220,7 +222,7 @@ Loom 与 Town 凭据分别通过系统密钥库加密保存，配对码不落盘
 | [配套更新](desktop/UPDATING.md) | 客户端与 Portal 的升级、恢复和发布流程 |
 | [Portal 恢复](desktop/PORTAL-RECOVERY.md) | 启动失败、手动重启、诊断日志与 Windows 启动说明 |
 | [发布说明](desktop/RELEASE_NOTES.md) | 版本交付说明 |
-| [社区插件方案](desktop/EXTENSIONS.md) | 拟议扩展契约、SDK、分发与生命周期 |
+| [开发者 API / SDK 指南](DEVELOPER-API-SDK.md) | Heart/Town API、插件 SDK 速查、接入边界与示例 |
 | [共同工作空间探索](desktop/SHARED-WORKSPACE.md) | 历史设计与待协商的场景协议，不代表已实现或当前路线图 |
 | [上游来源](UPSTREAM.md) | Loom 来源、Portal 固定提交与兼容分支维护 |
 
@@ -242,3 +244,5 @@ Loom 与 Town 凭据分别通过系统密钥库加密保存，配对码不落盘
 感谢 Loom、Heart Portal、[Beings Town](https://beings.town/) 与 [Town Client SDK](https://github.com/jeremyliu16/beings-town-client-sdk) 提供的基础能力，也感谢 [BeingDesktop](https://github.com/GuangCZ/BeingDesktop) 的开源实践与设计参考。来源及集成方式见 [UPSTREAM.md](UPSTREAM.md)。
 
 纯静态 OSS 包：运行 `npm run package:web:static`，输出 `out/town-web-oss.zip`。支持设置页添加到主屏幕，默认直连真实 Town 并直接配对，无域名检测或连接预验证，见 [OSS 部署说明](web/OSS.md)。
+
+工具库现统一提供 App、Kit、Plugin 分类和“仅本机存在”筛选，Plugin 分类内可导入与管理插件。模块沿用弹窗与右侧面板，插件支持页面和资源协作侧栏。详见 [插件说明](DEVELOPER-API-SDK.md#part-3--客户端插件-api--sdk)。

@@ -184,7 +184,11 @@ function ChatView({
   useEffect(() => {
     const shortcut = (event: KeyboardEvent) => {
       if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
-      if (event.key.toLowerCase() === "f") {
+      if (event.shiftKey && event.key.toLowerCase() === "p") {
+        event.preventDefault();
+        event.stopPropagation();
+        bridge.send({ type: "beings:plugin-commands" });
+      } else if (event.key.toLowerCase() === "f") {
         event.preventDefault();
         event.stopPropagation();
         bridge.send({ type: "beings:chat-search" });

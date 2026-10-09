@@ -46,6 +46,7 @@ export class WorkspaceModel extends Store {
   enter(view: string) {
     this.scenes.enter(view as SceneView);
     if (view === "chat") this.connection(this.online);
+    if (view === 'plugins') this.scenes.update({ status: 'ready', scope: '本机插件页面；插件内容不自动发送给 Being', identity: '' });
     if (view === "portal")
       this.scenes.update({
         status: "ready",

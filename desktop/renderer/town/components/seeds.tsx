@@ -1,3 +1,4 @@
+import { catalogPage } from '../models/pagination';
 import { useEffect, useRef, useState } from "react";
 import type { SeedFilters, TownQuery } from "../../../shared/types";
 import { TownModel, date, list, record, str, type Data } from "../models/town";
@@ -64,11 +65,11 @@ export function SeedSearch({ town }: { town: TownModel }) {
 }
 
 export function SeedGarden({ town, data }: { town: TownModel; data: Data }) {
-  const seeds = list(data, "seeds");
+  const { items: seeds, total } = catalogPage(town, data);
   return <>
     <div className="seed-intro">
       <p>{town.seedFilters.kit ? `${town.seedFilters.kit} · 经验墙` : "把走过的弯路，留成下一次的路标。"}</p>
-      <span className="card-meta">{Number(data.count ?? seeds.length)} 颗种子</span>
+      <span className="card-meta">{total} 颗种子</span>
     </div>
     {!seeds.length ? <div className="feed-empty"><strong>这里还没有种子</strong><p>试试其他关键词或筛选条件。</p></div> : (
       <div className="catalog-split seed-garden">

@@ -102,7 +102,8 @@ describe('Town civic rendering and state', () => {
     await vi.waitFor(() => expect(town.loading).toBe(false));
     let html = renderToStaticMarkup(createElement(Town, { model: town }));
     expect(html).toContain('小镇更新');
-    expect(html).toContain('共 30 项');
+    expect(html).toContain('共 1 项');
+    expect(html).toContain('第 1 / 1 页');
     town.offset = 24;
     town.selectTab('history');
     await vi.waitFor(() => expect(town.loading).toBe(false));

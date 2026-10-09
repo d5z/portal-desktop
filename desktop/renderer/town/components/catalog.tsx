@@ -1,3 +1,5 @@
+import { catalogPage } from '../models/pagination';
+import { groveEntryKind, pluginReleaseUrl } from '../../../shared/plugins';
 import { Fragment, useEffect, useRef, useState } from "react";
 import { TownModel, record, str, list, date, type Data } from "../models/town";
 import { sceneExcerpt } from "../../shared/models/scene";
@@ -128,7 +130,7 @@ const groveStages: Record<string, string> = {
 function groveStage(data: Data) {
   return groveStages[str(data.status)] || "成长阶段未标注";
 }
-function groveKind(data: Data) { return data.kind === "app" ? "App" : "Kit"; }
+function groveKind(data: Data) { return { app: 'App', kit: 'Kit', plugin: 'Plugin' }[groveEntryKind(data)]; }
 function groveAuthor(data: Data) {
   return str(data.display_name) || str(data.display).replace(/\s*\(t_[\w-]+\)$/, "") || "未命名 Being";
 }
@@ -158,19 +160,7 @@ function groveRepo(data: Data) {
 export function Catalog({ town, data }: { town: TownModel; data: Data }) {
   const kit = town.tab === "grove",
     book = town.view === "embers";
-  const entries = list(data, kit ? "kits" : "scrolls").filter((entry) =>
-    (!kit || !town.groveKind || (entry.kind || "kit") === town.groveKind) &&
-    town.matches(
-      entry.name,
-      entry.title,
-      entry.description,
-      entry.display_name,
-      entry.being_id,
-      entry.kind,
-      entry.status,
-      ...(Array.isArray(entry.tags) ? entry.tags : []),
-    ),
-  );
+  const entries = catalogPage(town, data).items;
   return (
     <>
     {kit && <KitInstallationNotice town={town} />}
@@ -197,7 +187,7 @@ export function Catalog({ town, data }: { town: TownModel; data: Data }) {
             {kit ? (
               <>
                 <p>{str(entry.description)}</p>
-                <span className="grove-tag-row"><span className="mini-tag">{groveStage(entry)}</span></span>
+                <span className="grove-tag-row"><span className="mini-tag">{groveKind(entry)}</span><span className="mini-tag">{groveStage(entry)}</span></span>
               </>
             ) : book ? (
               <span className="mini-tag">公开故事</span>
@@ -229,42 +219,22 @@ export function Catalog({ town, data }: { town: TownModel; data: Data }) {
   );
 }
 export function Pagination({ town }: { town: TownModel }) {
-  if (
-    !town.data ||
-    town.error ||
-    town.directId ||
-    ["town", "bonfire", "mail", "firesides", "contacts"].includes(town.view)
-  )
-    return null;
-  const entries = list(town.data, town.tab === "grove" ? "kits" : town.view === "seeds" ? "seeds" : town.view === "announcements" ? "items" : "scrolls"),
-    total = Number(town.data.total ?? town.data.count ?? entries.length);
-  return (
-    <>
-      <button
-        className="secondary"
-        disabled={town.loading || town.offset === 0}
-        onClick={() => {
-          town.offset = Math.max(0, town.offset - 24);
-          void town.load();
-        }}
-      >
-        ← 上一页
+  if (town.directId || !['kits', 'embers', 'scrolls', 'seeds', 'announcements'].includes(town.view) ||
+    (town.view !== 'kits' && (!town.data || town.error))) return null;
+  const page = town.pagination();
+  const loading = town.loading && !(town.view === 'kits' && town.localOnly);
+  return <>
+    <div className="pagination-controls">
+      <button className="pagination-arrow" aria-label="← 上一页" title="上一页" disabled={loading || page.page <= 1} onClick={() => town.turnPage(-1)}>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12 5-5 5 5 5" /></svg>
       </button>
-      <span>
-        第 {Math.floor(town.offset / 24) + 1} 页 · 共 {total} 项
-      </span>
-      <button
-        className="secondary"
-        disabled={town.loading || entries.length < 24 || town.offset + entries.length >= total}
-        onClick={() => {
-          town.offset += 24;
-          void town.load();
-        }}
-      >
-        下一页 →
+      <span className="pagination-page" aria-live="polite">{loading ? '正在读取…' : page.total ? `第 ${page.page} / ${page.pages} 页` : '暂无结果'}</span>
+      <button className="pagination-arrow" aria-label="下一页 →" title="下一页" disabled={loading || page.page >= page.pages} onClick={() => town.turnPage(1)}>
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 5 5 5-5 5" /></svg>
       </button>
-    </>
-  );
+    </div>
+    <small className="pagination-total">{loading ? '正在统计' : `共 ${page.total} 项`}</small>
+  </>;
 }
 export function DetailError({ town }: { town: TownModel }) {
   const error = town.detailError;
@@ -453,7 +423,8 @@ function GroveEvidence({ data }: { data: Data }) {
     {groveCount(data.feedback_count) > 0 && <span className="card-meta">{groveCount(data.feedback_count)} 位使用者反馈</span>}
   </>;
 }
-function KitDetail({ town, data }: { town: TownModel; data: Data }) {
+export function KitDetail({ town, data }: { town: TownModel; data: Data }) {
+  if (groveEntryKind(data) === 'plugin') return <GrovePluginDetail town={town} data={data} />;
   const manifest = record(data.manifest),
     tools = Array.isArray(manifest.tools) ? manifest.tools.map(record) : [],
     provision = record(manifest.provision),
@@ -497,7 +468,7 @@ function KitDetail({ town, data }: { town: TownModel; data: Data }) {
         {downloadable && town.supportsLocalKits && (
           <button
             className="primary"
-            disabled={town.prepareBusy || town.installBusy || Boolean(installed) || town.installedLoading || !town.installedLibrary}
+            disabled={town.prepareBusy || town.installBusy || Boolean(installed) || town.installedLoading || Boolean(town.installedError) || !town.installedLibrary}
             onClick={() => void town.prepareKit(str(data.id))}
           >
             {installed ? installed.problem ? "本机文件异常" : "已安装"
@@ -525,8 +496,8 @@ function KitDetail({ town, data }: { town: TownModel; data: Data }) {
         </button>
       </div>
       {installed ? <p className="field-help">
-        {installed.problem ? "本机已有此 Kit 的文件，请在“本机 Kits”中查看异常详情。"
-          : `本机已安装 v${installed.version}，可在“本机 Kits”中查看工具与配置。${town.installedLibrary?.enabled === false ? "当前 Portal 尚未启用 Kits。" : ""}`}
+        {installed.problem ? "本机已有此 Kit 的文件，请在“仅本机存在”筛选中查看异常详情。"
+          : `本机已安装 v${installed.version}，可在“仅本机存在”筛选中查看工具与配置。${town.installedLibrary?.enabled === false ? "当前 Portal 尚未启用 Kits。" : ""}`}
       </p> : app ? <p className="field-help">App 不提供 Kit 安装包，请查看发布者的 GitHub 仓库获取安装方式。</p> : downloadable && (
         <p className="field-help">
           在客户端完成下载、解压、依赖安装和工具检查。需要的凭据将在安装时填写。
@@ -571,6 +542,30 @@ function KitDetail({ town, data }: { town: TownModel; data: Data }) {
       </>}
     </>
   );
+}
+
+function GrovePluginDetail({ town, data }: { town: TownModel; data: Data }) {
+  const plugins = town.plugins;
+  const installed = plugins?.library.plugins.find(p => p.source.kind === 'grove' && p.source.id === str(data.id));
+  const downloadable = data.has_bundle === true || Boolean(str(data.source_url)) || Boolean(pluginReleaseUrl(data));
+  return <>
+    <h2 className="reading-title">{str(data.name)}</h2>
+    <p className="card-meta">Plugin · {groveAuthor(data)} · v{str(data.version)}</p>
+    <div className="grove-tag-row"><span className="mini-tag">plugin</span><span className="mini-tag">{groveStage(data)}</span></div>
+    <p>{str(data.description)}</p>
+    <p className="field-help">客户端界面插件：安装后可添加页面，启用和停用无需重新编译客户端。</p>
+    <div className="kit-actions">
+      {plugins?.api && downloadable && !installed && <button className="primary" disabled={plugins.busy} onClick={() => void plugins.act(async () => {
+        if (await plugins.api!.installGrove(str(data.id))) plugins.manage();
+      })}>{plugins.busy ? '正在下载并检查…' : '安装 Plugin'}</button>}
+      {plugins?.api && <button className="secondary" onClick={() => plugins.manage()}>{installed ? '已安装 · 管理插件' : '本机插件'}</button>}
+      {groveRepo(data) && <button className="secondary" onClick={() => void town.run(() => town.api.openBrowser(groveRepo(data)))}>查看插件仓库 ↗</button>}
+    </div>
+    {!downloadable && <p className="field-help">此条目尚无可下载的插件包；可从作者发布的目录导入。</p>}
+    {!plugins?.api && <p className="field-help">请在桌面客户端安装和使用 Plugin。</p>}
+    {plugins?.error && <p role="alert">{plugins.error}</p>}
+    <GroveDiscussion key={str(data.id)} town={town} id={str(data.id)} />
+  </>;
 }
 export function LocalKits({ town }: { town: TownModel }) {
   const library = town.library!,
@@ -638,7 +633,20 @@ export function LocalKits({ town }: { town: TownModel }) {
           </div>
           <div className="catalog-detail">
             {kit ? (
-              <>
+              <LocalKitDetail town={town} kit={kit} />
+            ) : (
+              <div className="detail-placeholder">
+                选择一项，查看内容与详情。
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+export function LocalKitDetail({town, kit}: {town: TownModel; kit: LocalKit}) { return (              <>
                 <div className="eyebrow">LOCAL KIT</div>
                 <h2 className="reading-title">{kit.name}</h2>
                 <InstalledKitStatus kit={kit} />
@@ -676,15 +684,4 @@ export function LocalKits({ town }: { town: TownModel }) {
                     <Tools tools={kit.tools.map((tool) => ({ ...tool }))} />
                   </>
                 )}
-              </>
-            ) : (
-              <div className="detail-placeholder">
-                选择一项，查看内容与详情。
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </>
-  );
-}
+              </>); }

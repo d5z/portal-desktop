@@ -56,11 +56,13 @@ export class HistoryCache {
       };
       const timer = setTimeout(() => finish(null), 1500);
       try {
-        const request = indexedDB.open(this.name!, 1);
+        const request = indexedDB.open(this.name!, 2);
         request.onupgradeneeded = () => {
           const db = request.result;
           if (!db.objectStoreNames.contains("messages")) db.createObjectStore("messages", { keyPath: "seq" });
           if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta", { keyPath: "key" });
+          const messages = request.transaction!.objectStore("messages");
+          if (!messages.indexNames.contains("scene")) messages.createIndex("scene", "scene_id");
         };
         request.onsuccess = () => {
           const db = request.result;
@@ -97,6 +99,26 @@ export class HistoryCache {
       if (!messages.length) return null;
       return { messages: messages.reverse(), lastSeq: Math.max(lastSeq, ...messages.map(m => m.seq)) };
     } catch { return null; }
+  }
+
+  /** Read a room independently of the global visible window and sync cursor. */
+  async readScene(sceneId: string, limit = 300): Promise<HistoryMessage[]> {
+    try {
+      const db = await this.open();
+      if (!db || this.closed || !sceneId) return [];
+      const tx = db.transaction("messages", "readonly");
+      const done = transactionDone(tx);
+      const messages: HistoryMessage[] = [];
+      // Equal index keys are ordered by the primary key (seq).
+      const cursor = tx.objectStore("messages").index("scene").openCursor(IDBKeyRange.only(sceneId), "prev");
+      cursor.onsuccess = () => {
+        if (!cursor.result || messages.length >= limit) return;
+        messages.push(cursor.result.value);
+        cursor.result.continue();
+      };
+      await done;
+      return messages.reverse();
+    } catch { return []; }
   }
 
   // Scan the complete cache, not the 300-message visible window. Exact scene

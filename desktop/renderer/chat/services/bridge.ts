@@ -214,7 +214,7 @@ export function createChatBridge(state: ChatState) {
             Date.now() > data.expiresAt
           )
             return;
-          const ok = !state.draft.trim() && !state.files.length;
+          const ok = !state.draft.trim() && !state.files.length && (data.sceneId === undefined || data.sceneId === state.currentScene.sceneId);
           if (ok) {
             state.draft = data.text;
             draftPrefix = data.text.split("以下是引用内容：")[0];

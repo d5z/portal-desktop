@@ -10,6 +10,7 @@ resources/heart-portal*
 *.log
 test-results/
 .env*
-
+plugins/*/dist/
+output
 resources/runtime-bundle.json
 resources/.portal-ready.json

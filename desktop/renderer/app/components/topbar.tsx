@@ -361,6 +361,13 @@ export function Topbar({ model }: { model: AppModel }) {
                 {app.update?.phase === "available" && <small>v{app.update.latestVersion}</small>}
               </button>
               <button
+                id="collect-logs"
+                disabled={app.collectingLogs}
+                onClick={() => void app.collectLogs()}
+              >
+                {app.collectingLogs ? '正在收集日志…' : '收集日志'}
+              </button>
+              <button
                 id="quit-client"
                 onClick={() => void app.run(() => app.api.quit())}
               >

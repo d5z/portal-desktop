@@ -1,3 +1,5 @@
+import { collectTownPages, paginatedViews, catalogPage, toolPage, PAGE_SIZE } from './pagination';
+import type { ToolEntry } from './tool-library';
 import { Store, errorText } from "../../shared/models/store";
 import { type SceneStore, type SceneResource } from "../../shared/models/scene";
 import type { FeedFilters, FeedReply } from "./feed";
@@ -161,13 +163,10 @@ export const definitions: Record<
     ],
   },
   kits: {
-    title: "Kit 工具库",
+    title: "工具库",
     eyebrow: "TOOLS FOR YOUR BEING",
-    description: "从 Grove 发现工具，通过本机 Portal 连接到 Being。",
-    tabs: [
-      ["grove", "Grove 市集"],
-      ["local", "本机 Kits"],
-    ],
+    description: "从 Grove 发现 Kit、App 和 Plugin，为 Being 添加工具，为客户端扩展页面。",
+    tabs: [],
   },
 };
 type SendTarget = {
@@ -178,8 +177,9 @@ type SendTarget = {
   beingId: string;
   reply?: FeedReply;
 };
-export type TownAPI = Pick<DesktopAPI, 'town' | 'townLive' | 'onTownLive' | 'reconnectTown' | 'sendTown' | 'townAuth' | 'autoPairTown' | 'cancelTownPair' | 'pairTown' | 'saveTownToken' | 'copyText' | 'openBrowser' | 'openTownLink' | 'localKits' | 'deleteKit' | 'importKit' | 'prepareKit' | 'installKit' | 'discardKit' | 'openKits'>;
+export type TownAPI = Pick<DesktopAPI, 'localApps' | 'associateApp' | 'unlinkApp' | 'town' | 'townLive' | 'onTownLive' | 'reconnectTown' | 'sendTown' | 'townAuth' | 'autoPairTown' | 'cancelTownPair' | 'pairTown' | 'saveTownToken' | 'copyText' | 'openBrowser' | 'openTownLink' | 'localKits' | 'deleteKit' | 'importKit' | 'prepareKit' | 'installKit' | 'discardKit' | 'openKits'>;
 export class TownModel extends Store {
+  plugins?: import('../../plugins/model').PluginsModel;
   supportsLocalKits = true;
   visible = true;
   view = "";
@@ -193,7 +193,18 @@ export class TownModel extends Store {
   announcementsLoading = false;
   announcementsError = "";
   groveStatus = "";
-  groveKind: "" | "kit" | "app" = "";
+  groveKind: "" | "kit" | "app" | "plugin" = "";
+  localOnly = false;
+  toolSelection = '';
+  localApps: import('../../../shared/types').LocalApp[] = [];
+  localAppsError = '';
+  private appsRequest = 0;
+  async refreshLocalApps() {
+    const request = ++this.appsRequest;
+    try { const apps = await this.api.localApps?.() || []; if (request === this.appsRequest) { this.localApps = apps; this.localAppsError = ''; } }
+    catch (error) { if (request === this.appsRequest) this.localAppsError = errorText(error); }
+    if (request === this.appsRequest) this.changed();
+  }
   seedFilters: SeedFilters = { q: "", domain: "", tag: "", kit: "", lifecycle: "" };
   data: Data | null = null;
   mentionNames: MentionNames = new Map();
@@ -546,21 +557,37 @@ export class TownModel extends Store {
     const samePage = this.view === view && this.directId === id;
     this.view = view;
     this.directId = id;
-    this.tab = this.tabs[view] || definitions[view].tabs[0]?.[0] || view;
+    this.tab = view === 'kits' ? 'grove' : this.tabs[view] || definitions[view].tabs[0]?.[0] || view;
     this.offset = 0;
     if (!samePage) this.search = "";
     void this.load();
     this.updateLive();
   }
   selectTab(tab: string) {
+    if (this.view === 'kits') {
+      this.localOnly = tab === 'local';
+      if (this.localOnly) this.groveKind = 'kit';
+      tab = 'grove';
+    }
     this.tab = tab;
     this.tabs[this.view] = tab;
     this.offset = 0;
     this.search = "";
     void this.load();
   }
+  pagination() { return this.view === 'kits' ? toolPage(this) : catalogPage(this); }
+  turnPage(direction: -1 | 1) {
+    const page = this.pagination();
+    this.offset = Math.max(0, Math.min(Math.max(0, page.pages - 1) * PAGE_SIZE, page.offset + direction * PAGE_SIZE));
+    this.detailRequest++;
+    this.detail = undefined; this.detailError = undefined; this.detailLoading = false;
+    this.selectedId = ''; this.toolSelection = ''; this.localKit = undefined;
+    this.scenes.update({ selection: undefined, count: page.total, filters: { tab: this.tab, offset: String(this.offset), search: this.search } });
+    this.changed();
+  }
   setSearch(search: string) {
     this.search = search;
+    if (paginatedViews.has(this.view)) this.offset = 0;
     this.scenes.update({
       selection: undefined,
       filters: {
@@ -756,6 +783,7 @@ export class TownModel extends Store {
     this.refreshError = '';
     this.loading = true;
     if (!preserveContent) this.status = "";
+    if (this.view === "kits") { void this.refreshLocalApps(); void this.plugins?.refresh(); }
     if (this.supportsLocalKits && this.view === "kits" && (this.tab !== "local" || this.directId))
       void this.refreshInstalledKits();
     this.changed();
@@ -798,7 +826,9 @@ export class TownModel extends Store {
         const [result, auth] = await Promise.all([
           this.view === "mail"
             ? this.queryMail(this.tab as "all" | "inbox" | "sent")
-            : this.api.town(this.query()),
+            : paginatedViews.has(this.view)
+              ? collectTownPages(this.query(), query => this.api.town(query), () => generation === this.request)
+              : this.api.town(this.query()),
           this.api.townAuth().catch(() => ({ configured: false, beingId: "" })),
         ]);
         if (generation !== this.request) return;
@@ -826,7 +856,7 @@ export class TownModel extends Store {
         status: "ready",
         scope: this.library
           ? "本机 Kit 清单；不代表工具已可调用"
-          : "已加载当前页；不代表全部内容或已阅读",
+          : paginatedViews.has(this.view) ? "已加载筛选范围内的目录；不代表已阅读正文" : "已加载当前页；不代表全部内容或已阅读",
       });
       if (this.view === "firesides" && this.data) {
         const entries = this.rooms();
@@ -904,7 +934,25 @@ export class TownModel extends Store {
     this.scenes.pin();
     this.showCompanion();
   };
+  private clearToolDetail() {
+    this.detailRequest++;
+    this.detail = undefined;
+    this.detailError = undefined;
+    this.detailLoading = false;
+    this.localKit = undefined;
+    this.selectedId = '';
+  }
+  selectTool(entry?: ToolEntry) {
+    if (entry?.kit) { this.selectLocal(entry.kit); return; }
+    this.clearToolDetail();
+    this.scenes.update({ title: entry?.name || definitions.kits.title, selection: undefined,
+      status: 'ready', scope: '工具库当前条目' });
+    if (entry?.remote) void this.loadDetail({ kind: 'kit', id: str(entry.remote.id) });
+    else this.changed();
+  }
   selectLocal(kit: LocalKit) {
+    this.clearToolDetail();
+    this.toolSelection = `kit:${kit.name}`;
     this.localKit = kit;
     this.selectedId = kit.name;
     this.scenes.update({
@@ -1429,7 +1477,6 @@ export class TownModel extends Store {
     const generation = ++this.installedRequest;
     this.installedLoading = true;
     this.installedError = "";
-    this.installedLibrary = null;
     this.changed();
     try {
       const library = await this.api.localKits();
@@ -1445,15 +1492,20 @@ export class TownModel extends Store {
   }
   async showInstalledKit(name: string) {
     this.directId = undefined;
-    this.tab = "local";
-    this.tabs.kits = "local";
+    this.tab = "grove";
+    this.localOnly = true;
+    this.groveKind = 'kit';
     this.search = "";
     this.offset = 0;
-    const pending = this.load(), generation = this.request;
-    await pending;
-    if (generation !== this.request) return;
-    const kit = this.library?.kits.find(kit => kit.name === name);
-    if (kit) this.selectLocal(kit);
+    const request = this.request;
+    await this.refreshInstalledKits();
+    if (request !== this.request || this.view !== 'kits') return;
+    const kit = this.installedLibrary?.kits.find(kit => kit.name === name);
+    if (kit) {
+      const index = this.installedLibrary!.kits.indexOf(kit);
+      this.offset = Math.floor(index / PAGE_SIZE) * PAGE_SIZE;
+      this.selectLocal(kit);
+    }
   }
   async prepareKit(id: string) {
     if (this.prepareBusy || this.plan) return;
@@ -1517,7 +1569,7 @@ export class TownModel extends Store {
       const result = await this.api.importKit();
       if (result.installed) {
         this.toast(`${result.name} 已导入。Portal 将自动刷新清单。`);
-        if (this.tab === "local") await this.load();
+        await this.refreshInstalledKits();
       }
     });
   }

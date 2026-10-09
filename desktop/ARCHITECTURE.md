@@ -122,7 +122,7 @@ Seed Garden 是公开阅读模块：主进程开放 `/api/seeds` 的分页/搜�
 
 `app/components/navigation.tsx` 在弹窗内提供主要 Town 功能切换，当前标题独立突出；入口统一调用 `AppModel.navigate`，每次进入都清理旧详情并重新读取，旧请求不能覆盖新页面。种子、卷轴和书架共用 `town/components/reading-actions.tsx` 的复制链接与浏览器打开操作栏。
 
-社区插件的后续扩展契约见 [插件扩展方案](EXTENSIONS.md)。该文档区分现有 Kit 能力与拟议的界面插件宿主；下文描述当前已实现的运行路径。
+客户端界面插件契约统一见 [开发指南 Part 3](../DEVELOPER-API-SDK.md#part-3--客户端插件-api--sdk)。main/plugins 管理清单、安装、私有存储、上下文权限与会话事件；renderer/plugins 提供导航、命令、侧栏及资源菜单。工作区 DTO 来自 SceneStore 和 Town 详情，任务元数据复用 SceneTaskObserver；通知只表示数据变化。Grove 的 plugin 标签条目走专用安装器，Portal Kit 路径保持独立。首个迁移插件在独立的 [starmap 仓库](https://github.com/chunqing-liu/starmap) 维护，源码、画布依赖与 CI 出包均由插件仓库管理，客户端只保留通用宿主和 SDK。
 
 `TownClient` 使用独立 GET 路由表与固定 `https://beings.town` 源。IPC 不接受任意请求地址、
 方法或认证头。配对通过固定 `POST /api/client/pair/confirm` 交换 `{town_id, code}`（兼容旧 `{being_id, code}`），主进程校验输入、响应身份和 token，再加密保存。token 不返回渲染器，配对码不落盘。公开目录/Grove/Embers 不带凭据；篝火、围炉、邮件及卷轴使用独立 Town 凭据，按 SDK 使用 Authorization Bearer，仅发给固定 Town 源。

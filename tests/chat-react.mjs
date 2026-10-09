@@ -122,6 +122,11 @@ try {
   await frame.locator('#input').focus();
   await page.keyboard.press('Control+f');
   await page.waitForFunction(() => window.received.some(item => item.type === 'beings:chat-search'));
+  for (const modifier of ['Control', 'Meta']) {
+    await page.evaluate(() => { window.received = []; });
+    await frame.locator('#input').press(`${modifier}+Shift+P`);
+    await page.waitForFunction(() => window.received.some(item => item.type === 'beings:plugin-commands'));
+  }
   assert.equal(await frame.locator('#messages .message').count(), 25);
   const messageFor = text => frame.getByText(text, { exact: true }).locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " message ")][1]');
   const oldMessageTime = await messageFor('历史问题 1').locator('.meta').textContent();

@@ -1,3 +1,5 @@
+import type { TownKind, TownQuery, TownResult } from '../../plugins/sdk';
+export type { TownKind, TownQuery, TownResult } from '../../plugins/sdk';
 export interface UpdateState {
   phase: 'idle' | 'checking' | 'available' | 'current' | 'unavailable';
   currentVersion: string; latestVersion?: string; message: string; releaseUrl: string;
@@ -62,6 +64,10 @@ export interface BrowserBounds { x: number; y: number; width: number; height: nu
 export type BrowserAction = 'back' | 'forward' | 'reload' | 'stop' | 'external' | 'close';
 export type ChatEditCommand = 'cut' | 'copy' | 'paste';
 export interface DesktopAPI {
+  localApps?(): Promise<LocalApp[]>;
+  associateApp?(entry: { id: string; name: string }): Promise<boolean>;
+  unlinkApp?(id: string): Promise<void>;
+  plugins?: import('./plugins').DesktopPluginAPI;
   platform: string;
   changeChatSession(operation: 'create' | 'bind' | 'select' | 'rename' | 'delete', value: string, endpoint: string, sceneId?: string): Promise<Snapshot>;
   clientStartup(enabled?: boolean): Promise<ClientStartup>;
@@ -118,6 +124,7 @@ export interface DesktopAPI {
   openWorkspace(): Promise<void>;
   diagnostics(): Promise<DiagnosticReport>;
   openLogs(): Promise<void>;
+  collectLogs(): Promise<string>;
   portalLogReference(): Promise<{ endpoint: string; text: string }>;
   exportDiagnostics(): Promise<boolean>;
   openLoom(): Promise<void>;
@@ -125,10 +132,7 @@ export interface DesktopAPI {
 }
 declare global { interface Window { beings: DesktopAPI } }
 
-export type TownKind = 'home' | 'bonfire' | 'firesides' | 'fireside' | 'fireside-members' | 'inbox' | 'sent' | 'embers' | 'scrolls' | 'my-scrolls' | 'grove' | 'kit-comments' | 'kit' | 'ember' | 'scroll' | 'seeds' | 'seed' | 'seed-lineage' | 'seed-absorbs' | 'announcements' | 'announcement' | 'contacts';
 export interface SeedFilters { q: string; domain: string; tag: string; kit: string; lifecycle: string }
-export interface TownQuery { kind: TownKind; offset?: number; id?: string; scrollKind?: string; groveStatus?: string; q?: string; domain?: string; tag?: string; kit?: string; lifecycle?: string; category?: string; includeExpired?: boolean }
-export type TownResult = { ok: true; data: Record<string, unknown>; fetchedAt: string; warnings?: string[] } | { ok: false; code: 'auth' | 'forbidden' | 'not-found' | 'http' | 'timeout' | 'format' | 'too-large' | 'network'; message: string; traceId?: string };
 export type TownChannel = 'bonfire' | 'mail' | 'firesides';
 export interface TownLiveState {
   phase: 'unpaired' | 'connecting' | 'connected' | 'reconnecting' | 'auth-error';
@@ -148,5 +152,6 @@ export type TownPost = { kind: 'bonfire'; content: string; replyTo?: number } | 
 export interface KitTool { name: string; description: string; params?: unknown }
 export interface LocalKit { name: string; version: string; description: string; directory: string; command: string[]; tools: KitTool[]; compatible: boolean; eager: boolean; problem?: string }
 export interface KitLibrary { directory: string; enabled: boolean; kits: LocalKit[]; configPath?: string }
+export interface LocalApp { id: string; name: string; path: string; exists: boolean }
 export interface KitInstallPlan { ticket: string; name: string; version: string; description: string; tools: number; command: string[]; environment: { name: string; description: string; required: boolean }[]; dependency: 'none' | 'npm' | 'python'; sha256: string; notes: string }
 export interface KitInstallInput { ticket: string; environment: Record<string, string> }

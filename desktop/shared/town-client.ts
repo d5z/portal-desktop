@@ -224,7 +224,7 @@ export class TownClient {
       return tracedFailure({ ok: false, code: 'network', message: '未收到发送确认。消息可能已送达，请刷新内容核对后再决定是否重发。' }, id);
     }
   }
-  async query(query: TownQuery, traceId?: string): Promise<TownResult> {
+  async query(query: TownQuery, traceId?: string, signal?: AbortSignal): Promise<TownResult> {
     if (query?.kind === 'my-scrolls' && (!this.getToken() || !this.getBeingId())) return { ok: false, code: 'auth', message: '请先用 Being 名和配对码连接 Town，再查看我的卷轴。' };
     const route = townRoute(query, this.getBeingId());
     const headers: Record<string, string> = { Accept: 'application/json' };
@@ -236,7 +236,7 @@ export class TownClient {
     }
     try {
       const request = await this.request(url.pathname + url.search, {
-        headers, method: 'GET', credentials: 'omit', redirect: 'error', signal: AbortSignal.timeout(20000),
+        headers, method: 'GET', credentials: 'omit', redirect: 'error', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000),
       }, async response => {
         if (!response.ok) return await townError(response, token);
         const data = query.kind === 'fireside-members'

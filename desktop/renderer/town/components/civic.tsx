@@ -1,3 +1,4 @@
+import { catalogPage } from '../models/pagination';
 import { useEffect, useRef, useState } from "react";
 import { TownModel, date, list, str, type Data } from "../models/town";
 import { townDisplayName, validTownIdentity } from "../../../shared/town-identity";
@@ -114,7 +115,7 @@ export function BonfireAnnouncements({ town }: { town: TownModel }) {
 export function Announcements({ town, data }: { town: TownModel; data: Data }) {
   const selected = useRef<HTMLButtonElement>(null);
   useEffect(() => { selected.current?.scrollIntoView({ block: 'nearest' }); }, [town.selectedId]);
-  const entries = list(data, "items").filter(entry => town.matches(entry.title, entry.content, entry.display_name, entry.display, entry.town_id));
+  const entries = catalogPage(town, data).items;
   return <div className="catalog-split announcement-board">
     <div className="catalog-list" aria-label="公告列表">
       {entries.map(entry => <button key={str(entry.id)}
@@ -127,7 +128,7 @@ export function Announcements({ town, data }: { town: TownModel; data: Data }) {
         <span className="card-meta">{name(entry)} · {date(entry.created_at)}</span>
         <p className="announcement-excerpt">{markdownText(str(entry.content)).slice(0, 140)}</p>
       </button>)}
-      {!entries.length && <p className="empty-inline">{town.search ? "当前页没有符合搜索的公告。" : "暂无符合条件的公告。"}</p>}
+      {!entries.length && <p className="empty-inline">{town.search ? "没有符合搜索的公告。" : "暂无符合条件的公告。"}</p>}
     </div>
     <AnnouncementDetail town={town} />
   </div>;

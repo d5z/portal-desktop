@@ -2,6 +2,9 @@ import { useLayoutEffect, useRef } from "react";
 import { definitions } from "../../town/models/town";
 import { NavigationControls } from "../../shared/components/navigation-controls";
 
+import { PluginNavigation } from '../../plugins/page';
+import type { PluginsModel } from '../../plugins/model';
+
 const places = [
   ["bonfire", "篝火"], ["firesides", "围炉"], ["mail", "私信"],
   ["announcements", "公告"], ["contacts", "通讯录"],
@@ -9,7 +12,8 @@ const places = [
   ["kits", "工具库"], ["town", "广场"],
 ] as const;
 
-export function PlaceHeading({ view, navigate, presentation, onPresentationChange, onBack, onForward, onClose = () => navigate("chat") }: {
+export function PlaceHeading({ plugins, view, navigate, presentation, onPresentationChange, onBack, onForward, onClose = () => navigate("chat") }: {
+  plugins?: PluginsModel;
   view: string;
   navigate: (view: string) => void;
   presentation: "dialog" | "panel";
@@ -31,7 +35,7 @@ export function PlaceHeading({ view, navigate, presentation, onPresentationChang
     <header className="place-sheet-heading">
       <div className="place-sheet-title-row">
         <div className="place-sheet-title-main">
-          <h1 id="view-title">{definitions[view]?.title || (view === "portal" ? "Portal 设置" : "对话")}</h1>
+          <h1 id="view-title">{definitions[view]?.title || (view === "plugins" ? "客户端插件" : view === "portal" ? "Portal 设置" : "对话")}</h1>
           <NavigationControls back={onBack} forward={onForward} />
         </div>
         <div className="place-sheet-actions">
@@ -54,6 +58,7 @@ export function PlaceHeading({ view, navigate, presentation, onPresentationChang
           <button type="button" key={target} aria-current={view === target ? "page" : undefined}
             onClick={() => navigate(target)}>{label}</button>
         ))}
+        {plugins && <PluginNavigation model={plugins} active={view === "plugins"} />}
       </nav>
     </header>
   );

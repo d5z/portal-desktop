@@ -11,6 +11,7 @@ import { createGunzip } from 'node:zlib';
 import { TOWN_ORIGIN, TownClient } from '../town/client';
 import { readKit, kitLocation } from './catalog';
 import { redact } from '../chat/connection';
+import { groveEntryKind } from '../../shared/plugins';
 import type { Settings, KitInstallPlan, KitInstallInput } from '../../shared/types';
 
 const MAX_DOWNLOAD = 64 * 1024 * 1024;
@@ -28,7 +29,7 @@ export function archivePath(value: string) {
   if (path.posix.isAbsolute(name) || path.win32.isAbsolute(name) || /[\\:\x00-\x1f]/.test(name) || name.split('/').some(p => !p || p === '..' || p === '.' || /[. ]$/.test(p) || /^(con|prn|aux|nul|com[0-9]|lpt[0-9])(\.|$)/i.test(p))) throw new Error('Kit 压缩包包含不安全或不兼容的路径。');
   return name;
 }
-export async function unpackKit(buffer: Buffer, directory: string) {
+export async function unpackKit(buffer: Buffer, directory: string, manifestFile = 'manifest.json') {
   if (buffer[0] !== 0x1f || buffer[1] !== 0x8b) throw new Error('Kit 下载内容不是受支持的 tar.gz 压缩包。');
   let count = 0, bytes = 0;
   const seen = new Set<string>();
@@ -54,15 +55,17 @@ export async function unpackKit(buffer: Buffer, directory: string) {
       } });
     if (violation) throw violation;
   } finally { await rm(tarFile, { force: true }); }
-  if (await exists(path.join(directory, 'manifest.json'))) return directory;
+  if (await exists(path.join(directory, manifestFile))) return directory;
   const entries = await readdir(directory, { withFileTypes: true });
   const folders = entries.filter(e => e.isDirectory() && !e.name.startsWith('.'));
-  if (folders.length === 1 && await exists(path.join(directory, folders[0].name, 'manifest.json'))) return path.join(directory, folders[0].name);
-  throw new Error('压缩包根目录或单个顶层目录中缺少 manifest.json。');
+  if (folders.length === 1 && await exists(path.join(directory, folders[0].name, manifestFile))) return path.join(directory, folders[0].name);
+  throw new Error(`压缩包根目录或单个顶层目录中缺少 ${manifestFile}。`);
 }
 export async function downloadKit(id: string, fetcher: typeof fetch) {
   if (!/^[a-zA-Z0-9_-]{1,160}$/.test(id)) throw new Error('无效的 Kit 编号。');
-  let url = `${TOWN_ORIGIN}/api/grove/${id}/download`;
+  return downloadBundle(`${TOWN_ORIGIN}/api/grove/${id}/download`, fetcher);
+}
+export async function downloadBundle(url: string, fetcher: typeof fetch) {
   const signal = AbortSignal.timeout(120000);
   for (let attempt = 0; attempt < 6; attempt++) {
     const parsed = new URL(url);
@@ -111,6 +114,7 @@ export class KitInstaller {
     if (!details.ok) throw new Error(details.message);
     if (details.data.ambiguous) throw new Error('此名称对应多个 Kit，请通过市集中的具体条目安装。');
     if (details.data.kind === 'app') throw new Error('Grove App 没有 Kit bundle，请前往其仓库获取安装方式。');
+    if (groveEntryKind(details.data) === 'plugin') throw new Error('此条目是客户端 Plugin，请使用插件安装入口。');
     if (details.data.has_bundle === false && !details.data.source_url) throw new Error('此 Kit 没有可下载的安装包。');
     const data = await downloadKit(id, this.fetcher);
     // Stage beside kits_dir, so final activation uses an atomic same-filesystem rename.

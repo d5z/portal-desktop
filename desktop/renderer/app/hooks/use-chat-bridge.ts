@@ -60,6 +60,7 @@ export function useChatBridge(
       if (message.revision !== new URL(target.src).searchParams.get("revision"))
         return;
       if (app.town.receiveContactDraft(message)) return;
+      if (app.plugins.receiveDraft(message)) return;
       if (message.type === 'beings:scene-tasks-request') {
         void app.api.sceneTasks?.().then(snapshot => {
           if (snapshot.endpoint === app.snapshot?.settings.endpoint && frame.current === target && new URL(target.src).searchParams.get('revision') === message.revision)
@@ -140,6 +141,10 @@ export function useChatBridge(
       }
       if (message.type === "beings:chat-search") {
         app.openSearch();
+        return;
+      }
+      if (message.type === "beings:plugin-commands") {
+        app.plugins.showCommands(true);
         return;
       }
       if (message.type === "beings:return-settings" && app.settingsRoute === "model") {

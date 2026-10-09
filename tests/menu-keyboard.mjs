@@ -17,6 +17,7 @@ const bundle = await build({
         chatLoading: false, sbsKnown: false, searchOpen: false,
         navigate(view) { window.navigated = view; },
         openClientSettings() { window.settingsOpened = (window.settingsOpened || 0) + 1; },
+        collectLogs() { window.logsCollected = (window.logsCollected || 0) + 1; },
       };
       createRoot(document.getElementById('root')).render(<Topbar model={model} />);`,
     resolveDir: process.cwd(), loader: 'tsx',
@@ -100,6 +101,9 @@ try {
     assert.equal(await page.locator('#outside').evaluate(el => el === document.activeElement), true);
   }
   assert.deepEqual(errors, []);
+  await page.locator('#options-trigger').click();
+  await page.getByRole('button', { name: '收集日志', exact: true }).click();
+  assert.equal(await page.evaluate(() => window.logsCollected), 1);
   console.log('PASS: blur closes without flashing; submenu Escape and Back restore focus after rendering; double Escape, keyboard entry, interrupted motion and reduced motion close correctly.');
 } catch (error) {
   console.error('Menu keyboard assertion failed:', error);

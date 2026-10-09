@@ -237,9 +237,13 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.pa
   await page.waitForFunction(() => document.body.dataset.view === 'seeds' && !document.querySelector('#town-body').hasAttribute('aria-busy'));
   await page.getByRole('button', { name: '回退', exact: true }).click();
   await page.waitForFunction(() => document.body.dataset.view === 'kits' && !document.querySelector('#town-body').hasAttribute('aria-busy'));
-  await page.getByRole('button', { name: '下一页 →' }).click(); await page.getByText('第 2 页 · 共 25 项').waitFor(); assert.equal(await page.locator('.catalog-item').count(), 1);
-  await page.locator('#town-search').fill('does-not-exist'); await page.getByText('当前页没有符合条件的内容。').waitFor();
-  await page.getByRole('tab', { name: '本机 Kits', exact: true }).click(); await page.getByText('给 Being 添一件工具').waitFor();
+  await page.getByRole('button', { name: '下一页 →' }).click(); await page.getByText('第 2 / 2 页').waitFor(); assert.equal(await page.locator('.catalog-item').count(), 1);
+  await page.locator('#town-search').fill('does-not-exist'); await page.getByText('没有符合筛选条件的工具。', { exact: true }).waitFor();
+  await page.locator('#town-search').fill('');
+  await page.getByRole('tab', { name: 'Kit', exact: true }).click();
+  await page.getByRole('checkbox', { name: '仅本机存在' }).check();
+  await page.getByText('没有符合筛选条件的工具。', { exact: true }).waitFor();
+  await page.getByRole('button', { name: '导入 Kit', exact: true }).waitFor();
   await nav('embers'); await page.locator('.catalog-item').first().click(); await page.getByText('完整内容', { exact: true }).waitFor(); assert.equal(await page.evaluate(() => window.pwned), undefined);
   // Exercise consecutive modal closes and iframe navigation without sleeps
   // between places. Each pointer click must open the requested place once.
@@ -247,16 +251,17 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.pa
     await nav('bonfire'); await page.locator('#town-message-0 .social-body strong').getByText('篝火测试', { exact: true }).waitFor();
     await nav('embers'); await page.locator('.catalog-item').first().waitFor();
   }
-  await nav('kits'); await page.getByRole('tab', { name: 'Grove 市集', exact: true }).click();
+  await nav('kits'); await page.getByRole('checkbox', { name: '仅本机存在' }).uncheck();
   await page.locator('.catalog-item').first().click(); await page.getByRole('button', { name: '安装到本机', exact: true }).click();
   await page.getByRole('heading', { name: '安装 downloaded-kit', exact: true }).waitFor();
   await page.locator('#kit-env-FIXTURE_API_KEY').fill('fixture-value');
   await mkdir('test-results', { recursive: true }); await page.screenshot({ path: 'test-results/kit-install.png' });
   await page.locator('.kit-install-form').getByRole('button', { name: '安装到本机', exact: true }).click();
-  await page.locator('.kit-detail').getByRole('button', { name: '已安装', exact: true }).waitFor({ timeout: 60000 });
-  assert.equal(await page.getByRole('tab', { name: 'Grove 市集', exact: true }).getAttribute('aria-selected'), 'true');
+  await page.getByRole('button', { name: '删除本机 Kit', exact: true }).waitFor({ timeout: 60000 });
+  assert.equal(await page.getByRole('tab', { name: 'Kit', exact: true }).getAttribute('aria-selected'), 'true');
+  assert.equal(await page.getByRole('checkbox', { name: '仅本机存在' }).isChecked(), false);
   assert.equal(await page.locator('.catalog-item').filter({ hasText: 'downloaded-kit' }).count(), 1);
-  assert.equal(await page.locator('.kit-detail').getByRole('button', { name: '已安装', exact: true }).isDisabled(), true);
+  await page.getByText('downloaded_ping', { exact: true }).waitFor();
   const downloaded = JSON.parse(await readFile(path.join(dir, 'kits/downloaded-kit/manifest.json'), 'utf8'));
   assert.equal(downloaded.tools[0].name, 'downloaded_ping');
   assert(!JSON.stringify(downloaded).includes('fixture-value'));
@@ -267,8 +272,9 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.pa
   await writeFile(path.join(source, 'manifest.json'), JSON.stringify({ name: 'desktop-test-kit', version: '1.0', command: ['node', 'server.mjs'], tools: [{ name: 'fixture_tool', description: 'Fixture tool', params: { type: 'object' } }] }));
   await writeFile(path.join(source, 'server.mjs'), 'throw new Error("must not execute on import");');
   await app.evaluate(({ dialog }, source) => { dialog.showOpenDialog = async () => ({ canceled: false, filePaths: [source] }); dialog.showMessageBox = async () => ({ response: 1, checkboxChecked: false }); }, source);
-  await nav('kits'); await page.getByRole('tab', { name: '本机 Kits', exact: true }).click();
-  await page.getByRole('button', { name: '导入本地 Kit', exact: true }).click(); await page.locator('.catalog-item').filter({ hasText: 'desktop-test-kit' }).click(); await page.getByText('fixture_tool', { exact: true }).waitFor();
+  await nav('kits'); await page.getByRole('tab', { name: 'Kit', exact: true }).click();
+  await page.getByRole('checkbox', { name: '仅本机存在' }).check();
+  await page.getByRole('button', { name: '导入 Kit', exact: true }).click(); await page.locator('.catalog-item').filter({ hasText: 'desktop-test-kit' }).click(); await page.getByText('fixture_tool', { exact: true }).waitFor();
   await mkdir('test-results', { recursive: true }); await page.screenshot({ path: 'test-results/kits.png' });
   const requests = await app.evaluate(() => globalThis.townRequests);
   assert(requests.filter(r => ['/api', '/api/grove', '/api/embers'].includes(r.path)).every(r => r.authorization === null));

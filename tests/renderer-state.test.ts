@@ -262,6 +262,22 @@ describe("React desktop state lifecycle", () => {
     await app.changeChatSession("rename", "技术方案", discussion.scene_id);
     expect(app.toastMessage).toBe("");
   });
+  it("prevents duplicate log collections and allows retry after an export failure", async () => {
+    vi.useFakeTimers();
+    const pending = deferred<string>();
+    const collectLogs = vi.fn().mockImplementationOnce(() => pending.promise).mockRejectedValueOnce(new Error('权限不足'));
+    const app = new AppModel(api({ collectLogs }).value);
+    const collecting = app.collectLogs();
+    expect(app.collectingLogs).toBe(true);
+    await app.collectLogs();
+    expect(collectLogs).toHaveBeenCalledTimes(1);
+    pending.resolve('/downloads/logs.zip'); await collecting;
+    expect(app.collectingLogs).toBe(false);
+    expect(app.toastMessage).toContain('日志已打包');
+    await app.collectLogs();
+    expect(app.collectingLogs).toBe(false);
+    expect(app.toastMessage).toContain('权限不足');
+  });
   it("previews Portal logs through Together without posting until the user composes a reference", async () => {
     vi.useFakeTimers();
     const pending = deferred<{ endpoint: string; text: string }>();
@@ -981,16 +997,15 @@ describe('Town cached refresh', () => {
     const library = { directory: '/kits', enabled: true, kits: [] };
     const localKits = vi.fn(async () => library);
     const { model } = town({ localKits });
-    model.tabs.kits = 'local';
+    model.localOnly = true;
     model.show('kits');
     await settle();
     localKits.mockRejectedValue(new Error('unavailable'));
-    const refresh = model.load(true);
-    expect(model.library).toBe(library);
+    const refresh = model.refreshInstalledKits();
+    expect(model.installedLibrary).toBe(library);
     await refresh;
-    expect(model.library).toBe(library);
-    expect(model.error).toBeUndefined();
-    expect(model.refreshError).toContain('unavailable');
+    expect(model.installedLibrary).toBe(library);
+    expect(model.installedError).toContain('unavailable');
   });
   it('refreshes all loaded scroll fragments atomically and keeps them on partial failure', async () => {
     const townApi = vi.fn(async query => result({ title: 'scroll', offset: query.offset || 0,

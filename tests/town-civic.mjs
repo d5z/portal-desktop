@@ -154,6 +154,7 @@ if (process.argv.includes('--serve')) {
     assert.equal(await page.evaluate(() => window.civicPwned), undefined);
     await page.getByRole('button', { name: '公告', exact: true }).click();
     await page.locator('.announcement-board .catalog-item').first().waitFor();
+    await page.waitForFunction(() => !window.civicTown.loading);
     assert.match(await page.locator('#town-pagination').textContent(), /共 25 项/);
     await page.getByRole('button', { name: '下一页 →', exact: true }).click();
     await page.waitForFunction(() => window.civicTown.offset === 24 && !window.civicTown.loading);

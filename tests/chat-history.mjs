@@ -67,7 +67,7 @@ async function cached() {
       const db = request.result;
       const tx = db.transaction(['messages', 'meta']);
       const rows = tx.objectStore('messages').getAll(), meta = tx.objectStore('meta').get('state');
-      tx.oncomplete = () => { db.close(); resolve({ messages: rows.result, meta: meta.result }); };
+      tx.oncomplete = () => { db.close(); resolve({ messages: rows.result, meta: meta.result, version: db.version }); };
       tx.onerror = () => { db.close(); reject(tx.error); };
     };
   }), dbName);
@@ -89,8 +89,28 @@ async function clearCache() {
   }), dbName);
 }
 try {
-  await launch(); await open('&name=Willow');
+  await launch();
+  // Simulate a profile written by the previous cache schema. The scene index
+  // must be added in place without losing persisted messages or the cursor.
+  await page.goto(origin + '/empty');
+  await page.evaluate(([name, message]) => new Promise((resolve, reject) => {
+    const request = indexedDB.open(name, 1);
+    request.onupgradeneeded = () => {
+      request.result.createObjectStore('messages', { keyPath: 'seq' });
+      request.result.createObjectStore('meta', { keyPath: 'key' });
+    };
+    request.onerror = () => reject(request.error);
+    request.onsuccess = () => {
+      const db = request.result, tx = db.transaction(['messages', 'meta'], 'readwrite');
+      tx.objectStore('messages').put(message);
+      tx.objectStore('meta').put({ key: 'state', lastSeq: message.seq });
+      tx.oncomplete = () => { db.close(); resolve(); };
+      tx.onerror = () => reject(tx.error);
+    };
+  }), [dbName, { seq: 1, role: 'user', content: '历史 1', scene_id: 'loom-Willow', at: history[0].at }]);
+  await open('&name=Willow');
   await waitCache(100);
+  assert.equal((await cached()).version, 2);
   assert.equal(await page.locator('#messages .message').count(), 100);
   await page.getByText('历史 3', { exact: true }).waitFor(); // A different scene remains visible.
   await page.locator('#input').fill('本地记录验证'); await page.locator('#send-btn').click();
@@ -167,6 +187,52 @@ try {
   assert.match(scenes, /another-client.*messages: 1/);
   assert.match(await reader.evaluate(endpoint => window.clientCommand(endpoint, 'scenes', ''), origin + '/other-being'), /No locally cached scenes/);
   await reader.close();
+
+  // Push the old scene beyond the latest 300 rows, then remove its server
+  // history. Both a fresh page and a scene switch must still restore its cache.
+  for (let i = 1; i <= 101; i++) append('being', `最近场景 ${i}`, 'recent-room');
+  await open(); await waitCache(453);
+  history = history.slice(-5);
+  queries.length = 0;
+  await open('&scene_id=another-client&scene_strict=1');
+  await page.getByText('已持久化的流式回复', { exact: true }).waitFor();
+  assert.equal(await page.locator('#messages .message').count(), 1);
+  assert.ok(queries.includes('453'), 'Scene cache reads keep the global cursor');
+
+  await context.close(); context = null;
+  offline = true; await launch();
+  await open('&scene_id=another-client&scene_strict=1');
+  await page.getByText('已持久化的流式回复', { exact: true }).waitFor();
+  assert.equal(await page.locator('#messages .message').count(), 1);
+  offline = false;
+
+  await page.goto(origin + '/empty');
+  await page.evaluate(() => {
+    const frame = document.createElement('iframe');
+    frame.src = '/loom.html?scene_id=recent-room&scene_strict=1&revision=cache-switch';
+    document.body.append(frame);
+  });
+  const frame = await page.waitForSelector('iframe');
+  const chat = await frame.contentFrame();
+  await chat.waitForFunction(() => performance.getEntriesByName('loom:ready').length > 0);
+  const selectScene = async sceneId => {
+    await page.evaluate(sceneId => document.querySelector('iframe').contentWindow.postMessage({
+      type: 'beings:session-select', revision: 'cache-switch',
+      scene: { scene_id: sceneId, scene_meta: { scene_label: sceneId } },
+    }, location.origin), sceneId);
+  };
+  await chat.locator('#input').fill('缓存恢复时保留草稿');
+  await selectScene('another-client');
+  await chat.getByText('已持久化的流式回复', { exact: true }).waitFor();
+  assert.equal(await chat.locator('#messages .message').count(), 1);
+  await selectScene('recent-room');
+  await chat.getByText('最近场景 101', { exact: true }).waitFor();
+  assert.equal(await chat.locator('#input').inputValue(), '缓存恢复时保留草稿');
+  await selectScene('another-client');
+  await chat.getByText('已持久化的流式回复', { exact: true }).waitFor();
+  assert.equal(await chat.locator('#messages .message').count(), 1);
+  assert.equal((await cached()).messages.length, 453);
+
   await clearCache(); await open();
   assert.equal(await page.locator('#messages .message').count(), 5);
   await waitCache(5);
@@ -192,7 +258,7 @@ try {
   await open();
   assert.equal(await page.locator('#messages .message').count(), 5);
   assert.deepEqual(errors, []);
-  console.log('PASS: IndexedDB survives process restart offline, retains all returned sources and live replies, paginates 250 missed messages, keeps older records beyond the render limit, and falls back after storage failures.');
+  console.log('PASS: IndexedDB migrates in place, survives offline restart, restores old scenes beyond 300 rows on open/switch, keeps drafts and the global cursor, paginates missed messages, and falls back after storage failures.');
 } finally {
   await context?.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
   const target = path.resolve(profile), temp = path.resolve(os.tmpdir());

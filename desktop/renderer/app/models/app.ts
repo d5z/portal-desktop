@@ -10,6 +10,8 @@ import type {
   UpdateState,
 } from "../../../shared/types";
 import { Store, errorText } from "../../shared/models/store";
+import { PluginsModel } from '../../plugins/model';
+import { hostPluginContext } from '../../plugins/context';
 import { WorkspaceModel } from "./workspace";
 import { TownModel } from "../../town/models/town";
 import type { HistoryScope } from "../../chat/models/scenes";
@@ -114,6 +116,16 @@ export class AppModel extends Store {
   portalAction: "start" | "stop" | "restart" | "force" | null = null;
   portalError = "";
   logsLoading = false;
+  collectingLogs = false;
+  async collectLogs() {
+    if (this.collectingLogs) return;
+    this.collectingLogs = true; this.changed();
+    try {
+      await this.api.collectLogs();
+      this.toast('日志已打包，已在下载文件夹中显示。');
+    } catch (error) { this.toast(error); }
+    finally { this.collectingLogs = false; this.changed(); }
+  }
   private logsRequest = "";
   clientStartup?: ClientStartup;
   notificationSettings?: NotificationSettings;
@@ -138,8 +150,13 @@ export class AppModel extends Store {
     () => Boolean(this.chatSource),
   );
   readonly town: TownModel;
+  readonly plugins: PluginsModel;
   constructor(readonly api: DesktopAPI) {
     super();
+    this.plugins = new PluginsModel(api?.plugins, this.navigate, {
+      notice: text => this.toast(text), post: message => this.post(message),
+      scene: () => this.snapshot?.chatScene?.scene_id || '', ready: () => Boolean(this.chatSource && !this.chatLoading),
+    });
     this.town = new TownModel(
       api,
       this.toast,
@@ -153,8 +170,10 @@ export class AppModel extends Store {
       () => this.changed(),
       () => Boolean(this.chatSource && !this.chatLoading),
     );
+    this.town.plugins = this.plugins;
   }
   start() {
+    void this.plugins.refresh();
     let active = true;
     const cleanupWorkspace = this.workspace.start();
     if (!this.api) {
@@ -179,6 +198,11 @@ export class AppModel extends Store {
       /* Optional preference. */
     }
     const cleanups = [
+      this.plugins.start(),
+      this.subscribe(() => this.plugins.updateContext(hostPluginContext(this))),
+      this.workspace.subscribe(() => this.plugins.updateContext(hostPluginContext(this))),
+      this.town.subscribe(() => this.plugins.updateContext(hostPluginContext(this))),
+      this.plugins.subscribe(() => this.town.changed()),
       cleanupWorkspace,
       this.town.start(),
       this.api.onNotificationOpen(() => {
@@ -258,6 +282,7 @@ export class AppModel extends Store {
     }
   };
   navigate = (view: string, id?: string) => {
+    if (view === 'plugin-library') { view = 'kits'; this.town.groveKind = 'plugin'; }
     this.view = view;
     const scene = this.snapshot?.chatScene?.scene_id;
     if (view === "chat" && this.chatHistoryScope === "current" && scene && this.chatSceneActivity[scene] === "done") {

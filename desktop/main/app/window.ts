@@ -1,4 +1,4 @@
-import { app, BrowserWindow, nativeTheme } from 'electron';
+import { app, BrowserWindow, nativeTheme, type BrowserWindowConstructorOptions } from 'electron';
 import os from 'node:os';
 import path from 'node:path';
 import { ClientBrowser } from '../browser/browser';
@@ -17,27 +17,7 @@ export interface MainWindowOptions {
 }
 
 export function createMainWindow(options: MainWindowOptions) {
-  const acrylic = process.platform === 'win32' && Number(os.release().split('.')[2]) >= 22621;
-  const windowIcon = () => path.join(
-    app.isPackaged ? process.resourcesPath : app.getAppPath(),
-    app.isPackaged ? 'branding' : 'resources/branding',
-    process.platform === 'win32'
-      ? 'logo.png'
-      : process.platform === 'darwin' ? 'app-mac.png' : 'app.png',
-  );
-  const window = new BrowserWindow({
-    width: 1280, height: 860, minWidth: 920, minHeight: 640, title: CLIENT_NAME,
-    icon: windowIcon(),
-    backgroundColor: acrylic ? '#00000000' : nativeTheme.shouldUseDarkColors ? '#212121' : '#ffffff',
-    ...(acrylic ? { backgroundMaterial: 'acrylic' as const } : {}),
-    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
-    autoHideMenuBar: process.platform === 'win32',
-    trafficLightPosition: { x: 18, y: 20 },
-    webPreferences: {
-      preload: path.join(__dirname, 'preload.js'), sandbox: true, contextIsolation: true,
-      nodeIntegration: false, nodeIntegrationInSubFrames: false, webSecurity: true,
-    },
-  });
+  const window = new BrowserWindow(clientWindowOptions());
   if (process.platform === 'win32') {
     window.setMenuBarVisibility(false);
     // Keep the native caption icon black. The installed shell shortcut and tray
@@ -55,6 +35,10 @@ export function createMainWindow(options: MainWindowOptions) {
   window.webContents.on('will-frame-navigate', event => {
     const url = event.url;
     const parsed = new URL(url);
+    const pluginDocument = !event.isMainFrame && parsed.protocol === 'beings:' && parsed.hostname === 'plugins' && /^\/[a-f0-9-]{36}\.html$/.test(parsed.pathname);
+    if (pluginDocument) return;
+    // Plugin documents cannot navigate to host pages, external sites or custom protocols.
+    if (event.frame?.url.startsWith('beings://plugins/')) { event.preventDefault(); return; }
     const chatDocument = parsed.protocol === 'beings:' && parsed.hostname === 'chat' && parsed.pathname === '/';
     if (!chatDocument && url !== options.shellURL()) { event.preventDefault(); options.openExternal(url); }
   });
@@ -73,4 +57,29 @@ export function createMainWindow(options: MainWindowOptions) {
   window.on('closed', () => options.onClosed(window));
   void window.loadURL(options.shellURL());
   return { window, browser };
+}
+
+/** Shared native caption, icon and platform styling for client-owned windows. */
+export function clientWindowOptions(): BrowserWindowConstructorOptions {
+  const acrylic = process.platform === 'win32' && Number(os.release().split('.')[2]) >= 22621;
+  const windowIcon = () => path.join(
+    app.isPackaged ? process.resourcesPath : app.getAppPath(),
+    app.isPackaged ? 'branding' : 'resources/branding',
+    process.platform === 'win32'
+      ? 'logo.png'
+      : process.platform === 'darwin' ? 'app-mac.png' : 'app.png',
+  );
+  return {
+    width: 1280, height: 860, minWidth: 920, minHeight: 640, title: CLIENT_NAME,
+    icon: windowIcon(),
+    backgroundColor: acrylic ? '#00000000' : nativeTheme.shouldUseDarkColors ? '#212121' : '#ffffff',
+    ...(acrylic ? { backgroundMaterial: 'acrylic' as const } : {}),
+    titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
+    autoHideMenuBar: process.platform === 'win32',
+    trafficLightPosition: { x: 18, y: 20 },
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'), sandbox: true, contextIsolation: true,
+      nodeIntegration: false, nodeIntegrationInSubFrames: false, webSecurity: true,
+    },
+  };
 }

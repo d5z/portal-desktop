@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { TownModel } from "../desktop/renderer/town/models/town";
 import { SceneStore } from "../desktop/renderer/shared/models/scene";
+import { hostPluginContext } from '../desktop/renderer/plugins/context';
 import type { DesktopAPI, KitInstallPlan, KitLibrary, LocalKit } from "../desktop/shared/types";
 
 const kit = (name: string, version = "1.0"): LocalKit => ({ name, version, directory: "/kits/" + name, description: "Kit", command: ["node", "server.mjs"], tools: [], compatible: true, eager: false });
@@ -20,6 +21,43 @@ function fixture(overrides: Partial<DesktopAPI> = {}) {
 }
 
 describe("Kit installation status", () => {
+  it('clears remote resource context and rejects late details when selecting a local tool', async () => {
+    let release!: (value: any) => void;
+    const { model } = fixture({ town: vi.fn().mockResolvedValueOnce({ ok: true,
+      data: { id: 'remote', name: 'Remote App', description: 'Remote resource' }, fetchedAt: '' })
+      .mockImplementationOnce(() => new Promise(resolve => { release = resolve; })) });
+    model.scenes.enter('kits');
+    model.live = { generation: 1 } as any;
+    const context = () => hostPluginContext({ view: 'kits', town: model,
+      snapshot: { settings: { endpoint: '' } }, workspace: { scenes: model.scenes } } as any)?.context;
+    await model.loadDetail({ kind: 'kit', id: 'remote' });
+    expect(context()?.resource?.id).toBe('remote');
+    const pending = model.loadDetail({ kind: 'kit', id: 'remote' });
+    model.selectTool({ key: 'kit:local', name: 'local', description: '', kind: 'kit', local: true, kit: kit('local') });
+    expect(model.detail).toBeUndefined();
+    expect(model.detailLoading).toBe(false);
+    expect(context()?.resource).toBeUndefined();
+    release({ ok: true, data: { id: 'remote', name: 'Late remote' }, fetchedAt: '' });
+    await pending;
+    expect(model.detail).toBeUndefined();
+    expect(context()?.title).toBe('工具间 · local');
+    expect(context()?.resource).toBeUndefined();
+  });
+
+  it('locates an installed Kit on its page and replaces an older tool selection', async () => {
+    const files = Array.from({ length: 26 }, (_, i) => kit(`local-${i}`));
+    const { model } = fixture({ localKits: vi.fn(async () => library(...files)) });
+    model.toolSelection = 'kit:local-0';
+    await model.showInstalledKit('local-25');
+    expect(model.offset).toBe(24);
+    expect(model.toolSelection).toBe('kit:local-25');
+    expect(model.pagination().items.some(item => item.key === model.toolSelection)).toBe(true);
+    expect(model.localKit).toBe(files[25]);
+    await model.showInstalledKit('local-1');
+    expect(model.offset).toBe(0);
+    expect(model.toolSelection).toBe('kit:local-1');
+  });
+
   it("reads all local manifests, including old versions and imports, on every Grove visit", async () => {
     const files = [kit("alpha", "0.9"), kit("imported")];
     const { model, api } = fixture({ localKits: vi.fn(async () => library(...files)) });
@@ -55,7 +93,9 @@ describe("Kit installation status", () => {
     expect(model.search).toBe("alpha");
     expect(model.plan).toBeUndefined();
     await model.showInstalledKit("alpha");
-    expect(model.tab).toBe("local");
+    expect(model.tab).toBe("grove");
+    expect(model.localOnly).toBe(true);
+    expect(model.groveKind).toBe('kit');
     expect(model.localKit?.name).toBe("alpha");
   });
 

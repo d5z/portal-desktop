@@ -117,7 +117,7 @@ try {
   await page.getByText('26 颗种子', { exact: true }).waitFor();
   assert.equal(await page.locator('.catalog-item').count(), 24);
   await page.getByRole('button', { name: '下一页 →' }).click();
-  await page.getByText('第 2 页 · 共 26 项').waitFor();
+  await page.getByText('第 2 / 2 页').waitFor();
   assert.equal(await page.locator('.catalog-item').count(), 2);
   await page.getByRole('searchbox', { name: '搜索种子' }).fill('Portal');
   await page.getByRole('button', { name: '搜索', exact: true }).click();
@@ -176,7 +176,7 @@ try {
     await page.waitForFunction(() => !window.seedTown.loading);
     assert.equal(await page.locator('#view-title').innerText(), title);
     assert.equal(await nav.locator('[aria-current="page"]').innerText(), label);
-    assert.equal(queries.filter(query => query.kind === kind).length, before + 1, 'Each switch fetches fresh content');
+    assert(queries.filter(query => query.kind === kind).length > before, 'Each switch fetches fresh content, including additional pages');
     assert.equal(await page.locator('#place-sheet').evaluate(el => el === window.originalSheet && el.open), true);
   };
   await switchTo('篝火', '篝火', 'bonfire');
@@ -210,7 +210,7 @@ try {
   assert.equal(scrollActions[1].x - scrollActions[0].right, seedActions[1].x - seedActions[0].right);
   await page.getByRole('button', { name: '复制链接', exact: true }).click();
   assert.equal(await page.evaluate(() => window.copiedSeedLink), 'https://beings.town/scrolls/scroll-1');
-  await switchTo('工具库', 'Kit 工具库', 'grove');
+  await switchTo('工具库', '工具库', 'grove');
   await switchTo('广场', '小镇广场', 'home');
   await switchTo('花园', '种子花园', 'seeds');
   assert.equal(await page.locator('#view-title').evaluate(el => parseFloat(getComputedStyle(el).fontSize)), 26);
@@ -239,6 +239,49 @@ try {
     return rect.left >= sheet.left && rect.right <= sheet.right && rect.bottom <= sheet.bottom;
   }), true, 'Seed filters fit the narrow sheet');
   await page.screenshot({ path: 'test-results/seed-garden-filters-narrow.png', animations: 'disabled' });
+  // Disk associations arrive before Grove. Enriching the same App key must load its detail.
+  await page.setViewportSize({ width: 1180, height: 900 });
+  await page.evaluate(() => {
+    const town = window.seedTown, read = town.api.town;
+    window.appDetailRequests = 0;
+    town.api.localKits = async () => ({ directory: '', enabled: false, kits: [] });
+    town.api.localApps = async () => [{ id: 'local-app', name: 'Local App', path: 'fixture.exe', exists: true }];
+    town.api.town = async query => {
+      if (query.kind === 'grove') {
+        await new Promise(resolve => { window.releaseGrove = resolve; });
+        return { ok: true, data: { kits: [{ id: 'local-app', name: 'Local App', kind: 'app' }], count: 1 }, fetchedAt: '' };
+      }
+      if (query.kind === 'kit' && query.id === 'local-app') {
+        window.appDetailRequests++;
+        return { ok: true, data: { id: query.id, name: 'Local App', kind: 'app', description: 'Remote App details' }, fetchedAt: '' };
+      }
+      return read(query);
+    };
+    town.show('kits');
+  });
+  await page.locator('.tools-library .catalog-detail h2').getByText('Local App', { exact: true }).waitFor();
+  await page.waitForFunction(() => Boolean(window.releaseGrove));
+  assert.equal(await page.evaluate(() => window.appDetailRequests), 0);
+  await page.evaluate(() => window.releaseGrove());
+  await page.getByText('Remote App details', { exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => window.appDetailRequests), 1);
+  // Selecting a local Kit clears the previous remote detail and its resource context.
+  await page.evaluate(async () => {
+    const town = window.seedTown;
+    const kits = Array.from({ length: 26 }, (_, i) => ({ name: 'Local Kit ' + i, description: 'Local fixture',
+      version: '1.0.0', directory: '/fixture', command: [], tools: [], compatible: true, eager: false }));
+    town.api.localKits = async () => ({ directory: '/fixture', enabled: true, kits });
+    await town.refreshInstalledKits();
+    town.localOnly = true; town.groveKind = 'kit'; town.changed();
+  });
+  await page.locator('.tools-library .reading-title').getByText('Local Kit 0', { exact: true }).waitFor();
+  assert.equal(await page.evaluate(() => window.seedTown.detail), undefined);
+  await page.evaluate(() => window.seedTown.showInstalledKit('Local Kit 25'));
+  await page.locator('.tools-library .reading-title').getByText('Local Kit 25', { exact: true }).waitFor();
+  assert.equal(await page.locator('.tools-library .catalog-item.selected .catalog-title').innerText(), 'Local Kit 25');
+  assert.equal(await page.evaluate(() => window.seedTown.offset), 24);
+  await page.evaluate(() => window.seedTown.showInstalledKit('Local Kit 1'));
+  await page.locator('.tools-library .reading-title').getByText('Local Kit 1', { exact: true }).waitFor();
   assert.deepEqual(errors, []);
   console.log('PASS: Seed Garden reading, shared Scrolls link layout, feature switching with fresh reads, stale-response isolation and narrow dark navigation.');
 } finally {

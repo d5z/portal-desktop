@@ -17,6 +17,7 @@ import { Diagnostics } from "./components/diagnostics";
 import { Dialog } from "../shared/components/dialog";
 import { EditContextMenu } from "../shared/components/context-menu";
 import { PlaceHeading } from "./components/navigation";
+import { Plugins, PluginCommands, PluginSlots, PluginSidebar } from '../plugins/page';
 import logo from "../../../resources/branding/logo.png";
 import logoWhite from "../../../resources/branding/logo-white.png";
 export function App({ model }: { model: AppModel }) {
@@ -38,6 +39,9 @@ export function App({ model }: { model: AppModel }) {
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
       const dialog = document.querySelector("dialog[open]");
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'p') {
+        event.preventDefault(); app.plugins.showCommands(true); return;
+      }
       if (
         (event.metaKey || event.ctrlKey) &&
         event.key.toLowerCase() === "f" &&
@@ -156,6 +160,7 @@ export function App({ model }: { model: AppModel }) {
             </>
           )}
           <Companion model={app.workspace} />
+          {app.view === "chat" && <PluginSidebar model={app.plugins} theme={app.theme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />}
           <Browser model={app} />
         </div>
       </main>
@@ -168,9 +173,10 @@ export function App({ model }: { model: AppModel }) {
         onClose={app.closePlace}
         dismissOnBackdrop
       >
-        {app.placePresentation === "dialog" && <PlaceContent app={app} />}
+        {app.view !== "chat" && app.placePresentation === "dialog" && <PlaceContent app={app} />}
       </Dialog>
       <ChatSearch model={app} />
+      <PluginCommands model={app.plugins} />
       <TownComposer model={app.town} />
       <TownAuth model={app.town} returnToSettings={app.settingsRoute === "town"}
         onReturnToSettings={app.returnToClientSettings} onDismissSettingsRoute={app.dismissSettingsRoute} />
@@ -237,9 +243,11 @@ function PlaceResizeHandle({ app }: { app: AppModel }) {
 }
 
 function PlaceContent({ app }: { app: AppModel }) {
+  useModel(app.town);
   return (
     <>
       <PlaceHeading
+        plugins={app.plugins}
         view={app.view}
         navigate={app.navigate}
         presentation={app.placePresentation}
@@ -248,8 +256,15 @@ function PlaceContent({ app }: { app: AppModel }) {
         onForward={app.town.forwardView ? app.forwardFromPlace : undefined}
         onClose={app.closePlace}
       />
-      <Portal model={app} />
-      <Town model={app.town} />
+      <PluginSlots model={app.plugins} />
+      <div className="plugin-place-layout">
+        <div className="plugin-place-main">
+          <Portal model={app} />
+          <Town model={app.town} />
+          {app.view === 'plugins' && <Plugins model={app.plugins} theme={app.theme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />}
+        </div>
+        <PluginSidebar model={app.plugins} theme={app.theme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />
+      </div>
     </>
   );
 }

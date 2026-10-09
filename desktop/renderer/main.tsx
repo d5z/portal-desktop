@@ -2,6 +2,7 @@ import { Component, StrictMode, type ReactNode } from "react";
 import { createRoot } from "react-dom/client";
 import { App } from "./app/page";
 import { AppModel } from "./app/models/app";
+import { PluginWindow } from './plugins/window';
 import "./app/styles.css";
 
 class ErrorBoundary extends Component<
@@ -27,12 +28,12 @@ class ErrorBoundary extends Component<
     return this.props.children;
   }
 }
-const model = new AppModel(window.beings);
+const model = window.beingsPluginWindow ? undefined : new AppModel(window.beings);
 const root = createRoot(document.getElementById("root")!);
 root.render(
   <StrictMode>
     <ErrorBoundary>
-      <App model={model} />
+      {window.beingsPluginWindow ? <PluginWindow api={window.beingsPluginWindow} /> : <App model={model!} />}
     </ErrorBoundary>
   </StrictMode>,
 );

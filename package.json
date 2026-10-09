@@ -7,6 +7,7 @@
   "license": "MIT",
   "main": ".vite/build/main.js",
   "scripts": {
+    "test:plugins-ui": "npm run build:chat && node tests/plugins-electron.mjs",
     "build:web:static": "node scripts/build-web-static.mjs",
     "package:web:static": "node scripts/package-web-static.mjs",
     "dev:web": "vite --config vite.web.config.mjs",
@@ -32,6 +33,7 @@
     "test:town-sdk": "node tests/town-sdk.mjs",
     "test:notifications": "node tests/notifications-electron.mjs",
     "test:menu-keyboard": "node tests/menu-keyboard.mjs",
+    "test:logs-ui": "npm run build:chat && node tests/logs-electron.mjs",
     "test:update-progress": "node tests/update-progress.mjs",
     "test:town-names": "node tests/town-names.mjs",
     "test:seed-garden": "node tests/seed-garden.mjs",
@@ -43,7 +45,8 @@
     "test:chat-context-menu": "npm run build:chat && node tests/chat-context-menu.mjs",
     "test:chat-sessions": "npm run build:chat && node tests/chat-sessions-electron.mjs",
     "test:client-context": "npm run build:chat && node tests/client-context-electron.mjs",
-    "test:chat-history": "npm run build:chat && node tests/chat-history.mjs"
+    "test:chat-history": "npm run build:chat && node tests/chat-history.mjs",
+    "test:plugins-packaged": "npm run build:chat && node tests/plugins-electron.mjs --packaged"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",

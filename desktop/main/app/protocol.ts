@@ -2,6 +2,7 @@ import { protocol, session } from 'electron';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import type { ChatProxy } from '../chat/proxy';
+import type { PluginRegistry } from '../plugins/registry';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -14,9 +15,10 @@ const MIME_TYPES: Record<string, string> = {
 const CHAT_CONTENT_SECURITY_POLICY = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src https: data: blob:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-src 'none'";
 const CHAT_ASSETS = new Set(['loom.html', 'chat.js', 'highlight.css', 'chat.css', 'client-context.html', 'client-context.js']);
 
-export function registerLocalProtocol(assets: string, proxy: ChatProxy) {
+export function registerLocalProtocol(assets: string, proxy: ChatProxy, plugins?: PluginRegistry) {
   protocol.handle('beings', async request => {
     const url = new URL(request.url);
+    if (url.hostname === 'plugins' && request.method === 'GET' && plugins) return plugins.document(url);
     if (url.hostname === 'chat' && (url.pathname.startsWith('/api/') || url.pathname === '/health')) return proxy.handle(request);
     if (!['desktop', 'chat'].includes(url.hostname) || request.method !== 'GET') return new Response('Not found', { status: 404 });
 

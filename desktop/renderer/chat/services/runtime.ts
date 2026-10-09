@@ -1,6 +1,6 @@
 import { createSceneRuntime } from "./scene-runtime";
 import { HistoryCache } from "./history-cache";
-import { inCurrentScene, messageScene, sceneTransitionNotice, stripSceneTransition } from "../models/scenes";
+import { inCurrentScene, messageScene, sceneTransitionNotice, stripSceneTransition, type MessageScene } from "../models/scenes";
 import type { ChatRuntime, ChatState, RuntimeOptions } from "../models/chat";
 
 /**
@@ -2385,6 +2385,7 @@ function createStreamRuntime(state: any, options: any): any {
   // 滚动位置跳变、正在流的 streamMessage 被抹掉、移动端每次切 tab 回来都闪一下。
   // /api/history 的 HistoryMessage 是带 seq 的（http.rs:419-425），有 seq 就能增量对账。
   let lastHistorySeq = 0;
+  let historyWindowStart = 0;
   let lastReconcileSawBeing = false;
   let lastHistoryReplyScenes: any[] = [];
   let reconcileInFlight: any = null;
@@ -2526,6 +2527,42 @@ function createStreamRuntime(state: any, options: any): any {
     return rendered;
   }
 
+  async function restoreSceneHistory(scene: MessageScene) {
+    if (!scene.sceneId || !historyCacheSeeded || disposed) return;
+    const ids = [scene.sceneId, ...(!scene.strict && scene.legacySceneId ? [scene.legacySceneId] : [])];
+    const cached = (await Promise.all(ids.map(id => historyCache.readScene(id)))).flat().sort((a, b) => a.seq - b.seq);
+    if (disposed) return;
+    const present = new Set(state.items.map((item: any) => item.historySeq).filter(Boolean));
+    let added = false;
+    for (const message of cached) {
+      // Only backfill rows preceding the initial history window. Newer cached
+      // rows may belong to a live reply deliberately skipped by reconciliation.
+      // Reading an older room must never advance or rewind the global cursor.
+      if (message.seq >= historyWindowStart || present.has(message.seq)) continue;
+      const identity = historyIdentity(message);
+      const role = message.role === "user" ? "user" : "being";
+      const text = isHistoryMarker(message)
+        ? `· ${breathMarkerLabel(message.content)} · ${identity.timestamp} ·`
+        : cleanContent(role === "user" ? stripSceneTransition(message.content) : message.content);
+      if (!text) continue;
+      const item = isHistoryMarker(message)
+        ? { ...identity, kind: "separator", id: `marker-${options.nextId()}`, marker: true, text }
+        : { ...identity, kind: "message", id: `message-${options.nextId()}`, role, text,
+            streaming: false, label: role === "user" ? "you" : beingName, consecutive: false };
+      // Insert old records in sequence order without rebuilding live bubbles,
+      // moving their tool runs, or changing the current stream's grouping state.
+      const index = state.items.findIndex((existing: any) => existing.historySeq
+        ? existing.historySeq > message.seq
+        : existing.kind !== "separator" && (!identity.createdAt ||
+            (existing.createdAt ?? existing.start ?? Infinity) >= identity.createdAt));
+      state.items.splice(index < 0 ? state.items.length : index, 0, item);
+      options.restoredHistory?.add(item);
+      present.add(message.seq);
+      added = true;
+    }
+    if (added) changed();
+  }
+
   // 返回一个在**最后一批渲染完成时**才 resolve 的 Promise（修初始化竞态 P1-G / P2-H）
   function renderHistoryBatched(messages: any) {
     return new Promise<void>((resolve) => {
@@ -2541,7 +2578,7 @@ function createStreamRuntime(state: any, options: any): any {
           const msg = messages[i];
           const ts = formatHistoryTime(msg.at);
           if (isHistoryMarker(msg)) {
-            addBreathMarker(msg.content, ts, messageScene(msg));
+            addBreathMarker(msg.content, ts, historyIdentity(msg));
             continue;
           }
           addHistoryMessage(msg);
@@ -2623,11 +2660,13 @@ function createStreamRuntime(state: any, options: any): any {
           resetMessages();
           localEchoes = [];
           await renderHistoryBatched(cached.messages);
+          historyWindowStart = Math.min(...cached.messages.map(m => m.seq));
           lastHistorySeq = Math.max(lastHistorySeq, cached.lastSeq);
           historyCacheSeeded = true;
           hydrated = true;
         }
       }
+      if (state.historyScope === "current") await restoreSceneHistory(options.selectedScene?.() || state.currentScene);
       const incremental = hydrated || (!full && lastHistorySeq > 0);
       // A cached cursor needs after=, not the prefetched latest 100: an offline
       // gap may contain more than 100 messages.
@@ -2647,6 +2686,7 @@ function createStreamRuntime(state: any, options: any): any {
         toCache = msgs;
         lastHistoryReplyScenes = msgs.filter(m => !isHistoryMarker(m) && m.role !== "user").map(messageScene);
         await renderHistoryBatched(toCache);
+        historyWindowStart = toCache.length ? Math.min(...toCache.map(m => Number(m.seq) || 0)) : 0;
         added = toCache.length;
         lastReconcileSawBeing = toCache.some(
           (m) => !isHistoryMarker(m) && m.role !== "user" && inCurrentScene(messageScene(m), state.currentScene),
@@ -2657,7 +2697,7 @@ function createStreamRuntime(state: any, options: any): any {
         toCache = fresh;
         for (const m of fresh) {
           if (isHistoryMarker(m)) {
-            addBreathMarker(m.content, formatHistoryTime(m.at), messageScene(m));
+            addBreathMarker(m.content, formatHistoryTime(m.at), historyIdentity(m));
             added++;
             continue;
           }
@@ -2717,7 +2757,7 @@ function createStreamRuntime(state: any, options: any): any {
         );
         for (const m of fresh) {
           const scene = messageScene(m);
-          if (isHistoryMarker(m)) addBreathMarker(m.content, formatHistoryTime(m.at), scene);
+          if (isHistoryMarker(m)) addBreathMarker(m.content, formatHistoryTime(m.at), historyIdentity(m));
           else {
             const role = m.role === "user" ? "user" : "being";
             // Current-room replies are already drawn by live/replay, including
@@ -2773,7 +2813,8 @@ function createStreamRuntime(state: any, options: any): any {
   }
   function pendingReplyArrived() {
     return pendingReply && state.items.some((item: any) => item.kind === "message" && item.role === "being"
-      && inCurrentScene(item, state.currentScene) && !item.streaming && !item.interim && !pendingReply.baseline.has(item));
+      && inCurrentScene(item, state.currentScene) && !item.streaming && !item.interim && !pendingReply.baseline.has(item)
+      && !options.restoredHistory?.has(item));
   }
   function startCatchUpWatcher() {
     stopCatchUpWatcher();
@@ -3348,6 +3389,7 @@ function createStreamRuntime(state: any, options: any): any {
       return { text: msg, files, message };
     },
     noteLocalEcho,
+    restoreSceneHistory,
     reconcileHistory,
     syncHistoryCursor,
     lastHistoryReplyIn: (scene: any) => lastHistoryReplyScenes.some(reply => inCurrentScene(reply, scene)),

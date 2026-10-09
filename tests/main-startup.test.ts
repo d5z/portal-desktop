@@ -17,7 +17,7 @@ vi.mock('electron', async () => {
     whenReady: () => ({ then: (ready: () => Promise<void>) => (fixture.startup = Promise.resolve().then(ready)) }),
   });
   return { app, clipboard: {}, Notification: { isSupported: () => true }, ipcMain: { handle: vi.fn() }, net: { fetch: vi.fn() },
-    dialog: { showErrorBox: vi.fn(), showMessageBox: vi.fn() }, nativeTheme: new EventEmitter(), nativeImage: {}, shell: {},
+    dialog: { showErrorBox: vi.fn(), showMessageBox: vi.fn() }, nativeTheme: new EventEmitter(), nativeImage: {}, shell: { showItemInFolder: vi.fn() },
     safeStorage: { isEncryptionAvailable: () => true },
     protocol: { registerSchemesAsPrivileged: vi.fn(), handle: vi.fn() },
     session: { defaultSession: { setPermissionRequestHandler: vi.fn(), setPermissionCheckHandler: vi.fn() } },
@@ -29,7 +29,7 @@ vi.mock('../desktop/main/app/window', () => ({ createMainWindow: vi.fn() }));
 it('defers repeated launch until initialization and opens one usable window even when background discovery fails', async () => {
   fixture.directory = await mkdtemp(path.join(os.tmpdir(), 'portal-window-startup-'));
   vi.stubEnv('PORTAL_DESKTOP_USER_DATA', fixture.directory);
-  const { app, protocol, dialog, ipcMain } = await import('electron');
+  const { app, protocol, dialog, ipcMain, shell } = await import('electron');
   const { createMainWindow } = await import('../desktop/main/app/window');
   let releaseSettings!: () => void;
   const settingsGate = new Promise<void>(resolve => { releaseSettings = resolve; });
@@ -43,7 +43,7 @@ it('defers repeated launch until initialization and opens one usable window even
     protocolReadyAtCreation.push(vi.mocked(protocol.handle).mock.calls.length > 0);
     const window = Object.assign(new EventEmitter(), {
       isDestroyed: () => false, isMinimized: () => false, show: vi.fn(), focus: vi.fn(), restore: vi.fn(),
-      webContents: { isDestroyed: () => false, send: vi.fn() },
+      webContents: Object.assign(new EventEmitter(), { isDestroyed: () => false, send: vi.fn() }),
     });
     const browser = { close: vi.fn() };
     options.onBrowser(browser as never);
@@ -74,6 +74,10 @@ it('defers repeated launch until initialization and opens one usable window even
     expect(await handlers.get('beings:notification-target')!(request as never)).toBeNull();
     await expect(handlers.get('beings:notifications')!({ ...request, senderFrame: {} } as never, { enabled: false })).rejects.toThrow('Untrusted');
     const snapshot = await handlers.get('beings:snapshot')!(request as never);
+    const archives = await Promise.all([handlers.get('beings:collect-logs')!(request as never), handlers.get('beings:collect-logs')!(request as never)]);
+    expect(archives[0]).toBe(archives[1]);
+    expect(shell.showItemInFolder).toHaveBeenCalledExactlyOnceWith(archives[0]);
+    expect((await readFile(archives[0])).subarray(0, 2).toString()).toBe('PK');
     expect(snapshot.portal.message).toBe('Windows 命令环境不可用，请检查后重试。');
     expect(snapshot.notice).not.toContain('ENOENT');
     const detail = 'powershell.exe (1): Error: Config file not found: status\n#< CLIXML\n<Objs>runtime details</Objs>';

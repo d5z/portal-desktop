@@ -1,3 +1,4 @@
+import { ToolsLibrary } from './components/tools-library';
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   TownModel,
@@ -96,12 +97,18 @@ export function Town({ model }: { model: TownModel }) {
             ))}
           </select>
           {town.view === "kits" && town.tab === "grove" && <div className="segmented grove-kind-filter" role="tablist" aria-label="Grove 类型">
-            {([["", "全部"], ["kit", "Kits"], ["app", "Apps"]] as const).map(([value, label]) => <button key={value} role="tab" aria-selected={town.groveKind === value} className={town.groveKind === value ? "selected" : ""} onClick={() => { town.groveKind = value; town.changed(); }}>{label}</button>)}
+            {([["", "全部"], ["app", "App"], ["kit", "Kit"], ["plugin", "Plugin"]] as const).map(([value, label]) => <button key={value} role="tab" aria-selected={town.groveKind === value} className={town.groveKind === value ? "selected" : ""} onClick={() => { town.groveKind = value; town.offset = 0; town.toolSelection = ""; town.selectedId = ""; town.localKit = undefined; town.changed(); }}>{label}</button>)}
           </div>}
+          {town.view === 'kits' && !town.directId && <>
+            <label className="tools-local-filter"><input type="checkbox" checked={town.localOnly} onChange={e => { town.localOnly = e.target.checked; town.offset = 0; town.toolSelection = ""; town.localKit = undefined; town.changed(); }} />仅本机存在</label>
+            {town.groveKind === 'plugin' && town.plugins?.api && <button className="primary" disabled={town.plugins.busy} onClick={() => void town.plugins!.act(() => town.plugins!.api!.importLocal())}>导入插件目录</button>}
+            {town.groveKind === 'plugin' && town.plugins && <button className="secondary" title="Ctrl / ⌘ + Shift + P" onClick={() => town.plugins!.showCommands(true)}>快捷操作</button>}
+            {town.groveKind === 'kit' && town.supportsLocalKits && <button className="primary" onClick={() => void town.importKit()}>导入 Kit</button>}
+          </>}
           <select
             id="grove-status"
             aria-label="Grove 成长阶段"
-            hidden={town.view !== "kits" || town.tab !== "grove" || Boolean(town.directId)}
+            hidden={town.view !== "kits" || town.localOnly || Boolean(town.directId)}
             value={town.groveStatus}
             onChange={(event) => {
               town.groveStatus = event.target.value;
@@ -123,7 +130,7 @@ export function Town({ model }: { model: TownModel }) {
             id="town-search"
             type="search"
             aria-label={social ? "搜索已加载的消息与作者" : town.view === "contacts" ? "搜索通讯录" : "筛选当前列表"}
-            placeholder={social ? "搜索消息、作者…" : town.view === "contacts" ? "搜索 Being、人类伙伴…" : town.view === "announcements" ? "搜索本页公告…" : "筛选当前列表…"}
+            placeholder={social ? "搜索消息、作者…" : town.view === "contacts" ? "搜索 Being、人类伙伴…" : town.view === "announcements" ? "搜索公告…" : "筛选当前列表…"}
             hidden={Boolean(town.directId) || town.view === "seeds"}
             value={town.search}
             onChange={(event) => town.setSearch(event.target.value)}
@@ -228,6 +235,7 @@ export function Town({ model }: { model: TownModel }) {
   );
 }
 function TownBody({ town }: { town: TownModel }) {
+  if (town.view === "kits" && !town.directId) return <ToolsLibrary town={town} />;
   if (town.error)
     return (
       <div className="empty-state">

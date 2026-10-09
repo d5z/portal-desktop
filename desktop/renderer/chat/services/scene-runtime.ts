@@ -6,6 +6,7 @@ import type { ChatRuntime, ChatState, RuntimeOptions } from "../models/chat";
 /** One Being coordinator; scene-local state is not a separate agent or breath. */
 export function createSceneRuntime(state: ChatState, options: RuntimeOptions, createRuntime: any): ChatRuntime {
   const sessions = new Map<any, any>();
+  const restoredHistory = new WeakSet<object>();
   let selected: any, owner: any, disposed = false, counter = 0;
   let lastActivity = "";
   const sendQueue: any[] = [];
@@ -200,6 +201,8 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
         await Promise.all([...sessions.values()].filter(s => s !== owner).map(s => s.runtime.recoverConnection(details)));
       },
       historyOwner: () => owner && owner !== session ? owner.runtime : null,
+      selectedScene: () => state.currentScene,
+      restoredHistory,
       isLiveScene: (scene: any) => [...sessions.values()].some(s => s.runtime?.ownsLiveScene(scene)),
       routeEvent(type: any, data: any) {
         if (!Object.hasOwn(data, "scene_id")) return false;
@@ -312,6 +315,8 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
         state.historyScope = "current";
         state.draft = selected.local.draft;
         publish();
+        await owner.runtime.restoreSceneHistory?.(scene);
+        if (disposed) return;
         void owner.runtime.refreshHistory();
       });
       return selection;

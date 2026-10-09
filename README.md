@@ -179,15 +179,17 @@ The following TODOs are grouped by implementation direction, without committed r
 - [ ] Improve Kit author, source, dependency, missing-configuration, and authentication details. Distinguish client-managed and externally managed Kits and report availability accurately.
 - [ ] Improve release signing, notarization, platform validation records, and contributor documentation.
 
-### Community plugins: designed, with no general loader yet
+### Community plugins: Plugin API v1
 
-- [ ] Unify discovery, configuration, and management around Grove / Portal Kits while preserving existing Kit compatibility.
-- [ ] Implement declarative UI plugins: panels, lists, cards, and settings forms that present existing service data through restricted interfaces.
-- [ ] Publish a versioned manifest, JSON Schema, TypeScript SDK, example plugin, and offline validation tools.
-- [ ] Add version pinning, dependency checks, disable controls, update rollback, and source records. Do not take over shared or externally managed Kits implicitly.
-- [ ] Verify failure isolation, identity changes, and permission revocation. A plugin failure must affect that extension without restarting the application.
+- [x] Plugin tags and filtering in Grove, local imports and Grove downloads alongside existing Kit/App flows.
+- [x] Versioned manifests, dynamic navigation, sandboxed HTML views, theme synchronization and private plugin storage.
+- [x] [SDK 1.3](DEVELOPER-API-SDK.md#part-3--客户端插件-api--sdk): standalone TypeScript types, Town reads, Being history/drafts/confirmed streaming chats, command palette, plugin settings and atomic storage updates.
+- [x] Workspace context, sidebar/resource slots, disposable domain events and current-scene task status; Pipeline integrates resource collaboration and explicit node/task bindings.
+- [x] Enable, disable, uninstall, source records and session revocation without patching client source.
+- [x] The community Pipeline board is now an independent plugin, with canvas, dragging, comments and persistence verified in Electron.
+- [ ] Automatic updates/rollback, signing, catalog-wide search, additional contributions and controlled tool calls.
 
-A public Scrolls reader is the proposed first UI example. Codex plugin packages cannot currently be installed directly. Rich web components need additional isolation and protocol adaptation. See the [Community extension proposal](desktop/EXTENSIONS.md) for contracts and implementation order.
+Clone [starmap](https://github.com/chunqing-liu/starmap) separately and run `npm ci` followed by `npm run check` there, then open Tools → Plugins and import its `dist` directory. The plugin has its own CI artifacts and tagged releases; no plugin implementation is bundled in this client repository. See [Plugin API v1](DEVELOPER-API-SDK.md#part-3--客户端插件-api--sdk) and the [Pipeline plugin](https://github.com/chunqing-liu/starmap). Grove distribution uses existing Apps with a plugin tag and a fixed Release asset; no live catalog entry has been published. Obsidian and Codex plugin packages are not directly compatible.
 
 ### Single-conversation orchestration: under consideration
 
@@ -225,7 +227,7 @@ The detailed implementation documents below are currently primarily in Chinese. 
 | [Paired updates](desktop/UPDATING.md) | Client and Portal upgrades, recovery, and release workflow |
 | [Portal recovery](desktop/PORTAL-RECOVERY.md) | Startup failures, manual restart, diagnostic logs, and Windows launch guidance (Chinese) |
 | [Release notes](desktop/RELEASE_NOTES.md) | Release delivery notes |
-| [Community extension proposal](desktop/EXTENSIONS.md) | Proposed contracts, SDK, distribution, and lifecycle |
+| [Developer API / SDK guide](DEVELOPER-API-SDK.md) | Heart/Town APIs, plugin SDK reference, access boundaries and examples |
 | [Shared workspace exploration](desktop/SHARED-WORKSPACE.md) | Historical design and protocols requiring agreement; not implemented features or the current roadmap |
 | [Source provenance](UPSTREAM.md) | Loom origins, the pinned Portal revision, and compatibility-branch maintenance |
 

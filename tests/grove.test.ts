@@ -16,6 +16,15 @@ function town(kit: Record<string, unknown>) {
 }
 
 describe('Grove catalog presentation', () => {
+  it('shows Plugin-tagged Apps in the plugin filter and never offers Kit installation', () => {
+    const plugin = { id: 'plugin-1', kind: 'app', tags: ['plugin'], name: 'Pipeline', version: '1.0.0', has_bundle: true };
+    const model = town(plugin); model.groveKind = 'plugin';
+    const listing = renderToStaticMarkup(createElement(Catalog, { town: model, data: { kits: [plugin, { id: 'kit-1', name: 'ordinary-kit' }] } }));
+    expect(listing).toContain('Pipeline'); expect(listing).toContain('Plugin'); expect(listing).not.toContain('ordinary-kit');
+    const detail = renderToStaticMarkup(createElement(CatalogDetail, { town: model }));
+    expect(detail).toContain('Plugin ·'); expect(detail).not.toContain('安装到本机');
+    expect(detail).toContain('桌面客户端');
+  });
   it('renders the server growth stage, vitality, progress, adoption and linked experience', () => {
     const kit = {
       id: 'kit-1', name: 'hand', version: '6.9.0', kind: 'kit', status: 'growing',
