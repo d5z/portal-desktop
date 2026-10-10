@@ -43,7 +43,10 @@ app.whenReady().then(() => {
       header.writeUInt32LE(data.length, entry + 8); header.writeUInt32LE(offset, entry + 12);
       offset += data.length;
     });
-    writeFileSync(path.resolve('resources/branding', `logo-${color}.ico`), Buffer.concat([header, ...images]));
+    const ico = Buffer.concat([header, ...images]);
+    writeFileSync(path.resolve('resources/branding', `logo-${color}.ico`), ico);
+    // Forge embeds app.ico in the EXE; NSIS desktop shortcuts use that resource.
+    if (color === 'white') writeFileSync(path.resolve('resources/branding/app.ico'), ico);
   }
   app.quit();
 }).catch(error => { console.error(error); app.exit(1); });

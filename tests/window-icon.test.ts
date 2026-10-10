@@ -25,7 +25,7 @@ vi.mock('electron', async () => {
 vi.mock('../desktop/main/browser/browser', () => ({ ClientBrowser: class {} }));
 import { nativeTheme } from 'electron';
 import { createMainWindow } from '../desktop/main/app/window';
-import { watchSystemTheme } from '../desktop/main/app/system-theme';
+import { refreshSystemTheme, watchSystemTheme } from '../desktop/main/app/system-theme';
 
 afterEach(() => { nativeTheme.removeAllListeners(); vi.restoreAllMocks(); });
 
@@ -45,9 +45,8 @@ it('keeps the caption black while shell theme listeners follow Windows independe
   nativeTheme.emit('updated');
   await vi.waitFor(() => expect(shellIcon).toHaveBeenLastCalledWith(false));
   shellTheme.light = 0;
-  const settingChange = vi.mocked(window.hookWindowMessage).mock.calls[0];
-  expect(settingChange[0]).toBe(0x001a);
-  settingChange[1](Buffer.alloc(0), Buffer.alloc(0));
+  // The taskbar icon controller owns WM_SETTINGCHANGE for all client windows.
+  refreshSystemTheme();
   await vi.waitFor(() => expect(shellIcon).toHaveBeenLastCalledWith(true));
   stopWatching();
   window.emit('closed');

@@ -7,6 +7,7 @@ import { app, clipboard, dialog, ipcMain, net, nativeImage, nativeTheme, Notific
 import { DesktopNotifications } from './app/notifications';
 import { repairDevelopmentShortcut, updateNotificationShortcutIcon, windowsAppId } from './app/windows-identity';
 import { brandingPath, notificationIcon } from './app/branding';
+import { installWindowsTaskbarIcons } from './app/taskbar-icons';
 import { systemUsesDarkColors, watchSystemTheme } from './app/system-theme';
 import { clientStartup } from './app/startup';
 import { clientUserData } from './app/profile';
@@ -153,6 +154,7 @@ async function ready() {
   let appearance: 'light' | 'dark' = 'light';
   try { const saved = JSON.parse(await readFile(path.join(app.getPath('userData'), 'appearance.json'), 'utf8')); if (saved.theme === 'dark') appearance = 'dark'; } catch { /* First launch uses the light workspace. */ }
   nativeTheme.themeSource = appearance;
+  installWindowsTaskbarIcons(error => { errorLog.report('taskbar-icon', error); });
   const directory = app.getPath('userData');
   const binary = app.isPackaged
     ? path.join(process.resourcesPath, process.platform === 'win32' ? 'heart-portal.exe' : 'heart-portal')

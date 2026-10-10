@@ -1,7 +1,6 @@
 import { app, BrowserWindow, nativeTheme, type BrowserWindowConstructorOptions } from 'electron';
 import path from 'node:path';
 import { ClientBrowser } from '../browser/browser';
-import { refreshSystemTheme } from './system-theme';
 
 const CLIENT_NAME = 'Portal Desktop';
 
@@ -19,9 +18,7 @@ export function createMainWindow(options: MainWindowOptions) {
   const window = new BrowserWindow(clientWindowOptions());
   if (process.platform === 'win32') {
     window.setMenuBarVisibility(false);
-    // Keep the native caption icon black. The installed shell shortcut and tray
-    // select their own icon from the taskbar theme.
-    window.hookWindowMessage(0x001a, refreshSystemTheme);
+    // ICON_SMALL stays black; taskbar-icons updates ICON_BIG independently.
   }
   window.webContents.on('before-input-event', (event, input) => {
     if (input.type !== 'keyDown' || input.key !== 'F12' || input.isAutoRepeat) return;

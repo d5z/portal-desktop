@@ -17,4 +17,22 @@
       Quit
     ${EndIf}
   !macroend
+  !macro customInstall
+    ; Upgrades preserve shortcuts, including ones redirected to an old test build.
+    ; Repair existing links without recreating shortcuts the user removed.
+    ${If} ${FileExists} "$newStartMenuLink"
+      ReadRegDWORD $0 HKCU "Software\Microsoft\Windows\CurrentVersion\Themes\Personalize" "SystemUsesLightTheme"
+      StrCpy $1 "$INSTDIR\resources\branding\logo-white.ico"
+      ${If} $0 == 1
+        StrCpy $1 "$INSTDIR\resources\branding\logo-black.ico"
+      ${EndIf}
+      CreateShortCut "$newStartMenuLink" "$appExe" "" "$1" 0 "" "" "${APP_DESCRIPTION}"
+      WinShell::SetLnkAUMI "$newStartMenuLink" "${APP_ID}"
+    ${EndIf}
+    ${If} ${FileExists} "$newDesktopLink"
+      CreateShortCut "$newDesktopLink" "$appExe" "" "$INSTDIR\resources\branding\app.ico" 0 "" "" "${APP_DESCRIPTION}"
+      WinShell::SetLnkAUMI "$newDesktopLink" "${APP_ID}"
+    ${EndIf}
+    System::Call 'shell32::SHChangeNotify(i 0x8000000, i 0, p 0, p 0)'
+  !macroend
 !endif

@@ -31,6 +31,7 @@
     "test:macos-package": "PORTAL_DESKTOP_MAC_PACKAGE_TESTS=1 vitest run tests/macos-package.test.ts",
     "test:macos-upgrade": "node tests/macos-upgrade-e2e.mjs",
     "test:windows-upgrade": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-windows-upgrade.ps1",
+    "test:taskbar-icons": "node tests/taskbar-icons-native.mjs",
     "test:town-sdk": "node tests/town-sdk.mjs",
     "test:notifications": "node tests/notifications-electron.mjs",
     "test:menu-keyboard": "node tests/menu-keyboard.mjs",

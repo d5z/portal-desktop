@@ -56,6 +56,7 @@ try {
   if (!flags.has('--reuse-package')) await npm('build-portal', ['run', 'build:portal']);
   await npm('unit', ['test', '--', '--reporter=default', '--reporter=junit', '--outputFile.junit=test-results/unit.xml']);
   await npm('menu-keyboard', ['run', 'test:menu-keyboard']);
+  await npm('taskbar-icons', ['run', 'test:taskbar-icons']);
   await npm('update-progress', ['run', 'test:update-progress']);
   await npm('town-names', ['run', 'test:town-names']);
   await npm('seed-garden', ['run', 'test:seed-garden']);
