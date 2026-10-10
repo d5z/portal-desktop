@@ -29,7 +29,6 @@
   --accent-border: rgba(88,166,255,0.25);
 
   /* ── 字体 ── */
-  --font-sans: -apple-system, 'SF Pro Text', 'Segoe UI', system-ui, sans-serif;
   --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
 
   --font-2xs: 10px;
@@ -192,7 +191,7 @@ html, body {
 /* Soul card */
 #soul-card {
   display: none; position: fixed; inset: 0; z-index: 200;
-  background: var(--overlay-backdrop); backdrop-filter: blur(8px);
+  background: var(--overlay-backdrop);
   align-items: center; justify-content: center;
 }
 #soul-card.active { display: flex; }
@@ -589,7 +588,7 @@ html, body {
 /* Drop zone */
 #drop-zone {
   display: none; position: fixed; inset: 0; z-index: 100;
-  background: var(--overlay-backdrop); backdrop-filter: blur(4px);
+  background: var(--overlay-backdrop);
   align-items: center; justify-content: center;
   font-size: 18px; color: var(--accent);
 }
@@ -958,7 +957,7 @@ body{-webkit-font-smoothing:antialiased;background:var(--bg)}
 .message.user .meta{color:var(--text-muted);font-size:10px;margin:5px 2px 0;order:2}
 /* Markdown supplies paragraph/br spacing; preserving its HTML newlines adds empty lines below bubbles. */
 .message.user .content{max-width:85%;background:var(--bg-softer);padding:12px 16px;border-radius:16px;white-space:normal}
-.message .content{font-size:var(--reading-size,15px);line-height:1.85;color:var(--text);overflow-wrap:anywhere}
+.message .content{font-size:var(--reading-size,16px);line-height:1.85;color:var(--text);overflow-wrap:anywhere}
 .message .content p{margin-bottom:16px}.message .content p:last-child{margin-bottom:0}
 .message .content h1,.message .content h2,.message .content h3{font-weight:550;line-height:1.55;margin:26px 0 12px;letter-spacing:-.3px}
 .message .content h1{font-size:22px}.message .content h2{font-size:20px}.message .content h3{font-size:17px}
@@ -992,7 +991,7 @@ body{-webkit-font-smoothing:antialiased;background:var(--bg)}
 #input{grid-column:1 / -1;grid-row:1;width:100%;min-height:60px;max-height:180px;border:0;border-radius:0;padding:2px 2px 14px;background:transparent;font-size:14px;line-height:1.7;box-shadow:none;outline:none}
 #input:hover,#input:focus,#input.queued{background:transparent;border:0;box-shadow:none}#input::placeholder{color:var(--text-muted)}
 #input-row>.btn-icon:not(#send-btn){grid-row:2;grid-column:1;display:grid;place-items:center;width:28px;height:28px;min-width:28px;min-height:28px;padding:0;font-size:24px;line-height:1;color:var(--text-dim);border-radius:6px;background:transparent}
-#subagent-setup-hint{position:absolute;left:0;bottom:calc(100% + 8px);z-index:4;display:flex;align-items:center;gap:8px;width:max-content;max-width:100%;margin:0;padding:6px 7px 6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text-dim);box-shadow:0 4px 14px #00000010;font:11px/18px -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
+#subagent-setup-hint{position:absolute;left:0;bottom:calc(100% + 8px);z-index:4;display:flex;align-items:center;gap:8px;width:max-content;max-width:100%;margin:0;padding:6px 7px 6px 10px;border:1px solid var(--border);border-radius:8px;background:var(--bg);color:var(--text-dim);box-shadow:0 4px 14px #00000010;font:12px/18px var(--font-sans)}
 #subagent-setup-hint .subagent-hint-text{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #subagent-setup-hint button{flex:0 0 auto;border:0;background:none;font:inherit;cursor:pointer}
 #subagent-setup-hint .subagent-hint-action{padding:2px 6px;border-radius:5px;color:var(--accent);font-weight:600}
@@ -1024,7 +1023,7 @@ body{-webkit-font-smoothing:antialiased;background:var(--bg)}
 #input-row:has(#input.queued) #send-btn{animation:none}
 /* One 16px icon column and 8px gap throughout the process summary and details. */
 #tui-wrapper,.message.thinking-indicator{display:none!important}
-.run-activity{--run-icon:16px;--run-gap:8px;margin:8px 0 24px;min-width:0;color:var(--text-dim);font:13px/1.6 -apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;letter-spacing:normal;text-align:left}
+.run-activity{--run-icon:16px;--run-gap:8px;margin:8px 0 24px;min-width:0;color:var(--text-dim);font:13px/1.6 var(--font-sans);letter-spacing:normal;text-align:left}
 .message.being:has(+ .run-activity){margin-bottom:8px}
 .run-activity>summary{list-style:none;display:flex;align-items:center;gap:var(--run-gap);min-height:32px;padding:4px 0;cursor:pointer;user-select:none}
 .run-activity>summary::-webkit-details-marker{display:none}
@@ -1067,7 +1066,7 @@ body{-webkit-font-smoothing:antialiased;background:var(--bg)}
 :root[data-theme=dark]{--bg:#202823;--border:#ffffff14}
 #messages{padding:24px max(28px,calc((100% - 720px)/2)) 28px}
 .message{margin-bottom:34px}
-.message .content{font-size:var(--reading-size,15px);line-height:1.85}
+.message .content{font-size:var(--reading-size,16px);line-height:1.85}
 .message.user .content{background:transparent;border-radius:0;padding:0 14px 0 0;border-right:2px solid var(--accent-border);max-width:88%}
 .message.user .meta{margin:7px 14px 0 0;font-size:10px}
 .message .meta{font-size:10px;opacity:.65}
@@ -1109,11 +1108,11 @@ button:focus-visible{outline:2px solid var(--accent-border);outline-offset:3px}
 .chat-scope-switch button[aria-pressed=true]{color:var(--text);background:var(--bg);box-shadow:0 1px 3px #0001}
 .chat-scope-switch button:disabled{opacity:.45;cursor:default}
 .chat-scope-switch button:focus-visible{outline:2px solid var(--accent-border);outline-offset:2px}
-.chat-scope-caption{font-size:11px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+.chat-scope-caption{font-size:12px;color:var(--text-dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
 .message-scene{display:inline-block;max-width:220px;margin-left:8px;padding:1px 6px;border-radius:4px;background:var(--bg-softer);color:var(--text-dim);vertical-align:bottom;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .chat-scope-empty{padding:48px 12px;text-align:center;color:var(--text-dim);font-size:13px}
 .chat-scope-empty button{display:block;margin:12px auto 0;border:0;background:none;color:var(--text);font:inherit;text-decoration:underline;cursor:pointer}
-@media(max-width:680px){.chat-history-scope{width:calc(100% - 48px);gap:8px}.chat-scope-caption{font-size:10px}.message-scene{max-width:160px}}
+@media(max-width:680px){.chat-history-scope{width:calc(100% - 48px);gap:8px}.chat-scope-caption{font-size:12px}.message-scene{max-width:160px}}
 button.llm-item, button.llm-custom-link, button.step2-back { font: inherit; color: inherit; text-align: left; }
 button.llm-item, button.llm-custom-link { background: transparent; }
 button.llm-custom-link, button.step2-back { border: 0; cursor: pointer; }
@@ -1163,14 +1162,14 @@ label.chat-scope-switch input{margin:0;accent-color:var(--accent)}
 .message.message-partial { opacity: 0.65; }
 
 /* Soft chat bubbles and floating composer, shared with the desktop shell. */
-:root{--bg:#fcfcfc;--bg-soft:#f2f2f3;--bg-softer:#ebebed;--border:#e9e9eb;--text:#242424;--text-dim:#74777a;--text-muted:#92969c;--accent:#3f78ae;--accent-rgb:63,120,174;--accent-border:#a9ccee;--chat-reply:#ebebed;--chat-sent:#cce5ff}
-:root[data-theme=dark]{--bg:#202124;--bg-soft:#292b30;--bg-softer:#34363b;--border:#ffffff14;--text:#eceef1;--text-dim:#b0b3b9;--text-muted:#878b94;--accent:#a5cef6;--accent-rgb:165,206,246;--accent-border:#597b9e;--chat-reply:#303237;--chat-sent:#304b68}
+:root{--bg:#fcfcfc;--bg-soft:#f2f2f3;--bg-softer:#ebebed;--border:#e9e9eb;--text:#242424;--text-dim:#62666b;--text-muted:#666b72;--accent:#3f78ae;--accent-rgb:63,120,174;--accent-border:#a9ccee;--chat-reply:#ebebed;--chat-sent:#cce5ff}
+:root[data-theme=dark]{--bg:#202124;--bg-soft:#292b30;--bg-softer:#34363b;--border:#ffffff14;--text:#eceef1;--text-dim:#b0b3b9;--text-muted:#a0a5ae;--accent:#a5cef6;--accent-rgb:165,206,246;--accent-border:#597b9e;--chat-reply:#303237;--chat-sent:#304b68}
 #messages{padding:26px max(24px,calc((100% - 860px)/2)) 24px}
 .message{margin-bottom:24px}.message.user{margin:14px 0 26px}.message.consecutive{margin-bottom:8px}
-.message .content{min-width:0;max-width:100%;overflow-wrap:anywhere;line-height:1.7;font-size:var(--reading-size,15px)}
+.message .content{min-width:0;max-width:100%;overflow-wrap:anywhere;line-height:1.7;font-size:var(--reading-size,16px)}
 .message.being .content{display:block;width:fit-content;min-width:0;max-width:92%;padding:15px 19px;border-radius:24px;background:var(--chat-reply)}
 .message.user .content{max-width:85%;padding:13px 19px;border:0;border-radius:24px;background:var(--chat-sent)}
-.message .meta,.message.user .meta{margin:7px 12px 0;font-size:10px;opacity:.8}.message.being .meta{margin:0 12px 7px}
+.message .meta,.message.user .meta{margin:7px 12px 0;font-size:12px;opacity:1;color:var(--text-dim)}.message.being .meta{margin:0 12px 7px;color:var(--text-dim)}
 #input-area{width:calc(100% - 40px);max-width:880px;margin:0 auto 20px;padding:12px 16px 8px;border:1px solid var(--border);border-radius:30px;background:var(--bg);box-shadow:0 5px 22px #0000000b;transition:box-shadow .18s,border-color .18s}
 #input-area:focus-within{border-color:var(--accent-border);box-shadow:0 6px 24px #00000010}
 #input-row{grid-template-columns:32px minmax(0,1fr) 36px;gap:4px 10px;align-items:center}

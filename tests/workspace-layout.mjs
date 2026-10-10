@@ -6,7 +6,7 @@ import { build } from 'esbuild';
 import { chromium } from 'playwright';
 const preview = process.env.PORTAL_LAYOUT_PREVIEW === '1';
 const assets = new Map(await Promise.all(['loom.html','chat.js','chat.css','highlight.css'].map(async file => ['/' + file, await readFile('desktop/generated/' + file)])));
-const bundle = await build({ plugins:[{name:'preview-chat-origin',setup(build){build.onLoad({filter:/app\/hooks\/use-chat-bridge\.tsx?$/},async args=>({contents:(await readFile(args.path,'utf8')).replaceAll('"beings://chat"','location.origin'),loader:'ts'}));}}], stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
+const bundle = await build({ plugins:[{name:'preview-chat-origin',setup(build){build.onLoad({filter:/app[\\/]hooks[\\/]use-chat-bridge\.tsx?$/},async args=>({contents:(await readFile(args.path,'utf8')).replaceAll('"beings://chat"','location.origin'),loader:'ts'}));}}], stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
   import {createRoot} from 'react-dom/client';
   import {App} from './desktop/renderer/app/page';
   import {AppModel} from './desktop/renderer/app/models/app';
@@ -64,7 +64,7 @@ const server = createServer((request,response) => {
   if (pathname === '/api/stream/active') {response.writeHead(204);response.end();return;}
   if (pathname === '/health') {response.end('OK');return;}
   if (pathname.startsWith('/api/')) return json({being_name:'Willow',sbs_enabled:true});
-  const file = bundle.outputFiles.find(file => file.path.endsWith(request.url));
+  const file = bundle.outputFiles.find(file => file.path.replaceAll('\\', '/').endsWith(pathname));
   if(file) {response.setHeader('Content-Type',request.url.endsWith('.css')?'text/css':'text/javascript');response.end(file.contents);return;}
   response.setHeader('Content-Type','text/html; charset=utf-8');
   response.end('<!doctype html><link rel="stylesheet" href="/stdin.css"><div id="root"></div><script src="/stdin.js"></script>');
@@ -226,7 +226,7 @@ try {
   assert.ok(chatBounds.x+chatBounds.width<=modelBounds.x+1,'Settings must occupy a sibling column without covering chat');
   assert.equal(await page.locator('#being-info').count(),0);
   await page.getByRole('separator',{name:'调整模型设置宽度'}).press('ArrowLeft');
-  assert.equal(Math.round((await page.locator('#subagent-model-panel').boundingBox()).width),Math.round(profileWidth+24));
+  await page.waitForFunction(expected => Math.round(document.querySelector('#subagent-model-panel').getBoundingClientRect().width) === expected, Math.round(profileWidth+24));
   await page.screenshot({path:'test-results/workspace-model-settings.png'});
   await page.setViewportSize({width:435,height:746});
   assert.equal(await page.locator('#chat-view').isVisible(),true);

@@ -1,6 +1,7 @@
+import { readShellStyles } from './support/shell-styles.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
 
@@ -31,7 +32,7 @@ const bundle = await build({ stdin: { contents: `
   window.app = app;
   createRoot(document.getElementById('root')).render(<Topbar model={app} />);
 `, loader: 'tsx', resolveDir: process.cwd() }, bundle: true, write: false, format: 'iife', jsx: 'automatic', platform: 'browser', define: { 'process.env.NODE_ENV': '"production"' } });
-const css = await readFile('desktop/renderer/app/styles.css');
+const css = await readShellStyles();
 const server = createServer((request, response) => {
   if (request.url === '/app.js') { response.setHeader('Content-Type', 'text/javascript'); response.end(bundle.outputFiles[0].contents); return; }
   if (request.url === '/app.css') { response.setHeader('Content-Type', 'text/css'); response.end(css); return; }

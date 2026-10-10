@@ -1,0 +1,6 @@
+:root {
+  /* Share explicit Windows and CJK font choices across shell and chat. */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei UI", "Microsoft YaHei", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", sans-serif;
+}
+
+button, input, select, textarea { font-family: inherit; }

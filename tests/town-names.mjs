@@ -1,7 +1,8 @@
+import { readShellStyles } from './support/shell-styles.mjs';
 // Real React components with local fixtures; no Town requests or credentials.
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
 
@@ -70,7 +71,7 @@ const { outputFiles } = await build({
   ` },
   bundle: true, write: false, platform: 'browser', format: 'iife', jsx: 'automatic',
 });
-const styles = await readFile('desktop/renderer/app/styles.css', 'utf8');
+const styles = await readShellStyles();
 const server = createServer((request, response) => {
   response.setHeader('Content-Type', request.url === '/fixture.js' ? 'text/javascript' : 'text/html; charset=utf-8');
   const css = `${styles} body {display:block;height:auto;padding:32px; overflow:auto;} .social-feed {max-width:960px;margin:auto;}`;

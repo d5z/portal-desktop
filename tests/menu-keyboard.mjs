@@ -1,7 +1,8 @@
+import { readShellStyles } from './support/shell-styles.mjs';
 // Render the real React menu in Chromium; no desktop services or Town requests.
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { readFile, mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
 
@@ -25,7 +26,7 @@ const bundle = await build({
   bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic',
   define: { 'process.env.NODE_ENV': '"production"' },
 });
-const css = await readFile('desktop/renderer/app/styles.css');
+const css = await readShellStyles();
 const server = createServer((request, response) => {
   if (request.url === '/menu.js') { response.setHeader('Content-Type', 'text/javascript'); response.end(bundle.outputFiles[0].contents); return; }
   if (request.url === '/app.css') { response.setHeader('Content-Type', 'text/css'); response.end(css); return; }

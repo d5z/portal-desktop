@@ -96,7 +96,7 @@ export class AppModel extends Store {
   searchEntries: import("../../chat/services/conversation-search").SearchEntry[] = [];
   searchLoading = false;
   searchError = "";
-  readingSize = 15;
+  readingSize = 16;
   chatHistoryLimit = DEFAULT_CHAT_HISTORY_LIMIT;
   update?: UpdateState;
   updateChecking = false;

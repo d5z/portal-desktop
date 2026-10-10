@@ -1,7 +1,8 @@
+import { readShellStyles } from './support/shell-styles.mjs';
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
-import { readFile, mkdir } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 
 const { outputFiles } = await build({
   stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
@@ -22,7 +23,7 @@ const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIG
 try {
   const page = await browser.newPage({ viewport: { width: 1000, height: 720 } });
   await page.setContent('<html><body><div id="root"></div></body></html>');
-  await page.addStyleTag({ content: await readFile('desktop/renderer/app/styles.css', 'utf8') });
+  await page.addStyleTag({ content: await readShellStyles() });
   await page.addScriptTag({ content: outputFiles[0].text });
   const toggle = page.getByRole('checkbox', { name: '显示全部场景上下文' });
   const selected = page.getByRole('button', { name: '切换到场景：方案讨论' });
