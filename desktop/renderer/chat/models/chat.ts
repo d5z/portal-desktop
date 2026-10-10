@@ -15,6 +15,10 @@ export interface Message extends MessageScene {
   kind: "message";
   id: string;
   turnId?: string;
+  /** Shared by speech fragments before the same reply boundary. */
+  replyId?: string;
+  /** Original message IDs represented by a combined display bubble. */
+  sourceMessageIds?: string[];
   role: "user" | "being" | "system";
   text: string;
   streaming: boolean;

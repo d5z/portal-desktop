@@ -260,6 +260,9 @@ try {
   assert.equal(await frame.locator('.run-activity').count(), 1, 'One process record per completed turn');
   assert.equal(await frame.locator('.run-activity.running').count(), 0);
   await frame.locator('.run-activity summary').click(); assert.match(await frame.locator('.run-list').innerText(), /fixture file read/);
+  const toolReply = frame.locator('.message.being').filter({ hasText: 'React 回复完成' });
+  assert.equal(await toolReply.count(), 1, 'Tool-separated speech belongs in one bubble');
+  assert.match(await toolReply.innerText(), /开始回复。/);
   const repliesBeforeContinuation = await frame.locator('.message.being:not(.thinking-indicator)').count();
   await frame.locator('#input').fill('continuation'); await frame.locator('#send-btn').click();
   await page.waitForFunction(() => window.received.some(item => item.type === 'beings:scene-result' && item.ok));

@@ -791,10 +791,12 @@ function createStreamRuntime(state: any, options: any): any {
     lastRole = role;
     lastSceneId = scene.sceneId;
 
+    const messageId = `message-${options.nextId()}`;
     const message = {
       ...scene,
       kind: "message",
-      id: `message-${options.nextId()}`,
+      id: messageId,
+      replyId: role === "being" && streaming ? (progressBubbles[0]?.message.replyId || messageId) : undefined,
       turnId: role === "user" ? `turn-${options.nextId()}` : undefined,
       role,
       text,
@@ -2553,8 +2555,11 @@ function createStreamRuntime(state: any, options: any): any {
     return true;
   }
   function historyEchoFor(role: any, texts: string[], scene: any, message: any) {
-    const candidates = state.items.map((item: any, index: any) => ({ item, index })).filter(({ item }: any) =>
-      item !== message && item.kind === "message" && item.historySeq && !item.persistedStreamId &&
+    // A previous reply may have identical text. Only a row added after this
+    // live fragment can be its history echo; never steal an older reply's row.
+    const localIndex = state.items.indexOf(message);
+    const candidates = state.items.map((item: any, index: any) => ({ item, index })).filter(({ item, index }: any) =>
+      index > localIndex && item !== message && item.kind === "message" && item.historySeq && !item.persistedStreamId &&
       item.role === role && texts.includes(normalizeEcho(item.text)));
     const exact = [...candidates].reverse().find(({ item }: any) => echoScenesMatch(item, message || scene));
     if (exact) return exact.item;
@@ -2563,7 +2568,6 @@ function createStreamRuntime(state: any, options: any): any {
     // A server can assign the canonical scene id while a reply is still live.
     // Only relax scene matching for the one persisted row appended after this
     // exact recent bubble; never collapse arbitrary equal text across scenes.
-    const localIndex = state.items.indexOf(message);
     const fallback = candidates.filter(({ item, index }: any) =>
       index > localIndex && echoTimesMatch(message, item));
     return fallback.length === 1 ? fallback[0].item : null;

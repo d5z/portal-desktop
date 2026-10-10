@@ -1,4 +1,5 @@
 import { ConversationSearch, searchEntries } from "./services/conversation-search";
+import { replyBubbles } from "./models/reply-bubbles";
 import { ScheduledMessage } from './components/scheduling';
 import { splitSchedulingHint, withScheduling } from './models/scheduling';
 import {
@@ -82,7 +83,7 @@ function ChatView({
     media.addEventListener('change', change);
     return () => media.removeEventListener('change', change);
   }, [mobileWeb]);
-  const visibleItems = sceneItems(withScheduling(state.items, state.sceneTasks), state.historyScope, state.currentScene);
+  const visibleItems = replyBubbles(sceneItems(withScheduling(state.items, state.sceneTasks), state.historyScope, state.currentScene));
   const currentSceneName = sceneName(state.currentScene, state.currentScene);
   const showActivity = state.historyScope === "all" || inCurrentScene(state.activeScene, state.currentScene);
   const messages = useRef<HTMLDivElement>(null),
@@ -539,11 +540,14 @@ function ChatView({
               <div
                 key={item.id}
                 ref={(el) => {
-                  if (el) messageElements.current.set(item.id, el);
-                  else messageElements.current.delete(item.id);
+                  for (const id of item.sourceMessageIds || [item.id]) {
+                    if (el) messageElements.current.set(id, el);
+                    else messageElements.current.delete(id);
+                  }
                 }}
                 data-message-id={item.id}
-                className={`message ${item.role}${item.persistedFrom === "partial" ? " message-partial" : ""}${item.consecutive ? " consecutive" : ""}${highlighted === item.id ? " index-target" : ""}`}
+                data-reply-id={item.replyId}
+                className={`message ${item.role}${item.persistedFrom === "partial" ? " message-partial" : ""}${item.consecutive ? " consecutive" : ""}${(highlighted === item.id || item.sourceMessageIds?.includes(highlighted || "")) ? " index-target" : ""}`}
               >
                 <div className={`meta${item.consecutive ? " time-only" : ""}`}>
                   {item.role === "user" && <CopyMessage text={splitSchedulingHint(item.text).text} copy={bridge.copyText} />}

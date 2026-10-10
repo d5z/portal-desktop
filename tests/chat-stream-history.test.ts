@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { replyBubbles } from "../desktop/renderer/chat/models/reply-bubbles";
 import { ChatState, type Message } from "../desktop/renderer/chat/models/chat";
 import { createChatRuntime } from "../desktop/renderer/chat/services/runtime";
 
@@ -35,6 +36,35 @@ describe("stream progress and persisted replies", () => {
       replies: () => state.items.filter((item): item is Message => item.kind === "message" && item.role === "being"),
     };
   }
+
+  it('keeps one visible bubble through tools and reasoning, then starts a new reply at stop', async () => {
+    const f = fixture();
+    const bubbles = () => replyBubbles(f.state.items).filter((i): i is Message => i.kind === 'message' && i.role === 'being');
+    try {
+      await f.runtime.start();
+      await f.runtime.send('continue');
+      await vi.advanceTimersByTimeAsync(0);
+      f.event('content_block_delta', { delta: { text: '先检查。' } });
+      await vi.advanceTimersByTimeAsync(20);
+      const id = bubbles()[0].id;
+      for (const event of ['tool_use', 'reasoning']) {
+        f.event(event, event === 'tool_use' ? { name: 'read', input: {} } : { text: '继续思考' });
+        f.event('content_block_delta', { delta: { text: '继续。' } });
+        await vi.advanceTimersByTimeAsync(20);
+        expect(bubbles()).toHaveLength(1);
+        expect(bubbles()[0]).toMatchObject({ id, streaming: true });
+      }
+      expect(bubbles()[0].text).toBe('先检查。\n\n继续。\n\n继续。');
+      f.event('message_stop', {});
+      f.event('content_block_delta', { delta: { text: '下一轮。' } });
+      await vi.advanceTimersByTimeAsync(20);
+      expect(bubbles()).toHaveLength(2);
+      expect(bubbles()[1].text).toBe('下一轮。');
+      f.event('message_stop', {});
+      f.close();
+      await vi.advanceTimersByTimeAsync(20);
+    } finally { f.runtime.dispose(); }
+  });
 
   it.each(["before", "after", "rendered-before"])("merges differing history text arriving %s persisted", async order => {
     const f = fixture();
@@ -293,6 +323,10 @@ describe("stream progress and persisted replies", () => {
       await f.runtime.refreshHistory();
       await f.runtime.refreshHistory();
       expect(f.replies().map(m => m.text)).toEqual(["正在检查列表。", "列表检查完成。", report]);
+      const bubbles = replyBubbles(f.state.items).filter((i): i is Message => i.kind === "message" && i.role === "being");
+      expect(bubbles).toHaveLength(1);
+      expect(bubbles[0].text).toBe("正在检查列表。\n\n列表检查完成。\n\n" + report);
+      expect(bubbles[0].sourceMessageIds).toEqual(f.replies().map(m => m.id));
       expect(f.replies().at(-1)).toMatchObject({ historySeq: 1, streaming: false });
       expect(f.state.streaming).toBe(false);
       expect(f.state.thinking).toBe(false);
@@ -398,6 +432,8 @@ describe("stream progress and persisted replies", () => {
         [(persistence === "truncated" ? "恢复前已经说出的开头。\n\n检查中。\n\n检查完成。" : "检查中。\n\n检查完成。"), "收到，就此收手。"] : ["检查中。", persistence === "persisted" ? "落库终稿。" : "检查完成。"]);
       expect(replies[1]).toMatchObject({ sceneId: scene, historySeq: (persistence === "partial" || persistence === "truncated") ? 2 : 1, streaming: false });
       if ((persistence === "partial" || persistence === "truncated")) expect(replies[0]).toMatchObject({ historySeq: 1, persistedFrom: "partial", streaming: false });
+      expect(replyBubbles(state.items).filter(i => i.kind === "message" && i.role === "being"))
+        .toHaveLength(persistence === "partial" || persistence === "truncated" ? 2 : 1);
       expect(state.streaming).toBe(false);
     } finally { runtime.dispose(); }
   });
