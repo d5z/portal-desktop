@@ -166,10 +166,27 @@ try {
   assert.equal(await page.locator('#chat-session-panel').isVisible(),true);
   const picker = await page.locator('#chat-session-panel').boundingBox();
   assert.ok(picker.y < 80 && picker.width <= 400);
+  const sceneChatFrame = await page.locator('#chat-frame').elementHandle();
+  const assertPinnedLayout = async () => {
+    const list = await page.locator('#chat-session-panel').boundingBox();
+    const chat = await page.locator('#chat-view').boundingBox();
+    assert.ok(chat.x >= list.x + list.width - 1, 'Pinned scenes must reserve space beside chat');
+    assert.ok(chat.width > 0 && chat.x + chat.width <= page.viewportSize().width + 1);
+    assert.ok(await sceneChatFrame.evaluate(node => node === document.querySelector('#chat-frame')), 'Resizing must retain the conversation');
+  };
+  await assertPinnedLayout();
   await page.getByRole('separator',{name:'调整场景列表宽度'}).press('ArrowRight');
   assert.equal(Math.round((await page.locator('#chat-session-panel').boundingBox()).width),344);
+  await assertPinnedLayout();
+  for (const width of [1100,760,435]) {
+    await page.setViewportSize({width,height:746});
+    await assertPinnedLayout();
+  }
+  await page.setViewportSize({width:1440,height:960});
+
   await page.getByLabel('场景列表选项',{exact:true}).click();
   await page.getByRole('button',{name:'关闭场景列表',exact:true}).click();
+  assert.equal(await page.locator('.workspace-stage').evaluate(node => node.style.getPropertyValue('--scene-panel-width')), '');
   await page.evaluate(()=>{window.fixtureApp.theme='dark';window.fixtureApp.changed();});
   await page.screenshot({animations:'disabled',path:'test-results/workspace-dark.png'});
   await page.setViewportSize({width:760,height:700});

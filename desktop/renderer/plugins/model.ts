@@ -68,6 +68,12 @@ export class PluginsModel extends Store {
       await this.api.setPlacement(id, view, placement);
     });
   }
+  setSidebarSlotVisible(id: string, slot: string, visible: boolean) {
+    return this.act(async () => {
+      if (!this.api?.setSidebarSlotVisible) throw new Error('当前客户端不支持配置侧栏入口。');
+      await this.api.setSidebarSlotVisible(id, slot, visible);
+    });
+  }
   updateContext(input: PluginHostContext | undefined) {
     if (!input) { this.context = undefined; this.contextInput = undefined; return; }
     if (JSON.stringify(this.contextInput) === JSON.stringify(input)) return;
@@ -77,7 +83,7 @@ export class PluginsModel extends Store {
   }
   async prepareSession() { await this.contextQueue; }
   slots(location: PluginSlot['location']) {
-    return this.library.plugins.filter(p => p.enabled).flatMap(p => (p.manifest.contributes.slots || []).filter(slot => slot.location === location).map(slot => ({ plugin: p.manifest, slot })))
+    return this.library.plugins.filter(p => p.enabled).flatMap(p => (p.manifest.contributes.slots || []).filter(slot => slot.location === location && (location !== 'right-sidebar' || p.visibleSidebarSlots?.includes(slot.id))).map(slot => ({ plugin: p.manifest, slot })))
       .filter(({ plugin, slot }) => location !== 'resource-actions' || (this.context?.resource && (!slot.resourceKinds || slot.resourceKinds.includes(this.context.resource.kind)) && plugin.capabilities.includes(this.context.resource.private ? 'town.private.read' : 'town.public.read')));
   }
   openSlot(id: string, slot: PluginSlot) {

@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { c as archive } from 'tar';
+import { PluginsModel } from '../desktop/renderer/plugins/model';
 import { PluginRegistry, readPlugin } from '../desktop/main/plugins/registry';
 import { groveEntryKind, parsePluginManifest, pluginReleaseUrl } from '../desktop/shared/plugins';
 import { unpackKit, KitInstaller } from '../desktop/main/kits/install';
@@ -20,6 +21,35 @@ async function fixture() {
   return { root, source, registry, bundle: await readPlugin(source) };
 }
 describe('desktop plugin contract', () => {
+  it('defaults sidebar shortcuts to hidden and persists opt-in without disabling the plugin or closing sessions', async () => {
+    const { registry, source, root } = await fixture();
+    await writeFile(path.join(source, 'desktop.plugin.json'), JSON.stringify({ ...manifest, capabilities: ['storage', 'ui'], contributes: {
+      ...manifest.contributes, slots: [
+        { id: 'current', title: 'Current', view: 'board', location: 'right-sidebar' },
+        { id: 'other', title: 'Other', view: 'board', location: 'right-sidebar' },
+      ],
+    } }));
+    const bundle = await readPlugin(source);
+    await registry.install(bundle, { kind: 'local' });
+    const model = new PluginsModel(undefined, () => {});
+    model.library = await registry.list();
+    expect(model.slots('right-sidebar')).toEqual([]);
+    const session = await registry.open(manifest.id, 'board', undefined, 'current');
+    await registry.call(session.token, 'storage.patch', { kept: true });
+    await registry.setSidebarSlotVisible(manifest.id, 'current', true);
+    await registry.setSidebarSlotVisible(manifest.id, 'other', true);
+    await registry.setSidebarSlotVisible(manifest.id, 'other', false);
+    const reloaded = new PluginRegistry(path.join(root, 'registry'));
+    model.library = await reloaded.list();
+    expect(model.slots('right-sidebar').map(s => s.slot.id)).toEqual(['current']);
+    expect(model.library.plugins[0]).toMatchObject({ enabled: true, sha256: bundle.sha256 });
+    await registry.setSidebarSlotVisible(manifest.id, 'current', false);
+    model.library = await reloaded.list();
+    expect(model.slots('right-sidebar')).toEqual([]);
+    expect(await registry.call(session.token, 'storage.load')).toEqual({ kept: true });
+    await expect(registry.setSidebarSlotVisible(manifest.id, 'missing', true)).rejects.toThrow();
+    await expect(registry.setSidebarSlotVisible(manifest.id, 'current', 'true' as any)).rejects.toThrow();
+  });
   it('persists per-view placement without changing plugin content or permissions', async () => {
     const { registry, bundle, root } = await fixture(); await registry.install(bundle, { kind: 'local' });
     await registry.setPlacement(manifest.id, 'board', 'navigation');

@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChatScene } from "../../../shared/types";
 import { CHAT_SCENE_ACTIVITY_LABELS, type ChatSceneActivity } from "../../../shared/types";
 import type { HistoryScope } from "../../chat/models/scenes";
@@ -76,6 +76,13 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
   };
   const [expanded, setExpanded] = useState(false);
   const trigger = useRef<HTMLButtonElement>(null);
+  // Reserve the same responsive width as the pinned list, without remounting chat.
+  useLayoutEffect(() => {
+    const stage = trigger.current?.closest<HTMLElement>(".workspace-stage");
+    if (!stage || !pinned || !expanded || !visible) return;
+    stage.style.setProperty("--scene-panel-width", `${width}px`);
+    return () => { stage.style.removeProperty("--scene-panel-width"); };
+  }, [pinned, expanded, visible, width]);
   const label = scene?.scene_meta.scene_label || "场景标记不可用";
   const collapse = () => { setMenu(undefined); setExpanded(false); trigger.current?.focus(); };
   const reveal = () => { setExpanded(true); onReveal?.(); };
@@ -106,7 +113,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
           <span className="chat-scene-label">{scene ? label : "场景"}</span>
         </button>
       </div>
-      {visible && expanded && <aside ref={panel} style={{ width }} id="chat-session-panel" className="chat-session-panel" aria-label="场景列表"
+      {visible && expanded && <aside ref={panel} style={{ width }} id="chat-session-panel" className="chat-session-panel" data-pinned={pinned} aria-label="场景列表"
         onKeyDown={event => { if (event.key === "Escape" && !editing && !open && !deleting && !menu) { event.preventDefault(); collapse(); } }}>
         <PanelResizeHandle panel={panel} label="调整场景列表宽度" width={width} onResize={setWidth} initial={320} min={240} max={480} reserve={48} edge="right" />
         <div className="chat-session-panel-heading">
