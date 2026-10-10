@@ -1,5 +1,4 @@
 import { app, BrowserWindow, nativeTheme, type BrowserWindowConstructorOptions } from 'electron';
-import os from 'node:os';
 import path from 'node:path';
 import { ClientBrowser } from '../browser/browser';
 import { refreshSystemTheme } from './system-theme';
@@ -61,7 +60,6 @@ export function createMainWindow(options: MainWindowOptions) {
 
 /** Shared native caption, icon and platform styling for client-owned windows. */
 export function clientWindowOptions(): BrowserWindowConstructorOptions {
-  const acrylic = process.platform === 'win32' && Number(os.release().split('.')[2]) >= 22621;
   const windowIcon = () => path.join(
     app.isPackaged ? process.resourcesPath : app.getAppPath(),
     app.isPackaged ? 'branding' : 'resources/branding',
@@ -72,8 +70,8 @@ export function clientWindowOptions(): BrowserWindowConstructorOptions {
   return {
     width: 1280, height: 860, minWidth: 920, minHeight: 640, title: CLIENT_NAME,
     icon: windowIcon(),
-    backgroundColor: acrylic ? '#00000000' : nativeTheme.shouldUseDarkColors ? '#212121' : '#ffffff',
-    ...(acrylic ? { backgroundMaterial: 'acrylic' as const } : {}),
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#212121' : '#ffffff',
+    ...(process.platform === 'win32' ? { backgroundMaterial: 'none' as const } : {}),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     autoHideMenuBar: process.platform === 'win32',
     trafficLightPosition: { x: 18, y: 20 },

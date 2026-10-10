@@ -1,3 +1,4 @@
+import { readShellStyles } from './support/shell-styles.mjs';
 // Real generated Loom + its desktop bridge, served only by a local fixture.
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
@@ -45,7 +46,7 @@ const { outputFiles } = await build({ stdin: { resolveDir: process.cwd(), loader
   app.applySnapshot(snapshot);
   createRoot(document.getElementById('root')).render(<Fixture />);
 ` }, bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic', define: { 'import.meta.env.DEV': 'false' } });
-const css = await readFile('desktop/renderer/app/styles.css', 'utf8');
+const css = await readShellStyles();
 const loom = await readFile('desktop/generated/loom.html', 'utf8');
 const assets = new Map(await Promise.all(['chat.js', 'chat.css', 'highlight.css'].map(async file => [ '/' + file, await readFile('desktop/generated/' + file) ])));
 let enabled = false, status = 200, malformed = false, holdReads = true, holdPatch = false, rejectPatch = false;

@@ -1,3 +1,4 @@
+import { readShellStyles } from './support/shell-styles.mjs';
 // Exercise the styled menu through the real chat iframe, shell bridge and Electron clipboard.
 import assert from 'node:assert/strict';
 import { build } from 'esbuild';
@@ -9,6 +10,7 @@ import { launchDesktop } from './support/electron-lifecycle.mjs';
 
 const require = createRequire(import.meta.url);
 const dir = await mkdtemp(path.join(tmpdir(), 'town-chat-menu-'));
+await writeFile(path.join(dir, 'shell.css'), await readShellStyles());
 async function bundle(name, contents, platform = 'node') {
   const result = await build({ stdin: { contents, resolveDir: process.cwd(), loader: 'tsx' },
     bundle: true, write: false, platform, format: platform === 'node' ? 'cjs' : 'iife',
@@ -59,7 +61,7 @@ await bundle('main.cjs', `
     protocol.handle('beings', async request => {
       const url = new URL(request.url);
       if (url.hostname === 'desktop') {
-        if (url.pathname === '/shell.css') return new Response(await readFile(${JSON.stringify(path.resolve('desktop/renderer/app/styles.css'))}), { headers: { 'Content-Type': 'text/css' } });
+        if (url.pathname === '/shell.css') return new Response(await readFile(path.join(__dirname, 'shell.css')), { headers: { 'Content-Type': 'text/css' } });
         if (url.pathname === '/shell.js') return new Response(await readFile(path.join(__dirname, 'shell.js')), { headers: { 'Content-Type': 'text/javascript' } });
         return new Response('<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="/shell.css"><style>html,body,#root{margin:0;height:100%;width:100%;overflow:hidden}iframe{display:block;border:0;width:100%;height:100%}</style><div id="root"></div><script src="/shell.js"></script>', { headers: { 'Content-Type': 'text/html' } });
       }

@@ -1,6 +1,7 @@
+import { readShellStyles } from './support/shell-styles.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { mkdir, readFile } from 'node:fs/promises';
+import { mkdir } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
 
@@ -57,7 +58,7 @@ const { outputFiles } = await build({ stdin: { resolveDir: process.cwd(), loader
   createRoot(document.getElementById('root')).render(<Fixture />);
   town.show('bonfire');
 ` }, bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic' });
-const css = await readFile('desktop/renderer/app/styles.css', 'utf8');
+const css = await readShellStyles();
 const server = createServer(async (request, response) => {
   if (request.url === '/query') {
     let body = ''; for await (const chunk of request) body += chunk;

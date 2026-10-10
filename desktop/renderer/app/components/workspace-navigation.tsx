@@ -19,7 +19,7 @@ const destinations = [
   ["town", "小镇广场", "m3 10 9-7 9 7M5 9v12h14V9m-9 12v-7h4v7"],
 ] as const;
 function Icon({ path }: { path: string }) {
-  return <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d={path} /></svg>;
+  return <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path className="rail-icon-line" pathLength="100" d={path} /></svg>;
 }
 function RailButton({ label, children, active, disabled, unread, onClick, className = "", plugin = false, id, expanded }: {
   id?: string; expanded?: boolean; label: string; children: ReactNode; active?: boolean; disabled?: boolean; unread?: boolean;

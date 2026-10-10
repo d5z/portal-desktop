@@ -222,7 +222,7 @@ export function ClientSettings({ model }: { model: AppModel }) {
                 <button
                   id="reading-reset"
                   type="button"
-                  onClick={() => app.setReadingSize(15)}
+                  onClick={() => app.setReadingSize(16)}
                 >
                   恢复默认
                 </button>

@@ -30,6 +30,7 @@ await copyFile(
   path.join(output, "highlight.css"),
 );
 await writeFile(path.join(output, "chat.css"),
+  await readFile("desktop/renderer/shared/typography.css", "utf8") + "\n" +
   await readFile("desktop/renderer/chat/styles.css", "utf8") + "\n" +
   await readFile("desktop/renderer/shared/model-settings.css", "utf8"));
 const notices = [];

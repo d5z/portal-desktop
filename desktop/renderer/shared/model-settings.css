@@ -88,7 +88,7 @@
 #settings-panel .btn-close{border:0;background:transparent;color:var(--text-dim);font-size:18px}
 #settings-panel .step2-back,#settings-panel .llm-custom-link{border:0;background:transparent}
 #subagent-model-panel{position:relative;display:flex;flex:0 1 320px;min-width:0;max-width:calc(100% - 396px);min-height:0;height:100%;background:var(--bg);border-left:1px solid var(--line);container-type:inline-size;container-name:model-settings}
-#subagent-model-panel #settings-panel{position:static;display:flex;flex-direction:column;width:100%;height:100%;transform:none;box-shadow:none;border:0;--border:var(--line);--text-dim:var(--muted);--bg-soft:var(--bg);--accent-tint:var(--selected);--accent-border:var(--line);--font-sans:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;--mono:ui-monospace,SFMono-Regular,monospace}
+#subagent-model-panel #settings-panel{position:static;display:flex;flex-direction:column;width:100%;height:100%;transform:none;box-shadow:none;border:0;--border:var(--line);--text-dim:var(--muted);--bg-soft:var(--bg);--accent-tint:var(--selected);--accent-border:var(--line);--mono:ui-monospace,SFMono-Regular,monospace}
 #subagent-model-panel #settings-panel h2{margin:0}
 @media(max-width:800px){#subagent-model-panel{position:absolute;z-index:80;inset:0 0 0 auto;max-width:calc(100% - 64px);box-shadow:-16px 0 48px #00000014}#subagent-model-panel>.panel-resize-handle{display:none}}
 
