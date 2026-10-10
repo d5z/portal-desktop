@@ -13,9 +13,7 @@ export function Plugins({ model, theme, contextKey }: PluginSurfaceProps) {
   const plugins = useModel(model);
   const selected = plugins.selected?.placement === 'page' ? plugins.selected : undefined;
   const installed = plugins.library.plugins.find(p => p.enabled && p.manifest.id === selected?.id);
-  return <section className="plugin-page view" aria-label="客户端插件">
-    <header className="plugin-toolbar"><h2>{installed?.manifest.name || '客户端插件'}</h2>
-      <button className="secondary" onClick={() => plugins.manage()}>管理插件</button></header>
+  return <section className="plugin-page view" aria-label={installed?.manifest.name || '客户端插件'}>
     {plugins.error && <p role="alert">{plugins.error}</p>}
     {selected && installed && plugins.api ?
       <PluginFrame key={`${selected.id}:${selected.revision}:${contextKey}`} api={plugins.api} model={plugins} id={selected.id}
@@ -54,7 +52,7 @@ export function PluginCard({ model, plugin }: { model: PluginsModel; plugin: imp
           <button disabled={!plugin.enabled || plugins.busy} className="secondary" onClick={() => plugins.open(plugin.manifest.id, view.id)}>{view.id === plugin.manifest.contributes.settingsView ? "插件设置" : view.title}</button>
           <select aria-label={`${view.title}显示位置`} disabled={plugins.busy}
           value={plugins.placement(plugin.manifest.id, view.id)} onChange={e => void plugins.setPlacement(plugin.manifest.id, view.id, e.target.value as import('../../shared/plugins').PluginPlacement)}>
-            <option value="page">默认页面</option><option value="navigation">顶部功能栏</option><option value="window">独立窗口</option>
+            <option value="page">默认页面</option><option value="navigation">左侧导航栏</option><option value="window">独立窗口</option>
           </select>
         </div>)}
       </div>
@@ -133,7 +131,7 @@ export function PluginFrame({ api, model, id, view, command, slot, theme, title 
       if (message.type !== 'grove:request' || !Number.isSafeInteger(message.id) || message.id < 1 || inflight >= 8) return;
       inflight++;
       try {
-        if (!['storage.load', 'storage.save', 'storage.patch', 'town.query', 'being.context', 'being.history', 'being.compose', 'being.chat', 'ui.notice', 'ui.navigate', 'workspace.context', 'being.tasks.list', 'events.subscribe', 'events.unsubscribe'].includes(message.method)) throw new Error('插件操作未开放。');
+        if (!['agent.snapshot', 'agent.mutate', 'storage.load', 'storage.save', 'storage.patch', 'town.query', 'being.context', 'being.history', 'being.compose', 'being.chat', 'ui.notice', 'ui.navigate', 'workspace.context', 'being.tasks.list', 'events.subscribe', 'events.unsubscribe'].includes(message.method)) throw new Error('插件操作未开放。');
         if (message.value !== undefined && (JSON.stringify(message.value)?.length ?? Infinity) > 1024 * 1024) throw new Error('插件数据超过 1 MB。');
         const value = await api.call(session.token, message.method, message.value);
         if (!active) return;

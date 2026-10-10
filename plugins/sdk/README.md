@@ -1,4 +1,4 @@
-# Grove Plugin SDK 1.3
+# Grove Plugin SDK 1.4
 
 TypeScript types for the host-injected `window.grove`. This package has no runtime and is not published to npm.
 
@@ -11,3 +11,5 @@ npm install --save-dev /path/to/Town-Client/plugins/sdk
 For standalone CI, vendor a fixed copy inside the plugin repository and depend on `file:vendor/grove-plugin-sdk`, as [Starmap](https://github.com/chunqing-liu/starmap) does. Commit the lockfile.
 
 All APIs, permissions, minimum versions, examples and publishing instructions are maintained in the [developer guide](../../DEVELOPER-API-SDK.md#part-3--客户端插件-api--sdk). The type contract is [index.d.ts](index.d.ts).
+
+SDK 1.4 adds opt-in plugin agent contracts and Being-scoped records through `grove.agent`. Plugin behavior is discovered through the existing authenticated Portal `@plugins` client command. It does not modify Being prompts, normal chat messages, or the core agent loop. See [agent.d.ts](agent.d.ts) and the developer guide.

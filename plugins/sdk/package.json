@@ -1,11 +1,13 @@
 {
   "name": "@beings/grove-plugin-sdk",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "description": "TypeScript contract for the host-provided Grove desktop plugin SDK",
   "license": "MIT",
   "types": "index.d.ts",
+    "agent.d.ts",
   "files": [
     "index.d.ts",
+    "agent.d.ts",
     "README.md"
   ]
 }

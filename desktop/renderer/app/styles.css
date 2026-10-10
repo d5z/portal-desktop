@@ -982,3 +982,14 @@ body:not([data-view=bonfire],[data-view=firesides],[data-view=mail]) #place-pane
 @keyframes rail-more-enter{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:translateX(0)}}
 @media(max-width:800px){.rail-more-panel{left:70px;width:min(300px,calc(100vw - 82px))}}
 @media(prefers-reduced-motion:reduce){.rail-more-panel{animation:none}.rail-pin-button{transition:none}}
+
+/* Plugin pages share one shell header; the embedded app owns its content. */
+body[data-view=plugins] #place-panel.central-place .place-sheet-heading{max-width:none;min-height:60px;padding:12px 24px;border-bottom:1px solid var(--line)}
+body[data-view=plugins] #place-panel.central-place #view-title{font-size:20px;letter-spacing:0}
+body[data-view=plugins] .place-sheet-actions{gap:8px;min-width:0}
+.place-sheet-actions .plugin-slot-toolbar{padding:0;border:0;gap:8px;min-width:0}
+.place-sheet-actions .plugin-slot-toolbar>button{font-size:12px;white-space:nowrap}
+.plugin-manage-button{display:grid;place-items:center;width:32px;height:32px;padding:6px;border:0;background:transparent;border-radius:8px;color:var(--secondary);flex-shrink:0}
+.plugin-manage-button:hover{background:var(--surface)}
+.plugin-manage-button svg{width:20px;height:20px;fill:currentColor}
+@media(max-width:640px){body[data-view=plugins] #place-panel.central-place .place-sheet-heading{padding:10px 16px}.place-sheet-actions .plugin-slot-toolbar{flex-wrap:wrap;justify-content:flex-end}}

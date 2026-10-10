@@ -30,11 +30,11 @@ export class ClientCommandServer {
         for await (const chunk of request) {
           const bytes = Buffer.from(chunk);
           chunks.push(bytes); size += bytes.length;
-          if (size > 8192) { reply(413, { error: 'Request too large' }); return; }
+          if (size > 65536) { reply(413, { error: 'Request too large' }); return; }
         }
         const data = JSON.parse(Buffer.concat(chunks).toString('utf8'));
         if (!data || typeof data.verb !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(data.verb) ||
-            typeof data.args !== 'string' || data.args.length > 1024 ||
+            typeof data.args !== 'string' || data.args.length > (data.verb === 'plugins' ? 16000 : 1024) ||
             (data.sceneId != null && (typeof data.sceneId !== 'string' || data.sceneId.length > 256))) {
           reply(400, { error: 'Invalid client command' }); return;
         }

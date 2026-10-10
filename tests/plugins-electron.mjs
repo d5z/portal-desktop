@@ -272,7 +272,7 @@ try {
     let denied = false; try { await grove.town.query({ kind: 'inbox' }); } catch { denied = true; }
     return { context, history, town, denied, sdkVersion: grove.sdkVersion };
   });
-  assert.equal(sdkResult.sdkVersion, '1.3.0'); assert.equal(sdkResult.context.sceneId, scene);
+  assert.equal(sdkResult.sdkVersion, '1.4.0'); assert.equal(sdkResult.context.sceneId, scene);
   assert.equal(sdkResult.history.messages.length, 1); assert.equal(sdkResult.history.messages[0].content, '本场景历史');
   assert(!JSON.stringify(sdkResult).includes('fixture-only')); assert(sdkResult.denied);
   assert.equal(sdkResult.town.data.seeds[0].id, 'seed-sdk');

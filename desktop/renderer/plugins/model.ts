@@ -15,7 +15,7 @@ export class PluginsModel extends Store {
   error = '';
   private refreshRevision = 0;
   constructor(readonly api: DesktopPluginAPI | undefined, private navigate: (view: string, id?: string) => void,
-    private host?: { notice: (text: string) => void; post: (message: unknown) => void; scene: () => string; ready: () => boolean }) { super(); }
+    private host?: { notice: (text: string) => void; post: (message: unknown) => void; scene: () => string; ready: () => boolean; showChat?: () => void }) { super(); }
   receiveDraft(message: { type?: string; id?: string; ok?: boolean }) {
     if (message.type !== 'beings:scene-draft-result' || !this.draft || message.id !== this.draft.id) return false;
     this.draft.finish(message.ok === true); return true;
@@ -27,7 +27,12 @@ export class PluginsModel extends Store {
     return new Promise<{ inserted: boolean }>(resolve => {
       const id = crypto.randomUUID();
       const timer = setTimeout(() => finish(false), 2500);
-      const finish = (ok: boolean) => { clearTimeout(timer); this.draft = undefined; resolve({ inserted: ok && host.scene() === value.sceneId }); };
+      const finish = (ok: boolean) => {
+        clearTimeout(timer); this.draft = undefined;
+        const inserted = ok && host.scene() === value.sceneId;
+        if (inserted) host.showChat?.();
+        resolve({ inserted });
+      };
       this.draft = { id, finish };
       host.post({ type: 'beings:scene-draft', id, text: value.text, sceneId: value.sceneId, expiresAt: Date.now() + 2000 });
     });

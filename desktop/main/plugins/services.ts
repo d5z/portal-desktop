@@ -8,16 +8,19 @@ import type { ChatProxy } from '../chat/proxy';
 export interface PluginCallContext { manifest: PluginManifest; signal: AbortSignal; emit: (text: string) => void; check: () => void }
 export interface PluginServices {
   contextKey(): string;
+  endpoint?(): string;
   call(method: string, value: unknown, context: PluginCallContext): Promise<unknown>;
 }
 export function eventCapability(topic: unknown): PluginCapability {
-  const topics = { 'workspace.changed': 'workspace.read', 'town.changed': 'town.private.read', 'tasks.changed': 'being.tasks.read' } as const;
+  const topics = { 'workspace.changed': 'workspace.read', 'town.changed': 'town.private.read', 'tasks.changed': 'being.tasks.read', 'agent.changed': 'agent.read' } as const;
   if (typeof topic !== 'string' || !Object.hasOwn(topics, topic)) throw new Error('插件事件主题未开放。');
   return topics[topic as PluginEventTopic];
 }
 export function capabilityFor(method: string, value?: unknown): PluginCapability {
   if (method === 'events.subscribe' || method === 'events.unsubscribe') return eventCapability((value as { topic?: unknown })?.topic);
   if (method === 'workspace.context') return 'workspace.read';
+  if (method === 'agent.snapshot') return 'agent.read';
+  if (method === 'agent.mutate') return 'agent.write';
   if (method === 'being.tasks.list') return 'being.tasks.read';
   if (method.startsWith('storage.') && ['storage.load', 'storage.save', 'storage.patch'].includes(method)) return 'storage';
   if (method === 'town.query') {
@@ -51,7 +54,7 @@ export function createPluginServices(options: {
   tasks?: () => Promise<SceneTaskSnapshot>;
 }): PluginServices {
   let chatting = false;
-  return { contextKey: options.contextKey, async call(method, value, context) {
+  return { contextKey: options.contextKey, endpoint: options.endpoint, async call(method, value, context) {
     context.check();
     if (method === 'town.query') return options.town(value as TownQuery, context.signal);
     if (method === 'being.context') return options.being();

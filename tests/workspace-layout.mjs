@@ -269,6 +269,48 @@ try {
     assert.equal(await page.locator('#chat-view').isVisible(),false);
     await page.screenshot({animations:'disabled',path:`test-results/workspace-page-${name}.png`});
   }
+  // A self-contained plugin fixture covers shell geometry without an external plugin checkout.
+  await page.evaluate(() => {
+    const app = window.fixtureApp;
+    app.plugins.api = {
+      open: async () => ({ token: 'layout-plugin', url: 'data:text/html,' + encodeURIComponent('<h1>Plugin layout fixture</h1><script>parent.postMessage({channel:"layout-plugin",type:"grove:ready"},"*")</script>') }),
+      close: async () => {},
+    };
+    app.plugins.library = { problems: [], plugins: [{ enabled: true, placements: { goals: 'navigation' },
+      manifest: { id: 'fixture.goals', name: '目标插件', capabilities: [], contributes: { views: [{ id: 'goals', title: '目标插件' }],
+        slots: [{ id: 'details', title: '查看目标', view: 'goals', location: 'right-sidebar' }] } } }] };
+    app.plugins.changed();
+  });
+  await rail.getByRole('button', { name: '更多功能', exact: true }).click();
+  await more.getByRole('button', { name: '固定到左侧：目标插件', exact: true }).click();
+  await more.getByRole('button', { name: '目标插件', exact: true }).click();
+  await page.frameLocator('.plugin-frame').getByRole('heading', { name: 'Plugin layout fixture' }).waitFor();
+  assert.equal(await rail.getByRole('button', { name: '目标插件', exact: true }).getAttribute('aria-current'), 'page');
+  const pluginElement = await page.locator('.plugin-frame').elementHandle();
+  await page.getByRole('button', { name: '展开对话', exact: true }).click();
+  const pluginBounds = await page.locator('.plugin-frame').boundingBox();
+  const splitBounds = await page.locator('#chat-view').boundingBox();
+  assert.ok(pluginBounds.width > 300 && pluginBounds.height > 300);
+  assert.ok(splitBounds.x + splitBounds.width <= pluginBounds.x + 1);
+  await page.getByRole('separator', { name: '调整并排对话宽度' }).press('ArrowLeft');
+  assert.ok(await pluginElement.evaluate(node => node === document.querySelector('.plugin-frame')), 'Resizing chat must retain the plugin frame');
+  await page.screenshot({ path: 'test-results/workspace-plugin-split.png' });
+  await page.getByRole('button', { name: '收起并排对话', exact: true }).click();
+  await rail.getByRole('button', { name: '更多功能', exact: true }).click();
+  await more.getByRole('button', { name: '种子花园', exact: true }).click();
+  await page.getByRole('button', { name: '查看目标', exact: true }).click();
+  await page.frameLocator('.plugin-sidebar .plugin-frame').getByRole('heading', { name: 'Plugin layout fixture' }).waitFor();
+  const sideElement = await page.locator('.plugin-sidebar .plugin-frame').elementHandle();
+  const sideBefore = await page.locator('.plugin-sidebar').boundingBox();
+  await page.getByRole('separator', { name: '调整插件侧栏宽度' }).press('ArrowLeft');
+  assert.equal(Math.round((await page.locator('.plugin-sidebar').boundingBox()).width), Math.round(sideBefore.width + 24));
+  assert.ok(await sideElement.evaluate(node => node === document.querySelector('.plugin-sidebar .plugin-frame')), 'Resizing the sidebar must retain its plugin session');
+  await page.setViewportSize({ width: 800, height: 650 });
+  const narrowSide = await page.locator('.plugin-sidebar').boundingBox();
+  assert.ok(narrowSide.width > 0 && narrowSide.x + narrowSide.width <= 801 && narrowSide.y + narrowSide.height <= 651);
+  await page.screenshot({ path: 'test-results/workspace-plugin-sidebar.png' });
+  await page.getByRole('button', { name: '关闭插件侧栏', exact: true }).click();
+  assert.equal(await page.locator('.plugin-sidebar').count(), 0);
   assert.deepEqual(errors,[]);
   console.log('Workspace layout passed: central destinations, central chat with right-side modules, resize, dismissible Being details, retained chat, dark and narrow layouts.');
 } finally {await browser?.close();await new Promise(resolve=>server.close(resolve));}

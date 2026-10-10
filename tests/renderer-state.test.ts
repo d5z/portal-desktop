@@ -26,6 +26,25 @@ const deferred = <T>() => {
   });
   return { promise, resolve };
 };
+describe('plugin draft visibility', () => {
+  it.each(['inserted', 'rejected', 'scene-changed'] as const)('keeps the plugin open and reveals only an acknowledged draft: %s', async outcome => {
+    const app = new AppModel({} as DesktopAPI);
+    app.snapshot = { ...state(), chatScene: { scene_id: 'scene-a' } } as Snapshot;
+    app.chatSource = 'beings://chat/loom.html';
+    app.chatLoading = false;
+    app.view = 'plugins';
+    app.post = vi.fn();
+    const pending = app.plugins.compose({ text: '一起完善这个目标', sceneId: 'scene-a' });
+    const message = vi.mocked(app.post).mock.calls[0][0] as { id: string };
+    expect(app.chatSplitOpen).toBe(false);
+    if (outcome === 'scene-changed') app.snapshot.chatScene!.scene_id = 'scene-b';
+    app.plugins.receiveDraft({ type: 'beings:scene-draft-result', id: message.id, ok: outcome !== 'rejected' });
+    expect(await pending).toEqual({ inserted: outcome === 'inserted' });
+    expect(app.chatSplitOpen).toBe(outcome === 'inserted');
+    expect(app.view).toBe('plugins');
+    expect(app.post).toHaveBeenCalledTimes(1);
+  });
+});
 const state = (being = "willow"): Snapshot => ({
   settings: {
     being,

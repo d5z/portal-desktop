@@ -8,7 +8,7 @@
 | 读取小镇内容、收发消息或发布资源 | [Town API](#town-api) | 公开读取可匿名，其余操作按身份授权 |
 | 添加客户端页面、命令、设置或侧栏 | [Grove 插件 SDK](#grove-插件-sdk) | 使用客户端当前连接，无需管理 token |
 
-**插件版本：** Plugin API v1 · Grove SDK 1.3.0。完整类型见 [index.d.ts](plugins/sdk/index.d.ts)。
+**插件版本：** Plugin API v1 · Grove SDK 1.4.0。完整类型见 [index.d.ts](plugins/sdk/index.d.ts)。
 
 ## Heart API
 
@@ -319,6 +319,7 @@ declare global {
 | `contributes.views` | 1–8 个页面，每项包含 `id` 和 `title` |
 | `contributes.commands` | 可选命令入口，每项包含 `id`、`title`、`view` |
 | `contributes.settingsView` | 可选设置页，值为已声明的 view ID |
+| `contributes.agent` | 可选的插件行为契约与字段定义，需要 `agent.read` 和 `minSdkVersion: "1.4.0"` |
 | `contributes.slots` | 可选侧栏或资源菜单入口，需要 `ui` 能力 |
 
 插件、页面、命令和插槽 ID 使用小写字母、数字、点或连字符，以字母开头，最长 100 字符；同一列表内 ID 不得重复。完整校验规则见 [清单定义](desktop/shared/plugins.ts)。
@@ -442,10 +443,59 @@ await window.grove.updateData({ searchText: '协作' });
 | `workspace.changed` | `workspace.read` | `workspace.onContextChange()` / `workspace.getContext()` |
 | `town.changed` | `town.private.read` | 收到通知后重新执行相关 `town.query()` |
 | `tasks.changed` | `being.tasks.read` | `being.tasks.onChange()` / `being.tasks.list()` |
+| `agent.changed` | `agent.read` | `agent.onChange()` / `agent.snapshot()`，仅本插件变更 |
 
 事件仅携带 `{ topic, revision, at }`，表示数据变化，需重新读取快照。先订阅再读取初始状态，异步刷新时忽略过期结果。上述订阅均返回 `Promise<取消函数>`；`onTheme`、`onUnload`、`being.onDelta` 同步返回取消函数。
 
 页面根元素自动设置 `data-theme="light"` 或 `"dark"`，可直接用于 CSS；图表等组件可用 `onTheme` 响应变化。页面关闭时清理订阅，保存操作应在关闭前完成。
+
+### 插件行为与 Being 双向协作（SDK 1.4）
+
+客户端只提供通用的数据和调用通道。插件在 `contributes.agent` 声明自己的说明、行为指导和数据契约，Being 在用户选择插件协作时读取契约。不会修改 Being 的主体提示词、普通聊天消息、工具循环或自主行为。目标等业务必须在独立插件项目中实现。
+
+```json
+{
+  "minSdkVersion": "1.4.0",
+  "capabilities": ["agent.read", "agent.write", "being.compose"],
+  "contributes": {
+    "views": [{"id":"main","title":"阅读清单"}],
+    "agent": {
+      "description": "协助用户维护阅读清单",
+      "instructions": "仅在用户选择本插件时协作；读取记录后再更新，不改变无关任务。",
+      "fields": {
+        "title": {"type":"string","title":"书名","maxLength":160},
+        "status": {"type":"string","title":"状态","enum":["new","read"]}
+      },
+      "required": ["title","status"]
+    }
+  }
+}
+```
+
+此片段需补齐常规清单字段。字段类型支持 `string`、`boolean`、有限 `number` 和字符串数组 `strings`；可用 `maxLength`、`maxItems`、字符串 `enum` 限制，不支持远程 schema、正则或可执行表达式。未知字段和类型均拒绝。
+
+- `agent.read`：`grove.agent.snapshot()`、`grove.agent.onChange(callback)`，并允许 Being 读取该插件契约和数据。
+- `agent.write`：`grove.agent.mutate(input)`，并允许 Being 按契约写入该插件数据。
+- 快照含 `scopeId`、`revision`、`records`、`events`、`preferences`。记录含 `id`、`revision`、`data` 和创建/更新时间。偏好含插件范围内的 `guidance`、`focusId`。
+- `create` 输入 `{op, requestId, data}`；`update` 输入 `{op, requestId, id, expectedRevision, patch, note}`，版本为记录版本；`configure` 输入 `{op, requestId, expectedRevision, preferences, note}`，版本为工作区版本。
+- 插件和 Being 共用相同状态，按插件 ID 和 Being endpoint 隔离。视图关闭后仍能通过命令读写；客户端退出后通道不可用。endpoint 变化视为另一份数据。
+- 写入串行化、原子落盘；最后 256 次操作支持相同 `requestId` 和相同内容重试，重复 ID 携带不同内容会报错。冲突时重新读取合并，不能盲目覆盖。
+- 当前上限：500 条记录、4 MiB 状态、2000 条最近变更事件，单条 data 12000 个 JS 字符；事件是近期审计记录而非无限历史。
+
+Being 使用现有 Portal `portal_exec` 调用客户端命令（不是 shell 命令）：
+
+```text
+@plugins
+@plugins {"plugin":"example.reading","op":"describe"}
+@plugins {"plugin":"example.reading","op":"list","offset":0}
+@plugins {"plugin":"example.reading","op":"create","requestId":"reading-1","data":{"title":"示例书籍","status":"new"}}
+```
+
+`describe` 返回完整操作格式与插件契约；`list` 每页 10 条并返回 `nextOffset`；`get` 返回指定记录及最近 10 条相关事件。输入不会交给 shell，也不会作为系统指令执行。行为契约是插件提供的任务指导，不能扩大用户授权。
+
+插件可调用现有 `being.compose()`，让用户发送“请使用此插件，先读取契约，再继续”的草稿；不能静默往普通对话附加插件行为。Portal 必须支持现有 Desktop client-command 注册机制，并与运行中的客户端在同一机器、连接同一 Being。SDK 不提供新的网络端口授权方式，不自动部署远程服务，也不创建后台计划。
+
+停用或卸载插件后，Being 命令、SDK 会话与事件订阅均撤销，数据保留供重新安装恢复。多个视图共享更新；只有具备该插件权限的视图收到失效通知。
 
 ### 运行约束
 

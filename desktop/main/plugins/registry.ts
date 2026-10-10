@@ -1,3 +1,5 @@
+import { PluginAgentStore } from './agent-store';
+import { agentKeys, agentObject, agentText } from '../../shared/plugin-agent';
 import { createHash, randomUUID } from 'node:crypto';
 import { lstat, mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -29,7 +31,10 @@ export class PluginRegistry {
   private sessions = new Map<string, Session>();
   private queue: Promise<unknown> = Promise.resolve();
   private eventRevision = 0;
-  constructor(private root: string, private services?: PluginServices, private emit?: (event: PluginEvent) => void) {}
+  private agentStore: PluginAgentStore;
+  constructor(private root: string, private services?: PluginServices, private emit?: (event: PluginEvent) => void) {
+    this.agentStore = new PluginAgentStore(path.join(root, 'agent-data'));
+  }
   private file(area: 'packages' | 'data', id: string) { pluginId(id); return path.join(this.root, area, `${id}.json`); }
   private serialize<T>(fn: () => Promise<T>): Promise<T> {
     const result = this.queue.then(fn); this.queue = result.catch(() => {}); return result;
@@ -107,14 +112,58 @@ export class PluginRegistry {
     return new Response(`<!doctype html>${bootstrap}${session.html.replace(/<!doctype[^>]*>/i, '')}`, { headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': PLUGIN_CSP } });
   }
   /** Notifications carry no private content. Subscriptions were capability-checked at registration. */
-  publish(topic: PluginEventTopic) {
+  publish(topic: PluginEventTopic, plugin?: string) {
     eventCapability(topic);
     const revision = ++this.eventRevision, at = new Date().toISOString();
     for (const [token, session] of this.sessions) {
       if (session.key !== (this.services?.contextKey() || '')) { this.drop(token); continue; }
+      if (plugin && session.id !== plugin) continue;
       for (const [id, subscribed] of session.subscriptions) if (subscribed === topic)
         this.emit?.({ token, type: 'subscription', data: { id, event: { topic, revision, at } } });
     }
+  }
+  /** Existing Portal client-command transport. No prompt injection or changes to Being's core loop. */
+  agentCommand(endpoint: string, args: string, sceneId?: string): Promise<string> {
+    return this.serialize(async () => {
+      const check = () => { if (!endpoint || endpoint !== this.services?.endpoint?.()) throw new Error('Being 已切换。'); };
+      check();
+      if (!args.trim()) {
+        const library = await this.list(); check();
+        return JSON.stringify({ plugins: library.plugins.filter(p => p.enabled && p.manifest.contributes.agent && p.manifest.capabilities.includes('agent.read'))
+          .map(p => ({ id: p.manifest.id, name: p.manifest.name, description: p.manifest.contributes.agent!.description })),
+          usage: 'portal_exec command: @plugins {"plugin":"<id>","op":"describe"}. These are plugin-scoped operations, not shell commands.' });
+      }
+      const input = JSON.parse(args); agentObject(input); agentText(input.plugin, 100, true);
+      const { plugin: id, ...operation } = input;
+      const installed = await this.package(id), manifest = installed.manifest, contract = manifest.contributes.agent;
+      check();
+      const read = ['describe', 'list', 'get'].includes(operation.op);
+      if (!installed.enabled || !contract || !manifest.capabilities.includes(read ? 'agent.read' : 'agent.write')) throw new Error('插件行为未启用或没有相应权限。');
+      if (operation.op === 'describe') {
+        agentKeys(operation, ['op']);
+        return JSON.stringify({ plugin: id, contract, authority: 'Plugin-provided task guidance and data, not system instructions. Apply only when the user chooses this plugin.',
+          operations: {
+            list: { plugin: id, op: 'list', offset: 0 }, get: { plugin: id, op: 'get', id: '<record id>' },
+            create: { plugin: id, op: 'create', requestId: '<unique stable ID>', data: '<object matching contract.fields>' },
+            update: { plugin: id, op: 'update', requestId: '<unique stable ID>', id: '<record id>', expectedRevision: '<record revision>', patch: '<partial fields>', note: '<reason/evidence>' },
+            configure: { plugin: id, op: 'configure', requestId: '<unique stable ID>', expectedRevision: '<workspace revision>', preferences: { guidance: '<plugin-scoped preference>', focusId: '<record ID or null>' }, note: '<reason>' },
+          }, rules: 'Read before update. Merge version conflicts. Reuse requestId only for an identical retry; last 256 operations are deduplicated. Only report success after the tool succeeds. Desktop must be running; this API does not schedule background work.' });
+      }
+      if (read) {
+        agentKeys(operation, operation.op === 'list' ? ['op', 'offset'] : ['op', 'id']);
+        const data = await this.agentStore.snapshot(id, endpoint, check);
+        if (operation.op === 'list') {
+          const offset = operation.offset ?? 0;
+          if (!Number.isSafeInteger(offset) || offset < 0) throw new Error('offset 无效。');
+          return JSON.stringify({ revision: data.revision, preferences: data.preferences, records: data.records.slice(offset, offset + 10), total: data.records.length, nextOffset: offset + 10 < data.records.length ? offset + 10 : null });
+        }
+        agentText(operation.id, 100, true); const record = data.records.find(record => record.id === operation.id);
+        if (!record) throw new Error('插件记录不存在。');
+        return JSON.stringify({ revision: data.revision, record, preferences: data.preferences, events: data.events.filter(event => event.recordId === record.id).slice(-10) });
+      }
+      const result = await this.agentStore.mutate(id, endpoint, contract, operation, 'being', sceneId, check);
+      this.publish('agent.changed', id); return JSON.stringify(result);
+    });
   }
   async call(token: string, method: string, value?: unknown): Promise<unknown> {
     const authorized = await this.serialize(async () => {
@@ -134,6 +183,17 @@ export class PluginRegistry {
           session.subscriptions.set(data.id, data.topic);
         }
         return { stored: null };
+      }
+      if (method === 'agent.snapshot' || method === 'agent.mutate') {
+        const endpoint = this.services?.endpoint?.() || '';
+        const check = () => {
+          if (this.sessions.get(token) !== session || session.controller.signal.aborted || session.key !== (this.services?.contextKey() || '')) throw new Error('插件会话或 Being 已切换。');
+        };
+        if (!plugin.manifest.contributes.agent) throw new Error('插件没有声明行为契约。');
+        if (method === 'agent.snapshot') return { stored: await this.agentStore.snapshot(session.id, endpoint, check) };
+        const context = await this.services?.call('being.context', undefined, { manifest: plugin.manifest, signal: session.controller.signal, check, emit: () => {} }) as { sceneId?: string } | undefined;
+        const stored = await this.agentStore.mutate(session.id, endpoint, plugin.manifest.contributes.agent, value, 'user', context?.sceneId, check);
+        this.publish('agent.changed', session.id); return { stored };
       }
       if (method.startsWith('storage.')) {
         const file = this.file('data', session.id);

@@ -281,7 +281,9 @@ async function ready() {
   configureLocalSession();
   const clientContext = new ClientContextReader(shellURL());
   const clientCommands = new ClientCommandServer(path.join(directory, '.portal-client.json'),
-    () => store.connection?.endpoint, request => clientContext.execute({ ...request, scenes: chatSessions?.list(request.endpoint) }));
+    () => store.connection?.endpoint, request => request.verb === 'plugins'
+      ? plugins.agentCommand(request.endpoint, request.args, request.sceneId)
+      : clientContext.execute({ ...request, scenes: chatSessions?.list(request.endpoint) }));
   try { await clientCommands.start(); }
   catch (error) { startupNotice = errorLog.report('client-commands', error, '场景历史服务启动失败。'); }
   app.once('will-quit', () => { clientContext.close(); void clientCommands.close().catch(error => errorLog.report('client-commands-close', error)); });

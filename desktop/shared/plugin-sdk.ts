@@ -54,12 +54,13 @@ export const PLUGIN_SDK = String.raw`
     message.error ? item.reject(new Error(message.error)) : item.resolve(message.value);
   });
   Object.defineProperty(window, 'grove', { value: Object.freeze({
-    apiVersion: 1, sdkVersion: '1.3.0', view, command, slot,
+    apiVersion: 1, sdkVersion: '1.4.0', view, command, slot,
     loadData: () => request('storage.load'),
     saveData: value => request('storage.save', value),
     updateData: value => request('storage.patch', value),
     onTheme: callback => subscribe(themes, callback),
     onUnload: callback => subscribe(unloads, callback),
+    agent: Object.freeze({ snapshot: () => request('agent.snapshot'), mutate: input => request('agent.mutate', input), onChange: callback => listen('agent.changed', callback) }),
     workspace: Object.freeze({ getContext: () => request('workspace.context'), onContextChange: callback => listen('workspace.changed', callback) }),
     events: Object.freeze({ subscribe: listen }),
     town: Object.freeze({ query: query => request('town.query', query) }),

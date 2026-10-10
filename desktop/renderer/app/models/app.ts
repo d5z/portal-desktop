@@ -175,6 +175,7 @@ export class AppModel extends Store {
     this.plugins = new PluginsModel(api?.plugins, this.navigate, {
       notice: text => this.toast(text), post: message => this.post(message),
       scene: () => this.snapshot?.chatScene?.scene_id || '', ready: () => Boolean(this.chatSource && !this.chatLoading),
+      showChat: () => { if (this.view !== 'chat') { this.chatSplitOpen = true; this.changed(); } },
     });
     this.town = new TownModel(
       api,

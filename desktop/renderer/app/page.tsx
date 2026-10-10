@@ -186,10 +186,21 @@ export function App({ model }: { model: AppModel }) {
 
 function PlaceContent({ app }: { app: AppModel }) {
   useModel(app.town);
+  const plugins = useModel(app.plugins);
+  const selectedPlugin = plugins.selected?.placement === 'page'
+    ? plugins.library.plugins.find(plugin => plugin.enabled && plugin.manifest.id === plugins.selected?.id)
+    : undefined;
   return (
     <>
       <PlaceHeading
         view={app.view}
+        title={app.view === 'plugins' ? selectedPlugin?.manifest.name : undefined}
+        actions={app.view === 'plugins' ? <>
+          <PluginSlots model={app.plugins} />
+          <button className="plugin-manage-button" aria-label="管理插件" title="管理插件" onClick={() => plugins.manage()}>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg>
+          </button>
+        </> : undefined}
         chatExpanded={app.chatSplitOpen}
         onToggleChat={app.toggleChatSplit}
         navigate={app.navigate}
@@ -197,7 +208,7 @@ function PlaceContent({ app }: { app: AppModel }) {
         onForward={app.town.forwardView ? app.forwardFromPlace : undefined}
         onClose={app.closePlace}
       />
-      <PluginSlots model={app.plugins} />
+      {app.view !== 'plugins' && <PluginSlots model={app.plugins} />}
       <div className="plugin-place-layout">
         <div className="plugin-place-main">
           {app.view === "portal" ? <Portal model={app} /> : app.view !== "plugins" && <Town model={app.town} />}
