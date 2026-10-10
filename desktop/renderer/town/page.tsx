@@ -232,15 +232,6 @@ export function Town({ model }: { model: TownModel }) {
           {definition && <Pagination town={town} />}
         </div>
       </div>
-      {town.view === "bonfire" && <footer className="bonfire-footer">
-        <label className="feed-select feed-load-count">
-          加载条数
-          <select aria-label="篝火加载条数" value={town.bonfireLimit} disabled={town.loading}
-            onChange={event => town.setBonfireLimit(Number(event.target.value))}>
-            {[20, 50, 100, 200].map(value => <option key={value} value={value}>{value} 条</option>)}
-          </select>
-        </label>
-      </footer>}
     </section>
   );
 }
