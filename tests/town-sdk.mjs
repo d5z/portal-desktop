@@ -87,11 +87,8 @@ try {
   await waitForChatReady(page);
   const chatInput = page.frameLocator('#chat-frame').locator('#input');
   const home = async () => {
-    if (await page.locator('#place-sheet').evaluate(el => el.open)) await page.locator('#back-to-chat').click();
-    const trigger = page.locator('#options-trigger');
-    if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click();
-    await page.waitForFunction(() => document.querySelector('#options-trigger')?.getAttribute('aria-expanded') === 'true');
-    await page.locator('[data-view="town"]').click();
+    if (await page.locator('#place-panel').isVisible()) await page.locator('#back-to-chat').click();
+    await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'小镇广场',exact:true}).click();
     await page.locator('.service-card').first().waitFor();
   };
   const open = async title => {
@@ -134,7 +131,7 @@ try {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.locator('#options-trigger').focus();
   await page.keyboard.press('ArrowDown');
-  assert.equal(await page.locator('#toggle-chat-search').evaluate(el => el === document.activeElement), true);
+  assert.equal(await page.locator('#local-portal-status').evaluate(el => el === document.activeElement), true);
   await page.keyboard.press('Escape');
   await page.waitForFunction(() => !document.querySelector('#conversation-options').open);
   await page.emulateMedia({ reducedMotion: 'no-preference' });

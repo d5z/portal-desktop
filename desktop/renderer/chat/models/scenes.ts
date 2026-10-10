@@ -48,9 +48,16 @@ export function sceneName(scene: MessageScene, current: MessageScene, names: Rec
     scene.sceneLabel || scene.sceneId || "未标记场景";
 }
 
+/** Unaddressed Being messages belong to the shared timeline, not a user room.
+ * Do not use this display rule for stream ownership or queued-reply matching.
+ */
+export function isGlobalBeingMessage(item: ChatItem): boolean {
+  return !item.sceneId && item.kind === "message" && item.role === "being";
+}
+
 export function sceneItems(items: ChatItem[], scope: HistoryScope, current: MessageScene): ChatItem[] {
   return scope === "current" && current.sceneId
-    ? items.filter(item => inCurrentScene(item, current))
+    ? items.filter(item => inCurrentScene(item, current) || isGlobalBeingMessage(item) || (!item.sceneId && item.kind === "separator" && item.marker === true))
     : items;
 }
 

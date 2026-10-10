@@ -121,6 +121,9 @@ export function townRoute(query: TownQuery, beingId = ''): { route: string; priv
 }
 
 export class TownClient {
+  private conditionalCache = new Map<string,{etag:string;modified:string;data:Record<string,unknown>}>();
+  private cacheIdentity = '';
+
   constructor(private getToken: () => string, private fetcher: typeof fetch = fetch, private origin = TOWN_ORIGIN, private getBeingId: () => string = () => '', private reportRequest?: (event: TownRequestEvent) => void) {}
   private report(event: TownRequestEvent) {
     try { this.reportRequest?.(event); } catch { /* Diagnostics must not change request behavior. */ }
@@ -140,7 +143,7 @@ export class TownClient {
       this.report({
         traceId: trace.traceId, spanId: trace.spanId, requestedAt,
         method: init.method || 'GET', route, status, durationMs: Date.now() - started,
-        ...(!response.ok ? { failure: `http-${status}`, error: `HTTP ${status}` } : {}),
+        ...(!response.ok && response.status!==304 ? { failure: `http-${status}`, error: `HTTP ${status}` } : {}),
       });
       return { value, traceId: trace.traceId };
     } catch (error) {
@@ -228,6 +231,12 @@ export class TownClient {
     if (query?.kind === 'my-scrolls' && (!this.getToken() || !this.getBeingId())) return { ok: false, code: 'auth', message: '请先用 Being 名和配对码连接 Town，再查看我的卷轴。' };
     const route = townRoute(query, this.getBeingId());
     const headers: Record<string, string> = { Accept: 'application/json' };
+    const identity=this.getToken();
+    if (identity!==this.cacheIdentity) {this.conditionalCache.clear();this.cacheIdentity=identity;}
+    const cacheable=['scrolls','my-scrolls','embers','seeds','scroll','ember','seed'].includes(query.kind);
+    const cached=cacheable ? this.conditionalCache.get(route.route) : undefined;
+    if (cached?.etag) headers['If-None-Match']=cached.etag;
+    else if (cached?.modified) headers['If-Modified-Since']=cached.modified;
     // Loom/relay credentials are never used here. Public content needs no credentials.
     const url = new URL(this.origin + route.route);
     const token = this.getToken();
@@ -238,10 +247,20 @@ export class TownClient {
       const request = await this.request(url.pathname + url.search, {
         headers, method: 'GET', credentials: 'omit', redirect: 'error', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(20000)]) : AbortSignal.timeout(20000),
       }, async response => {
+        if (response.status===304 && cached) return {ok:true,data:cached.data,fetchedAt:new Date().toISOString()} as TownResult;
         if (!response.ok) return await townError(response, token);
         const data = query.kind === 'fireside-members'
           ? await readTownMembersJson(response)
           : await readTownJson(response);
+        if (cacheable && identity===this.getToken()) {
+          const etag=response.headers.get('etag') || '', modified=response.headers.get('last-modified') || '';
+          this.conditionalCache.delete(route.route);
+          const noStore = /(?:^|,)\s*no-store\s*(?:,|$)/i.test(response.headers.get('cache-control') || '');
+          if (!noStore && (etag || modified)) {
+            this.conditionalCache.set(route.route,{etag,modified,data});
+            if (this.conditionalCache.size>24) this.conditionalCache.delete(this.conditionalCache.keys().next().value!);
+          }
+        }
         return { ok: true, data, fetchedAt: new Date().toISOString() } as TownResult;
       }, traceId);
       return tracedFailure(request.value, request.traceId);

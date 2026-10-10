@@ -19,7 +19,8 @@ const { outputFiles } = await build({ stdin: { resolveDir: process.cwd(), loader
   import React from 'react';
   import { createRoot } from 'react-dom/client';
   import { Town } from './desktop/renderer/town/page';
-  import { Dialog } from './desktop/renderer/shared/components/dialog';
+  import { AppModel } from './desktop/renderer/app/models/app';
+  import { WorkspaceNavigation } from './desktop/renderer/app/components/workspace-navigation';
   import { PlaceHeading } from './desktop/renderer/app/components/navigation';
   import { useModel } from './desktop/renderer/shared/hooks/use-model';
   import { TownModel } from './desktop/renderer/town/models/town';
@@ -36,11 +37,13 @@ const { outputFiles } = await build({ stdin: { resolveDir: process.cwd(), loader
     openTownLink: async value => { window.openedSeedLink = value; },
   }, () => {}, view => town.show(view), scenes, () => {}, () => {});
   window.seedTown = town;
+  const app = new AppModel({}); app.town = town; app.navigate = town.navigate;
   function Fixture() {
     useModel(town);
-    return <Dialog id="place-sheet" aria-labelledby="view-title" open onClose={() => {}}>
+    app.view = town.view;
+    return <main style={{height:"100vh",flexDirection:"row"}}><WorkspaceNavigation app={app}/><section id="place-panel" className="workspace-stage central-place" aria-labelledby="view-title">
       <PlaceHeading view={town.view} navigate={town.navigate} /><Town model={town} />
-    </Dialog>;
+    </section></main>;
   }
   createRoot(document.getElementById('root')).render(<Fixture />);
   town.show('town');
@@ -168,16 +171,18 @@ try {
   await page.getByRole('button', { name: '清除筛选' }).click();
   await page.getByText('26 颗种子', { exact: true }).waitFor();
 
-  const nav = page.getByRole('navigation', { name: '小镇功能切换' });
-  await page.locator('#place-sheet').evaluate(el => { window.originalSheet = el; });
-  const switchTo = async (label, title, kind) => {
+  const nav = page.getByRole('navigation', { name: '主导航' });
+  await page.locator('#place-panel').evaluate(el => { window.originalSheet = el; });
+  const switchTo = async (label, title, kind, cached = false) => {
     const before = queries.filter(query => query.kind === kind).length;
     await nav.getByRole('button', { name: label, exact: true }).click();
     await page.waitForFunction(() => !window.seedTown.loading);
     assert.equal(await page.locator('#view-title').innerText(), title);
-    assert.equal(await nav.locator('[aria-current="page"]').innerText(), label);
-    assert(queries.filter(query => query.kind === kind).length > before, 'Each switch fetches fresh content, including additional pages');
-    assert.equal(await page.locator('#place-sheet').evaluate(el => el === window.originalSheet && el.open), true);
+    assert.equal(await nav.locator('[aria-current="page"]').getAttribute('aria-label'), label);
+    const after = queries.filter(query => query.kind === kind).length;
+    if (cached) assert.equal(after, before, 'Fresh catalogs reopen from cache without another request');
+    else assert(after > before, 'Uncached pages fetch their content');
+    assert.equal(await page.locator('#place-panel').evaluate(el => el === window.originalSheet && el.isConnected), true);
   };
   await switchTo('篝火', '篝火', 'bonfire');
   await page.getByText('篝火内容 · 第 1 次读取', { exact: true }).waitFor();
@@ -211,31 +216,29 @@ try {
   await page.getByRole('button', { name: '复制链接', exact: true }).click();
   assert.equal(await page.evaluate(() => window.copiedSeedLink), 'https://beings.town/scrolls/scroll-1');
   await switchTo('工具库', '工具库', 'grove');
-  await switchTo('广场', '小镇广场', 'home');
-  await switchTo('花园', '种子花园', 'seeds');
-  assert.equal(await page.locator('#view-title').evaluate(el => parseFloat(getComputedStyle(el).fontSize)), 26);
-  assert.equal(await nav.locator('[aria-current="page"]').evaluate(el => parseFloat(getComputedStyle(el).fontSize)), 12);
+  await switchTo('小镇广场', '小镇广场', 'home');
+  await switchTo('种子花园', '种子花园', 'seeds', true);
   await page.evaluate(() => window.seedTown.show('seeds', 'seed-0'));
   await page.locator('.direct-reading .reading-title').waitFor();
   await verifyRefresh(['.direct-reading .reading-title', '.reading-fragment .reading-text'], 'seed-direct');
   await page.setViewportSize({ width: 420, height: 800 });
   await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
-  assert.equal(await page.locator('#place-sheet').evaluate(el => el.scrollWidth <= el.clientWidth), true);
+  assert.equal(await page.locator('#place-panel').evaluate(el => el.scrollWidth <= el.clientWidth), true);
   const narrowActions = await actionLayout();
   assert.equal(narrowActions[0].y, narrowActions[1].y);
   assert.equal(narrowActions[1].x - narrowActions[0].right, 8);
   await page.screenshot({ path: 'test-results/seed-garden-narrow.png', animations: 'disabled' });
-  await switchTo('卷轴', '卷轴', 'scrolls');
+  await switchTo('卷轴', '卷轴', 'scrolls', true);
   const selectedVisible = await nav.locator('[aria-current="page"]').evaluate(el => {
     const rect = el.getBoundingClientRect(), parent = el.parentElement.getBoundingClientRect();
     return rect.left >= parent.left && rect.right <= parent.right;
   });
   assert.equal(selectedVisible, true);
-  await switchTo('花园', '种子花园', 'seeds');
+  await switchTo('种子花园', '种子花园', 'seeds', true);
   assert.equal(await page.evaluate(() => window.seedTown.directId), undefined);
   await page.locator('.seed-filter-menu > summary').click();
   assert.equal(await page.locator('.seed-filter-fields').evaluate(el => {
-    const rect = el.getBoundingClientRect(), sheet = document.getElementById('place-sheet').getBoundingClientRect();
+    const rect = el.getBoundingClientRect(), sheet = document.getElementById('place-panel').getBoundingClientRect();
     return rect.left >= sheet.left && rect.right <= sheet.right && rect.bottom <= sheet.bottom;
   }), true, 'Seed filters fit the narrow sheet');
   await page.screenshot({ path: 'test-results/seed-garden-filters-narrow.png', animations: 'disabled' });

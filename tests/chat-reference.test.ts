@@ -9,7 +9,7 @@ function fixture() {
   vi.stubGlobal('location', new URL('beings://chat/?revision=fixture'));
   const state = new ChatState(), bridge = createChatBridge(state);
   const runtime = { loadSbsState: async () => false, send: vi.fn(), refreshHistory: vi.fn(async () => {}) };
-  bridge.start(runtime as unknown as ChatRuntime, { panel() {}, theme() {}, reading() {}, activity() {}, search() {}, jump() {}, focus() {}, scope() {} });
+  bridge.start(runtime as unknown as ChatRuntime, { panel() {}, theme() {}, reading() {}, search() {}, jump() {}, focus() {}, scope() {} });
   const send = (data: Record<string, unknown> = {}, origin = 'beings://desktop', source: unknown = parent) => {
     window.dispatchEvent(Object.assign(new Event('message'), { source, origin, data: {
       type: 'beings:scene-draft', id: 'fixture-request', text: '一起看 Portal 日志\n> fixture', expiresAt: Date.now() + 2500, ...data,

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { DesktopPluginAPI, PluginSession } from '../../shared/plugins';
 import { PLUGIN_CAPABILITIES } from '../../shared/plugins';
+import { PanelResizeHandle, usePanelWidth } from "../shared/components/panel-resize";
 import { Dialog } from '../shared/components/dialog';
 import { useModel } from '../shared/hooks/use-model';
 import { errorText } from '../shared/models/store';
@@ -24,11 +25,14 @@ export function Plugins({ model, theme, contextKey }: PluginSurfaceProps) {
 }
 
 export function PluginSidebar({ model, theme, contextKey }: PluginSurfaceProps) {
+  const panel = useRef<HTMLElement>(null);
+  const [width, setWidth] = usePanelWidth("plugin", 340);
   const plugins = useModel(model);
   const selected = plugins.selected?.placement === 'sidebar' ? plugins.selected : undefined;
   const installed = plugins.library.plugins.find(p => p.enabled && p.manifest.id === selected?.id);
   if (!selected || !installed || !plugins.api) return null;
-  return <aside className="plugin-sidebar" aria-label={`${installed.manifest.name}侧栏`}>
+  return <aside ref={panel} style={{ width, flexBasis: width }} className="plugin-sidebar" aria-label={`${installed.manifest.name}侧栏`}>
+    <PanelResizeHandle panel={panel} label="调整插件侧栏宽度" width={width} onResize={setWidth} initial={340} />
     <header><strong>{installed.manifest.name}</strong>
       <button className="text-button" onClick={() => plugins.closeSidebar()}>关闭插件侧栏</button></header>
     <PluginFrame key={`${selected.id}:${selected.revision}:${contextKey}`} api={plugins.api} model={plugins} id={selected.id}
@@ -63,15 +67,6 @@ export function PluginCard({ model, plugin }: { model: PluginsModel; plugin: imp
       </div>
     </div>
   </article>;
-}
-
-export function PluginNavigation({ model, active }: { model: PluginsModel; active: boolean }) {
-  const plugins = useModel(model);
-  return <>{plugins.navigationViews().map(({ plugin, view }) =>
-    <button type="button" key={`${plugin.id}:${view.id}`} data-plugin-navigation
-      aria-current={active && plugins.selected?.id === plugin.id && plugins.selected.view === view.id ? 'page' : undefined}
-      onClick={() => plugins.open(plugin.id, view.id, undefined, 'navigation')} title={plugin.name}>{view.title}</button>
-  )}</>;
 }
 
 export function PluginCommands({ model }: { model: PluginsModel }) {

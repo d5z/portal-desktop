@@ -24,8 +24,23 @@ export class AppModel extends Store {
   theme: "light" | "dark" = "light";
   startup: "loading" | "ready" | "error" = "loading";
   view = "chat";
-  placePresentation: "dialog" | "panel" = "dialog";
-  placePanelWidth = 620;
+  chatSplitOpen = false;
+  toggleChatSplit = () => { this.chatSplitOpen = !this.chatSplitOpen; this.changed(); };
+  beingInfoOpen = true;
+  toggleBeingInfo = () => {
+    this.beingInfoOpen = !this.beingInfoOpen;
+    if (this.beingInfoOpen) this.chatSplitOpen = false;
+    this.changed();
+  };
+
+  returnToMainChat = async () => {
+    this.chatSplitOpen = false;
+    this.navigate("chat");
+    const main = this.snapshot?.chatSessions?.[0];
+    if (main && (main.scene_id !== this.snapshot?.chatScene?.scene_id || this.chatHistoryScope !== "current"))
+      await this.run(() => this.changeChatSession("select", main.scene_id));
+  };
+
   chatSource = "";
   chatLoading = false;
   chatHistoryScope: HistoryScope = "current";
@@ -78,7 +93,9 @@ export class AppModel extends Store {
   diagnosticsOpen = false;
   searchOpen = false;
   search = "";
-  searchEntries: { id: string; text: string }[] = [];
+  searchEntries: import("../../chat/services/conversation-search").SearchEntry[] = [];
+  searchLoading = false;
+  searchError = "";
   readingSize = 15;
   chatHistoryLimit = DEFAULT_CHAT_HISTORY_LIMIT;
   update?: UpdateState;
@@ -192,11 +209,6 @@ export class AppModel extends Store {
       const size = Number(localStorage.getItem("beings:reading-size"));
       if (Number.isInteger(size) && size >= 13 && size <= 21)
         this.readingSize = size;
-      if (localStorage.getItem("beings:place-presentation") === "panel")
-        this.placePresentation = "panel";
-      const panelWidth = Number(localStorage.getItem("beings:place-panel-width"));
-      if (Number.isInteger(panelWidth) && panelWidth >= 220 && panelWidth <= 1600)
-        this.placePanelWidth = panelWidth;
     } catch {
       /* Optional preference. */
     }
@@ -297,30 +309,6 @@ export class AppModel extends Store {
     this.town.show(view, id);
     this.changed();
   };
-  setPlacePresentation = (presentation: "dialog" | "panel") => {
-    if (this.placePresentation === presentation) return;
-    this.placePresentation = presentation;
-    try {
-      localStorage.setItem("beings:place-presentation", presentation);
-    } catch {
-      /* Optional preference. */
-    }
-    this.changed();
-  };
-  setPlacePanelWidth = (width: number, persist = false) => {
-    const next = Math.round(Math.max(220, Math.min(1600, width)));
-    if (this.placePanelWidth !== next) {
-      this.placePanelWidth = next;
-      this.changed();
-    }
-    if (persist) {
-      try {
-        localStorage.setItem("beings:place-panel-width", String(next));
-      } catch {
-        /* Optional preference. */
-      }
-    }
-  };
   applySnapshot(next: Snapshot, reload = false) {
     const sameChat = Boolean(this.chatSource &&
       this.snapshot?.settings.endpoint === next.settings.endpoint &&
@@ -368,7 +356,7 @@ export class AppModel extends Store {
     this.post({ type: "beings:sbs-request" });
     if (this.chatSource) this.post({ type: "beings:history-scope-request", revision: new URL(this.chatSource).searchParams.get("revision") });
     this.town.updateLive();
-    this.post({ type: "beings:search-request" });
+    this.post({ type: "beings:search-request", query: this.searchOpen ? this.search : "" });
     this.changed();
   }
   toggleSbs() {
@@ -386,8 +374,7 @@ export class AppModel extends Store {
     if (this.snapshot?.settings.endpoint !== endpoint) return;
     this.applySnapshot(next);
     this.chatHistoryScope = "current";
-    if (this.placePresentation !== "panel" || this.view === "chat")
-      this.navigate("chat");
+    if (!this.chatSplitOpen) this.navigate("chat");
     this.postCurrentSession();
     if (next.chatScene && next.chatScene.scene_id !== previousSceneId)
       this.toast(`已切到「${next.chatScene.scene_meta.scene_label}」场景`);
@@ -402,8 +389,7 @@ export class AppModel extends Store {
   changeChatHistoryScope(scope: HistoryScope) {
     if (!this.chatSource || this.chatLoading || !this.chatHistoryScopeKnown || (scope === "current" && !this.snapshot?.chatScene)) return;
     this.chatHistoryScope = scope;
-    if (this.placePresentation !== "panel" || this.view === "chat")
-      this.navigate("chat");
+    if (!this.chatSplitOpen) this.navigate("chat");
     this.post({ type: "beings:history-scope", scope, revision: new URL(this.chatSource).searchParams.get("revision") });
   }
   setChatHistoryScope(scope: HistoryScope) {
@@ -452,7 +438,7 @@ export class AppModel extends Store {
   openSearch() {
     if (!this.snapshot?.settings.hasToken) return;
     this.searchOpen = true;
-    this.post({ type: "beings:search-request" });
+    this.post({ type: "beings:search-request", query: this.searchOpen ? this.search : "" });
     this.changed();
   }
   chatAction(action: string) {

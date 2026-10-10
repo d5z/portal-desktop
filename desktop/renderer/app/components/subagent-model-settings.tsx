@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { PanelResizeHandle, usePanelWidth } from '../../shared/components/panel-resize';
 import { ChatSettings } from '../../chat/components/settings';
 import { ChatState, type ChatRuntime, type LlmConfig, type ConfigResult, type Preset } from '../../chat/models/chat';
 import { errorText } from '../../shared/models/store';
@@ -8,6 +9,10 @@ import type { SubagentSetup } from '../../../shared/types';
 
 /** Same model page, with a local Portal adapter instead of Heart's HTTP API. */
 export function SubagentModelSettings({ app }: { app: AppModel }) {
+  const panel = useRef<HTMLDivElement>(null);
+  const closeButton = useRef<HTMLButtonElement>(null);
+  const [width, setWidth] = usePanelWidth("being", 320);
+  useEffect(() => { closeButton.current?.focus(); }, []);
   const staged = app.subagentFromConnection;
   const [busy, setBusy] = useState(false);
   const [beingPreset, setBeingPreset] = useState<Preset>();
@@ -128,13 +133,14 @@ export function SubagentModelSettings({ app }: { app: AppModel }) {
     setTarget(value);
     setVisited(previous => new Set([...previous, value]));
   };
-  return <div id="subagent-model-panel">
+  return <div id="subagent-model-panel" ref={panel} style={{width, flexBasis:width}}>
+    <PanelResizeHandle panel={panel} label="调整模型设置宽度" width={width} onResize={setWidth} initial={320} min={240} max={640} reserve={396} />
     <aside id="settings-panel" aria-label="模型设置" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
       <div className="settings-header panel-header">
         <div><div className="settings-title-line"><h2>模型设置</h2></div>
           <p>{target === 'Heart' ? '选择当前 Being 使用的模型' : staged ? '选择 subagent 模型，随连接一起安装与配置' : '配置本机 subagent 使用的模型'}</p>
         </div>
-        <button type="button" className="btn-close" aria-label="关闭模型设置" disabled={busy} onClick={close}>✕</button>
+        <button ref={closeButton} type="button" className="btn-close" aria-label="关闭模型设置" disabled={busy} onClick={close}>✕</button>
       </div>
       <div className="model-target-header"><div className="toggle-group model-targets" role="tablist" aria-label="模型配置对象">
         {(['Heart', 'subagent'] as const).map(value => <button key={value} type="button" role="tab" id={`model-tab-${value}`} aria-controls={`model-content-${value}`} aria-selected={target === value} className={target === value ? 'active' : ''} disabled={busy} onClick={() => switchTarget(value)}>{value === 'Heart' ? 'Being 模型' : 'subagent'}</button>)}

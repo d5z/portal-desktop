@@ -8,7 +8,7 @@ export function shareTownData(previous: Data | null | undefined, next: Data): Da
   for (const key of Object.keys(next)) {
     const before = previous[key], after = next[key];
     if (JSON.stringify(before) === JSON.stringify(after)) merged[key] = before;
-    else if (key === 'messages' && Array.isArray(before) && Array.isArray(after)) {
+    else if (['messages','scrolls','seeds','items','kits'].includes(key) && Array.isArray(before) && Array.isArray(after)) {
       const identity = (value: unknown) => {
         const entry = value && typeof value === 'object' ? value as Data : {};
         return String(entry.id ?? entry.message_id ?? entry.seq ?? '');

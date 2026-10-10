@@ -338,7 +338,7 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
       selected.local.files = state.files;
       return selected.runtime[method](...args);
     };
-  for (const method of ["loadLlmConfig", "applyConfigChange", "toggleSbs", "loadSbsState", "request"])
+  for (const method of ["loadLlmConfig", "applyConfigChange", "toggleSbs", "loadSbsState", "request", "revealHistory"])
     runtime[method] = (...args: any[]) => owner.runtime[method](...args);
   return runtime as ChatRuntime;
 }

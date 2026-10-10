@@ -20,7 +20,7 @@ const app=Object.assign(new Store(), {
 });
 window.saves=[];window.heartPatches=[];window.app=app;
 window.openSettings=(staged,target='subagent')=>{app.modelSettingsTarget=target;app.subagentFromConnection=staged;app.subagentSettingsOpen=true;app.changed()};
-function Fixture(){useSyncExternalStore(app.subscribe,app.getVersion);return app.subagentSettingsOpen?<SubagentModelSettings app={app}/>:null}
+function Fixture(){useSyncExternalStore(app.subscribe,app.getVersion);return <div className="workspace-body" style={{height:"100vh"}}><main className="workspace-stage">对话保留在这里</main>{app.subagentSettingsOpen&&<SubagentModelSettings app={app}/>}</div>}
 createRoot(document.getElementById('root')).render(<StrictMode><Fixture/></StrictMode>);
 `, loader: 'tsx', resolveDir: process.cwd() }, bundle: true, write: false, format: 'iife', jsx: 'automatic', platform: 'browser' });
 const css = (await readFile('desktop/renderer/app/styles.css', 'utf8')).replace('@import "../shared/model-settings.css";', '') + await readFile('desktop/renderer/shared/model-settings.css', 'utf8');

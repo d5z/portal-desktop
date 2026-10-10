@@ -105,6 +105,13 @@ try {
   await page.evaluate(() => window.fixtureApp.closeSubagentSettings());
   const original = await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id);
   await chat.locator('#input').fill('原会话草稿');
+  await page.getByRole('button',{name:'展开场景列表',exact:true}).click();
+  await page.getByLabel('场景列表选项',{exact:true}).click();
+  await page.getByRole('button',{name:'保持显示聊天面板',exact:true}).click();
+  await page.getByRole('searchbox',{name:'搜索场景'}).fill('不存在的对话');
+  await page.getByRole('status').getByText('没有找到匹配的对话').waitFor();
+  assert.equal(await page.locator('.chat-session-list [data-scene-id]').count(),0);
+  await page.getByRole('searchbox',{name:'搜索场景'}).fill('');
   await page.getByRole('button',{name:'新建场景',exact:true}).click();
   await page.getByRole('textbox',{name:'场景名称'}).fill('方案讨论');
   await page.getByRole('button',{name:'创建并进入'}).click();
@@ -138,7 +145,7 @@ try {
   await chat.locator('#input:not(:disabled)').waitFor();
   assert.equal(await chat.locator('#send-btn').isDisabled(),false);
   const unselectedItemBox = await page.getByRole('button',{name:'切换到场景：技术方案'}).boundingBox();
-  assert.equal(selectedItemBox.height,40);
+  assert.equal(selectedItemBox.height,44);
   assert.equal(unselectedItemBox.height,selectedItemBox.height,'Selecting a session must not change its row height');
   const composerInAll = await chat.locator('#input-area').boundingBox();
   assert.ok(Math.abs(composerInAll.height - composerBeforeAll.height) < 1, 'Switching to all scenes must preserve composer height');
@@ -153,10 +160,12 @@ try {
   const panel = page.getByRole('complementary',{name:'场景列表'});
   assert.equal(await panel.isVisible(),true);
   const panelBox = await panel.boundingBox(), chatBox = await page.locator('#chat-view').boundingBox();
-  assert.ok(panelBox.x + panelBox.width <= chatBox.x, 'Floating panel must not cover the conversation');
+  assert.ok(panelBox.x >= chatBox.x && panelBox.x + panelBox.width <= chatBox.x + chatBox.width, 'Scene picker must stay within the conversation width');
+  assert.ok(panelBox.y < chatBox.y + 20, 'Scene picker must open at the top of the conversation');
   await chat.locator('#input').click();
   assert.equal(await panel.isVisible(),true, 'Typing must not dismiss session navigation');
   await page.screenshot({animations:'disabled',path:'test-results/chat-sessions-panel.png'});
+  await page.getByLabel('场景列表选项',{exact:true}).click();
   await page.getByRole('button',{name:'关闭场景列表',exact:true}).click();
   assert.equal(await panel.count(),0);
   await page.getByRole('button',{name:'展开场景列表',exact:true}).click();
@@ -252,6 +261,7 @@ try {
   await page.reload();
   await chat.getByText('回复：方案内容',{exact:true}).waitFor();
   assert.equal(await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id),discussion);
+  await page.getByRole('button',{name:'展开场景列表',exact:true}).click();
   // Right-click an inactive scene: rename and delete must not select it.
   await page.getByRole('button',{name:'切换到场景：桌面·测试设备'}).click({button:'right'});
   await page.getByRole('menu',{name:'场景操作'}).waitFor();
@@ -283,6 +293,7 @@ try {
   const replacement = await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id);
   assert.notEqual(replacement,discussion);
   await page.reload();
+  await page.getByRole('button',{name:'展开场景列表',exact:true}).click();
   await page.getByRole('button',{name:'切换到场景：新场景'}).waitFor();
   assert.equal(await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id),replacement);
   await page.getByRole('checkbox',{name:'显示全部场景上下文',exact:true}).check();
@@ -296,6 +307,7 @@ try {
   assert.equal(quick.chatScene.scene_meta.scene_label,'快捷新会话');
   assert.notEqual(quick.chatScene.scene_id,replacement);
   assert.equal(await chat.locator('.all-scenes-notice').count(),0);
+  await page.getByLabel('场景列表选项',{exact:true}).click();
   await page.getByRole('button',{name:'绑定已有场景',exact:true}).click();
   await page.screenshot({animations:'disabled',path:'test-results/chat-bind-dialog.png'});
   await page.getByRole('textbox',{name:'场景 ID',exact:true}).fill('feishu-shared');
@@ -304,11 +316,15 @@ try {
   await page.locator('#chat-session-editor').waitFor({state:'hidden'});
   await page.getByRole('button',{name:'切换到场景：跨客户端场景'}).waitFor();
   assert.equal((await page.evaluate(() => window.beings.snapshot())).chatScene.scene_id,'feishu-shared');
+  await page.waitForFunction(() => !window.fixtureApp.chatLoading);
+  await chat.locator('#input:not(:disabled)').waitFor();
   await chat.locator('#input').fill('Bound scene message');
   await chat.locator('#send-btn').click();
   await chat.locator('.message.user').filter({hasText:'Bound scene message'}).waitFor();
+  assert.equal(await chat.locator('.message.user').filter({hasText:'Bound scene message'}).count(),1);
   assert.equal((await application.evaluate(() => globalThis.fixture.requests)).at(-1).scene_id,'feishu-shared');
   await page.reload();
+  await page.getByRole('button',{name:'展开场景列表',exact:true}).click();
   await page.getByRole('button',{name:'切换到场景：跨客户端场景'}).waitFor();
   assert.equal((await page.evaluate(() => window.beings.snapshot())).chatScene.scene_id,'feishu-shared');
   // Scheduling is inspectable process metadata, never inline conversation prose.
@@ -346,5 +362,5 @@ try {
   await chat.locator('.scene-task-list').getByText('模型鉴权失败，请检查 subagent 密钥',{exact:true}).waitFor();
   await page.screenshot({animations:'disabled',path:'test-results/scene-scheduling-failed.png'});
   assert.deepEqual(errors,[]);
-  console.log('PASS: same Being, create/switch/rename scenes through the actual UI, isolated history, per-scene drafts, send identity, persistent left panel, collapse/reopen, FIFO scene queue, context-menu rename, confirmed deletion, last-scene replacement and reload.');
+  console.log('PASS: same Being, create/switch/rename scenes through the actual UI, isolated history, per-scene drafts, send identity, top scene picker, collapse/reopen, FIFO scene queue, context-menu rename, confirmed deletion, last-scene replacement and reload.');
 } finally { await application?.close(); await rm(directory,{recursive:true,force:true}); }

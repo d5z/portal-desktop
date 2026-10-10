@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   feedMessages,
   feedDisplayName,
@@ -282,9 +282,7 @@ const Message = memo(function Message({
   selected: boolean;
   onSelect: (message: FeedMessage) => void;
 }) {
-  const expanded = useRef<HTMLDetailsElement>(null),
-    preview = useRef<HTMLElement>(null);
-  const [expandedOpen, setExpandedOpen] = useState(false);
+
   const [replyOpen, setReplyOpen] = useState(false);
   const collapsible = m.content.length > 480 || m.content.split("\n").length > 8;
   const renderText = useCallback(
@@ -406,28 +404,7 @@ const Message = memo(function Message({
           </details>
         )}
         {collapsible ? (
-          <details
-            className="social-expand"
-            ref={expanded}
-            onToggle={event => setExpandedOpen(event.currentTarget.open)}
-          >
-            <summary ref={preview}>
-              <span className="social-preview">{snippet}</span>
-              <span className="expand-label">展开全文</span>
-            </summary>
-            {expandedOpen && body}
-            <button
-              className="text-button"
-              type="button"
-              onClick={() => {
-                if (expanded.current) expanded.current.open = false;
-                setExpandedOpen(false);
-                preview.current?.focus();
-              }}
-            >
-              收起全文
-            </button>
-          </details>
+          <SmoothMessageExpansion snippet={snippet}>{body}</SmoothMessageExpansion>
         ) : (
           body
         )}
@@ -454,3 +431,32 @@ const Message = memo(function Message({
     </article>
   );
 });
+
+function SmoothMessageExpansion({snippet,children}:{snippet:string;children:import('react').ReactNode}) {
+  const [open,setOpen]=useState(false);
+  const [visited,setVisited]=useState(false);
+  const box=useRef<HTMLDivElement>(null);
+  const motion=useRef<Animation|null>(null);
+  const from=useRef<number|null>(null);
+  const toggle=()=>{
+    if (!box.current) return;
+    from.current=box.current.getBoundingClientRect().height;
+    motion.current?.cancel();
+    setVisited(true);setOpen(value=>!value);
+  };
+  useLayoutEffect(()=>{
+    const node=box.current;
+    if (!node || from.current===null) return;
+    const start=from.current;from.current=null;
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const animation=node.animate([{height:`${start}px`},{height:`${node.getBoundingClientRect().height}px`}],{duration:260,easing:'cubic-bezier(.2,.8,.2,1)'});
+    motion.current=animation;
+    animation.onfinish=()=>{motion.current=null;};
+    return ()=>animation.cancel();
+  },[open]);
+  return <div className="social-expansion" ref={box}>
+    <div hidden={open}><span className="social-preview">{snippet}</span></div>
+    {visited && <div hidden={!open}>{children}</div>}
+    <button className="text-button expand-label" type="button" aria-expanded={open} onClick={toggle}>{open?'收起全文':'展开全文'}</button>
+  </div>;
+}

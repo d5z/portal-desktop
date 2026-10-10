@@ -168,12 +168,16 @@ export function useChatBridge(
             (entry) =>
               entry &&
               typeof entry.id === "string" &&
-              /^turn-\d+$/.test(entry.id) &&
+              /^history-\d+$/.test(entry.id) &&
               typeof entry.text === "string" &&
-              entry.text.length <= 240,
+              entry.text.length <= 1100 &&
+              ["sceneId", "sceneLabel", "role", "at"].every(key => typeof entry[key] === "string" && entry[key].length <= 512),
           )
         )
           return;
+        if (message.query !== app.search) return;
+        app.searchLoading = message.loading === true;
+        app.searchError = typeof message.error === "string" ? message.error.slice(0,200) : "";
         app.searchEntries = entries;
         app.changed();
         return;

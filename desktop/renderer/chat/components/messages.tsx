@@ -1,6 +1,6 @@
 import { SceneScheduling } from './scheduling';
 import { useEffect, useMemo, useState } from "react";
-import type { ChatItem, Message, ChatRuntime, Run } from "../models/chat";
+import type { ChatItem, Message, Run } from "../models/chat";
 const duration = (seconds: number) =>
   seconds < 60
     ? `${seconds} 秒`
@@ -36,16 +36,10 @@ function Icon({ name }: { name: keyof typeof icons }) {
 }
 export function ChatActivity({
   run,
-  runtime,
-  stopping,
   sceneLabel,
-  canStop = true,
 }: {
   run: Run;
-  runtime: ChatRuntime;
-  stopping: boolean;
   sceneLabel?: string;
-  canStop?: boolean;
 }) {
   const [open, setOpen] = useState(false),
     [now, setNow] = useState(Date.now);
@@ -98,19 +92,6 @@ export function ChatActivity({
         <span className="run-chevron">
           <Icon name="chevron" />
         </span>
-        <button
-          className="run-stop"
-          type="button"
-          title="停止生成"
-          aria-label="停止生成"
-          hidden={!canStop || !!run.end || run.waitingForReply}
-          disabled={stopping}
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            void runtime.stopCurrentTurn();
-          }}
-        />
       </summary>
       <p className="run-hint" hidden={!run.hint}>
         {run.hint}

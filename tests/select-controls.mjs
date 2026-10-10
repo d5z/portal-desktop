@@ -38,9 +38,8 @@ try {
   await page.waitForFunction(async () => (await window.beings.townLive()).phase === 'connected');
   await mkdir('test-results/select-controls', { recursive: true });
   const navigate = async title => {
-    if (await page.locator('#place-sheet').evaluate(el => el.open)) await page.locator('#back-to-chat').click();
-    await page.locator('#options-trigger').click();
-    await page.locator('#conversation-options [data-view="town"]').click();
+    if (await page.locator('#place-panel').isVisible()) await page.locator('#back-to-chat').click();
+    await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'小镇广场',exact:true}).click();
     await page.locator('.service-card').filter({ has: page.getByRole('heading', { name: title, exact: true }) }).getByRole('button', { name: '打开', exact: true }).click();
     await page.waitForFunction(() => !document.querySelector('#town-body').hasAttribute('aria-busy'));
   };
@@ -71,7 +70,7 @@ try {
     await kind.click();
     await page.keyboard.press('Escape');
     assert.equal(await opened(kind), false);
-    assert.equal(await page.locator('#place-sheet').evaluate(el => el.open), true);
+    assert.equal(await page.locator('#place-panel').isVisible(), true);
     await navigate('种子花园 · Seed Garden');
     await page.locator('.seed-filter-menu summary').click();
     const lifecycle = page.getByLabel('种子状态');
@@ -124,13 +123,13 @@ try {
     assert.ok(box && box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width && box.y + box.height <= viewport.height);
   }
   const fields = await page.locator('.seed-filter-fields').boundingBox();
-  const dialog = await page.locator('#place-sheet').boundingBox();
+  const dialog = await page.locator('#place-panel').boundingBox();
   assert.ok(fields.y + fields.height <= dialog.y + dialog.height);
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('.seed-filter-menu').evaluate(el => el.open), true);
   await page.keyboard.press('Escape');
   assert.equal(await page.locator('.seed-filter-menu').evaluate(el => el.open), false);
-  assert.equal(await page.locator('#place-sheet').evaluate(el => el.open), true);
+  assert.equal(await page.locator('#place-panel').isVisible(), true);
   await page.locator('.seed-filter-menu summary').click();
   await page.locator('#view-title').click();
   assert.equal(await page.locator('.seed-filter-menu').evaluate(el => el.open), false);

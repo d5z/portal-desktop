@@ -52,15 +52,16 @@ try {
   const frame = page.frameLocator('#chat');
   const child = () => page.frames().find(frame => frame.url().includes('/loom.html'));
   const post = data => page.evaluate(data => document.querySelector('iframe').contentWindow.postMessage(data, location.origin), data);
-  await frame.locator('.chat-index-tick').nth(11).waitFor();
+  await frame.locator('.message.user').nth(11).waitFor();
   await frame.locator('#input').fill('hold');
   await frame.locator('#send-btn').click();
-  await frame.locator('.run-activity.running .run-stop').waitFor();
+  await frame.locator('#send-btn.stop').waitFor();
   const messages = frame.locator('#messages');
   const replyOffset = () => messages.evaluate(el => {
     const reply = [...el.querySelectorAll('.message.being')].at(-1);
     return reply ? reply.getBoundingClientRect().top - el.getBoundingClientRect().top : null;
   });
+  await frame.getByText('开始回复。', {exact:true}).waitFor();
   // Reply starts near the bottom while content is short (follow-bottom mode).
   assert.ok(await replyOffset() > 100, 'Short reply stays near the bottom, not forced to top');
   // Stream enough content so the reply start scrolls out of view, triggering anchor.
@@ -86,7 +87,8 @@ try {
   await page.mouse.wheel(0, -40);
   await new Promise(r => setTimeout(r, 100));
   // Resume: click latest, then verify follow-bottom works.
-  await frame.locator('#chat-index-latest').click();
+  await frame.locator('#chat-jump-latest').click();
+  await child().waitForFunction(()=>{const el=document.querySelector('#messages');return el.scrollHeight-el.scrollTop-el.clientHeight<2;});
   const bottomBeforeWheel = await messages.evaluate(el => el.scrollTop);
   await messages.hover();
   await page.mouse.wheel(0, -40);
@@ -98,7 +100,8 @@ try {
     assert.ok(Math.abs(await messages.evaluate(el => el.scrollTop) - readingTop) < 2,
       'Streaming must preserve the reading position after a small upward scroll');
   }
-  await frame.locator('#chat-index-latest').click();
+  await frame.locator('#chat-jump-latest').click();
+  await child().waitForFunction(()=>{const el=document.querySelector('#messages');return el.scrollHeight-el.scrollTop-el.clientHeight<2;});
   event(heldResponse, 'content_block_delta', { delta: { text: '\n\n恢复跟随底部' } });
   await frame.getByText('恢复跟随底部', { exact: true }).waitFor();
   assert.ok(await messages.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight < 2),

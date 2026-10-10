@@ -15,7 +15,6 @@ const { outputFiles } = await build({
     import { TownAuth } from './desktop/renderer/town/components/auth';
     import { TownModel } from './desktop/renderer/town/models/town';
     import { SceneStore } from './desktop/renderer/shared/models/scene';
-    import { ChatPlaces } from './desktop/renderer/chat/components/navigation';
     import { collectMentionNames } from './desktop/renderer/town/models/mentions';
     const messages = [
       { id: 'incoming', sender_display: '河流', sender_name: 'old-river', sender_town_id: 't_RiverA', recipient_town_id: 't_Willow', content: '当前显示名优先', created_at: '2026-09-14T10:00:00Z' },
@@ -62,14 +61,6 @@ const { outputFiles } = await build({
       };
       model.show(location.pathname.split('/').at(-1));
       createRoot(document.getElementById('root')).render(<Town model={model} />);
-    } else if (location.pathname === '/places') {
-      window.fixturePlaces = [];
-      function PlacesFixture() {
-        const [channels, setChannels] = React.useState([]);
-        window.updatePlaces = setChannels;
-        return <div id="input-area"><div id="input-row"><textarea id="input" placeholder="说点什么…"/><button type="button" className="btn-icon" aria-label="添加附件">＋</button><div id="desktop-composer-tools"><ChatPlaces send={message => window.fixturePlaces.push(message)} channels={channels}/></div><button id="send-btn" type="button" aria-label="发送">↑</button></div></div>;
-      }
-      createRoot(document.getElementById('root')).render(<PlacesFixture/>);
     } else createRoot(document.getElementById('root')).render(<>
       <TownFeed town={model} data={{ messages: feed }} filterKey={model.view + ':all'} />
       <TownComposer model={model} />
@@ -80,12 +71,9 @@ const { outputFiles } = await build({
   bundle: true, write: false, platform: 'browser', format: 'iife', jsx: 'automatic',
 });
 const styles = await readFile('desktop/renderer/app/styles.css', 'utf8');
-const chatStyles = await readFile('desktop/renderer/chat/styles.css', 'utf8');
 const server = createServer((request, response) => {
   response.setHeader('Content-Type', request.url === '/fixture.js' ? 'text/javascript' : 'text/html; charset=utf-8');
-  const css = request.url === '/places'
-    ? `${chatStyles} body {margin:0;} #root {min-height:100vh;display:flex;align-items:flex-end;} #input-area {box-sizing:border-box;} #input {box-sizing:border-box;resize:none;font-family:system-ui;} #send-btn {cursor:pointer;}`
-    : `${styles} body {display:block;height:auto;padding:32px; overflow:auto;} .social-feed {max-width:960px;margin:auto;}`;
+  const css = `${styles} body {display:block;height:auto;padding:32px; overflow:auto;} .social-feed {max-width:960px;margin:auto;}`;
   response.end(request.url === '/fixture.js' ? outputFiles[0].text : `<!doctype html><html lang="zh-CN"><meta charset="utf-8"><style>${css}</style><div id="root"></div><script src="/fixture.js"></script></html>`);
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
@@ -176,25 +164,25 @@ try {
     await card.hover();
     await card.getByRole('button', { name: '复制正文', exact: true }).click();
     assert.equal(await page.evaluate(() => window.fixtureCopied), await page.evaluate(() => window.fixtureMessages[1].content));
-    const summary = card.locator('.social-expand > summary');
+    const summary = card.locator('.social-expansion > button');
     await summary.focus();
     await summary.press('Enter');
-    await card.locator('.social-expand .social-body h1').waitFor();
-    assert.equal(await card.locator('.social-expand .social-body strong').count(), 40);
+    await card.locator('.social-expansion .social-body h1').waitFor();
+    assert.equal(await card.locator('.social-expansion .social-body strong').count(), 40);
     await card.getByRole('button', { name: '收起全文', exact: true }).click();
-    await page.waitForFunction(() => document.querySelectorAll('.social-body').length === 0);
+    await page.waitForFunction(() => [...document.querySelectorAll('.social-body')].every(node => !node.checkVisibility()));
     assert.equal(await summary.evaluate(el => el === document.activeElement), true);
     await summary.press('Enter');
-    await card.locator('.social-expand .social-body').waitFor();
+    await card.locator('.social-expansion .social-body').waitFor();
     await card.getByRole('button', { name: '收起全文', exact: true }).click();
-    await page.waitForFunction(() => document.querySelectorAll('.social-body').length === 0);
+    await page.waitForFunction(() => [...document.querySelectorAll('.social-body')].every(node => !node.checkVisibility()));
     await card.locator('.feed-reply-preview > summary').click();
     await card.locator('.feed-reply-full .social-body h1').waitFor();
     assert.equal(await card.locator('.feed-reply-full h1').innerText(), '长消息 0');
     await card.getByRole('button', { name: '跳转原文', exact: true }).click();
     await page.waitForFunction(() => document.activeElement?.id === 'town-message-0');
     await card.locator('.feed-reply-preview > summary').click();
-    await page.waitForFunction(() => document.querySelectorAll('.social-body').length === 0);
+    await page.waitForFunction(() => [...document.querySelectorAll('.social-body')].every(node => !node.checkVisibility()));
   }
   for (const view of ['bonfire', 'firesides', 'mail']) {
     await page.goto(`http://127.0.0.1:${server.address().port}/refresh/${view}`);
@@ -219,7 +207,7 @@ try {
     };
     await resolveNext();
     const card = page.locator('#town-message-0');
-    await card.locator('.social-expand > summary').click();
+    await card.locator('.social-expansion > button').click();
     await card.locator('.social-body h1').waitFor();
     await page.evaluate(() => {
       window.originalCard = document.querySelector('#town-message-0');
@@ -229,7 +217,7 @@ try {
       await page.locator('#town-refresh').click();
       assert.equal(await page.locator('#town-body > #town-refresh-indicator').innerText(), '正在刷新…');
       assert.equal(await page.locator('#town-refresh-indicator .startup-spinner').isVisible(), true);
-      assert.equal(await card.locator('.social-expand').getAttribute('open'), '');
+      assert.equal(await card.locator('.social-expansion > button').getAttribute('aria-expanded'), 'true');
       if (mode === 'same') await page.screenshot({ path: `test-results/town-refresh-${view}.png` });
       await resolveNext(mode);
       await page.waitForFunction(() => !document.querySelector('#town-refresh-indicator'));
@@ -250,56 +238,8 @@ try {
     await resolveNext();
     await page.waitForFunction(() => !document.querySelector('#town-refresh-indicator'));
   }
-  await page.goto(`http://127.0.0.1:${server.address().port}/places`);
-  const trigger = page.locator('#chat-places-trigger');
-  await trigger.waitFor();
-  assert.equal(await trigger.getAttribute('aria-expanded'), 'true');
-  const row = page.locator('#chat-places-menu button');
-  assert.deepEqual(await row.evaluateAll(items => items.map(item => item.dataset.place)),
-    ['bonfire', 'firesides', 'mail', 'seeds', 'embers', 'scrolls', 'kits', 'contacts']);
-  assert.equal(await row.evaluateAll(items => new Set(items.map(item => Math.round(item.getBoundingClientRect().y))).size), 1);
-  await page.locator('#input').fill('保留我的草稿');
-  await trigger.click();
-  assert.equal(await page.locator('#chat-places-popup').isVisible(), false);
-  await trigger.hover();
-  assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
-  await page.evaluate(() => window.updatePlaces(['mail']));
-  assert.equal(await trigger.getAttribute('aria-label'), '展开小镇入口 · 有新动态');
-  await trigger.press('ArrowRight');
-  assert.equal(await page.locator('[data-place="bonfire"]').evaluate(el => el === document.activeElement), true);
-  await page.keyboard.press('ArrowRight');
-  assert.equal(await page.locator('[data-place="firesides"]').evaluate(el => el === document.activeElement), true);
-  await page.keyboard.press('End');
-  assert.equal(await page.locator('[data-place="contacts"]').evaluate(el => el === document.activeElement), true);
-  await page.keyboard.press('Enter');
-  assert.deepEqual(await page.evaluate(() => window.fixturePlaces), [{ type: 'beings:open-place', view: 'contacts' }]);
-  await page.keyboard.press('Escape');
-  assert.equal(await trigger.getAttribute('aria-expanded'), 'false');
-  assert.equal(await trigger.evaluate(el => el === document.activeElement), true);
-  await trigger.press('Enter');
-  await page.locator('[data-place="mail"]').click();
-  assert.deepEqual(await page.evaluate(() => window.fixturePlaces), [
-    { type: 'beings:open-place', view: 'contacts' },
-    { type: 'beings:open-place', view: 'mail' },
-  ]);
-  assert.equal(await page.locator('#input').inputValue(), '保留我的草稿');
-  assert.equal(await trigger.getAttribute('aria-expanded'), 'true');
-  await page.screenshot({ path: 'test-results/chat-places-expanded.png' });
-  await trigger.click();
-  await page.screenshot({ path: 'test-results/chat-places-collapsed.png' });
-  await page.setViewportSize({ width: 420, height: 700 });
-  await page.emulateMedia({ reducedMotion: 'reduce' });
-  await trigger.click();
-  assert.equal(await row.evaluateAll(items => new Set(items.map(item => Math.round(item.getBoundingClientRect().y))).size), 1);
-  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-  await page.locator('[data-place="scrolls"]').click();
-  assert.equal(await page.evaluate(() => window.fixturePlaces.at(-1).view), 'scrolls');
-  await page.locator('[data-place="kits"]').click();
-  assert.deepEqual(await page.evaluate(() => window.fixturePlaces.at(-1)), { type: 'beings:open-place', view: 'kits' });
-  await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
-  await page.screenshot({ path: 'test-results/chat-places-narrow-dark.png' });
   assert.deepEqual(errors, []);
-  console.log('PASS: DM names and recipients; lazy bodies/replies in 100-message feeds; incremental refresh and reopen preserve DOM/expansion across Bonfire/Fireside/mail, visible body spinner and refresh failures; horizontal town shortcuts, keyboard, narrow layout, reduced motion and draft preservation.');
+  console.log('PASS: DM names and recipients; lazy bodies/replies in 100-message feeds; incremental refresh and reopen preserve DOM/expansion across Bonfire/Fireside/mail, visible body spinner and refresh failures.');
 } finally {
   await browser?.close();
   await new Promise(resolve => server.close(resolve));

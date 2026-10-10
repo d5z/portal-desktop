@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { PanelResizeHandle, usePanelWidth } from "../../shared/components/panel-resize";
 import { useModel } from "../../shared/hooks/use-model";
 import type { WorkspaceModel } from "../models/workspace";
 export function SceneRibbon({ model }: { model: WorkspaceModel }) {
@@ -54,6 +55,7 @@ export function Companion({ model }: { model: WorkspaceModel }) {
   const workspace = useModel(model),
     ref = workspace.scenes.reference || workspace.scenes.current;
   const panel = useRef<HTMLElement>(null);
+  const [width, setWidth] = usePanelWidth("companion", 340);
   useEffect(() => {
     if (!workspace.open && panel.current?.contains(document.activeElement))
       document
@@ -64,9 +66,11 @@ export function Companion({ model }: { model: WorkspaceModel }) {
     <aside
       id="companion-panel"
       ref={panel}
+      style={{ width }}
       aria-label="一起看"
       hidden={!workspace.open}
     >
+      <PanelResizeHandle panel={panel} label="调整一起看面板宽度" width={width} onResize={setWidth} initial={340} reserve={64} disabled={!workspace.open} />
       <div className="companion-heading">
         <div>
           <h2>一起看</h2>

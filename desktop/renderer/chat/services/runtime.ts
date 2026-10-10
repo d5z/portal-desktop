@@ -1978,7 +1978,8 @@ function createStreamRuntime(state: any, options: any): any {
 
     if (!isManualRetry) {
       const localMessage = sendOptions.queuedMessage || addMessage("user", msg || `[${filesToSend.length} file(s)]`);
-      noteLocalEcho("user", requestMessage || `[${filesToSend.length} file(s)]`, sendingScene, localMessage);
+      // Servers may persist the user body without the transport-only scene cue.
+      noteLocalEcho("user", requestMessage || `[${filesToSend.length} file(s)]`, sendingScene, localMessage, [stripSceneTransition(requestMessage)]);
       if (!fromQueue) clearComposer();
     }
     setStatus("thinking");
@@ -2333,10 +2334,6 @@ function createStreamRuntime(state: any, options: any): any {
     });
   }
 
-  // ---- Send (Sensory Splice: always send, like IM) ----
-  function handleSendOrStop() {
-    send(state.draft);
-  }
   function updateSendButton() {
     state.streaming = isStreaming;
     updateRun();
@@ -3083,7 +3080,7 @@ function createStreamRuntime(state: any, options: any): any {
       // discovery request was in flight. Do not replace that newer transport.
       if (disposed || epoch !== writerEpoch) return;
       if (data.origin && data.origin !== "human") {
-        if (Object.hasOwn(data, "scene_id") && messageScene(data).sceneId !== state.currentScene.sceneId) return;
+        if (messageScene(data).sceneId && messageScene(data).sceneId !== state.currentScene.sceneId) return;
         if (isStreaming) return;
         if (data.finished) {
           reconcileHistory();
@@ -3552,6 +3549,7 @@ function createStreamRuntime(state: any, options: any): any {
     noteLocalEcho,
     bindPersisted,
     registerPersistedGroup,
+    revealHistory: (rows: any[]) => insertCachedHistory(rows, false),
     restoreSceneHistory,
     reconcileHistory,
     syncHistoryCursor,

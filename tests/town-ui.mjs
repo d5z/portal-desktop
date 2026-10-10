@@ -89,24 +89,16 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.pa
   // Wait for the chat document to finish initial focus before opening shell menus.
   await waitForChatReady(page);
   const nav = async name => {
-    if (await page.locator('#place-sheet').evaluate(element => element.open)) {
-      await page.locator('#back-to-chat').click();
-      await page.waitForFunction(() => document.body.dataset.view === 'chat' && !document.querySelector('#place-sheet').open);
+    if (name === 'portal') {
+      await page.locator('#options-trigger').click();
+      await page.locator('#local-portal-status').click();
     }
-    if (['town', 'kits', 'portal'].includes(name)) {
-      const options = page.locator('#conversation-options');
-      const trigger = options.locator('#options-trigger');
-      if (await trigger.getAttribute('aria-expanded') !== 'true') await trigger.click();
-      await page.waitForFunction(() => document.querySelector('#options-trigger')?.getAttribute('aria-expanded') === 'true');
-      if (name === 'portal') { await options.locator('#client-settings-button').click(); await page.locator('#client-settings-dialog [data-view="portal"]').click(); }
-      else await options.locator(`[data-view="${name}"]`).click();
-    } else {
-      const frame = page.frameLocator('#chat-frame');
-      if (await frame.locator('#chat-places-trigger').getAttribute('aria-expanded') !== 'true') await clickChatControl(page, '#chat-places-trigger');
-      await clickChatControl(page, `[data-place="${name}"]`);
+    else {
+      const labels = {town:'小镇广场',kits:'工具库',bonfire:'篝火',firesides:'围炉',mail:'私信',seeds:'种子花园',embers:'书架',scrolls:'卷轴'};
+      await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:labels[name],exact:true}).click();
     }
-    await page.waitForFunction(view => document.body.dataset.view === view && document.querySelector('#place-sheet')?.open, name);
-    await page.waitForFunction(() => !document.querySelector('#town-body').hasAttribute('aria-busy'));
+    await page.waitForFunction(view => document.body.dataset.view === view && document.querySelector('#place-panel'), name);
+    await page.waitForFunction(() => !document.querySelector('#town-body')?.hasAttribute('aria-busy'));
   };
   // Settings destinations retain a single, explicit route back to the settings hub.
   await page.locator('#options-trigger').click();
@@ -124,7 +116,7 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.pa
   await page.locator('#close-client-settings').click();
   await page.locator('#options-trigger').click();
   await page.locator('#client-settings-button').click();
-  assert.equal(await page.getByRole('button', { name: '前进', exact: true }).isDisabled(), true);
+  assert.equal(await page.getByRole('button', { name: '前进', exact: true }).count(), 0);
   await page.locator('#close-client-settings').click();
   await nav('town'); await page.getByText('4 项服务').waitFor();
   assert.deepEqual(await page.getByRole('tab').allTextContents(), ['服务目录', '最近更新']);
@@ -138,29 +130,26 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.pa
   assert.equal(await page.getByRole('button', { name: '关于我', exact: true }).count(), 0);
   await page.getByRole('tab', { name: '已发送', exact: true }).click(); await page.getByText('已发送的测试信件').waitFor();
   await nav('bonfire'); await page.locator('#town-message-0 .social-body strong').getByText('篝火测试', { exact: true }).waitFor(); assert.equal(await page.evaluate(() => window.pwned), undefined);
-  await page.getByRole('button', { name: '在右侧展示', exact: true }).click();
+  await page.getByRole('button', { name: '展开对话', exact: true }).click();
   await page.locator('#place-panel').waitFor();
-  assert.equal(await page.locator('#place-sheet').evaluate(element => element.open), false);
+  assert.equal(await page.locator('dialog#place-panel').count(), 0);
   assert.deepEqual(await page.locator('.workspace-body').evaluate(element => {
-    const chat = element.querySelector('.workspace-stage').getBoundingClientRect();
+    const chat = element.querySelector('#chat-view').getBoundingClientRect();
     const panel = element.querySelector('#place-panel').getBoundingClientRect();
     const frame = element.querySelector('#chat-frame').getBoundingClientRect();
     return { sideBySide: chat.right <= panel.left + 1, chatVisible: frame.width > 0 && frame.height > 0 };
   }), { sideBySide: true, chatVisible: true });
-  assert.equal(await page.locator('#place-panel #town-message-0 .social-body strong').getByText('篝火测试', { exact: true }).count(), 1);
-  await page.locator('#chat-session-panel').waitFor();
-  const resizeHandle = page.locator('#place-resize-handle');
+  const resizeHandle = page.getByRole('separator', { name: '调整并排对话宽度' });
   const handleBox = await resizeHandle.boundingBox();
-  const panelWidth = (await page.locator('#place-panel').boundingBox()).width;
+  const chatWidth = (await page.locator('#chat-view').boundingBox()).width;
   await page.mouse.move(handleBox.x + handleBox.width / 2, handleBox.y + handleBox.height / 2);
   await page.mouse.down();
-  await page.mouse.move(handleBox.x - 60, handleBox.y + handleBox.height / 2, { steps: 4 });
+  await page.mouse.move(handleBox.x + 60, handleBox.y + handleBox.height / 2, { steps: 4 });
   await page.mouse.up();
-  assert.equal((await page.locator('#place-panel').boundingBox()).width > panelWidth + 40, true);
-  assert.equal(await page.evaluate(() => Number(localStorage.getItem('beings:place-panel-width')) > 620), true);
-  await page.getByRole('button', { name: '以弹窗显示', exact: true }).click();
-  await page.locator('#place-sheet[open]').waitFor();
-  assert.equal(await page.locator('#place-panel').count(), 0);
+  assert.equal((await page.locator('#chat-view').boundingBox()).width > chatWidth + 40, true);
+  await page.getByRole('button', { name: '收起对话', exact: true }).click();
+  assert.equal(await page.locator('#chat-view').isVisible(), false);
+  await page.locator('#place-panel').waitFor();
   const reply = page.locator('.feed-reply-preview');
   await reply.locator('summary').click();
   assert.equal(await reply.locator('.feed-reply-copy > span').evaluate(element => getComputedStyle(element).display), 'none');
@@ -228,7 +217,7 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.pa
   await page.waitForFunction(() => document.body.dataset.view === 'seeds' && !document.querySelector('#town-body').hasAttribute('aria-busy'));
   // Horizontal history gestures are enabled only on macOS.
   if (process.platform === 'darwin') {
-    await page.locator('#place-sheet').dispatchEvent('wheel', { deltaX: -80, deltaY: 0, deltaMode: 0 });
+    await page.locator('#place-panel').dispatchEvent('wheel', { deltaX: -80, deltaY: 0, deltaMode: 0 });
   } else {
     await page.getByRole('button', { name: '回退', exact: true }).click();
   }

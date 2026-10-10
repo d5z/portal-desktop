@@ -84,6 +84,7 @@ export function NavigationControls({
       surface.removeEventListener("wheel", wheel);
     };
   }, [back, forward]);
+  if (!back && !forward) return null;
   return (
     <div
       ref={controls}
@@ -91,28 +92,26 @@ export function NavigationControls({
       role="group"
       aria-label="页面历史"
     >
-      <button
+      {back && <button
         type="button"
         aria-label="回退"
         title="回退"
-        disabled={!back}
         onClick={back}
       >
         <svg viewBox="0 0 20 20" aria-hidden="true">
           <path d="m12.5 4.5-5.5 5.5 5.5 5.5" />
         </svg>
-      </button>
-      <button
+      </button>}
+      {forward && <button
         type="button"
         aria-label="前进"
         title="前进"
-        disabled={!forward}
         onClick={forward}
       >
         <svg viewBox="0 0 20 20" aria-hidden="true">
           <path d="m7.5 4.5 5.5 5.5-5.5 5.5" />
         </svg>
-      </button>
+      </button>}
     </div>
   );
 }

@@ -56,13 +56,9 @@ try {
     protocol.handle('https', () => Response.json({ services: {}, kits: [], count: 0 }));
   }, plugin);
   await page.locator('#client-main').waitFor({ state: 'visible' });
-  await page.locator('#options-trigger').click();
-  await page.locator('button[data-view="kits"]').click();
-  await page.locator('#place-sheet').waitFor({ state: 'visible' });
-  await page.getByRole('button', { name: '在右侧展示', exact: true }).click();
+  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'工具库',exact:true}).click();
   await page.locator('#place-panel').waitFor({ state: 'visible' });
-  await page.getByRole('button', { name: '以弹窗显示', exact: true }).click();
-  await page.locator('#place-sheet').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#place-panel').evaluate(el => el.tagName), 'SECTION');
   assert.equal(await page.evaluate(() => typeof window.beings.panelWindow), 'undefined');
   await page.getByRole('tab', { name: 'Plugin', exact: true }).click();
   await page.getByRole('button', { name: '导入插件目录' }).click();
@@ -117,17 +113,17 @@ try {
   // Placement is configured per view; pinned entries survive a renderer restart.
   await page.getByRole('button', { name: '管理插件', exact: true }).click();
   await page.getByLabel('流程看板显示位置', { exact: true }).selectOption('navigation');
-  await page.locator('.place-switcher').getByRole('button', { name: '流程看板', exact: true }).waitFor();
+  await page.locator('.workspace-rail').getByRole('button', { name: '流程看板', exact: true }).waitFor();
   await page.reload();
   await page.locator('#client-main').waitFor({ state: 'visible' });
-  await page.locator('#options-trigger').click(); await page.locator('button[data-view="kits"]').click();
-  await page.locator('.place-switcher').getByRole('button', { name: '流程看板', exact: true }).click();
+  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'工具库',exact:true}).click();
+  await page.locator('.workspace-rail').getByRole('button', { name: '流程看板', exact: true }).click();
   await page.frameLocator('.plugin-frame:visible').getByRole('button', { name: /插件持久化验收/ }).waitFor();
-  assert.equal(await page.locator('.place-switcher [aria-current="page"]').innerText(), '流程看板');
-  const functionRow = page.locator('.place-switcher');
+  assert.equal(await page.locator('.workspace-rail [aria-current="page"]').getAttribute('aria-label'), '流程看板');
+  const functionRow = page.locator('.workspace-rail');
   const libraryEntry = await functionRow.getByRole('button', { name: '工具库', exact: true }).boundingBox();
   const pluginEntry = await functionRow.getByRole('button', { name: '流程看板', exact: true }).boundingBox();
-  assert(Math.abs(libraryEntry.y - pluginEntry.y) < 2, 'plugin is in the same function row as the tool library');
+  assert(Math.abs(libraryEntry.x - pluginEntry.x) < 2, 'plugin is in the same navigation rail as the tool library');
   assert.equal(await page.locator('.plugin-pinned-tabs').count(), 0);
   await page.screenshot({ path: path.join(screenshots, 'plugin-function-row.png') });
   await page.getByRole('button', { name: '管理插件', exact: true }).click();
@@ -219,8 +215,7 @@ try {
   await page.evaluate(() => window.beings.appearance('dark'));
   await page.reload();
   await page.locator('#client-main').waitFor({ state: 'visible' });
-  await page.locator('#options-trigger').click();
-  await page.locator('button[data-view="kits"]').click();
+  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'工具库',exact:true}).click();
   await page.locator('.plugin-card').getByRole('button', { name: '流程看板', exact: true }).click();
   await page.frameLocator('.plugin-frame:visible').getByRole('button', { name: /插件持久化验收/ }).waitFor();
   const darkFrame = await activePluginFrame(page);
@@ -267,7 +262,7 @@ try {
     await page.locator('#plugin-commands').getByRole('button', { name: '关闭', exact: true }).click();
     await page.locator('#plugin-commands').waitFor({ state: 'hidden' });
   }
-  await page.locator('#options-trigger').click(); await page.locator('button[data-view="kits"]').click();
+  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'工具库',exact:true}).click();
   await page.locator('.plugin-card').getByRole('button', { name: '流程看板', exact: true }).click();
   await page.frameLocator('.plugin-frame:visible').locator('.react-flow__node').first().waitFor();
   let sdkFrame = await activePluginFrame(page);
@@ -358,7 +353,7 @@ try {
   await page.getByRole('button', { name: '关闭插件侧栏', exact: true }).click();
   assert.equal(await page.locator('.plugin-sidebar').count(), 0);
   assert.match(await page.evaluate(async token => { try { await window.beings.plugins.call(token, 'workspace.context'); return ''; } catch (error) { return error.message; } }, sideToken), /关闭/);
-  await page.locator('.place-switcher').getByRole('button', { name: '工具库', exact: true }).click();
+  await page.locator('.workspace-rail').getByRole('button', { name: '工具库', exact: true }).click();
   await page.getByRole('tab', { name: 'Plugin', exact: true }).click();
   await page.getByLabel('仅本机存在', { exact: true }).check();
   await page.locator('.plugin-card:visible').waitFor();

@@ -186,7 +186,7 @@ export function Contacts({ town, data }: { town: TownModel; data: Data }) {
             <h2>{display}{self && <span className="mini-tag">我</span>}</h2>
             <p className="contact-partner"><span>人类伙伴</span>{str(entry.human_name)}</p>
             {str(entry.note) && <p className="contact-note">{str(entry.note)}</p>}
-            <span className="card-meta">更新于 {date(entry.updated_at)}</span>
+            {Boolean(entry.updated_at) && <span className="card-meta">更新于 {date(entry.updated_at)}</span>}
           </div>
           <div className="contact-actions">
             <button className="secondary" disabled={!validTownIdentity(id) || !id.startsWith('t_')}

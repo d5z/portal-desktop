@@ -48,7 +48,7 @@ try {
   await page.waitForFunction(() => typeof window.updateActivity === 'function');
   assert.equal(await page.locator('#client-update').count(), 0);
   await page.locator('#options-trigger').click();
-  assert.equal(await page.locator('#check-updates').evaluate(el => el.nextElementSibling?.id), 'quit-client');
+  assert.equal(await page.locator('#check-updates').evaluate(el => el.nextElementSibling?.id), 'collect-logs');
   await page.getByRole('button', { name: '手动检查更新' }).click();
   await page.getByRole('button', { name: '正在检查更新…', disabled: true }).waitFor();
   assert.equal(await page.locator('#options-trigger').getAttribute('aria-expanded'), 'true');
@@ -69,7 +69,7 @@ try {
   await page.evaluate(() => window.failDownload());
   await page.getByRole('button', { name: '发现新版本 0.2.0，点击下载' }).waitFor();
   assert.match(await page.evaluate(() => window.app.toastMessage), /下载失败/);
-  await page.locator('#options-trigger').click();
+  assert.equal(await page.locator('#options-trigger').getAttribute('aria-expanded'), 'false');
   await page.getByRole('button', { name: '发现新版本 0.2.0，点击下载' }).click();
   assert.equal(await page.evaluate(() => window.downloads), 2);
   assert.equal(await page.locator('#options-trigger').getAttribute('aria-expanded'), 'false');

@@ -1,3 +1,4 @@
+import { ConversationSearch, searchEntries } from "./services/conversation-search";
 import { ScheduledMessage } from './components/scheduling';
 import { splitSchedulingHint, withScheduling } from './models/scheduling';
 import {
@@ -17,7 +18,7 @@ import {
   type Message,
   type RuntimeOptions,
 } from "./models/chat";
-import { inCurrentScene, sceneItems, sceneName, type HistoryScope } from "./models/scenes";
+import { inCurrentScene, isGlobalBeingMessage, sceneItems, sceneName, type HistoryScope } from "./models/scenes";
 import { useModel } from "../shared/hooks/use-model";
 import { Markdown } from "../shared/components/markdown";
 import { CopyMessage } from '../shared/components/copy-message';
@@ -26,11 +27,7 @@ import { ChatSettings } from "./components/settings";
 import { ChatInfoPanels } from "./components/panels";
 import { SubagentSetupHint } from "./components/subagent-hint";
 import { EditContextMenu } from "../shared/components/context-menu";
-import {
-  ChatIndex,
-  ChatPlaces,
-  type ChatIndexHandle,
-} from "./components/navigation";
+import { JumpToLatest } from "./components/navigation";
 import type { ChatBridge } from "./services/bridge";
 import { useChatSession } from "./hooks/use-chat-session";
 
@@ -92,7 +89,6 @@ function ChatView({
     composer = useRef<HTMLTextAreaElement>(null),
     fileInput = useRef<HTMLInputElement>(null);
   const messageElements = useRef(new Map<string, HTMLDivElement>()),
-    index = useRef<ChatIndexHandle>(null),
     scrollLock = useRef(true),
     anchoredReplyId = useRef<string | null>(null),
     trackedReplyId = useRef<string | null>(null),
@@ -104,6 +100,7 @@ function ChatView({
     followedTurnId.current = null;
     wheelAccum.current = 0;
   }
+  const showStop = state.streaming && !state.draft.trim() && state.files.length === 0;
   function sendDraft() {
     releaseAnchor();
     scrollLock.current = true;
@@ -128,8 +125,7 @@ function ChatView({
     [highlighted, setHighlighted] = useState<string | null>(null),
     [panel, setPanel] = useState<ChatPanel>(null),
     [panelReturnsToSettings, setPanelReturnsToSettings] = useState(false);
-  const [channels, setChannels] = useState<string[]>([]),
-    [readingSize, setReadingSize] = useState(16);
+  const [readingSize, setReadingSize] = useState(16);
   const [theme, setTheme] = useState<"light" | "dark">(() =>
     new URLSearchParams(location.search).get("theme") === "dark"
       ? "dark"
@@ -159,6 +155,10 @@ function ChatView({
     setSubagentEnabling(false);
   }
   useEffect(() => {
+    const search = new ConversationSearch((path, init) => runtime.request(path, init));
+    const abort = new AbortController();
+    let searchQuery = '';
+    const publishSearch = (loading: boolean, error = '') => bridge.send({type:'beings:search-index', query:searchQuery, entries:searchEntries(search.rows,searchQuery), loading, error});
     bridge.start(runtime, {
       panel: (value, returnToSettings = false) => {
         setPanel((current) => (current === value ? null : value));
@@ -166,14 +166,32 @@ function ChatView({
       },
       theme: setTheme,
       reading: setReadingSize,
-      activity: setChannels,
-      search: () => index.current?.publish(),
-      jump: (id) => index.current?.jump(id),
+      search: query => {
+        searchQuery = query;
+        publishSearch(Boolean(query.trim()));
+        if (query.trim()) void search.sync(abort.signal,()=>publishSearch(true)).then(()=>publishSearch(false),()=>{if (!abort.signal.aborted) publishSearch(false,'历史读取未完成，显示已读取的匹配内容，请重试');});
+      },
+      jump: id => {
+        const rowIndex = search.rows.findIndex(row=>`history-${row.seq}` === id);
+        if (rowIndex < 0) return;
+        runtime.revealHistory(search.rows.slice(Math.max(0,rowIndex-10),rowIndex+11));
+        releaseAnchor();
+        scrollLock.current = false;
+        state.historyScope = 'all';
+        bridge.send({type:'beings:history-scope-state',scope:'all'});
+        state.changed();
+        requestAnimationFrame(()=>requestAnimationFrame(()=>{
+          const message = state.items.find((item): item is Message => item.kind === 'message' && item.historySeq === search.rows[rowIndex].seq);
+          const target = message && messageElements.current.get(message.id);
+          if (target && message) {target.scrollIntoView({block:'center'});setHighlighted(message.id);}
+        }));
+      },
       focus: () => composer.current?.focus(),
       scope: changeScope,
     });
     void runtime.start();
     composer.current?.focus();
+    return () => abort.abort();
   }, [bridge, runtime]);
   useEffect(() => {
     bridge.send({ type: "beings:history-scope-state", scope: state.historyScope, sceneId: state.currentScene.sceneId });
@@ -515,9 +533,6 @@ function ChatView({
               <ChatActivity
                 key={item.id}
                 run={item}
-                runtime={runtime}
-                stopping={state.stopping}
-                canStop={item.sceneId === state.currentScene.sceneId}
                 sceneLabel={state.historyScope === "all" ? sceneName(item, state.currentScene, state.sceneNames) : undefined}
               />
             ) : (
@@ -538,7 +553,7 @@ function ChatView({
                     {item.role !== "user" && <CopyMessage text={splitSchedulingHint(item.text).text} copy={bridge.copyText} />}
                   </span>
                   {item.persistedFrom === "partial" && <span className="message-scene">已中断</span>}
-                  {state.historyScope === "all" && <span className="message-scene" title={item.sceneId || "这条历史消息未提供场景标记"}>{sceneName(item, state.currentScene, state.sceneNames)}</span>}
+                  {(state.historyScope === "all" || isGlobalBeingMessage(item)) && <span className="message-scene" title={isGlobalBeingMessage(item) ? "Being 发出的无场景消息，在各场景共享显示；包含自主醒来消息" : item.sceneId || "这条历史消息未提供场景标记"}>{isGlobalBeingMessage(item) ? "全局消息" : sceneName(item, state.currentScene, state.sceneNames)}</span>}
                 </div>
                 <ScheduledMessage
                   text={item.text}
@@ -581,6 +596,7 @@ function ChatView({
           {state.banner}
         </div>
         <div id="input-area">
+          <JumpToLatest items={visibleItems} container={messages} elements={messageElements} scrollLock={scrollLock} clearAnchor={releaseAnchor} />
           <div
             id="pending-files"
             className={state.files.length ? "active" : ""}
@@ -656,17 +672,17 @@ function ChatView({
             >
               ＋
             </button>
-            <div id="desktop-composer-tools">
-              <ChatPlaces send={bridge.send} channels={channels} />
-            </div>
             <button
-              className="btn-icon"
+              className={`btn-icon${showStop ? " stop" : ""}`}
               id="send-btn"
               type="button"
-              title="send"
-              aria-label="send message"
+              title={showStop ? "停止生成" : "发送消息"}
+              aria-label={state.stopping ? "正在停止" : showStop ? "停止生成" : "发送消息"}
+              disabled={state.stopping}
+              aria-busy={state.stopping}
               onClick={() => {
-                sendDraft();
+                if (showStop) void runtime.stopCurrentTurn();
+                else sendDraft();
                 composer.current?.focus();
               }}
             >
@@ -694,16 +710,6 @@ function ChatView({
           />
         </div>
       </div>
-      <ChatIndex
-        ref={index}
-        items={visibleItems}
-        container={messages}
-        elements={messageElements}
-        scrollLock={scrollLock}
-        clearAnchor={releaseAnchor}
-        send={bridge.send}
-        highlight={setHighlighted}
-      />
       <ChatSettings
         mobilePage={nativeTouch}
         state={state}

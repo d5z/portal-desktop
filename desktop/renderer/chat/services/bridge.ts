@@ -84,8 +84,7 @@ export function createChatBridge(state: ChatState) {
       panel(value: ChatPanel, returnToSettings?: boolean): void;
       theme(value: "light" | "dark"): void;
       reading(value: number): void;
-      activity(channels: string[]): void;
-      search(): void;
+      search(query: string): void;
       jump(id: string): void;
       focus(): void;
       scope(value: HistoryScope): void;
@@ -188,14 +187,6 @@ export function createChatBridge(state: ChatState) {
           if (Number.isInteger(data.size) && data.size >= 13 && data.size <= 21)
             ui.reading(data.size);
           return;
-        case "beings:town-activity":
-          if (Array.isArray(data.channels))
-            ui.activity(
-              data.channels.filter((v: unknown) =>
-                ["bonfire", "mail", "firesides"].includes(String(v)),
-              ),
-            );
-          return;
         case "beings:chat-action":
           if (data.action === "model" && embedded && location.protocol === "beings:") { send({ type: "beings:model-settings" }); return; }
           if (["model", "being", "privacy"].includes(data.action))
@@ -203,7 +194,7 @@ export function createChatBridge(state: ChatState) {
           else if (data.action === "close") ui.panel(null);
           return;
         case "beings:search-request":
-          ui.search();
+          ui.search(typeof data.query === "string" ? data.query.slice(0,500) : "");
           return;
         case "beings:search-jump":
           if (typeof data.id === "string") ui.jump(data.id);

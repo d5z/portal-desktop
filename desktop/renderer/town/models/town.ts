@@ -277,6 +277,12 @@ export class TownModel extends Store {
   private reconciling = false;
   private historyNavigation = false;
   private drafts = new Map<string, { content: string; recipient: string }>();
+  private catalogCache = new Map<string, {data:Data;status:string;at:number;detail:TownModel['detail'];selectedId:string}>();
+  private catalogUpdatedAt = 0;
+  private catalogView() { return ['scrolls','seeds','embers'].includes(this.view); }
+  private rememberCatalog() {
+    if (this.catalogView() && this.pageKey && this.data) cacheTownData(this.catalogCache,this.pageKey,{data:this.data,status:this.status,at:this.catalogUpdatedAt,detail:this.detail,selectedId:this.selectedId});
+  }
   private feedCache = new Map<string, { data: Data; status: string }>();
   private roomCache = new Map<string, { data: Data; members?: Data[] }>();
   private dataKey = '';
@@ -296,6 +302,12 @@ export class TownModel extends Store {
   }
   start() {
     let active = true;
+    const updateCatalog = () => {
+      if (active && this.visible && this.catalogView() && !this.loading && (typeof document === 'undefined' || document.visibilityState !== 'hidden') && Date.now()-this.catalogUpdatedAt>=30000) void this.load(true);
+    };
+    const catalogTimer=setInterval(updateCatalog,30000);
+    if (typeof window !== 'undefined') window.addEventListener('focus',updateCatalog);
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange',updateCatalog);
     const stop = this.api.onTownLive((state) => this.receiveLive(state));
     void this.api
       .townLive()
@@ -305,6 +317,9 @@ export class TownModel extends Store {
       .catch(() => {});
     return () => {
       active = false;
+      clearInterval(catalogTimer);
+      if (typeof window !== 'undefined') window.removeEventListener('focus',updateCatalog);
+      if (typeof document !== 'undefined') document.removeEventListener('visibilitychange',updateCatalog);
       if (this.autoPairId) void this.api.cancelTownPair(this.autoPairId).catch(() => {});
       this.autoPairId = undefined;
       this.authBusy = false;
@@ -319,6 +334,7 @@ export class TownModel extends Store {
       this.authRequest++;
       this.drafts.clear();
       this.contactDraft?.finish(false);
+      this.catalogCache.clear();
       this.feedCache.clear();
       this.roomCache.clear();
       this.content = "";
@@ -349,16 +365,11 @@ export class TownModel extends Store {
     return (this.live?.firesideVersions?.[id] || 0) > (this.seenFiresides.get(id) || 0);
   }
   updateLive() {
-    this.post({
-      type: "beings:town-activity",
-      channels: (["bonfire", "mail", "firesides"] as TownChannel[]).filter(
-        (name) => this.unread(name),
-      ),
-    });
     this.changed();
   }
   private resetIdentity() {
     this.contactDraft?.finish(false);
+    this.catalogCache.clear();
     this.feedCache.clear();
     this.roomCache.clear();
     this.dataKey = '';
@@ -477,6 +488,9 @@ export class TownModel extends Store {
   }
   private scheduleReconcile() {
     clearTimeout(this.reconcileTimer);
+    if (this.catalogView() && this.visible && !this.loading) {
+      this.reconcileTimer=setTimeout(()=>void this.load(true),700);return;
+    }
     if (this.channel())
       this.reconcileTimer = setTimeout(() => void this.reconcile(), 700);
   }
@@ -554,6 +568,7 @@ export class TownModel extends Store {
       this.updateLive();
       return;
     }
+    this.rememberCatalog();
     const samePage = this.view === view && this.directId === id;
     this.view = view;
     this.directId = id;
@@ -736,7 +751,13 @@ export class TownModel extends Store {
       channel = this.channel(),
       key = channel && !this.directId ? `${this.view}:${this.tab}` : '';
     const pageKey = JSON.stringify([this.view, this.directId, this.query()]);
-    const preservePage = !channel && this.pageKey === pageKey && Boolean(this.data || this.library || this.detail);
+    let preservePage = !channel && this.pageKey === pageKey && Boolean(this.data || this.library || this.detail);
+    const cachedCatalog = this.catalogView() ? this.catalogCache.get(pageKey) : undefined;
+    if (!preservePage && cachedCatalog) {
+      this.data=cachedCatalog.data;this.status=cachedCatalog.status;
+      this.detail=cachedCatalog.detail;this.selectedId=cachedCatalog.selectedId;
+      this.catalogUpdatedAt=cachedCatalog.at;preservePage=true;
+    }
     const selectedDetail = preservePage ? this.detail : undefined;
     this.pageKey = pageKey;
     if (key && this.dataKey !== key && !(refresh && !this.dataKey)) {
@@ -781,6 +802,9 @@ export class TownModel extends Store {
     this.detailError = undefined;
     this.error = undefined;
     this.refreshError = '';
+    if (cachedCatalog && !refresh && Date.now()-cachedCatalog.at<30000) {
+      this.loading=false;this.scenes.update({status:'ready',scope:this.status});this.changed();return;
+    }
     this.loading = true;
     if (!preserveContent) this.status = "";
     if (this.view === "kits") { void this.refreshLocalApps(); void this.plugins?.refresh(); }
@@ -849,6 +873,7 @@ export class TownModel extends Store {
         if (channel !== "firesides" && this.tab !== "sent")
           this.acknowledge(channel, liveAtStart);
         this.status = `来自 beings.town · ${date(result.fetchedAt)} 已刷新${this.view === "bonfire" ? " · 最近 100 条" : this.view === "mail" ? " · 最近 100 封" : ""}${result.warnings?.length ? ` · ${result.warnings[0]}` : ""}`;
+        if (this.catalogView()) {this.catalogUpdatedAt=Date.now();this.rememberCatalog();}
         if (key) cacheTownData(this.feedCache, key, { data: this.data, status: this.status });
       }
       this.scenes.update({
@@ -885,6 +910,7 @@ export class TownModel extends Store {
       }
     } finally {
       if (generation === this.request) {
+        this.rememberCatalog();
         this.loading = false;
         this.changed();
       }

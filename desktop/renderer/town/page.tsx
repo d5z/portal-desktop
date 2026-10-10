@@ -38,6 +38,7 @@ export function Town({ model }: { model: TownModel }) {
   return (
     <section
       id="town-view"
+      data-module={town.view}
       ref={root}
       className={`view${social ? " social-view" : ""}${paginated ? " paginated-view" : ""}${town.view === "embers" ? " bookshelf-view" : ""}${["scrolls", "embers", "announcements"].includes(town.view) && !town.directId ? " reading-catalog" : ""}${town.view === "kits" && town.tab === "grove" && !town.directId ? " kit-catalog" : ""}${town.view === "seeds" && !town.directId ? " seed-catalog" : ""}`}
       hidden={!town.visible || !definition}

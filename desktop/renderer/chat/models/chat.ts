@@ -147,6 +147,7 @@ export interface ChatRuntime {
   ): Promise<ConfigResult | null>;
   toggleSbs(): Promise<void>;
   loadSbsState(): Promise<boolean | undefined>;
+  revealHistory(rows: import("../services/history-cache").HistoryMessage[]): void;
   refreshHistory(): Promise<void>;
   refreshOnRegainedAttention(): Promise<void>;
   request(path: string, init?: RequestInit): Promise<Response>;

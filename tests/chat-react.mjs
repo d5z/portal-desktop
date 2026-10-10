@@ -113,7 +113,7 @@ try {
   const frame = page.frameLocator('#chat');
   const child = () => page.frames().find(frame => frame.url().includes('/loom.html'));
   const post = data => page.evaluate(data => document.querySelector('iframe').contentWindow.postMessage(data, location.origin), data);
-  await frame.locator('.chat-index-tick').nth(11).waitFor();
+  await frame.locator('.message.user').nth(11).waitFor();
   await child().evaluate(() => {
     document.querySelector('#input').addEventListener('keydown', event => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') event.stopPropagation();
@@ -122,6 +122,16 @@ try {
   await frame.locator('#input').focus();
   await page.keyboard.press('Control+f');
   await page.waitForFunction(() => window.received.some(item => item.type === 'beings:chat-search'));
+  await post({type:'beings:search-request',query:'历史'});
+  await page.waitForFunction(()=>window.received.some(item=>item.type==='beings:search-index' && item.query==='历史' && item.loading===false));
+  const searchResults=await page.evaluate(()=>window.received.filter(item=>item.type==='beings:search-index').at(-1).entries);
+  assert.ok(searchResults.some(entry=>entry.role==='user'));
+  await post({type:'beings:search-request',query:'回复'});
+  await page.waitForFunction(()=>window.received.some(item=>item.type==='beings:search-index' && item.query==='回复' && item.loading===false));
+  const replyResult=await page.evaluate(()=>window.received.filter(item=>item.type==='beings:search-index' && item.query==='回复').at(-1).entries.find(entry=>entry.role==='being'));
+  assert.ok(replyResult);
+  await post({type:'beings:search-jump',id:replyResult.id});
+  await frame.locator('.message.index-target').waitFor();
   for (const modifier of ['Control', 'Meta']) {
     await page.evaluate(() => { window.received = []; });
     await frame.locator('#input').press(`${modifier}+Shift+P`);
@@ -158,14 +168,16 @@ try {
   await frame.getByRole('button', { name: '打开篝火', exact: true }).click();
   await page.waitForFunction(() => window.received.some(item => item.type === 'beings:open-place' && item.view === 'bonfire'));
   await frame.locator('#input').fill('保留草稿');
-  await frame.locator('.chat-index-tick').first().hover();
-  await frame.locator('#chat-index-preview').waitFor();
-  assert.match(await frame.locator('#chat-index-preview').textContent(), /第 1 轮回复/);
-  await frame.locator('.chat-index-tick').first().click();
+  assert.equal(await frame.locator('#chat-index').count(),0);
+  await frame.locator('#messages').evaluate(el=>{el.scrollTop=0;el.dispatchEvent(new Event('scroll'));});
+  await frame.locator('#chat-jump-latest').waitFor();
+  assert.match(await frame.locator('#chat-jump-latest').textContent(), /\d+ 条消息/);
+  await frame.locator('#chat-jump-latest').click();
+  await child().waitForFunction(()=>{const el=document.querySelector('#messages');return el.scrollHeight-el.scrollTop-el.clientHeight<2;});
+  await frame.locator('#chat-jump-latest').waitFor({state:'hidden'});
   assert.equal(await frame.locator('#input').inputValue(), '保留草稿');
-  const initialScroll = await frame.locator('#messages').evaluate(el => el.scrollTop);
-  await post({ type: 'beings:town-activity', channels: ['mail'] });
-  assert.equal(await frame.locator('#messages').evaluate(el => el.scrollTop), initialScroll);
+  assert.equal(await frame.locator('#chat-places').count(),0);
+  assert.equal(await frame.locator('#messages').evaluate(el => getComputedStyle(el).scrollbarWidth),'none');
   await post({ type: 'beings:chat-action', action: 'model' });
   await frame.locator('#settings-panel.active').waitFor();
   await frame.locator('#llm-current').getByText('Claude Alpha', { exact: true }).waitFor();
@@ -256,13 +268,22 @@ try {
   const continuationReplies = await frame.locator('.message.being:not(.thinking-indicator)').allTextContents();
   assert.equal(continuationReplies.length, repliesBeforeContinuation + 2,
     `A reply boundary must split continuation bubbles: ${JSON.stringify(continuationReplies.slice(-4))}`);
-  await frame.locator('#input').fill('hold'); await frame.locator('#send-btn').click(); await frame.locator('.run-activity.running .run-stop').waitFor();
+  await frame.locator('#input').fill('hold'); await frame.locator('#send-btn').click(); await frame.locator('#send-btn.stop').waitFor();
+  assert.equal(await frame.locator('.run-stop').count(), 0, 'Stop belongs in the composer');
+  await frame.locator('#input').fill('   ');
+  assert.equal(await frame.locator('#send-btn').getAttribute('aria-label'), '停止生成');
+  await frame.locator('#input').fill('继续补充');
+  assert.equal(await frame.locator('#send-btn').getAttribute('aria-label'), '发送消息');
+  await frame.locator('#input').fill('');
+  await frame.getByRole('button', {name:'停止生成',exact:true}).waitFor();
   await frame.locator('#file-input').setInputFiles({ name: 'splice.txt', mimeType: 'text/plain', buffer: Buffer.from('splice attachment') });
-  await frame.locator('#pending-files.active').waitFor(); await frame.locator('#input').fill('additional input'); await frame.locator('#send-btn').click();
+  await frame.locator('#pending-files.active').waitFor();
+  assert.equal(await frame.locator('#send-btn').getAttribute('aria-label'), '发送消息', 'Attachments can be sent without text');
+  await frame.locator('#input').fill('additional input'); await frame.locator('#send-btn').click();
   await waitUntil(() => requests.at(-1)?.message === 'additional input', 'The interrupting message reaches the server');
   assert.equal(requests.at(-1).attachments[0].data, Buffer.from('splice attachment').toString('base64'));
   assert.equal(await frame.getByText(/消息已送达/).count(), 0, 'Interrupting a reply does not add a system bubble to the conversation');
-  await frame.locator('.run-activity.running .run-stop').click(); await frame.locator('.run-activity[data-outcome="stopped"]').waitFor(); assert.equal(stopCount, 1);
+  await frame.locator('#send-btn.stop').click(); await frame.locator('.run-activity[data-outcome="stopped"]').waitFor(); assert.equal(stopCount, 1);
   await frame.locator('#input').fill('http-error'); await frame.locator('#send-btn').click(); await frame.getByText(/fixture request failed/).waitFor();
   assert.equal(await frame.locator('.run-activity.running').count(), 0);
   assert.equal(await frame.locator('.run-activity').last().getAttribute('data-outcome'), 'error');
@@ -282,7 +303,9 @@ try {
   ] };
   await page.reload(); await frame.getByText('replay-once-complete', { exact: true }).waitFor();
   assert.equal(await frame.getByText('replay-once-complete', { exact: true }).count(), 1);
-  await frame.locator('#chat-index-latest').click();
+  await frame.locator('#messages').evaluate(el=>{el.scrollTop=0;el.dispatchEvent(new Event('scroll'));});
+  await frame.locator('#chat-jump-latest').click();
+  await frame.locator('#chat-jump-latest').waitFor({state:'hidden'});
   await mkdir('test-results', { recursive: true }); await page.screenshot({ path: 'test-results/chat-react-light.png' });
   await post({ type: 'beings:appearance', theme: 'dark' }); await post({ type: 'beings:reading', size: 19 });
   await child().waitForFunction(() => document.documentElement.dataset.theme === 'dark');

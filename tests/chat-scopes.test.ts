@@ -825,6 +825,19 @@ describe("chat scene scopes", () => {
     expect(inCurrentScene(messageScene({ scene_id: "desktop-test " }), current)).toBe(false);
   });
 
+  it("shows global Being replies in every strict room without treating them as that room's reply", () => {
+    const global = {kind:"message", id:"global", role:"being", text:"自主消息", label:"Being", streaming:false} as ChatItem;
+    const user = {...global,id:"old-user",role:"user"} as ChatItem;
+    const other = {...global,id:"other",sceneId:"room-a"} as ChatItem;
+    const marker = {kind:"separator",id:"breath",text:"呼吸",marker:true} as ChatItem;
+    const items = [global,user,other,marker];
+    for (const sceneId of ["room-b","room-c"]) {
+      expect(sceneItems(items,"current",{sceneId,strict:true}).map(item=>item.id)).toEqual(["global","breath"]);
+      expect(inCurrentScene(global,{sceneId,strict:true})).toBe(false);
+    }
+    expect(sceneItems(items,"all",{sceneId:"room-b",strict:true})).toBe(items);
+  });
+
   it("reads only scene identity and display labels from protocol metadata", () => {
     expect(messageScene({ scene_id: "loom-Willow", scene_meta: { scene_label: "Loom", token: "secret" }, trace_id: "trace" }))
       .toEqual({ sceneId: "loom-Willow", sceneLabel: "Loom" });

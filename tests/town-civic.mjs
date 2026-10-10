@@ -21,7 +21,8 @@ const { outputFiles } = await build({ stdin: { resolveDir: process.cwd(), loader
   import { createRoot } from 'react-dom/client';
   import { Town } from './desktop/renderer/town/page';
   import { TownComposer } from './desktop/renderer/town/components/composer';
-  import { Dialog } from './desktop/renderer/shared/components/dialog';
+  import { AppModel } from './desktop/renderer/app/models/app';
+  import { WorkspaceNavigation } from './desktop/renderer/app/components/workspace-navigation';
   import { PlaceHeading } from './desktop/renderer/app/components/navigation';
   import { useModel } from './desktop/renderer/shared/hooks/use-model';
   import { TownModel } from './desktop/renderer/town/models/town';
@@ -45,12 +46,13 @@ const { outputFiles } = await build({ stdin: { resolveDir: process.cwd(), loader
   });
   town.live = { phase: 'connected', beingId: 't_Self', display: '柳树', generation: 1, revision: 1, sync: 0, message: '已连接', versions: { bonfire: 0, mail: 0, firesides: 0 } };
   window.civicTown = town;
+  const app = new AppModel({}); app.town = town; app.navigate = town.navigate;
   function Fixture() {
-    useModel(town);
-    return <><Dialog id="place-sheet" aria-labelledby="view-title" open onClose={() => {}}>
+    useModel(town); app.view = town.view;
+    return <><main style={{height:"100vh",display:"flex",flexDirection:"row"}}><WorkspaceNavigation app={app} /><section id="place-panel" className="central-place" aria-labelledby="view-title" style={{height: "100vh"}}>
       <PlaceHeading view={town.view} navigate={town.navigate} onBack={town.returnView ? () => town.returnToSource() : undefined} />
       <Town model={town} />
-    </Dialog><TownComposer model={town} /></>;
+    </section></main><TownComposer model={town} /></>;
   }
   createRoot(document.getElementById('root')).render(<Fixture />);
   town.show('bonfire');
@@ -90,6 +92,7 @@ if (process.argv.includes('--serve')) {
     await page.clock.install();
     const errors = []; page.on('pageerror', error => errors.push(error.message));
     await page.goto(url);
+    await page.addStyleTag({ content: '#place-panel.central-place { animation: none; }' });
     await page.locator('.announcement-compact-regular').waitFor();
     assert.equal(await page.locator('#bonfire-announcement-panel').count(), 0);
     assert.ok((await page.locator('.bonfire-announcements').boundingBox()).height <= 40);

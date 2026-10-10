@@ -277,7 +277,7 @@ describe("React desktop state lifecycle", () => {
       .mockResolvedValueOnce({ ...changed, chatScene: { ...discussion, scene_meta: { ...discussion.scene_meta, scene_label: "技术方案" } } });
     const app = new AppModel(api({ changeChatSession }).value);
     app.applySnapshot(initial);
-    app.setPlacePresentation("panel");
+    app.toggleChatSplit();
     app.navigate("bonfire");
 
     await app.changeChatSession("select", discussion.scene_id);
@@ -287,6 +287,23 @@ describe("React desktop state lifecycle", () => {
     app.toastMessage = "";
     await app.changeChatSession("rename", "技术方案", discussion.scene_id);
     expect(app.toastMessage).toBe("");
+  });
+  it("returns to the main scene and closes the parallel chat from the Being shortcut", async () => {
+    const main = { scene_id: "desktop-main", scene_meta: { client: "portal-desktop", scene_label: "日常对话" } };
+    const other = { scene_id: "desktop-other", scene_meta: { client: "portal-desktop", scene_label: "讨论" } };
+    const initial = { ...state(), chatScene: other, chatSessions: [main, other] };
+    const changeChatSession = vi.fn().mockResolvedValue({ ...initial, chatScene: main });
+    const app = new AppModel(api({ changeChatSession }).value);
+    app.applySnapshot(initial);
+    app.navigate("bonfire");
+    app.toggleChatSplit();
+    await app.returnToMainChat();
+    expect(app.view).toBe("chat");
+    expect(app.chatSplitOpen).toBe(false);
+    expect(app.snapshot?.chatScene?.scene_id).toBe(main.scene_id);
+    expect(changeChatSession).toHaveBeenCalledTimes(1);
+    await app.returnToMainChat();
+    expect(changeChatSession).toHaveBeenCalledTimes(1);
   });
   it("prevents duplicate log collections and allows retry after an export failure", async () => {
     vi.useFakeTimers();
@@ -309,7 +326,7 @@ describe("React desktop state lifecycle", () => {
     const pending = deferred<{ endpoint: string; text: string }>();
     const getLogs = vi.fn(() => pending.promise);
     const app = new AppModel(api({ portalLogReference: getLogs }).value), post = vi.fn();
-    const messages = () => post.mock.calls.map(call => call[0]).filter(message => message.type !== 'beings:town-activity');
+    const messages = () => post.mock.calls.map(call => call[0]);
     app.post = post;
     app.applySnapshot(state()); app.frameLoaded(); app.connection = 'online';
     post.mockClear();

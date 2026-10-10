@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef } from "react";
 import type { AppModel } from "./models/app";
 import { useModel } from "../shared/hooks/use-model";
 import { useChatBridge } from "./hooks/use-chat-bridge";
+import { WorkspaceNavigation, BeingInfo } from "./components/workspace-navigation";
+import { PanelResizeHandle, usePanelWidth } from "../shared/components/panel-resize";
 import { Topbar } from "./components/topbar";
 import { SceneRibbon, Companion } from "./components/workspace";
 import { Browser } from "../browser/page";
@@ -14,7 +16,6 @@ import { ChatSearch } from "./components/search";
 import { ConnectionSettings, ClientSettings } from "./components/settings";
 import { SubagentModelSettings } from "./components/subagent-model-settings";
 import { Diagnostics } from "./components/diagnostics";
-import { Dialog } from "../shared/components/dialog";
 import { EditContextMenu } from "../shared/components/context-menu";
 import { PlaceHeading } from "./components/navigation";
 import { Plugins, PluginCommands, PluginSlots, PluginSidebar } from '../plugins/page';
@@ -23,6 +24,8 @@ import logoWhite from "../../../resources/branding/logo-white.png";
 export function App({ model }: { model: AppModel }) {
   const app = useModel(model),
     frame = useRef<HTMLIFrameElement>(null);
+  const chatPanel = useRef<HTMLElement>(null);
+  const [chatWidth, setChatWidth] = usePanelWidth("chat", 640);
   const themedLogo = app.theme === "dark" ? logoWhite : logo;
   useChatBridge(app, frame);
   useEffect(() => app.start(), [app]);
@@ -34,8 +37,7 @@ export function App({ model }: { model: AppModel }) {
       app.readingSize + "px",
     );
     document.body.dataset.view = app.view;
-    document.body.dataset.placePresentation = app.placePresentation;
-  }, [app.theme, app.view, app.placePresentation, app.readingSize, app.api]);
+  }, [app.theme, app.view, app.readingSize, app.api]);
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
       const dialog = document.querySelector("dialog[open]");
@@ -99,6 +101,7 @@ export function App({ model }: { model: AppModel }) {
       </section>
       <main id="client-main" hidden={app.startup !== "ready"}>
         <div className="workspace-body">
+          <WorkspaceNavigation app={app} />
           <div className="workspace-stage">
             <Topbar model={app} />
             <p
@@ -110,7 +113,11 @@ export function App({ model }: { model: AppModel }) {
               {app.snapshot?.notice || ""}
             </p>
             <SceneRibbon model={app.workspace} />
-            <section id="chat-view" className="view">
+            <div className={`workspace-content${app.view !== "chat" && app.chatSplitOpen ? " split-chat" : ""}`}>
+            <section ref={chatPanel} id="chat-view" className="view" hidden={app.view !== "chat" && !app.chatSplitOpen}
+              style={{ "--chat-pane-width": `${chatWidth}px` } as import("react").CSSProperties}>
+              <PanelResizeHandle panel={chatPanel} label="调整并排对话宽度" edge="right" width={chatWidth} onResize={setChatWidth} initial={640} min={300} max={1000} disabled={app.view === "chat" || !app.chatSplitOpen} />
+              {app.view !== "chat" && <header className="split-chat-heading"><span>与你的 Being 对话</span><button className="close" aria-label="收起并排对话" onClick={app.toggleChatSplit} /></header>}
               <div
                 id="welcome"
                 hidden={!app.snapshot || app.snapshot.settings.hasToken}
@@ -149,32 +156,19 @@ export function App({ model }: { model: AppModel }) {
                 }}
               />
             </section>
+            {app.view !== "chat" && <section id="place-panel" className="place-surface central-place" aria-labelledby="view-title">
+              <PlaceContent app={app} />
+            </section>}
+            </div>
           </div>
-          {app.view !== "chat" && app.placePresentation === "panel" && (
-            <>
-              <PlaceResizeHandle app={app} />
-              <aside id="place-panel" className="place-surface" aria-labelledby="view-title"
-                style={{ width: app.placePanelWidth, flexBasis: app.placePanelWidth }}>
-                <PlaceContent app={app} />
-              </aside>
-            </>
-          )}
+          {!app.subagentSettingsOpen && <BeingInfo app={app} />}
+          {app.subagentSettingsOpen && <SubagentModelSettings app={app} />}
           <Companion model={app.workspace} />
-          {app.view === "chat" && <PluginSidebar model={app.plugins} theme={app.theme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />}
+          {app.view === "chat" && !app.subagentSettingsOpen && <PluginSidebar model={app.plugins} theme={app.theme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />}
           <Browser model={app} />
         </div>
       </main>
       <Diagnostics model={app} />
-      <Dialog
-        id="place-sheet"
-        className="place-surface"
-        aria-labelledby="view-title"
-        open={app.view !== "chat" && app.placePresentation === "dialog"}
-        onClose={app.closePlace}
-        dismissOnBackdrop
-      >
-        {app.view !== "chat" && app.placePresentation === "dialog" && <PlaceContent app={app} />}
-      </Dialog>
       <ChatSearch model={app} />
       <PluginCommands model={app.plugins} />
       <TownComposer model={app.town} />
@@ -182,7 +176,6 @@ export function App({ model }: { model: AppModel }) {
         onReturnToSettings={app.returnToClientSettings} onDismissSettingsRoute={app.dismissSettingsRoute} />
       <ClientSettings model={app} />
       <ConnectionSettings model={app} />
-      {app.subagentSettingsOpen && <SubagentModelSettings app={app} />}
       <KitInstall model={app.town} />
       <Toast message={app.toastMessage} />
       <EditContextMenu edit={app.api.editSelection} rootSelector="#client-main, dialog[open]"
@@ -191,67 +184,15 @@ export function App({ model }: { model: AppModel }) {
   );
 }
 
-function PlaceResizeHandle({ app }: { app: AppModel }) {
-  const bounds = () => {
-    const available = Math.max(220, window.innerWidth - 280);
-    return { min: Math.min(360, available), max: available };
-  };
-  const resize = (clientX: number, persist = false) => {
-    const { min, max } = bounds();
-    app.setPlacePanelWidth(Math.max(min, Math.min(max, window.innerWidth - clientX)), persist);
-  };
-  const finish = (element: HTMLElement, pointerId: number) => {
-    delete element.dataset.resizing;
-    if (element.hasPointerCapture(pointerId)) element.releasePointerCapture(pointerId);
-  };
-  const { min, max } = bounds();
-  return (
-    <div id="place-resize-handle" className="place-resize-handle" role="separator" tabIndex={0}
-      aria-label="调整对话与内容区域宽度" aria-orientation="vertical"
-      aria-valuemin={min} aria-valuemax={max} aria-valuenow={Math.max(min, Math.min(max, app.placePanelWidth))}
-      onDoubleClick={() => app.setPlacePanelWidth(620, true)}
-      onKeyDown={event => {
-        const step = event.shiftKey ? 64 : 24;
-        let next = app.placePanelWidth;
-        if (event.key === "ArrowLeft") next += step;
-        else if (event.key === "ArrowRight") next -= step;
-        else if (event.key === "Home") next = min;
-        else if (event.key === "End") next = max;
-        else return;
-        event.preventDefault();
-        app.setPlacePanelWidth(Math.max(min, Math.min(max, next)), true);
-      }}
-      onPointerDown={event => {
-        if (event.button !== 0) return;
-        event.preventDefault();
-        event.currentTarget.dataset.resizing = "true";
-        event.currentTarget.setPointerCapture(event.pointerId);
-      }}
-      onPointerMove={event => {
-        if (event.currentTarget.hasPointerCapture(event.pointerId)) resize(event.clientX);
-      }}
-      onPointerUp={event => {
-        resize(event.clientX, true);
-        finish(event.currentTarget, event.pointerId);
-      }}
-      onPointerCancel={event => {
-        app.setPlacePanelWidth(app.placePanelWidth, true);
-        finish(event.currentTarget, event.pointerId);
-      }}
-    />
-  );
-}
-
 function PlaceContent({ app }: { app: AppModel }) {
   useModel(app.town);
   return (
     <>
       <PlaceHeading
-        plugins={app.plugins}
         view={app.view}
+        chatExpanded={app.chatSplitOpen}
+        onToggleChat={app.toggleChatSplit}
         navigate={app.navigate}
-        presentation={app.placePresentation}
-        onPresentationChange={app.setPlacePresentation}
         onBack={app.settingsRoute === "portal" || app.town.returnView ? app.returnFromPlace : undefined}
         onForward={app.town.forwardView ? app.forwardFromPlace : undefined}
         onClose={app.closePlace}
@@ -259,8 +200,7 @@ function PlaceContent({ app }: { app: AppModel }) {
       <PluginSlots model={app.plugins} />
       <div className="plugin-place-layout">
         <div className="plugin-place-main">
-          <Portal model={app} />
-          <Town model={app.town} />
+          {app.view === "portal" ? <Portal model={app} /> : app.view !== "plugins" && <Town model={app.town} />}
           {app.view === 'plugins' && <Plugins model={app.plugins} theme={app.theme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />}
         </div>
         <PluginSidebar model={app.plugins} theme={app.theme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />

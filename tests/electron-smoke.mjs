@@ -126,12 +126,12 @@ async function openClientSettings(page) {
 }
 async function openChatSearch(page) {
   const toggle = page.locator('#toggle-chat-search');
-  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await (await openOptions(page)).locator('#toggle-chat-search').click();
+  if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
 }
 async function openPlace(page, view) {
   if (view === 'chat') { await page.locator('#back-to-chat').click(); return; }
   if (view === 'portal') { await openClientSettings(page); await page.locator('#client-settings-dialog [data-view="portal"]').click(); }
-  else await (await openOptions(page)).locator(`[data-view="${view}"]`).click();
+  else await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:({town:'小镇广场',kits:'工具库',bonfire:'篝火',firesides:'围炉',mail:'私信'})[view],exact:true}).click();
 }
 function cleanup() {
   return cleanupPromise ??= (async () => {
@@ -229,8 +229,8 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   await frame.getByText('本机 Portal 已完成操作。', { exact: false }).waitFor();
   assert.equal(chatBody.attachments[0].data, Buffer.from('attachment fixture').toString('base64'));
   assert.equal(await readFile(path.join(dir, '工作目录/hello.txt'), 'utf8'), '来自 Being 的问候');
-  // Tick navigation previews and jumps within the frame; sidebar search shares the same targets.
-  await frame.locator('.chat-index-tick').first().waitFor();
+  // Latest-message navigation and global conversation search preserve the draft.
+  await frame.locator('.message.user').first().waitFor();
   const appendHistory = (role, content) => messages.push({ indexOnly: true, seq: seq++, role, content, scene_id: sceneId, at: new Date().toISOString() });
   for (let i = 0; i < 10; i++) {
     appendHistory('user', `历史提问 ${i + 1}：讨论客户端的界面和工具`);
@@ -242,19 +242,10 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   appendHistory('being', '配置检查完成。');
   // Feed real history through the API instead of calling retired DOM globals.
   await childFrame.goto(childFrame.url());
-  await childFrame.waitForFunction(() => document.querySelectorAll('.chat-index-tick').length === 13);
+  await childFrame.waitForFunction(() => document.querySelectorAll('.message.user').length === 13);
   await frame.locator('#input').fill('索引跳转保留的草稿');
-  const firstTick = frame.getByRole('button', { name: /跳转到提问.*第一项/ });
-  await firstTick.hover();
-  await frame.locator('#chat-index-preview').waitFor();
-  assert((await frame.locator('#chat-index-preview').textContent()).includes('段落 1'));
-  await mkdir('test-results', { recursive: true });
-  await page.screenshot({ path: 'test-results/chat-index-preview.png' });
-  await firstTick.click();
-  await childFrame.waitForFunction(() => {
-    const el = document.querySelector('.index-target');
-    return el && Math.abs(el.getBoundingClientRect().top - document.querySelector('#messages').getBoundingClientRect().top - 24) < 2;
-  });
+  await frame.locator('#messages').evaluate(el=>{el.scrollTop=0;el.dispatchEvent(new Event('scroll'));});
+  await frame.locator('#chat-jump-latest').waitFor();
   assert.equal(await frame.locator('#input').inputValue(), '索引跳转保留的草稿');
   const readingPosition = await childFrame.evaluate(() => document.querySelector('#messages').scrollTop);
   appendHistory('being', '索引浏览时收到新回复。');
@@ -279,21 +270,20 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   assert.equal(await frame.locator('#input').inputValue(), '索引跳转保留的草稿');
   await openChatSearch(page);
   await page.locator('#chat-search-input').fill('不存在的提问');
-  assert.equal(await page.locator('#chat-search-status').textContent(), '没有匹配的提问');
+  await page.getByRole('status').getByText('没有匹配的对话内容',{exact:true}).waitFor();
   await page.locator('#chat-search-input').fill('第一项');
   await page.evaluate(() => window.postMessage({ type: 'beings:search-index', entries: [{ id: 'turn-1', text: '伪造目录' }] }, '*'));
   assert.equal(await page.locator('.chat-search-result').count(), 1);
   await page.locator('#chat-search-input').press('Escape');
   assert.equal(await page.locator('#toggle-chat-search').getAttribute('aria-expanded'), 'false');
   assert.equal(await page.locator('#chat-search-panel').evaluate(el => el.open), false);
-  await clickChatControl(page, '#chat-index-latest');
+  await clickChatControl(page, '#chat-jump-latest');
   await childFrame.waitForFunction(() => {
     const messages = document.querySelector('#messages');
     return messages.scrollHeight - messages.scrollTop - messages.clientHeight < 2;
   });
-  await childFrame.waitForFunction(() => document.querySelector('.chat-index-tick[aria-current="location"]')?.getAttribute('aria-label').includes('第二项'));
   await frame.locator('#input').fill('');
-  console.log('PASS: tick previews/jump, sidebar search, scroll tracking, draft preservation and streaming scroll lock.');
+  console.log('PASS: message count/latest jump, sidebar search, scroll tracking, draft preservation and streaming scroll lock.');
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/chat.png' });
   // Model settings and the compact options menu preserve the draft.
@@ -330,13 +320,14 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   await childFrame.waitForFunction(() => document.documentElement.dataset.theme === 'dark');
   assert.equal(await app.evaluate(({ nativeTheme }) => nativeTheme.themeSource), 'dark');
   await page.screenshot({ path: 'test-results/chat-dark.png' });
-  await firstTick.hover();
-  await page.screenshot({ path: 'test-results/chat-index-dark.png' });
+  await frame.locator('#messages').evaluate(el=>{el.scrollTop=0;el.dispatchEvent(new Event('scroll'));});
+  await frame.locator('#chat-jump-latest').waitFor();
+  await page.screenshot({ path: 'test-results/chat-latest-dark.png' });
 
   // Stream cancellation goes all the way from the local Loom frame to /api/stop.
   await frame.locator('#input').fill('test-stop'); await frame.locator('#send-btn').dispatchEvent('click');
-  await frame.locator('.run-activity.running .run-stop').waitFor();
-  await frame.locator('.run-activity.running .run-stop').click();
+  await frame.locator('#send-btn.stop').waitFor();
+  await frame.locator('#send-btn.stop').click();
   await page.waitForTimeout(300); assert.equal(stopCount, 1);
   await openPlace(page, 'portal');
   const beforeRestart = handshakeCount;
