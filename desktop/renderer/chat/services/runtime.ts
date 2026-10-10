@@ -194,7 +194,10 @@ function createStreamRuntime(state: any, options: any): any {
         setConfigStatus(data.error || "请填写该服务商的 API 密钥。", "error");
         return data;
       }
-      if (!res.ok || !data.ok) throw new Error(data.error || "设置未能保存，请稍后重试。");
+      if (!res.ok || !data.ok) {
+        setConfigStatus(data.error || "设置未能保存，请稍后重试。", "error");
+        return { ...data, ok: false, http_status: data.http_status || res.status };
+      }
       if (data.config) state.config = data.config;
       setConfigStatus(
         data.rolled_back ? "已恢复上次可用配置" : "设置已更新",

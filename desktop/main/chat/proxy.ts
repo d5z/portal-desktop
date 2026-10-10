@@ -5,6 +5,7 @@ const routes: Record<string, string[]> = {
   '/health': ['GET'], '/api/status': ['GET'], '/api/history': ['GET'],
   '/api/stream/active': ['GET'], '/api/chat/stream': ['POST'], '/api/stop': ['POST'],
   '/api/llm/config': ['GET', 'PATCH'],
+  '/api/llm/routes': ['GET'], '/api/llm/models': ['GET'], '/api/llm/keys': ['POST'],
 };
 export function upstreamRequest(request: Request, connection: Connection) {
   const local = new URL(request.url);
@@ -15,6 +16,10 @@ export function upstreamRequest(request: Request, connection: Connection) {
   for (const key of ['limit', 'after']) {
     const value = local.searchParams.get(key);
     if (value !== null && /^\d{1,16}$/.test(value)) url.searchParams.set(key, value);
+  }
+  if (local.pathname === '/api/llm/models') {
+    const route = local.searchParams.get('route');
+    if (route && route.length <= 256) url.searchParams.set('route', route);
   }
   url.searchParams.set('token', connection.token);
   const headers = new Headers();

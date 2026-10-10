@@ -87,6 +87,7 @@ const api: DesktopAPI = {
   openTownLink: route => ipcRenderer.invoke('beings:town-open', route),
   snapshot: () => ipcRenderer.invoke('beings:snapshot'),
   save: input => ipcRenderer.invoke('beings:save', input),
+  beingModelCatalog: input => ipcRenderer.invoke('beings:model-catalog', input),
   beingModelConfig: patch => ipcRenderer.invoke("beings:model-config", patch),
   sceneTasks: () => ipcRenderer.invoke('beings:scene-tasks'),
   onSceneTasks: callback => {

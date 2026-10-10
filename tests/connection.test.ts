@@ -28,6 +28,16 @@ describe('connection and credential boundary', () => {
       expect(() => upstreamRequest(new Request('beings://chat/api/llm/oauth' + (route ? '/' + route : ''), { method }), connection)).toThrow();
     }
   });
+  it('allows model catalog and key endpoints while isolating route queries and credentials', () => {
+    const request = new Request('beings://chat/api/llm/models?route=openai-responses&token=evil&base_url=https://evil');
+    const upstream = upstreamRequest(request, connection);
+    expect(upstream.url).toBe('https://echo.example/alice/api/llm/models?route=openai-responses&token=fixture-token');
+    expect(upstream.headers.get('X-Relay-Secret')).toBe('relay-key');
+    expect(upstreamRequest(new Request('beings://chat/api/llm/routes'), connection).url).toContain('/api/llm/routes?token=');
+    expect(upstreamRequest(new Request('beings://chat/api/llm/keys', { method: 'POST' }), connection).url).toContain('/api/llm/keys?token=');
+    for (const [path, method] of [['routes', 'POST'], ['models', 'PATCH'], ['keys', 'GET']])
+      expect(() => upstreamRequest(new Request('beings://chat/api/llm/' + path, { method }), connection)).toThrow();
+  });
   it('forwards request bodies and preserves streamed chunks without buffering', async () => {
     let push!: ReadableStreamDefaultController<Uint8Array>;
     let captured: RequestInit | undefined;

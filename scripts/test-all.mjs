@@ -88,6 +88,7 @@ try {
   if (!flags.has('--reuse-package')) {
     await npm('package', ['run', 'package']);
   }
+  await npm('model-catalog', ['run', 'test:model-catalog']);
   await npm('chat-react', ['run', 'test:chat-react']);
   await npm('chat-scroll', ['run', 'test:chat-scroll']);
   await npm('chat-context-menu', ['run', 'test:chat-context-menu']);

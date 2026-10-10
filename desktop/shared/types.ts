@@ -111,6 +111,7 @@ export interface DesktopAPI {
   openTownLink(route: string): Promise<void>;
   snapshot(): Promise<Snapshot>;
   save(input: SaveSettings): Promise<Snapshot>;
+  beingModelCatalog?(input: { kind: 'routes' | 'models' | 'keys'; route?: string; api_key?: string }): Promise<{ status: number; data: Record<string, unknown> }>;
   beingModelConfig(patch?: Record<string, string | number | boolean>): Promise<Record<string, unknown>>;
   sceneTasks(): Promise<SceneTaskSnapshot>;
   onSceneTasks(callback: (snapshot: SceneTaskSnapshot) => void): () => void;

@@ -35,6 +35,18 @@ const response = (value: unknown) =>
 const flush = () => vi.advanceTimersByTimeAsync(0);
 
 describe("React chat runtime lifecycle", () => {
+  it("preserves catalog switch errors and candidates without replacing confirmed configuration", async () => {
+    const failure = { ok: false, error: 'model not found', candidates: ['vendor/valid'] };
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json(failure, { status: 404 })));
+    const state = new ChatState(), runtime = createChatRuntime(state);
+    state.config = { provider: 'router', model: 'vendor/current' };
+    try {
+      expect(await runtime.applyConfigChange({ provider: 'router', model: 'vendor/missing' }))
+        .toEqual({ ...failure, http_status: 404 });
+      expect(state.config.model).toBe('vendor/current');
+      expect(state.configStatusClass).toBe('error');
+    } finally { runtime.dispose(); }
+  });
   it.each(['edit', 'remove', 'read-error'])('does not send stale text or incomplete attachments after %s during file reading', async change => {
     let reader!: { onload(): void; onerror(): void; result: string; readyState: number };
     vi.stubGlobal('FileReader', class {

@@ -28,7 +28,15 @@ export function SubagentModelSettings({ app }: { app: AppModel }) {
   const being = useMemo(() => {
     const state = new ChatState();
     let revision = 0;
-    const runtime: Pick<ChatRuntime, 'loadLlmConfig' | 'applyConfigChange'> = {
+    const runtime: Pick<ChatRuntime, 'loadLlmConfig' | 'applyConfigChange'> & Partial<Pick<ChatRuntime, 'request'>> = {
+      ...(app.api.beingModelCatalog ? { request: async (path: string, init?: RequestInit) => {
+        const url = new URL(path, 'https://local.invalid');
+        const kind = url.pathname.split('/').pop() as 'routes' | 'models' | 'keys';
+        if (!['routes', 'models', 'keys'].includes(kind)) throw new Error('不支持的模型接口。');
+        const input = kind === 'keys' ? JSON.parse(String(init?.body || '{}')) : { route: url.searchParams.get('route') || undefined };
+        const result = await app.api.beingModelCatalog!({ ...input, kind });
+        return Response.json(result.data, { status: result.status });
+      } } : {}),
       async loadLlmConfig() {
         const request = ++revision;
         state.configLoading = true;

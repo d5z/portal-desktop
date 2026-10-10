@@ -46,6 +46,7 @@ const server = createServer(async (request, response) => {
     config = { ...config, ...patch, sbs_enabled: patch.sbs_enabled ? patch.sbs_enabled === 'on' : config.sbs_enabled };
     return json({ ok: true, config });
   }
+  if (url.pathname === '/api/llm/routes') return json({ error: 'Legacy fixture has no catalog' }, 404);
   if (url.pathname.startsWith('/api/llm/oauth')) { oauthRequests++; return json({ status: 'portal_required' }, 503); }
   if (url.pathname === '/api/stop') { stopCount++; heldResponse?.end(); heldResponse = null; return json({ ok: true }); }
   if (url.pathname === '/api/stream/active') {

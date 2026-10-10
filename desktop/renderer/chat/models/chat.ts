@@ -81,6 +81,9 @@ export interface Preset {
   has_key?: boolean;
 }
 export interface LlmConfig {
+  history?: { provider: string; model: string }[];
+  has_api_key?: boolean;
+  oauth_connected?: boolean;
   enabled?: boolean;
   base_url?: string;
   api?: string;
@@ -97,6 +100,8 @@ export interface ConfigResult {
   error?: string;
   config?: LlmConfig;
   rolled_back?: boolean;
+  http_status?: number;
+  candidates?: string[];
 }
 export interface Soul {
   name?: string;

@@ -1,3 +1,4 @@
+import { BeingModelSettings } from "./being-model-settings";
 import { useEffect, useRef, useState } from "react";
 import type { ChatRuntime, ChatState, Preset } from "../models/chat";
 import { useModel } from "../../shared/hooks/use-model";
@@ -43,7 +44,7 @@ interface ModelDraft {
   api?: string;
 }
 
-export function ChatSettings({
+function LegacyChatSettings({
   state,
   runtime,
   open,
@@ -60,7 +61,7 @@ export function ChatSettings({
   mobilePage = false,
 }: {
   state: ChatState;
-  runtime: Pick<ChatRuntime, "loadLlmConfig" | "applyConfigChange">;
+  runtime: Pick<ChatRuntime, "loadLlmConfig" | "applyConfigChange"> & Partial<Pick<ChatRuntime, "request">>;
   open: boolean;
   close: () => void;
   back?: () => void;
@@ -683,4 +684,9 @@ export function ChatSettings({
       </div>
     </Root>
   );
+}
+
+export function ChatSettings(props: Parameters<typeof LegacyChatSettings>[0]) {
+  if (props.target === "subagent" || !props.runtime.request) return <LegacyChatSettings {...props} />;
+  return <BeingModelSettings {...props} fallback={<LegacyChatSettings {...props} />} />;
 }

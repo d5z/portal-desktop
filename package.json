@@ -41,6 +41,7 @@
     "test:sbs-refresh": "npm run prepare:desktop && node tests/sbs-refresh.mjs",
     "test:browser": "node tests/browser-e2e.mjs",
     "build:chat": "node scripts/build-chat.mjs",
+    "test:model-catalog": "node tests/model-catalog-ui.mjs",
     "test:chat-react": "npm run build:chat && node tests/chat-react.mjs",
     "test:chat-layout": "npm run build:chat && node tests/chat-layout.mjs",
     "test:chat-scroll": "npm run build:chat && node tests/chat-scroll.mjs",

@@ -601,6 +601,19 @@ async function ready() {
   registerKitsIpc({ handle, exclusive, window: () => window, store, kitInstaller });
   registerPluginsIpc({ handle, exclusive, window: () => window, registry: plugins, closeWindows: id => pluginWindows?.close(id), fetcher: downloadFetch });
   handle('beings:plugins-context', context => pluginWorkspace.update(context));
+  handle('beings:model-catalog', async (input: { kind: string; route?: string; api_key?: string }) => {
+    if (!input || !['routes', 'models', 'keys'].includes(input.kind) ||
+      (input.kind !== 'routes' && (typeof input.route !== 'string' || !input.route || input.route.length > 256)) ||
+      (input.kind === 'keys' && (typeof input.api_key !== 'string' || !input.api_key.trim() || input.api_key.length > 16384)))
+      throw new Error('无效的模型目录请求。');
+    const path = '/api/llm/' + input.kind + (input.kind === 'models' ? '?route=' + encodeURIComponent(input.route!) : '');
+    const response = await proxy.handle(new Request('beings://chat' + path, {
+      method: input.kind === 'keys' ? 'POST' : 'GET',
+      headers: { 'Content-Type': 'application/json' },
+      ...(input.kind === 'keys' ? { body: JSON.stringify({ route: input.route, api_key: input.api_key }) } : {}),
+    }));
+    return { status: response.status, data: await response.json().catch(() => ({ error: '无法读取模型目录。' })) };
+  });
   handle('beings:model-config', async (patch?: Record<string, unknown>) => {
     if (patch !== undefined && (!patch || Array.isArray(patch) || typeof patch !== 'object' ||
       Object.entries(patch).some(([key, value]) => !['model', 'provider', 'base_url', 'api_key', 'thinking', 'temperature', 'rollback'].includes(key) || !['string', 'number', 'boolean'].includes(typeof value)) || JSON.stringify(patch).length > 16384))
@@ -611,8 +624,8 @@ async function ready() {
       ...(patch === undefined ? {} : { body: JSON.stringify(patch) }),
     }));
     const data = await response.json();
-    if (!response.ok && !data.needs_key) throw new Error(data.error || '无法读取或保存 Being 模型配置。');
-    return data;
+    if (!response.ok && patch === undefined) throw new Error(data.error || '无法读取或保存 Being 模型配置。');
+    return { ...data, ...(!response.ok ? { ok: false, http_status: data.http_status || response.status } : {}) };
   });
   const taskSnapshot = async (tasks: import('../shared/types').SceneTask[]) => {
     const endpoint = store.connection?.endpoint || '';
