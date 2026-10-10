@@ -56,6 +56,16 @@ export function PluginCard({ model, plugin }: { model: PluginsModel; plugin: imp
           </select>
         </div>)}
       </div>
+      {plugin.manifest.contributes.slots?.some(slot => slot.location === 'right-sidebar') && <div className="plugin-view-list">
+        <div className="plugin-view-heading"><span>侧栏快捷入口</span><span>在标题栏显示</span></div>
+        <p className="field-help">默认隐藏；隐藏后仍可从这里打开侧栏，不影响插件功能。</p>
+        {plugin.manifest.contributes.slots.filter(slot => slot.location === 'right-sidebar').map(slot => <div className="plugin-view-placement" key={slot.id}>
+          <button className="secondary" disabled={!plugin.enabled || plugins.busy} onClick={() => plugins.openSlot(plugin.manifest.id, slot)}>{slot.title}</button>
+          <input type="checkbox" aria-label={`在标题栏显示${slot.title}`} disabled={plugins.busy}
+            checked={plugin.visibleSidebarSlots?.includes(slot.id) === true}
+            onChange={event => void plugins.setSidebarSlotVisible(plugin.manifest.id, slot.id, event.target.checked)} />
+        </div>)}
+      </div>}
       <div className="plugin-management">
         <span>插件管理</span>
         <div>

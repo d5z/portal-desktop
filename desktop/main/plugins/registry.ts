@@ -85,6 +85,15 @@ export class PluginRegistry {
       await this.atomic(this.file('packages', id), { ...value, placements: { ...value.placements, [view]: placement } });
     });
   }
+  setSidebarSlotVisible(id: string, slot: string, visible: boolean) {
+    return this.serialize(async () => {
+      const value = await this.package(id);
+      if (typeof visible !== 'boolean' || !value.manifest.contributes.slots?.some(s => s.id === slot && s.location === 'right-sidebar')) throw new Error('无效的插件侧栏入口。');
+      const slots = new Set(value.visibleSidebarSlots || []);
+      if (visible) slots.add(slot); else slots.delete(slot);
+      await this.atomic(this.file('packages', id), { ...value, visibleSidebarSlots: [...slots] });
+    });
+  }
   remove(id: string) {
     return this.serialize(async () => { this.revoke(id); await rm(this.file('packages', id), { force: true }); });
   }

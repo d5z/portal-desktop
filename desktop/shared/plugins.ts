@@ -44,6 +44,7 @@ export interface InstalledPlugin {
   sha256: string;
   installedAt: string;
   placements?: Record<string, PluginPlacement>;
+  visibleSidebarSlots?: string[];
 }
 export type PluginPlacement = 'page' | 'navigation' | 'window';
 export interface PluginHostRequest { requestId: string; action: 'compose' | 'ui' | 'commands' | 'dock'; value?: any }
@@ -61,6 +62,7 @@ declare global { interface Window { beingsPluginWindow?: PluginWindowAPI } }
 export interface PluginLibrary { plugins: InstalledPlugin[]; problems: string[] }
 export interface PluginSession { token: string; url: string }
 export interface DesktopPluginAPI {
+  setSidebarSlotVisible?(id: string, slot: string, visible: boolean): Promise<void>;
   setPlacement?(id: string, view: string, placement: PluginPlacement): Promise<void>;
   openWindow?(id: string, view: string, command?: string): Promise<void>;
   onHostRequest?(callback: (request: PluginHostRequest) => void): () => void;

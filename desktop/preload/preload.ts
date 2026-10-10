@@ -16,6 +16,7 @@ const api: DesktopAPI = {
     list: () => ipcRenderer.invoke('beings:plugins-list'),
     importLocal: () => ipcRenderer.invoke('beings:plugins-import'),
     installGrove: id => ipcRenderer.invoke('beings:plugins-install', id),
+    setSidebarSlotVisible: (id, slot, visible) => ipcRenderer.invoke('beings:plugins-sidebar-slot-visible', id, slot, visible),
     setEnabled: (id, enabled) => ipcRenderer.invoke('beings:plugins-enable', id, enabled),
     remove: id => ipcRenderer.invoke('beings:plugins-remove', id),
     open: (id, view, command, slot) => ipcRenderer.invoke('beings:plugins-open', id, view, command, slot),
