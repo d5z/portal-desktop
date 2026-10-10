@@ -169,7 +169,12 @@ try {
   await frame.getByRole('button', { name: '打开篝火', exact: true }).click();
   await page.waitForFunction(() => window.received.some(item => item.type === 'beings:open-place' && item.view === 'bonfire'));
   await frame.locator('#input').fill('保留草稿');
-  assert.equal(await frame.locator('#chat-index').count(),0);
+  assert.equal(await frame.locator('#chat-index').count(),1);
+  await frame.locator('.chat-index-tick').first().hover();
+  await frame.locator('#chat-index-preview').waitFor();
+  await frame.locator('.chat-index-tick').first().click();
+  await frame.locator('.message.index-target').waitFor();
+  assert.equal(await frame.locator('#input').inputValue(), '保留草稿');
   await frame.locator('#messages').evaluate(el=>{el.scrollTop=0;el.dispatchEvent(new Event('scroll'));});
   await frame.locator('#chat-jump-latest').waitFor();
   assert.match(await frame.locator('#chat-jump-latest').textContent(), /\d+ 条消息/);

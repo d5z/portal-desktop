@@ -28,7 +28,7 @@ import { ChatSettings } from "./components/settings";
 import { ChatInfoPanels } from "./components/panels";
 import { SubagentSetupHint } from "./components/subagent-hint";
 import { EditContextMenu } from "../shared/components/context-menu";
-import { JumpToLatest } from "./components/navigation";
+import { ChatIndex, JumpToLatest } from "./components/navigation";
 import type { ChatBridge } from "./services/bridge";
 import { useChatSession } from "./hooks/use-chat-session";
 
@@ -599,6 +599,7 @@ function ChatView({
         >
           {state.banner}
         </div>
+        <ChatIndex items={visibleItems} container={messages} elements={messageElements} scrollLock={scrollLock} clearAnchor={releaseAnchor} highlight={setHighlighted} />
         <div id="input-area">
           <JumpToLatest items={visibleItems} container={messages} elements={messageElements} scrollLock={scrollLock} clearAnchor={releaseAnchor} />
           <div

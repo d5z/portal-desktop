@@ -39,7 +39,7 @@ try{
     await page.setViewportSize({width,height:800});
     const overflow=await frame.locator('#messages, .message, .message .content, .code-block, .table-wrap, #input-area, #pending-files, .pending-file').evaluateAll(nodes=>nodes.filter(n=>n.scrollWidth>n.clientWidth+1).map(n=>({element:n.id||n.className,width:n.clientWidth,contentWidth:n.scrollWidth})));
     assert.deepEqual(overflow,[],`Horizontal overflow at ${width}px`);
-    assert.equal(await frame.locator('#chat-index').count(),0);
+    assert.equal(await frame.locator('#chat-index').count(),1);
     await frame.locator('#input').fill(long);
     assert.ok(await frame.locator('#input').evaluate(n=>n.scrollWidth<=n.clientWidth+1));
     assert.ok(await frame.locator('#messages').evaluate(n=>n.scrollHeight>n.clientHeight),'Vertical reading must remain available');

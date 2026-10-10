@@ -1208,3 +1208,21 @@ label.chat-scope-switch input{margin:0;accent-color:var(--accent)}
 #chat-jump-latest svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
 #chat-jump-latest:hover{filter:brightness(.97)}
 #chat-jump-latest:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+
+/* Compact turn index, with its own space beside the message bubbles. */
+#chat-index{position:fixed;left:5px;top:46%;transform:translateY(-50%);width:36px;z-index:15;display:flex;flex-direction:column;align-items:stretch}
+#chat-index[hidden],#chat-index-preview[hidden]{display:none}
+#chat-index-ticks{position:relative;max-height:min(42vh,360px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;padding:6px 0}
+#chat-index-ticks::-webkit-scrollbar{display:none}
+.chat-index-tick{display:flex;align-items:center;justify-content:flex-start;width:36px;height:12px;border:0;padding:0 7px;background:transparent;cursor:pointer;border-radius:3px}
+.chat-index-tick span{display:block;width:var(--tick-width,6px);height:2px;border-radius:2px;background:var(--text-muted);opacity:.38;transition:width .15s,opacity .15s}
+.chat-index-tick[aria-current=location] span{background:var(--text);opacity:1}
+.chat-index-tick:hover span,.chat-index-tick:focus-visible span{width:26px;opacity:1;background:var(--text)}
+.chat-index-tick:focus-visible{outline:1px solid var(--text-muted);outline-offset:1px}
+#chat-index-preview{position:fixed;left:48px;z-index:20;width:min(340px,calc(100vw - 76px));padding:13px 15px;border:1px solid var(--border);border-radius:12px;background:var(--bg-softer);box-shadow:0 8px 30px #0002;pointer-events:none;text-align:left;font-size:12px;line-height:1.7}
+#chat-index-preview strong{font-weight:500;color:var(--text);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+#chat-index-preview p{margin:6px 0 0;color:var(--text-muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;overflow-wrap:anywhere}
+@media(prefers-reduced-motion:reduce){.chat-index-tick span{transition:none}}
+#chat-index{opacity:.25;transition:opacity .2s}
+#chat-index:hover,#chat-index:focus-within{opacity:1}
+#messages{padding-left:max(48px,calc((100% - 860px)/2))}
