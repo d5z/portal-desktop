@@ -721,6 +721,8 @@ body[data-view=chat].has-topic .scene-ribbon{display:flex!important;min-height:0
 .workspace-content>#chat-view,.plugin-sidebar{position:relative}
 .being-info{flex-shrink:1;max-width:calc(100% - 396px)}
 .chat-session-panel{max-width:calc(100% - 48px)}
+.chat-session-panel[data-pinned=true]{max-width:40cqw;box-shadow:none}
+.workspace-stage:has(.chat-session-panel[data-pinned=true])>.workspace-content{margin-left:min(var(--scene-panel-width,320px),40cqw)}
 .plugin-sidebar{max-width:60%;min-width:0}
 #companion-panel{min-width:0}
 @media(max-width:800px){.being-info{max-width:calc(100% - 64px);width:min(320px,calc(100% - 64px))}.being-info>.panel-resize-handle{display:none}}
