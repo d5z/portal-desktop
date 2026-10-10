@@ -965,3 +965,20 @@ body:not([data-view=bonfire],[data-view=firesides],[data-view=mail]) #place-pane
 #place-panel .social-foot .scene-select{min-height:30px;padding:5px 11px;border-radius:16px;background:transparent;border-color:var(--line);font-size:11px}
 #place-panel .social-foot .scene-select:hover{background:var(--feed-tint,var(--surface))!important}
 @container stage (max-width:570px){#place-panel .social-meta{min-height:28px}}
+
+.rail-more-panel{position:fixed;z-index:180;left:84px;top:86px;width:min(300px,calc(100vw - 96px));max-height:calc(100dvh - 110px);display:flex;flex-direction:column;padding:14px;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:22px;box-shadow:0 16px 48px #00000026;animation:rail-more-enter .16s ease-out}
+.rail-more-panel header{display:flex;align-items:flex-start;justify-content:space-between;padding:6px 6px 12px;gap:12px}
+.rail-more-panel header strong{font-size:15px}.rail-more-panel header p{margin:5px 0 0;font-size:12px;color:var(--secondary)}
+.rail-more-panel header button{width:28px;height:28px;border-radius:50%;font-size:22px;color:var(--secondary)}
+.rail-more-list{min-height:0;overflow-y:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
+.rail-more-row{display:flex;align-items:center;gap:4px;margin:3px 0}
+.rail-more-destination{display:flex;align-items:center;gap:12px;flex:1;min-width:0;padding:11px 12px;border-radius:12px;text-align:left;color:var(--text)}
+.rail-more-destination span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rail-more-panel svg{width:20px;height:20px;flex-shrink:0}
+.rail-more-destination[aria-current=page],.rail-pin-button[aria-pressed=true]{background:var(--selected);color:var(--text)}
+.rail-more-destination:hover,.rail-more-panel header button:hover,.rail-pin-button:hover{background:var(--surface)}
+.rail-more-destination i{width:6px;height:6px;flex-shrink:0;border-radius:50%;background:var(--accent,#329260)}
+.rail-pin-button{display:grid;place-items:center;width:34px;height:34px;flex-shrink:0;border-radius:10px;color:var(--secondary);transition:background .15s,color .15s}
+.rail-pin-button[aria-pressed=true] svg{fill:currentColor;fill-opacity:.18}
+@keyframes rail-more-enter{from{opacity:0;transform:translateX(-6px)}to{opacity:1;transform:translateX(0)}}
+@media(max-width:800px){.rail-more-panel{left:70px;width:min(300px,calc(100vw - 82px))}}
+@media(prefers-reduced-motion:reduce){.rail-more-panel{animation:none}.rail-pin-button{transition:none}}

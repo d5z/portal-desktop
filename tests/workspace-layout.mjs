@@ -95,6 +95,22 @@ try {
   await page.evaluate(()=>{const app=window.fixtureApp;app.update={phase:'current',currentVersion:'0.1.7'};app.changed();});
   assert.equal(await updateButton.count(),0);
   const rail = page.getByRole('navigation',{name:'主导航'});
+  assert.equal(await rail.getByRole('button',{name:'卷轴',exact:true}).count(),0);
+  await rail.getByRole('button',{name:'更多功能',exact:true}).click();
+  const more = page.getByRole('dialog',{name:'更多功能'});
+  await more.getByRole('button',{name:'固定到左侧：卷轴',exact:true}).click();
+  assert.equal(await rail.getByRole('button',{name:'卷轴',exact:true}).count(),1);
+  await page.screenshot({path:'test-results/workspace-more-functions.png'});
+  await page.keyboard.press('Escape');
+  assert.equal(await more.count(),0);
+  assert.equal(await page.locator('#rail-more-trigger').evaluate(el=>el===document.activeElement),true);
+  await page.reload();
+  await rail.getByRole('button',{name:'卷轴',exact:true}).waitFor();
+  await rail.getByRole('button',{name:'更多功能',exact:true}).click();
+  await more.getByRole('button',{name:'取消固定：卷轴',exact:true}).click();
+  assert.equal(await rail.getByRole('button',{name:'卷轴',exact:true}).count(),0);
+  await page.mouse.click(600,80);
+  assert.equal(await more.count(),0);
   await rail.getByRole('button',{name:'篝火',exact:true}).hover();
   await page.getByRole('tooltip').getByText('篝火',{exact:true}).waitFor();
   await page.screenshot({animations:'disabled',path:'test-results/workspace-tooltip.png'});
@@ -157,7 +173,8 @@ try {
   await page.evaluate(()=>{window.fixtureApp.theme='dark';window.fixtureApp.changed();});
   await page.screenshot({animations:'disabled',path:'test-results/workspace-dark.png'});
   await page.setViewportSize({width:760,height:700});
-  await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:'小镇广场',exact:true}).click();
+  await rail.getByRole('button',{name:'更多功能',exact:true}).click();
+  await more.getByRole('button',{name:'小镇广场',exact:true}).click();
   await page.locator('#place-panel').waitFor();
   assert.ok(await page.locator('#place-panel').evaluate(node=>node.getBoundingClientRect().right <= innerWidth));
   await page.screenshot({animations:'disabled',path:'test-results/workspace-narrow.png'});
@@ -239,7 +256,14 @@ try {
   await page.getByRole('button',{name:'关闭设置',exact:true}).click();
   await page.setViewportSize({width:1440,height:960});
   for (const [name,title] of [['篝火','篝火'],['围炉','围炉'],['私信','私信'],['种子花园','种子花园'],['书架','书架'],['卷轴','卷轴'],['工具库','工具库'],['公告','公告'],['通讯录','通讯录'],['小镇广场','小镇广场']]) {
-    await rail.getByRole('button',{name,exact:true}).click();
+    const pinned = rail.getByRole('button',{name,exact:true});
+    if (await pinned.count()) await pinned.click();
+    else {
+      await rail.getByRole('button',{name:'更多功能',exact:true}).click();
+      await more.getByRole('button',{name,exact:true}).click();
+      assert.equal(await more.count(),0);
+      assert.equal(await rail.locator('#rail-more-trigger').getAttribute('aria-current'),'page');
+    }
     await page.locator('#place-panel').waitFor();
     assert.equal(await page.locator('#place-panel .place-switcher').count(),0);
     assert.equal(await page.locator('#chat-view').isVisible(),false);

@@ -44,9 +44,61 @@ function RailButton({ label, children, active, disabled, unread, onClick, classN
   </>;
 }
 
+const PINNED_NAVIGATION_KEY = "beings:pinned-navigation";
+const defaultPins = ["bonfire", "firesides", "mail"];
+function readPinnedNavigation(): string[] {
+  try {
+    const saved: unknown = JSON.parse(localStorage.getItem(PINNED_NAVIGATION_KEY) || "null");
+    if (Array.isArray(saved) && saved.every(key => typeof key === "string")) return saved;
+  } catch { /* Use defaults when local preferences are unavailable. */ }
+  return defaultPins;
+}
+
 export function WorkspaceNavigation({ app }: { app: AppModel }) {
   const town = useModel(app.town), plugins = useModel(app.plugins);
   const name = town.displayName || app.snapshot?.settings.being || "Being";
+  const [pins, setPins] = useState(readPinnedNavigation);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const morePanel = useRef<HTMLDivElement>(null);
+  const closeMore = (restoreFocus = false) => {
+    setMoreOpen(false);
+    if (restoreFocus) document.getElementById("rail-more-trigger")?.focus();
+  };
+  useEffect(() => {
+    if (!moreOpen) return;
+    const outside = (event: PointerEvent) => {
+      const target = event.target as Node;
+      if (!morePanel.current?.contains(target) && !document.getElementById("rail-more-trigger")?.contains(target)) setMoreOpen(false);
+    };
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") { event.preventDefault(); closeMore(true); }
+    };
+    document.addEventListener("pointerdown", outside);
+    document.addEventListener("keydown", escape);
+    morePanel.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    return () => {
+      document.removeEventListener("pointerdown", outside);
+      document.removeEventListener("keydown", escape);
+    };
+  }, [moreOpen]);
+  const entries = [
+    ...destinations.map(([key, label, path]) => ({
+      key, label, path, active: app.view === key, plugin: false,
+      unread: key === "bonfire" || key === "firesides" || key === "mail" ? town.unread(key) : false,
+      open: () => app.navigate(key),
+    })),
+    ...plugins.navigationViews().map(({ plugin, view }) => ({
+      key: `plugin:${plugin.id}:${view.id}`, label: view.title,
+      path: "M8 3h8v5h5v8h-5v5H8v-5H3V8h5V3Z", plugin: true, unread: false,
+      active: app.view === "plugins" && plugins.selected?.id === plugin.id && plugins.selected.view === view.id,
+      open: () => plugins.open(plugin.id, view.id, undefined, "navigation"),
+    })),
+  ];
+  const togglePin = (key: string) => {
+    const next = pins.includes(key) ? pins.filter(pin => pin !== key) : [...pins, key];
+    setPins(next);
+    try { localStorage.setItem(PINNED_NAVIGATION_KEY, JSON.stringify(next)); } catch { /* Keep the session preference. */ }
+  };
   return <nav className="workspace-rail" aria-label="主导航">
     <RailButton label={`${name} · 返回主对话`} className="rail-being" onClick={() => void app.returnToMainChat()}>
       <span aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>
@@ -54,14 +106,26 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
     <div className="rail-links">
       <RailButton label="对话" active={app.view === "chat"} onClick={() => app.navigate("chat")}><Icon path="M4 4h16v12H9l-5 4V4Z" /></RailButton>
       <RailButton id="toggle-chat-search" expanded={app.searchOpen} label="查找对话" disabled={!app.snapshot?.settings.hasToken} onClick={() => app.openSearch()}><Icon path="m16 16 5 5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z" /></RailButton>
-      {destinations.map(([key, label, path]) => <RailButton key={key} label={label} active={app.view === key}
-        unread={key === "bonfire" || key === "firesides" || key === "mail" ? town.unread(key) : false}
-        onClick={() => app.navigate(key)}><Icon path={path} /></RailButton>)}
-      {plugins.navigationViews().map(({ plugin, view }) => <RailButton key={`${plugin.id}:${view.id}`} plugin label={view.title}
-        active={app.view === "plugins" && plugins.selected?.id === plugin.id && plugins.selected.view === view.id}
-        onClick={() => plugins.open(plugin.id, view.id, undefined, "navigation")}><Icon path="M8 3h8v5h5v8h-5v5H8v-5H3V8h5V3Z" /></RailButton>)}
+      {entries.filter(entry => pins.includes(entry.key)).map(entry => <RailButton key={entry.key} label={entry.label} active={entry.active}
+        plugin={entry.plugin} unread={entry.unread} onClick={entry.open}><Icon path={entry.path} /></RailButton>)}
+      <RailButton id="rail-more-trigger" label={moreOpen ? "收起更多功能" : "更多功能"} expanded={moreOpen}
+        active={entries.some(entry => !pins.includes(entry.key) && entry.active)}
+        unread={entries.some(entry => !pins.includes(entry.key) && entry.unread)} onClick={() => setMoreOpen(open => !open)}>
+        <Icon path={moreOpen ? "m7 14 5-5 5 5" : "M5 11h2v2H5zM11 11h2v2h-2zM17 11h2v2h-2z"} />
+      </RailButton>
     </div>
     <div className="rail-settings-placeholder" aria-hidden="true" />
+    {moreOpen && createPortal(<div ref={morePanel} className="rail-more-panel" role="dialog" aria-label="更多功能">
+      <header><div><strong>更多功能</strong><p>将常用功能固定到左侧</p></div><button aria-label="收起更多功能" onClick={() => closeMore(true)}>×</button></header>
+      <div className="rail-more-list">{entries.map(entry => <div className="rail-more-row" key={entry.key}>
+        <button className="rail-more-destination" aria-current={entry.active ? "page" : undefined} data-plugin-navigation={entry.plugin || undefined}
+          onClick={() => { closeMore(); entry.open(); }}><Icon path={entry.path} /><span>{entry.label}</span>{entry.unread && <i aria-label="有新动态" />}</button>
+        <button className="rail-pin-button" aria-label={`${pins.includes(entry.key) ? "取消固定" : "固定到左侧"}：${entry.label}`}
+          aria-pressed={pins.includes(entry.key)} title={pins.includes(entry.key) ? "取消固定" : "固定到左侧"} onClick={() => togglePin(entry.key)}>
+          <Icon path="m9 3 6 0-1 6 4 4v2h-5v6l-1-2-1 2v-6H6v-2l4-4-1-6Z" />
+        </button>
+      </div>)}</div>
+    </div>, document.body)}
   </nav>;
 }
 export function BeingInfo({ app }: { app: AppModel }) {
