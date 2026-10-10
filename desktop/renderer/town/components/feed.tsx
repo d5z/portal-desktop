@@ -98,8 +98,8 @@ export function TownFeed({
         : filters.relation,
     author: authors.some(([id]) => id === filters.author) ? filters.author : "",
   };
-  const filtered = filterMessages(messages, effective, town.search),
-    limit = town.view === "firesides" ? 50 : 100;
+  const filtered = filterMessages(messages, effective, town.search);
+  const countLabel = filtered.length === messages.length ? `已加载 ${messages.length} 条` : `匹配 ${filtered.length} 条 · 已加载 ${messages.length} 条`;
   const serialized = JSON.stringify({ ...effective, search: town.search });
   useEffect(() => {
     if (!town.visible) return;
@@ -107,9 +107,9 @@ export function TownFeed({
     town.scenes.update({
       count: filtered.length,
       filters: { tab: town.tab, ...JSON.parse(serialized) },
-      scope: `${filtered.length} 条符合筛选 · 最近 ${limit} 条内筛选；未确认阅读`,
+      scope: `${countLabel}；未确认阅读`,
     });
-  }, [town, town.visible, filterKey, serialized, filtered.length, limit, town.tab]);
+  }, [town, town.visible, filterKey, serialized, filtered.length, countLabel, town.tab]);
   useEffect(() => {
     const outside = (event: Event) => {
       if (more.current && !more.current.contains(event.target as Node))
@@ -142,7 +142,7 @@ export function TownFeed({
   );
   const summary = (
     <div className="feed-summary" role="status">
-      {`${filtered.length} / ${messages.length} 条 · 最近 ${limit} 条内筛选${me ? "" : " · 配对后可识别 @我和我的发言"}`}
+      {`${countLabel}${me ? "" : " · 配对后可识别 @我和我的发言"}`}
     </div>
   );
   return (

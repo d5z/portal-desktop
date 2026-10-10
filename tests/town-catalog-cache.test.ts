@@ -4,6 +4,18 @@ import {TownModel} from '../desktop/renderer/town/models/town';
 import {SceneStore} from '../desktop/renderer/shared/models/scene';
 import type {DesktopAPI} from '../desktop/shared/types';
 describe('catalog cache',()=>{
+ it('keeps bonfire batch caches separate and refreshes using the selected count',async()=>{
+  const read=vi.fn(async(query:any)=>({ok:true,data:{messages:[{seq:query.limit,content:String(query.limit)}]},fetchedAt:new Date().toISOString()}));
+  const town=new TownModel({town:read,townAuth:async()=>({configured:false})} as unknown as DesktopAPI,()=>{},()=>{},new SceneStore(),()=>{},()=>{});
+  town.view='bonfire';town.tab='bonfire';town.visible=true;
+  await town.load();
+  town.setBonfireLimit(200);
+  await vi.waitFor(()=>expect(town.loading).toBe(false));
+  expect(town.data?.messages).toEqual([{seq:200,content:'200'}]);
+  expect(town.status).not.toContain('最近 200 条');
+  await town.load(true);
+  expect(read.mock.calls.filter(([query])=>query.kind==='bonfire').map(([query])=>query.limit)).toEqual([100,200,200]);
+ });
  it('discards validators when a refreshed response prohibits storage',async()=>{
   const headers:Headers[]=[];
   const client=new TownClient(()=>'',(async(_url:unknown,init?:RequestInit)=>{

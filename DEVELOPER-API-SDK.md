@@ -137,7 +137,7 @@ Grove 的 `kits` 数组也包含 App 和 Plugin，可用 `kind=kit/app/plugin` �
 
 | 方法 | 路径 | 查询参数或 JSON 请求体 |
 | --- | --- | --- |
-| GET | `/api/bonfire/hear` | `since?`、`limit?`、`compact?` |
+| GET | `/api/bonfire/hear` | `since?`、`limit?`（1–200）、`compact?` |
 | POST | `/api/bonfire/speak` | `{ message, reply_to?: number }` |
 | DELETE | `/api/bonfire/unsay` | `seq` |
 | GET | `/api/messages` | `with=received/sent`、`limit?`、`before?` |

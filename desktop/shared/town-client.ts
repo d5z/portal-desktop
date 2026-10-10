@@ -86,7 +86,11 @@ export function townRoute(query: TownQuery, beingId = ''): { route: string; priv
       const suffix = query.kind === 'seed-lineage' ? '/lineage' : query.kind === 'seed-absorbs' ? '/absorb' : '';
       return { route: `/api/seeds/${query.id}${suffix}`, private: false };
     }
-    case 'bonfire': return { route: '/api/bonfire/hear?limit=100', private: true };
+    case 'bonfire': {
+      const limit = query.limit ?? 100;
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200) throw new Error('篝火加载条数应为 1–200。');
+      return { route: `/api/bonfire/hear?limit=${limit}`, private: true };
+    }
     case 'firesides': return { route: '/api/fireside/list', private: true };
     case 'fireside': case 'fireside-members': {
       if (typeof query.id !== 'string' || !/^\d{1,16}$/.test(query.id)) throw new Error('无效的围炉编号。');

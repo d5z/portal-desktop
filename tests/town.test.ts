@@ -6,6 +6,11 @@ import { TownClient, TownCredentials, townRoute } from '../desktop/main/town/cli
 import type { TownQuery } from '../desktop/shared/types';
 
 describe('Town reads', () => {
+  it('accepts configurable bonfire batches within the server limit', () => {
+    expect(townRoute({kind:'bonfire'}).route).toBe('/api/bonfire/hear?limit=100');
+    for (const limit of [20,50,100,200]) expect(townRoute({kind:'bonfire',limit}).route).toBe(`/api/bonfire/hear?limit=${limit}`);
+    for (const limit of [0,201,-1,1.5,NaN]) expect(()=>townRoute({kind:'bonfire',limit})).toThrow();
+  });
   it('routes only fixed resources with constrained identifiers and pagination', () => {
     expect(townRoute({ kind: 'sent' }).route).toBe('/api/messages?with=sent');
     expect(townRoute({ kind: 'fireside-members', id: '10' }).route).toBe('/api/fireside/members?fireside_id=10');

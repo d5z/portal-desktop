@@ -189,6 +189,7 @@ export class TownModel extends Store {
   search = "";
   scrollKind = "";
   announcementCategory = "";
+  bonfireLimit = 100;
   bonfireAnnouncements: Data[] | null = null;
   announcementsLoading = false;
   announcementsError = "";
@@ -299,6 +300,17 @@ export class TownModel extends Store {
     private hasChat: () => boolean = () => Boolean(this.scenes.being),
   ) {
     super();
+    try {
+      const saved = Number(localStorage.getItem('beings:bonfire-limit'));
+      if ([20, 50, 100, 200].includes(saved)) this.bonfireLimit = saved;
+    } catch { /* Optional reading preference. */ }
+  }
+  setBonfireLimit(limit: number) {
+    if (![20, 50, 100, 200].includes(limit) || limit === this.bonfireLimit) return;
+    this.bonfireLimit = limit;
+    try { localStorage.setItem('beings:bonfire-limit', String(limit)); } catch { /* Optional preference. */ }
+    if (this.view === 'bonfire') void this.load();
+    else this.changed();
   }
   start() {
     let active = true;
@@ -700,6 +712,7 @@ export class TownModel extends Store {
     return {
       kind: (this.view === "town" ? "home" : this.view === "announcements" ? "announcements" : this.tab) as TownKind,
       offset: this.offset,
+      ...(this.view === "bonfire" ? { limit: this.bonfireLimit } : {}),
       ...(this.view === "scrolls" ? { scrollKind: this.scrollKind } : {}),
       ...(this.view === "kits" && this.tab === "grove" ? { groveStatus: this.groveStatus } : {}),
       ...(this.view === "seeds" ? this.seedFilters : {}),
@@ -749,7 +762,7 @@ export class TownModel extends Store {
     this.memberLoading = false;
     const liveAtStart = this.live,
       channel = this.channel(),
-      key = channel && !this.directId ? `${this.view}:${this.tab}` : '';
+      key = channel && !this.directId ? `${this.view}:${this.tab}${this.view === "bonfire" ? `:${this.bonfireLimit}` : ""}` : '';
     const pageKey = JSON.stringify([this.view, this.directId, this.query()]);
     let preservePage = !channel && this.pageKey === pageKey && Boolean(this.data || this.library || this.detail);
     const cachedCatalog = this.catalogView() ? this.catalogCache.get(pageKey) : undefined;
@@ -872,7 +885,7 @@ export class TownModel extends Store {
         if (Array.isArray(result.data.messages)) this.mentionNames = collectMentionNames(list(result.data, 'messages'), this.mentionNames);
         if (channel !== "firesides" && this.tab !== "sent")
           this.acknowledge(channel, liveAtStart);
-        this.status = `来自 beings.town · ${date(result.fetchedAt)} 已刷新${this.view === "bonfire" ? " · 最近 100 条" : this.view === "mail" ? " · 最近 100 封" : ""}${result.warnings?.length ? ` · ${result.warnings[0]}` : ""}`;
+        this.status = `来自 beings.town · ${date(result.fetchedAt)} 已刷新${this.view === "mail" ? " · 最近 100 封" : ""}${result.warnings?.length ? ` · ${result.warnings[0]}` : ""}`;
         if (this.catalogView()) {this.catalogUpdatedAt=Date.now();this.rememberCatalog();}
         if (key) cacheTownData(this.feedCache, key, { data: this.data, status: this.status });
       }
