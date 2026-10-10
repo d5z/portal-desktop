@@ -183,7 +183,7 @@ The following TODOs are grouped by implementation direction, without committed r
 
 - [x] Plugin tags and filtering in Grove, local imports and Grove downloads alongside existing Kit/App flows.
 - [x] Versioned manifests, dynamic navigation, sandboxed HTML views, theme synchronization and private plugin storage.
-- [x] [SDK 1.3](DEVELOPER-API-SDK.md#part-3--客户端插件-api--sdk): standalone TypeScript types, Town reads, Being history/drafts/confirmed streaming chats, command palette, plugin settings and atomic storage updates.
+- [x] [SDK 1.4](DEVELOPER-API-SDK.md#part-3--客户端插件-api--sdk): standalone TypeScript types, Town reads, Being history/drafts/confirmed streaming chats, command palette, plugin settings and atomic storage updates.
 - [x] Workspace context, sidebar/resource slots, disposable domain events and current-scene task status; Pipeline integrates resource collaboration and explicit node/task bindings.
 - [x] Enable, disable, uninstall, source records and session revocation without patching client source.
 - [x] The community Pipeline board is now an independent plugin, with canvas, dragging, comments and persistence verified in Electron.
