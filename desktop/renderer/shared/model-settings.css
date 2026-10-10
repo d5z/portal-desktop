@@ -17,7 +17,7 @@
 #settings-panel button:disabled { cursor: default; opacity: .5; }
 #settings-panel .llm-current { padding: 20px; margin: 0 0 26px; border: 1px solid var(--accent-border); border-radius: 14px; background: var(--accent-tint); }
 #settings-panel .current-model-caption { display: flex; align-items: center; gap: 7px; color: var(--accent); font-size: 11px; font-weight: 500; }
-#settings-panel .model-indicator { width: 6px; height: 6px; background: var(--accent); border-radius: 50%; }
+#settings-panel .model-indicator { width: 6px; height: 6px; flex-shrink: 0; background: var(--green); border-radius: 50%; }
 #settings-panel .model-name { margin: 9px 0 4px; font-size: 20px; font-weight: 600; letter-spacing: -.3px; overflow-wrap: anywhere; }
 #settings-panel .model-detail { font-size: 11px; line-height: 1.7; color: var(--text-dim); overflow-wrap: anywhere; }
 #settings-panel .model-detail span { padding: 0 4px; opacity: .5; }
