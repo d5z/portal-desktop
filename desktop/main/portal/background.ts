@@ -86,7 +86,7 @@ fi
 if [ "$((now - previous))" -ge 60 ]; then crashes=0; fi
 if [ "$crashes" -ge 6 ]; then printf '%s' crash-limit > "$failure"; exit 0; fi
 printf '%s %s\\n' "$now" "$((crashes + 1))" > "$attempt"
-${environmentEntries(environment).map(([key, value]) => `export ${key}=${sh(value)}\n`).join('')}cd ${sh(settings.workspace)}\nexport PATH=${sh(settings.portalEnvironmentPath || environment.PATH || process.env.PATH || '/usr/local/bin:/usr/bin:/bin')}\nexport PORTAL_CONNECT_LINK="$(cat ${sh(path.join(root, 'connection.url'))})"\nexport HEART_PORTAL_SUPERVISED=1 HEART_PORTAL_CLIENT_MANAGED=1 RUST_LOG=info NO_COLOR=1\n` +
+${environmentEntries(environment).map(([key, value]) => `export ${key}=${sh(value)}\n`).join('')}cd ${sh(settings.workspace)}\nexport PATH=${sh(settings.portalEnvironmentPath || environment.PATH || process.env.PATH || '/usr/local/bin:/usr/bin:/bin')}\nexport PORTAL_CONNECT_LINK="$(cat ${sh(path.join(root, 'connection.url'))})"\nexport HEART_PORTAL_LOG_FILE=${sh(path.join(root, 'portal.log'))}\nexport HEART_PORTAL_SUPERVISED=1 HEART_PORTAL_CLIENT_MANAGED=1 RUST_LOG=info NO_COLOR=1\n` +
     `export HEART_PORTAL_STATUS_FILE=${sh(path.join(root, '.portal-connection-status.json'))}\nexport HEART_PORTAL_STATUS_NONCE="$(/usr/bin/uuidgen)"\nprintf '%s' "$HEART_PORTAL_STATUS_NONCE" >${sh(path.join(root, '.portal-status-nonce'))}\n` +
     `printf '%s' "$HEART_PORTAL_STATUS_NONCE" >${sh(path.join(root, '.portal-launch-nonce'))}\n` +
     `export HEART_PORTAL_READY_FILE=${sh(path.join(root, '.portal-ready.json'))}\nexport HEART_PORTAL_READY_NONCE="$HEART_PORTAL_STATUS_NONCE"\n` +
