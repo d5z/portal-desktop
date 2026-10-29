@@ -24,7 +24,7 @@ ToolHost::call_with_scene 在内置、Kit、自定义 MCP 分发前判定 allow 
 
 ## Windows 命令隔离
 
-前台、后台命令统一通过 sandbox::shell_command。安全协作模式为每次命令创建独立 Windows AppContainer，并启用 LPAC，不授予网络能力。只向本次随机 package SID 授予工作区权限。已有 .git、代理目录和 Portal/MCP 配置只读；.env*、SSH 和客户端连接文件不授予访问。硬链接、符号链接和目录联接不授予目标权限。互斥锁串行管理临时 ACL；正常结束撤销授权并删除 profile。
+前台、后台命令统一通过 sandbox::shell_command。安全协作模式为每次命令创建独立 Windows AppContainer，并启用 LPAC，不授予网络能力。只向本次随机 package SID 授予工作区权限。已有 .git、代理目录和 Portal/MCP 配置只读；.env*、SSH 和客户端连接文件不授予访问。存在硬链接的工作区拒绝运行命令，避免修改工作区外同一文件对象的 ACL；符号链接和目录联接不授予目标权限。启动前保存现有对象的 ACL 并隔离继承，再给普通目录授予可继承的本次沙箱权限，使新建文件和子目录可立即读写。受保护对象的祖先目录不可移动；显式指定的配置路径缺失时拒绝启动。互斥锁串行管理临时 ACL；正常结束按文件 ID 恢复原 ACL 和继承设置，清除新对象继承的授权并删除 profile。
 
 为兼容 PowerShell，沙箱进程带有 registryRead、lpacInstrumentation、lpacCom 系统能力。继承句柄限定为标准输入输出；环境变量清空后按系统白名单重建，不继承令牌、代理配置或自定义 PATH。进程挂起创建，加入 kill-on-close Job Object，核验 AppContainer token 后再恢复；最多 32 个子进程。命令结束会终止后代进程。
 
@@ -54,7 +54,7 @@ Windows PowerShell 使用 Workspace:\ 专属 PSDrive，避免给工作区父目�
 
 这是工具授权与 **shell 子进程** 的 OS 隔离，不是整个客户端、模型联网进程或第三方 MCP/Kit 的隔离。经批准的外部工具仍可能拥有宿主权限，对话框会说明。Pi 控制器需要连接模型，属于受信任运行时；工具操作经 Portal 执行。
 
-AppContainer 仍可访问 Windows 允许的系统资源和自身 profile 存储。ACL 方案不防御同用户恶意宿主进程并发替换路径；不要把系统目录或用户主目录设为工作区。新建对象使用 lowbox 默认 ACL。强制终止 helper 或系统崩溃可能留下随机 SID 的临时 ACL/profile；这些 SID 不复用，正常退出会回收。权限降低不等于撤销此前完全信任任务启动的所有外部进程。
+AppContainer 仍可访问 Windows 允许的系统资源和自身 profile 存储。ACL 方案不防御同用户恶意宿主进程并发替换路径；不要把系统目录或用户主目录设为工作区。新建对象继承所在普通目录的本次沙箱授权。强制终止 helper 或系统崩溃可能留下随机 SID 的临时 ACL/profile；这些 SID 不复用，正常退出会回收。权限降低不等于撤销此前完全信任任务启动的所有外部进程。
 
 ## 参考
 
