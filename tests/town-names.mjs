@@ -147,9 +147,11 @@ try {
     assert.equal(await copy.evaluate(el => getComputedStyle(el).opacity), '1');
     assert.equal(await card.evaluate(el => {
       const icon = el.querySelector('.message-copy').getBoundingClientRect();
-      const time = el.querySelector('time').getBoundingClientRect();
-      return icon.right <= time.left && Math.abs((icon.top + icon.bottom) - (time.top + time.bottom)) < 2;
-    }), true, 'Copy stays to the left of the timestamp, centered without overlap');
+      const author = el.querySelector('.social-author').getBoundingClientRect();
+      const meta = el.querySelector('.social-meta').getBoundingClientRect();
+      return icon.left >= author.right && icon.right <= meta.right + 1;
+    }), true, 'Copy stays within the metadata row without overlapping the author');
+    assert.ok(await page.locator('.message-time-divider').count() > 0, 'Timestamps appear as message group dividers');
     await copy.click();
     await card.getByRole('button', { name: '已复制', exact: true }).waitFor();
     assert.equal(await page.evaluate(() => window.fixtureCopied), await page.evaluate(() => window.fixtureMessages[0].content));

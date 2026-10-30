@@ -70,7 +70,6 @@ try{
   const frame=page.frameLocator('#chat');
   await frame.getByText('缓存回复 500',{exact:true}).waitFor();
   // The activity has equal text in many scenes; seq, never text, chooses the target.
-  await page.waitForFunction(()=>document.querySelectorAll('.being-history-row').length===12).catch(async error=>{console.log(await page.evaluate(()=>({rows:document.querySelectorAll('.being-history-row').length,loading:window.app.chatLoading,received:window.received.slice(-8),body:document.querySelector('#root').textContent})));throw error;});
   const jump=async seq=>{
     await page.getByRole('button',{name:'打开动态',exact:true}).click();
     await page.waitForFunction(()=>document.querySelectorAll('.being-history-row').length===12);

@@ -121,6 +121,8 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.pa
   await page.locator('.town-advanced-auth summary').click();
   await page.locator('#town-token').fill('town-fixture-token'); await page.getByRole('button', { name: '保存已有凭据' }).click();
   await page.getByText('一封测试来信').waitFor();
+  await page.locator('#close-client-settings').click();
+  await page.locator('#client-settings-dialog').waitFor({ state: 'hidden' });
   assert.equal(await page.getByRole('button', { name: '关于我', exact: true }).count(), 0);
   await page.getByRole('tab', { name: '已发送', exact: true }).click(); await page.getByText('已发送的测试信件').waitFor();
   await nav('bonfire'); await page.locator('#town-message-0 .social-body strong').getByText('篝火测试', { exact: true }).waitFor(); assert.equal(await page.evaluate(() => window.pwned), undefined);

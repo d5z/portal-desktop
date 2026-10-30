@@ -86,6 +86,12 @@ try {
   }, dir);
   await waitForChatReady(page);
   const chatInput = page.frameLocator('#chat-frame').locator('#input');
+  const fillChatDraft = async text => {
+    await chatInput.press('ControlOrMeta+a');
+    await chatInput.press('Backspace');
+    if (text) await page.keyboard.insertText(text);
+    assert.equal(await chatInput.evaluate(el => el.editor.getMarkdown()), text);
+  };
   const fillTownDraft = async text => {
     const editor = page.locator('#town-send-content');
     await editor.press('ControlOrMeta+a');
@@ -107,7 +113,7 @@ try {
   // Compact menu: nested navigation, interrupted motion, keyboard and merged settings.
   await page.locator('#options-trigger').click();
   assert.deepEqual(await page.locator('#options-home > button').evaluateAll(nodes => nodes.map(node => node.id)),
-    ['local-portal-status', 'open-browser', 'client-settings-button', 'options-help', 'check-updates', 'collect-logs', 'quit-client']);
+    ['local-portal-status', 'client-settings-button', 'options-help', 'check-updates', 'collect-logs', 'quit-client']);
   await page.locator('#options-help').click();
   assert.equal(await page.locator('#conversation-options').getAttribute('open'), '');
   await page.keyboard.press('Escape');
@@ -203,7 +209,7 @@ try {
   // The header prefers the connected identity over names from feed messages.
   assert.equal(await page.locator('#conversation-name').textContent(), '柳树');
   assert.doesNotMatch(await page.locator('#conversation-name').textContent(), /t_[a-zA-Z0-9_-]+/);
-  await chatInput.fill('保留手写草稿');
+  await fillChatDraft('保留手写草稿');
   await partner.getByRole('button', { name: '回复', exact: true }).click();
   await fillTownDraft('语气温和一些');
   assert.equal(await page.locator('#town-send-dialog').getByRole('button', { name: '让 Being 回复', exact: true }).count(), 1);
@@ -222,7 +228,7 @@ try {
   assert.match(beingReplyRequest, /伙伴代发消息/);
   assert.match(beingReplyRequest, /语气温和一些/);
   assert.equal(await chatInput.evaluate(el => el.value ?? el.editor.getMarkdown()), '保留手写草稿');
-  await chatInput.fill('');
+  await fillChatDraft('');
   await open('篝火');
   await partner.getByRole('button', { name: '回复', exact: true }).click();
   await page.locator('#town-reply-preview').getByText('服务端展示名：伙伴代发消息', { exact: true }).waitFor();
@@ -239,14 +245,14 @@ try {
   assert.match(await chatInput.innerText(), /^一起看看篝火里的这段（t_WillowFull）：/);
   assert.equal(await chatInput.locator('blockquote').innerText(), '伙伴代发消息');
   // An existing draft is preserved, and inserting a quote never sends it.
-  await chatInput.fill('保留我的草稿');
+  await fillChatDraft('保留我的草稿');
   await open('篝火');
   await page.locator('.social-message').filter({ hasText: '伙伴代发消息' }).getByRole('button', { name: '一起看', exact: true }).click();
   await page.locator('#scene-compose').click();
   await page.getByText('对话输入框已有草稿，请先处理原草稿，再放入引用。', { exact: true }).waitFor();
   assert.equal(await chatInput.evaluate(el => el.value ?? el.editor.getMarkdown()), '保留我的草稿');
   await page.locator('#close-companion').click();
-  await chatInput.fill('');
+  await fillChatDraft('');
   await open('篝火');
   assert.equal(await page.locator('#town-write').getAttribute('class'), 'town-write-button');
   await page.locator('#town-write').click();
@@ -283,7 +289,7 @@ try {
   await page.waitForFunction(() => document.querySelector('#companion-panel').hidden);
   assert.match(await chatInput.evaluate(el => el.value ?? el.editor.getMarkdown()), /来自伙伴的私信/);
   assert.equal(await app.evaluate(() => globalThis.sdkWrites.length), 2);
-  await chatInput.fill('');
+  await fillChatDraft('');
   await open('私信');
   await page.locator('.social-message').getByRole('button', { name: '回复', exact: true }).click();
   assert.equal(await page.locator('#town-recipient').inputValue(), 'Seam Walker');
@@ -310,7 +316,7 @@ try {
   await page.locator('#scene-compose').click();
   await page.waitForFunction(() => document.querySelector('#companion-panel').hidden);
   assert.match(await chatInput.evaluate(el => el.value ?? el.editor.getMarkdown()), /伙伴代发消息/);
-  await chatInput.fill('');
+  await fillChatDraft('');
   await open('围炉');
   await page.locator('.social-message').getByRole('button', { name: '回复', exact: true }).click();
   await fillTownDraft('SDK 围炉回复');
@@ -329,7 +335,7 @@ try {
   assert.equal(await app.evaluate(() => globalThis.sdkWrites.length), 4);
   assert.equal(await app.evaluate(() => globalThis.sdkPairConfirms.length), 1);
   assert.equal(await app.evaluate(() => globalThis.sdkPairChats.length), 5);
-  await chatInput.fill('');
+  await fillChatDraft('');
   // Manual pairing remains available after an automatic connection.
   await home(); await page.locator('#town-auth-button').click();
   await page.locator('#town-pair-mode').click();

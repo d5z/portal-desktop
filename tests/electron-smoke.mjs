@@ -129,6 +129,15 @@ async function openOptions(page) {
   });
   return options;
 }
+// Exercise the real approval UI for external tools and rejected host writes.
+async function toolWithApproval(page, name, args, allow) {
+  const [result] = await Promise.all([
+    rpc('tools/call', { name, arguments: args }),
+    page.locator('.tool-approval-dialog').getByRole('button', { name: allow ? '允许这一次' : '拒绝', exact: true }).click(),
+  ]);
+  await page.locator('.tool-approval-dialog').waitFor({ state: 'hidden' });
+  return result;
+}
 async function openClientSettings(page) {
   const options = await openOptions(page);
   await clickWhenPointerReady(page, options.locator('#client-settings-button'));
@@ -139,7 +148,14 @@ async function openChatSearch(page) {
   if ((await toggle.getAttribute('aria-expanded')) !== 'true') await toggle.click();
 }
 async function openPlace(page, view) {
-  if (view === 'chat') { await page.locator('#back-to-chat').click(); return; }
+  if (view === 'chat') {
+    if (await page.locator('#client-settings-dialog').isVisible()) {
+      await page.locator('#close-client-settings').click();
+      await page.locator('#client-settings-dialog').waitFor({ state: 'hidden' });
+    }
+    if (await page.locator('#back-to-chat').isVisible()) await page.locator('#back-to-chat').click();
+    return;
+  }
   if (view === 'portal') { await openClientSettings(page); await page.getByRole('tab',{name:'Portal',exact:true}).click(); }
   else await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:({town:'小镇广场',kits:'工具库',bonfire:'篝火',firesides:'围炉',mail:'私信'})[view],exact:true}).click();
 }
@@ -205,7 +221,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   const list = await rpc('tools/list');
   assert(list.tools.some(tool => tool.name === 'portal_file_write'));
   assert(list.tools.some(tool => tool.name === 'desktop_fixture_ping'));
-  const kitReply = await rpc('tools/call', { name: 'desktop_fixture_ping', arguments: { value: 'connected' } });
+  const kitReply = await toolWithApproval(page, 'desktop_fixture_ping', { value: 'connected' }, true);
   assert(JSON.stringify(kitReply).includes('Kit reply: connected'));
   // Install a second real Kit through the client's Grove download IPC. Portal
   // owns discovery and hot reload, so the connection must remain uninterrupted.
@@ -231,10 +247,10 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   }
   assert(reloadedTools.tools.some(tool => tool.name === 'client_download_ping'));
   assert.equal(handshakeCount, beforeKitReload, 'Kit hot reload must not reconnect Portal');
-  const downloadReply = await rpc('tools/call', { name: 'client_download_ping', arguments: { value: 'installed via client' } });
+  const downloadReply = await toolWithApproval(page, 'client_download_ping', { value: 'installed via client' }, true);
   assert(JSON.stringify(downloadReply).includes('Kit reply: installed via client'));
   console.log('PASS: client download, atomic installation, Portal hot reload and real downloaded Kit tool call without reconnecting.');
-  const rejected = await rpc('tools/call', { name: 'portal_file_write', arguments: { path: '../outside.txt', content: 'no' } });
+  const rejected = await toolWithApproval(page, 'portal_file_write', { path: '../outside.txt', content: 'no' }, false);
   assert(rejected.isError || JSON.stringify(rejected).includes('outside workspace'));
   await openPlace(page, 'chat');
   // Attachment upload/parse/delivery uses the dedicated real transport fixture
@@ -307,7 +323,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   // Model settings and the compact options menu preserve the draft.
   await openClientSettings(page);
   await page.getByRole('tab',{name:'模型',exact:true}).click();
-  await page.locator('[data-chat-action="model"]').click();
+  await page.getByRole('tab', { name: 'Being 模型', exact: true }).click();
   const modelPanel = page.locator('#subagent-model-panel #settings-panel');
   await modelPanel.waitFor();
   await modelPanel.getByRole('button', { name: /^Alternate Model/ }).click();
@@ -318,7 +334,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
     provider: 'anthropic',
     base_url: 'https://api.anthropic.com',
   });
-  await modelPanel.locator('.btn-close').dispatchEvent('click');
+  await page.locator('#close-client-settings').click();
   await modelPanel.waitFor({ state: 'hidden' });
   await frame.locator('#input').fill('unsent draft');
   const options = await openOptions(page);
@@ -352,7 +368,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   assert.equal(stopCount, 1);
   await openPlace(page, 'portal');
   const beforeRestart = handshakeCount;
-  await rpc('tools/call', { name: 'portal_restart', arguments: {} });
+  await toolWithApproval(page, 'portal_restart', {}, true);
   await page.waitForTimeout(5500);
   await page.waitForFunction(() => document.querySelector('#portal-phase').textContent === '已连接', { timeout: 15000 });
   assert(handshakeCount > beforeRestart);

@@ -7,7 +7,7 @@ import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import assert from 'node:assert/strict';
-import { desktopExecutable, waitForChatReady } from './support/desktop.mjs';
+import { desktopExecutable, waitForChatReady, clickWhenPointerReady } from './support/desktop.mjs';
 
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'portal-runtime-e2e-'));
 const token = 'local-runtime-fixture';
@@ -156,7 +156,8 @@ try {
   await frame.locator('#pending-files.active').waitFor();
   const openPortal = async () => {
     await page.locator('#options-trigger').click();
-    await page.locator('#client-settings-button').click();
+    await clickWhenPointerReady(page, page.locator('#client-settings-button'));
+    await page.locator('#client-settings-dialog[open]').waitFor();
     await page.getByRole('tab',{name:'Portal',exact:true}).click();
     await page.locator('#portal-settings-page').waitFor({ state: 'visible' });
   };

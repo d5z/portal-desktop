@@ -23,8 +23,8 @@ try {
   page.on('pageerror', e => errors.push(e.message));
   const native = code => app.evaluate(({ BrowserWindow }, code) => BrowserWindow.getAllWindows()[0].contentView.children.find(v => v.webContents).webContents.executeJavaScript(code), code);
   const visible = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].contentView.children.find(v => v.webContents)?.getVisible());
-  await page.locator('#options-trigger').click();
-  await page.locator('#open-browser').click();
+  // Browser links now open through the shell API; the compact menu has no browser item.
+  await page.evaluate(() => window.beings.openBrowser());
   await page.locator('#browser-address').fill(base + '/one?token=fixture-secret');
   await page.locator('#browser-address').press('Enter');
   await page.waitForFunction(() => document.querySelector('#browser-title').textContent === '浏览器测试');
