@@ -8,13 +8,15 @@ import { subagentCatalog } from '../models/subagent-catalog';
 import type { SubagentSetup } from '../../../shared/types';
 
 /** Same model page, with a local Portal adapter instead of Heart's HTTP API. */
-export function SubagentModelSettings({ app }: { app: AppModel }) {
+export function SubagentModelSettings({ app, embedded = false, inline = false, onBusyChange }: { app: AppModel; embedded?: boolean; inline?: boolean; onBusyChange?: (busy: boolean) => void }) {
   const panel = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   const [width, setWidth] = usePanelWidth("being", 320);
   useEffect(() => { closeButton.current?.focus(); }, []);
-  const staged = app.subagentFromConnection;
+  const staged = inline || app.subagentFromConnection;
   const [busy, setBusy] = useState(false);
+  useEffect(() => { onBusyChange?.(busy); }, [busy, onBusyChange]);
+  useEffect(() => () => { onBusyChange?.(false); }, [onBusyChange]);
   const [beingPreset, setBeingPreset] = useState<Preset>();
   const [catalogHint, setCatalogHint] = useState('');
   const updateBeingCatalog = (config: LlmConfig) => {
@@ -112,7 +114,12 @@ export function SubagentModelSettings({ app }: { app: AppModel }) {
             const previous = app.form?.subagentSetup;
             if (!input.api_key && previous?.provider === input.provider && previous?.base_url === input.base_url) input.api_key = previous.api_key;
             app.editForm('subagentSetup', input);
-            app.closeSubagentSettings();
+            if (inline) {
+              state.config = { enabled: input.enabled !== false, provider: input.provider, model: input.model, thinking: input.thinking, base_url: input.base_url, api: input.api, presets };
+              state.configStatus = '已加入待保存配置，请点击上方保存按钮应用。';
+              state.configStatusClass = 'success';
+              state.changed();
+            } else app.closeSubagentSettings();
           } else {
             if (!app.snapshot) throw new Error('请先连接 Being。');
             const next = await app.api.save({ ...app.snapshot.settings, subagentSetup: input });
@@ -133,31 +140,43 @@ export function SubagentModelSettings({ app }: { app: AppModel }) {
       },
     };
     return { state, runtime, dispose: () => { disposed = true; ++revision; } };
-  }, [app, staged]);
+  }, [app, staged, inline]);
   useEffect(() => () => { adapter.dispose(); being.dispose(); }, [adapter, being]);
+  useEffect(() => {
+    if (inline && !app.form?.subagentSetup && adapter.state.configStatus.startsWith('已加入待保存配置')) {
+      void adapter.runtime.loadLlmConfig();
+    }
+  }, [inline, app.form?.subagentSetup, adapter]);
   const close = () => { if (!busy) app.closeSubagentSettings(); };
   const switchTarget = (value: "Heart" | "subagent") => {
     if (busy) return;
     setTarget(value);
     setVisited(previous => new Set([...previous, value]));
   };
-  return <div id="subagent-model-panel" ref={panel} style={{width, flexBasis:width}}>
-    <PanelResizeHandle panel={panel} label="调整模型设置宽度" width={width} onResize={setWidth} initial={320} min={240} max={640} reserve={396} />
-    <aside id="settings-panel" aria-label="模型设置" onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); close(); } }}>
-      <div className="settings-header panel-header">
+  return <div id="subagent-model-panel" ref={panel} className={embedded ? "embedded-model-settings" : undefined} style={embedded ? undefined : {width, flexBasis:width}}>
+    {!embedded && <PanelResizeHandle panel={panel} label="调整模型设置宽度" width={width} onResize={setWidth} initial={320} min={240} max={640} reserve={396} />}
+    <aside id="settings-panel" aria-label="模型设置" onKeyDown={event => { if (!embedded && event.key === 'Escape') { event.stopPropagation(); close(); } }}>
+      <div className="settings-header panel-header" hidden={embedded}>
         <div><div className="settings-title-line"><h2>模型设置</h2></div>
           <p>{target === 'Heart' ? '选择当前 Being 使用的模型' : staged ? '选择 subagent 模型，随连接一起安装与配置' : '配置本机 subagent 使用的模型'}</p>
         </div>
         <button ref={closeButton} type="button" className="btn-close" aria-label="关闭模型设置" disabled={busy} onClick={close}>✕</button>
       </div>
       <div className="model-target-header"><div className="toggle-group model-targets" role="tablist" aria-label="模型配置对象">
-        {(['Heart', 'subagent'] as const).map(value => <button key={value} type="button" role="tab" id={`model-tab-${value}`} aria-controls={`model-content-${value}`} aria-selected={target === value} className={target === value ? 'active' : ''} disabled={busy} onClick={() => switchTarget(value)}>{value === 'Heart' ? 'Being 模型' : 'subagent'}</button>)}
+        {(['Heart', 'subagent'] as const).map(value => <button key={value} type="button" role="tab" id={`model-tab-${value}`} aria-controls={`model-content-${value}`} aria-selected={target === value} tabIndex={target === value ? 0 : -1}
+          onKeyDown={event => {
+            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || busy) return;
+            event.preventDefault();
+            const next = event.key === 'Home' ? 'Heart' : event.key === 'End' ? 'subagent' : target === 'Heart' ? 'subagent' : 'Heart';
+            switchTarget(next);
+            document.getElementById(`model-tab-${next}`)?.focus();
+          }} className={target === value ? 'active' : ''} disabled={busy} onClick={() => switchTarget(value)}>{value === 'Heart' ? 'Being 模型' : 'subagent'}</button>)}
       </div></div>
       {(['Heart', 'subagent'] as const).map(value => <div key={value} id={`model-content-${value}`} role="tabpanel" aria-labelledby={`model-tab-${value}`} className="model-target-content" hidden={target !== value}>
         {visited.has(value) && <ChatSettings state={value === 'Heart' ? being.state : adapter.state} runtime={value === 'Heart' ? being.runtime : adapter.runtime}
           copyPreset={value === 'subagent' ? beingPreset : undefined} catalogHint={value === 'subagent' ? catalogHint : undefined}
           onEnableSubagent={value === 'subagent' && !staged ? () => app.enableSubagent() : undefined}
-          open contentOnly target={value} staged={value === 'subagent' && staged} close={close} onBusy={setBusy} />}
+          open contentOnly inlineEditing={inline} target={value} staged={value === 'subagent' && staged} close={close} onBusy={setBusy} />}
       </div>)}
     </aside>
   </div>;

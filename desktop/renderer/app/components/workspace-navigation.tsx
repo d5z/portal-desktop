@@ -158,18 +158,19 @@ export function BeingInfo({ app }: { app: AppModel }) {
   const name = town.displayName || app.snapshot?.settings.being || "Being";
   const status = !app.snapshot?.settings.hasToken ? "未连接" : ({online:"已连接",connecting:"连接中",reconnecting:"重连中",offline:"已离线",degraded:"连接不稳定"}[app.connection] || "正在确认连接");
   const hidden = !app.beingInfoOpen || app.view !== "chat";
-  const [currentModel, setCurrentModel] = useState('');
+  const modelKey = JSON.stringify([app.snapshot?.settings.endpoint, app.snapshot?.settings.being, app.snapshot?.settings.hasToken]);
+  const [modelPreview, setModelPreview] = useState({ key: '', label: '' });
+  const currentModel = modelPreview.key === modelKey ? modelPreview.label : '';
   const connected = Boolean(app.snapshot?.settings.hasToken);
   useEffect(() => {
     let active = true;
-    setCurrentModel('');
     if (!hidden && connected && !app.subagentSettingsOpen) {
       void app.api.beingModelConfig().then(config => {
-        if (active) setCurrentModel(typeof config.model === 'string' ? config.model : '查看与配置');
-      }).catch(() => { if (active) setCurrentModel('查看与配置'); });
+        if (active) setModelPreview({ key: modelKey, label: typeof config.model === 'string' ? config.model : '查看与配置' });
+      }).catch(() => { if (active) setModelPreview(previous => previous.key === modelKey && previous.label ? previous : { key: modelKey, label: '查看与配置' }); });
     }
     return () => { active = false; };
-  }, [app, hidden, connected, app.snapshot?.settings.being, app.snapshot?.settings.endpoint, app.subagentSettingsOpen]);
+  }, [app, hidden, connected, modelKey, app.subagentSettingsOpen]);
 
   return <aside ref={panel} style={{ width, flexBasis: width }} id="being-info" className="being-info" aria-label={privacyOpen ? "隐私说明" : "Being 信息"} hidden={hidden}>
     <PanelResizeHandle panel={panel} label="调整 Being 信息宽度" width={width} onResize={setWidth} initial={320} reserve={396} disabled={hidden} />

@@ -66,10 +66,10 @@
 :root[data-theme=dark] :is(.reading-text,.composer-highlight) .hljs-string{color:#a5d6ff}:root[data-theme=dark] :is(.reading-text,.composer-highlight) .hljs-attr{color:#e3b341}:root[data-theme=dark] :is(.reading-text,.composer-highlight) .hljs-number,:root[data-theme=dark] :is(.reading-text,.composer-highlight) .hljs-literal{color:#79c0ff}:root[data-theme=dark] :is(.reading-text,.composer-highlight) .hljs-keyword{color:#ff7b72}
 
 /* Each composer action owns a column, including when the desktop adds permissions. */
-#input-area #input-row{grid-template-columns:32px minmax(0,1fr) 36px}
+#input-area #input-row{grid-template-columns:32px minmax(0,1fr) 34px}
 #input-area #input-row>.composer-add{grid-column:1;grid-row:2;align-self:center}
 #input-area #input-row #send-btn{grid-column:3}
-#input-area #input-row:has(.permission-quick-trigger){grid-template-columns:32px max-content minmax(0,1fr) 36px}
+#input-area #input-row:has(.permission-quick-trigger){grid-template-columns:32px max-content minmax(0,1fr) 34px}
 #input-area #input-row>.permission-quick-trigger{grid-column:2;grid-row:2;display:inline-flex;align-items:center;justify-content:center;gap:5px;width:max-content;height:32px;min-width:32px;min-height:32px;padding:0 8px;border:0;border-radius:8px;font:12px/20px var(--font-sans,sans-serif);white-space:nowrap}
 #input-area #input-row>.permission-quick-trigger svg{width:16px;height:16px}
 #input-area #input-row>.permission-quick-trigger .permission-chevron{width:10px;height:10px}
@@ -82,11 +82,17 @@
 .composer-add-trigger:hover,.composer-add-trigger[aria-expanded=true]{background:var(--bg-softer);color:var(--text)}
 .composer-add-trigger[data-active=true]{color:var(--accent)}
 .composer-add-dot{position:absolute;right:2px;top:2px;width:5px;height:5px;border-radius:50%;background:var(--accent);box-shadow:0 0 0 2px var(--bg)}
-#input-area #input-row:has(#input) #send-btn{background:var(--text);color:var(--bg);border-radius:12px;transition:opacity .14s,transform .14s}
-#input-area #input-row:has(#input) #send-btn::before{background-color:var(--bg)}
-#input-area #input-row:has(#input) #send-btn:hover:not(:disabled){background:var(--text);opacity:.85}
-#input-area #input-row #send-btn:active:not(:disabled){transform:scale(.94)}
+/* Muse-style send and stop share one quiet circular control. */
+#input-area #input-row #send-btn{display:grid;place-items:center;flex:none;width:34px;height:34px;min-width:34px;min-height:34px;margin:0;padding:0;border:0;border-radius:50%;background:#c6e2fb;color:#315c83;box-shadow:0 1px 2px #244b7014;opacity:1;cursor:pointer;align-self:center;transition:background-color .14s ease,color .14s ease,transform .14s ease}
+#input-area #input-row #send-btn svg{display:block;width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+#input-area #input-row #send-btn.stop svg rect{fill:currentColor;stroke:none}
+#input-area #input-row #send-btn:hover:not(:disabled){background:#acd5fc;color:#23496c}
+#input-area #input-row #send-btn:disabled{background:#edf4fb;color:#9da9b5;box-shadow:none;cursor:default}
+#input-area #input-row #send-btn:active:not(:disabled){transform:scale(.95)}
 #input-area #input-row #send-btn:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+:root[data-theme=dark] #input-area #input-row #send-btn{background:#365a78;color:#edf6ff}
+:root[data-theme=dark] #input-area #input-row #send-btn:hover:not(:disabled){background:#416b8e}
+:root[data-theme=dark] #input-area #input-row #send-btn:disabled{background:#293d50;color:#8293a3}
 #input-area #input-row>.chat-composer{grid-column:1 / -1;grid-row:1;min-width:0}
 .composer-add-menu,.composer-slash-menu{box-sizing:border-box;padding:7px;border:1px solid color-mix(in srgb,var(--text) 12%,transparent);border-radius:18px;background:var(--bg);color:var(--text);box-shadow:0 16px 48px #00000012,0 3px 10px #00000006;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;font:13px/1.5 var(--font-sans,sans-serif)}
 :root[data-theme=dark] :is(.composer-add-menu,.composer-slash-menu){background:color-mix(in srgb,var(--bg) 92%,var(--text));box-shadow:0 16px 48px #00000038,0 3px 10px #00000020}

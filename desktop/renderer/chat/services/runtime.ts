@@ -718,8 +718,7 @@ function createStreamRuntime(state: any, options: any): any {
       renderActivityLogTimer = null;
       if (renderActivityLogPending) {
         renderActivityLogPending = false;
-        renderActivityLog();
-        // start another cooldown window
+        // Render once and start another cooldown window.
         scheduleRenderActivityLog();
       }
     }, 200);
@@ -749,7 +748,9 @@ function createStreamRuntime(state: any, options: any): any {
   let tuiHintText = "";
 
   function setTuiHint(text: any) {
-    tuiHintText = text || "";
+    const next = text || "";
+    if (tuiHintText === next) return;
+    tuiHintText = next;
     updateRun();
     changed();
   }
@@ -777,6 +778,7 @@ function createStreamRuntime(state: any, options: any): any {
   }
 
   function tuiClear() {
+    if (!tuiElapsedTimer && tuiCurrentState === null && !tuiCurrentArg && !tuiHintText) return;
     clearInterval(tuiElapsedTimer);
     tuiElapsedTimer = null;
     tuiCurrentState = null;
@@ -838,8 +840,6 @@ function createStreamRuntime(state: any, options: any): any {
       breaksRoleGroup = gap > 60000;
       if (gap > 300000) {
         hasTimeGap = true;
-        const prev = new Date(prevMessageTime);
-        addTimeGap(formatMessageTime(prev), scene);
       }
     }
     if (msgTime) lastMessageTime = Math.max(lastMessageTime || 0, msgTime);
@@ -869,16 +869,6 @@ function createStreamRuntime(state: any, options: any): any {
     moveRun();
     changed();
     return message;
-  }
-
-  function addTimeGap(text: any, scene: any) {
-    state.items.push({
-      ...scene,
-      kind: "separator",
-      id: `gap-${options.nextId()}`,
-      text: `— ${text} —`,
-    });
-    changed();
   }
 
   // History markers describe an autonomous breath transition; render them as a
@@ -948,12 +938,39 @@ function createStreamRuntime(state: any, options: any): any {
     changed();
   }
 
+  /** Both SSE and replay share one visual writer. After the first bubble,
+   * token bursts update the store only once per animation frame. */
+  function appendStreamText(text: string) {
+    removeThinkingIndicator();
+    tuiClear();
+    // A final answer can resume after the waiting indicators already cleared.
+    // Refresh the phase once without copying the tool log for every token.
+    if (currentRun?.status !== 'replying') updateRun();
+    streamText += text;
+    if (!streamMessage) {
+      const visible = cleanContent(streamText);
+      if (visible) streamMessage = addMessage("being", visible, true);
+    } else if (!renderTimer) {
+      const rafEpoch = writerEpoch;
+      renderTimer = requestAnimationFrame(() => {
+        renderTimer = null;
+        if (rafEpoch !== writerEpoch) return;
+        if (streamMessage && streamText) {
+          const visible = cleanContent(streamText);
+          if (visible) updateMessage(streamMessage, visible);
+        }
+      });
+    }
+  }
+
   function showThinkingIndicator() {
+    if (state.thinking) return;
     state.thinking = true;
     changed();
   }
 
   function removeThinkingIndicator() {
+    if (!state.thinking) return;
     state.thinking = false;
     changed();
   }
@@ -1716,28 +1733,7 @@ function createStreamRuntime(state: any, options: any): any {
               const text = data.delta?.text || "";
               if (!text) continue;
               if (myEpoch !== writerEpoch) continue; // F2: 已被 poller 接管，静默丢弃
-              removeThinkingIndicator();
-              tuiClear();
-              streamText += text;
-
-              if (!streamMessage) {
-                streamMessage = addMessage("being", streamText, true);
-              }
-              // Smooth streaming: rAF for visual updates, markdown re-parse throttled
-              if (!renderTimer) {
-                const rafEpoch = writerEpoch;
-                renderTimer = requestAnimationFrame(() => {
-                  renderTimer = null;
-                  if (rafEpoch !== writerEpoch) return; // F2
-                  if (streamMessage && streamText) {
-                    const visible = cleanContent(streamText);
-                    if (visible) {
-                      updateMessage(streamMessage, visible);
-                      changed();
-                    }
-                  }
-                });
-              }
+              appendStreamText(text);
             }
 
             if (eventType === "thinking" || eventType === "reasoning") {
@@ -3516,27 +3512,7 @@ function createStreamRuntime(state: any, options: any): any {
       case "content_block_delta": {
         const text = eventData.delta?.text || "";
         if (!text) break;
-        removeThinkingIndicator();
-        tuiClear();
-        streamText += text;
-        if (!streamMessage) {
-          const visibleText = cleanContent(streamText);
-          if (visibleText)
-            streamMessage = addMessage("being", visibleText, true);
-        } else if (!renderTimer) {
-          const rafEpoch = writerEpoch;
-          renderTimer = requestAnimationFrame(() => {
-            renderTimer = null;
-            if (rafEpoch !== writerEpoch) return; // F2
-            if (streamMessage && streamText) {
-              const visible = cleanContent(streamText);
-              if (visible) {
-                updateMessage(streamMessage, visible);
-                changed();
-              }
-            }
-          });
-        }
+        appendStreamText(text);
         break;
       }
       case "thinking":

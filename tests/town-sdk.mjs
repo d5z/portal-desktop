@@ -126,13 +126,11 @@ try {
   await page.locator('#client-settings-dialog[open]').waitFor();
   await page.locator('#settings-tab-appearance').click();
   assert.equal(await page.locator('#theme-toggle').isVisible(), true);
-  await page.locator('#settings-tab-connections').click();
-  assert.equal(await page.locator('#settings-button').isVisible(), true);
+  await page.getByRole('tab',{name:'Being',exact:true}).click();
+  await page.locator('#connection-link').waitFor({state:'visible'});
+  assert.equal(await page.locator('dialog[open]').count(),1);
   await page.screenshot({ path: path.join(os.tmpdir(), 'town-settings-review.png') });
-  await page.locator('#settings-button').click();
-  assert.equal(await page.locator('#client-settings-dialog').evaluate(el => el.open), false);
-  await page.locator('#settings-dialog[open]').waitFor();
-  await page.locator('#close-settings').click();
+  await page.locator('#close-client-settings').click();
   await page.locator('#options-trigger').click();
   await page.waitForFunction(() => document.querySelector('.options-menu').getAnimations().length === 0);
   await page.screenshot({ path: path.join(os.tmpdir(), 'town-menu-review.png') });
@@ -161,8 +159,8 @@ try {
       await new Promise(resolve => setTimeout(resolve, 20));
     }
   });
-  await page.locator('#close-town-auth').click();
-  await page.waitForFunction(() => !document.querySelector('#town-auth-dialog').open);
+  await page.locator('#close-client-settings').click();
+  await page.locator('#client-settings-dialog').waitFor({state:'hidden'});
   assert.equal(await page.evaluate(async () => (await window.beings.townAuth()).configured), false);
   assert.equal(await app.evaluate(() => globalThis.sdkPairConfirms.length), 0);
   await page.locator('#town-auth-button').click();
@@ -175,7 +173,9 @@ try {
   await page.locator('#town-pair-mode').click();
   await app.evaluate(() => { globalThis.sdkPairMode = 'normal'; });
   await page.locator('#town-auth-form button[type="submit"]').click();
-  await page.waitForFunction(() => !document.querySelector('#town-auth-dialog').open);
+  await page.getByText('已连接 Town。',{exact:true}).waitFor();
+  await page.locator('#close-client-settings').click();
+  await page.locator('#client-settings-dialog').waitFor({state:'hidden'});
   await page.waitForFunction(async () => (await window.beings.townLive()).phase === 'connected');
   assert.equal(await page.frameLocator('#chat-frame').locator('#input').evaluate(el => el.value ?? el.editor.getMarkdown()), '配对期间保留草稿');
   await page.frameLocator('#chat-frame').locator('#input').fill('');
@@ -336,7 +336,9 @@ try {
   await page.locator('#town-being').fill('willow');
   await page.locator('#town-pair-code').fill('AB3XY9');
   await page.locator('#town-auth-form button[type="submit"]').click();
-  await page.waitForFunction(() => !document.querySelector('#town-auth-dialog').open);
+  await page.getByText('已连接 Town。',{exact:true}).waitFor();
+  await page.locator('#close-client-settings').click();
+  await page.locator('#client-settings-dialog').waitFor({state:'hidden'});
   assert.equal(await app.evaluate(() => globalThis.sdkPairConfirms.length), 2);
   assert.equal(await app.evaluate(() => globalThis.sdkPairChats.length), 5);
   console.log('PASS: authenticated automatic pairing, stream cancellation, auth-error fallback, preserved chat drafts and manual pairing; explicit private quotations work with canonical Town IDs and imported credentials without re-pairing or sending.');

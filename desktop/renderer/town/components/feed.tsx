@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { Fragment, memo, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from "react";
 import {
   feedMessages,
   feedDisplayName,
@@ -14,6 +14,8 @@ import { sceneExcerpt } from "../../shared/models/scene";
 import { Markdown, markdownText } from "../../shared/components/markdown";
 import { collectMentionNames, mentionText, type MentionNames } from '../models/mentions';
 import { MentionText } from './mention-text';
+import {useMessageMenu} from '../../shared/components/message-menu';
+import {startsTimeGroup,messageTimeLabel} from '../../shared/models/message-time';
 import { CopyMessage } from '../../shared/components/copy-message';
 const messageKey = (message: FeedMessage) => str(message.entry.id || message.entry.seq ||
   `${message.authorId}:${message.rawDate}:${message.index}`);
@@ -21,15 +23,18 @@ export function TownFeed({
   town,
   data,
   filterKey,
+  heading,
 }: {
   town: TownModel;
   data: Data;
   filterKey: string;
+  heading?: import("react").ReactNode;
 }) {
   const [filters, setFilters] = useState<FeedFilters>(
     () => town.feedFilters[filterKey] || newFeedFilters(),
   );
   const [selected, setSelected] = useState("");
+  const messageMenu=useMessageMenu(text=>town.api.copyText(text),filterKey);
   const more = useRef<HTMLDetailsElement>(null);
   const me = town.me || (typeof data.being === "string" ? data.being : "");
   const mail =
@@ -147,81 +152,85 @@ export function TownFeed({
   );
   return (
     <div className="social-feed">
-      <div className="feed-controls">
-        {mail && summary}
-        {!mail && (
-          <div className="feed-relations" aria-label="消息关系筛选">
-            {[
-              ["all", "全部"],
-              ["about", "关于我"],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                data-relation={value}
-                disabled={!me && value !== "all"}
-                className={effective.relation === value ? "selected" : ""}
-                aria-pressed={effective.relation === value}
-                onClick={() => setFilters({ ...effective, relation: value })}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        )}
-        <details
-          className="feed-options"
-          ref={more}
-          onKeyDown={(event) => {
-            if (event.key === "Escape") {
-              event.stopPropagation();
-              // Let the native picker close before dismissing its filter panel.
-              if (event.target instanceof Element && event.target.closest("select:open")) return;
-              event.preventDefault();
-              event.currentTarget.open = false;
-              event.currentTarget.querySelector("summary")?.focus();
-            }
-          }}
-        >
-          <summary>
-            {effective.order !== "newest" ||
-            effective.days !== "all" ||
-            effective.author
-              ? "筛选 · 已设置"
-              : "筛选"}
-          </summary>
-          <div className="feed-selectors">
-            {select(
-              "排序",
-              [
-                ["newest", "最新在前"],
-                ["oldest", "最早在前"],
-              ],
-              "order",
-            )}
-            {select(
-              "时间",
-              [
-                ["all", "全部时间"],
-                ["1", "最近 24 小时"],
-                ["7", "最近 7 天"],
-                ["30", "最近 30 天"],
-              ],
-              "days",
-            )}
-            {select("作者", [["", "全部作者"], ...authors], "author")}
-          </div>
-        </details>
+      <div className="feed-header">
+        {heading}
+        <div className="feed-controls">
+          {!mail && (
+            <div className="feed-relations" aria-label="消息关系筛选">
+              {[
+                ["all", "全部"],
+                ["about", "关于我"],
+              ].map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  data-relation={value}
+                  disabled={!me && value !== "all"}
+                  className={effective.relation === value ? "selected" : ""}
+                  aria-pressed={effective.relation === value}
+                  onClick={() => setFilters({ ...effective, relation: value })}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          )}
+          {summary}
+          <details
+            className="feed-options"
+            ref={more}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.stopPropagation();
+                // Let the native picker close before dismissing its filter panel.
+                if (event.target instanceof Element && event.target.closest("select:open")) return;
+                event.preventDefault();
+                event.currentTarget.open = false;
+                event.currentTarget.querySelector("summary")?.focus();
+              }
+            }}
+          >
+            <summary>
+              {effective.order !== "newest" ||
+              effective.days !== "all" ||
+              effective.author
+                ? "筛选 · 已设置"
+                : "筛选"}
+            </summary>
+            <div className="feed-selectors">
+              {select(
+                "排序",
+                [
+                  ["newest", "最新在前"],
+                  ["oldest", "最早在前"],
+                ],
+                "order",
+              )}
+              {select(
+                "时间",
+                [
+                  ["all", "全部时间"],
+                  ["1", "最近 24 小时"],
+                  ["7", "最近 7 天"],
+                  ["30", "最近 30 天"],
+                ],
+                "days",
+              )}
+              {select("作者", [["", "全部作者"], ...authors], "author")}
+            </div>
+          </details>
+        </div>
       </div>
-      {!mail && summary}
       <div className="social-messages">
-        {filtered.map((message) => {
+        {filtered.map((message,index) => {
           const id = messageKey(message);
           const location = messageLocations.get(str(mail ? message.entry.id : message.entry.seq));
           const replyTarget = messageLocations.get(str(message.entry.reply_to));
           return (
+            <Fragment key={id}>
+            {startsTimeGroup(message.time,filtered[index-1]?.time)&&<time className="message-time-divider" dateTime={new Date(message.time).toISOString()}>{messageTimeLabel(message.time)}</time>}
             <Message
-              key={id}
+              openMenu={messageMenu.openMenu}
               {...{ message, town, mail, mentionNames }}
               domId={location?.domId || `town-message-${message.index}`}
               replyTarget={replyTarget?.message}
@@ -231,6 +240,7 @@ export function TownFeed({
               onSelect={onSelect}
               canReply={town.live?.phase === 'connected'}
             />
+            </Fragment>
           );
         })}
         {!filtered.length && (
@@ -246,14 +256,15 @@ export function TownFeed({
             {messages.length > 0 && (
               <button
                 className="secondary"
-                onClick={() => setFilters(newFeedFilters())}
+                onClick={() => { setFilters(newFeedFilters()); town.setSearch(""); }}
               >
-                重置筛选
+                清空搜索与筛选
               </button>
             )}
           </div>
         )}
       </div>
+      {messageMenu.menu}
     </div>
   );
 }
@@ -269,7 +280,9 @@ const Message = memo(function Message({
   onJumpReply,
   selected,
   onSelect,
+  openMenu,
 }: {
+  openMenu: ReturnType<typeof useMessageMenu>["openMenu"];
   message: FeedMessage;
   town: TownModel;
   mail?: "all" | "inbox" | "sent";
@@ -290,7 +303,6 @@ const Message = memo(function Message({
     [mentionNames],
   );
   const via = str(m.entry.via),
-    validTime = Number.isFinite(m.time),
     replyId = Number(m.entry.seq),
     state = str(m.entry.delivery_status);
   const reply = mail ? mailReply(m) : Number.isSafeInteger(replyId) && replyId > 0
@@ -320,6 +332,11 @@ const Message = memo(function Message({
         .slice(0, 240) : "",
     [collapsible, m.content, mentionNames],
   );
+  const quotedContent = str(m.entry.reply_to_preview) || replyTarget?.content || "原消息预览不可用";
+  const quotedPreview = useMemo(
+    () => markdownText(quotedContent.slice(0, 500), text => mentionText(text, mentionNames)).replace(/\s+/g, ' ').trim(),
+    [quotedContent, mentionNames],
+  );
   const body = (
     <Markdown richCode className="reading-text social-body" content={m.content}
       renderText={renderText} />
@@ -328,7 +345,7 @@ const Message = memo(function Message({
     <article
       id={domId}
       tabIndex={-1}
-      className={`social-message${m.mentioned ? " mentions-me" : ""}${selected ? " scene-selected" : ""}`}
+      className={`social-message${m.mine ? " social-mine" : ""}${m.mentioned ? " mentions-me" : ""}${selected ? " scene-selected" : ""}`}
     >
       <span className="social-avatar" aria-hidden="true">
         {authorName === '未命名 Being' ? '·' : authorName.slice(0, 1)}
@@ -354,20 +371,12 @@ const Message = memo(function Message({
           )}
           <span className="message-time-actions">
             <CopyMessage text={m.content} copy={text => town.api.copyText(text)} />
-            <time
-              dateTime={validTime ? new Date(m.time).toISOString() : undefined}
-            >
-              {validTime
-                ? new Date(m.time).toLocaleString("zh-CN", {
-                    month: "2-digit",
-                    day: "2-digit",
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  })
-                : m.rawDate}
-            </time>
+
           </span>
         </div>
+        <div className="social-bubble" tabIndex={0} role="group" aria-label={`${authorName}的消息`} aria-haspopup="menu"
+          onContextMenu={event=>openMenu(event,{text:m.content,time:m.time,fallbackTime:m.rawDate})}
+          onKeyDown={event=>openMenu(event,{text:m.content,time:m.time,fallbackTime:m.rawDate})}>
         {m.entry.reply_to != null && (
           <details
             className={`feed-reply-preview${replyTarget ? " has-full-reply" : ""}`}
@@ -376,12 +385,7 @@ const Message = memo(function Message({
             <summary>
               <span className="feed-reply-copy">
                 <strong>回复 {replyTarget ? feedDisplayName(replyTarget.author, replyTarget.authorId) : replyAuthor}</strong>
-                <span>
-                  <MentionText
-                    text={str(m.entry.reply_to_preview).slice(0, 500) || replyTarget?.content.slice(0, 500) || "原消息预览不可用"}
-                    names={mentionNames}
-                  />
-                </span>
+                <span className="feed-reply-excerpt">{quotedPreview}</span>
               </span>
               <span className="feed-reply-toggle" aria-hidden="true" />
             </summary>
@@ -404,10 +408,11 @@ const Message = memo(function Message({
           </details>
         )}
         {collapsible ? (
-          <SmoothMessageExpansion snippet={snippet}>{body}</SmoothMessageExpansion>
+          <MessageExpansion snippet={snippet}>{body}</MessageExpansion>
         ) : (
           body
         )}
+        </div>
         <div className="social-foot">
           {mail
             ? labels[state] || state
@@ -432,31 +437,28 @@ const Message = memo(function Message({
   );
 });
 
-function SmoothMessageExpansion({snippet,children}:{snippet:string;children:import('react').ReactNode}) {
+function MessageExpansion({snippet,children}:{snippet:string;children:import('react').ReactNode}) {
   const [open,setOpen]=useState(false);
   const [visited,setVisited]=useState(false);
+  const contentId=useId();
   const box=useRef<HTMLDivElement>(null);
-  const motion=useRef<Animation|null>(null);
-  const from=useRef<number|null>(null);
+  const restoreAnchor=useRef(false);
   const toggle=()=>{
-    if (!box.current) return;
-    from.current=box.current.getBoundingClientRect().height;
-    motion.current?.cancel();
+    // Collapse back to the message instead of leaving the reader below it.
+    const scroller=box.current?.closest('.fireside-thread, #town-body');
+    restoreAnchor.current=Boolean(open && box.current && scroller &&
+      box.current.getBoundingClientRect().top < scroller.getBoundingClientRect().top);
     setVisited(true);setOpen(value=>!value);
   };
   useLayoutEffect(()=>{
-    const node=box.current;
-    if (!node || from.current===null) return;
-    const start=from.current;from.current=null;
-    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
-    const animation=node.animate([{height:`${start}px`},{height:`${node.getBoundingClientRect().height}px`}],{duration:260,easing:'cubic-bezier(.2,.8,.2,1)'});
-    motion.current=animation;
-    animation.onfinish=()=>{motion.current=null;};
-    return ()=>animation.cancel();
+    if (!open && restoreAnchor.current) {
+      box.current?.closest('article')?.scrollIntoView({block:'start',behavior:'instant'});
+      restoreAnchor.current=false;
+    }
   },[open]);
   return <div className="social-expansion" ref={box}>
     <div hidden={open}><span className="social-preview">{snippet}</span></div>
-    {visited && <div hidden={!open}>{children}</div>}
-    <button className="text-button expand-label" type="button" aria-expanded={open} onClick={toggle}>{open?'收起全文':'展开全文'}</button>
+    <div id={contentId} className="social-expanded-body" hidden={!open}>{visited ? children : null}</div>
+    <button className="text-button expand-label" type="button" aria-controls={contentId} aria-expanded={open} onClick={toggle}>{open?'收起全文':'展开全文'}</button>
   </div>;
 }

@@ -1,3 +1,8 @@
+import useMemoizedFn from 'ahooks/es/useMemoizedFn';
+import { useFileDrop } from './hooks/use-file-drop';
+import { useChatViewport } from './hooks/use-chat-viewport';
+import { useMessageSelection } from './hooks/use-message-selection';
+import { useChatShortcuts } from './hooks/use-chat-shortcuts';
 import { LocalFileAction, requestLocalFilePreview } from '../shared/components/local-file-link';
 import { PermissionIcon, choicesFor } from '../shared/components/permission-picker';
 import { SbsControl } from "../shared/components/sbs-control";
@@ -14,6 +19,7 @@ import { ScheduledMessage } from './components/scheduling';
 import { splitSchedulingHint, withScheduling } from './models/scheduling';
 import {
   Component,
+  Fragment,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -37,6 +43,8 @@ import { type ComposerHandle } from "../shared/components/rich-composer";
 import { ChatComposer } from "./components/composer";
 import { ComposerAddMenu } from './components/composer-add-menu';
 import { canUseComposerCommand, parseComposerCommands } from './models/composer-commands';
+import {useMessageMenu} from '../shared/components/message-menu';
+import {startsTimeGroup,messageTimeLabel} from '../shared/models/message-time';
 import { CopyMessage } from '../shared/components/copy-message';
 import { TemperatureGlow, ChatActivity } from "./components/messages";
 import { SceneLoading } from './components/scene-loading';
@@ -130,18 +138,17 @@ function ChatView({
   mobileWeb: boolean;
 }) {
   useModel(state);
-  const [nativeTouch, setNativeTouch] = useState(() => mobileWeb && matchMedia('(max-width: 760px), (hover: none) and (pointer: coarse)').matches);
+  const { viewport, nativeTouch } = useChatViewport(mobileWeb);
   const [editingQueued, setEditingQueued] = useState<Message | null>(null);
-  useEffect(() => {
-    if (!mobileWeb) return;
-    const media = matchMedia('(max-width: 760px), (hover: none) and (pointer: coarse)');
-    const change = () => setNativeTouch(media.matches);
-    media.addEventListener('change', change);
-    return () => media.removeEventListener('change', change);
-  }, [mobileWeb]);
   const timelineItems = replyBubbles(sceneItems(withScheduling(state.items.filter(item => item.kind !== "message" || !item.queued || !!item.attachmentViews?.length || !!item.attachmentUploads?.length), state.sceneTasks), state.historyScope, state.currentScene, state.showSbsMessages));
   const historyWindow=useHistoryWindow(state.historyLoading ? [] : timelineItems,JSON.stringify([state.historyScope,state.currentScene.sceneId,state.showSbsMessages]),before=>runtime.loadOlderHistory(before));
   const visibleItems=historyWindow.items;
+  const timeGroups=new Set<string>();
+  let previousMessageTime:number|undefined;
+  for(const item of visibleItems) if(item.kind==='message') {
+    if(startsTimeGroup(item.createdAt,previousMessageTime))timeGroups.add(item.id);
+    if(item.createdAt!==undefined&&Number.isFinite(item.createdAt))previousMessageTime=item.createdAt;
+  }
   const pendingReveal=useRef<{seq:number;sceneId?:string}|null>(null);
   const queuedMessages = state.items.filter((item): item is Message => item.kind === 'message' && !!item.queued && item.sceneId === state.currentScene.sceneId && !hasAttachmentMessage(item));
   useEffect(() => {
@@ -184,7 +191,7 @@ function ChatView({
     scrollLock.current = true;
     void runtime.send(state.draft, null, { mode });
   }
-  function changeScope(scope: HistoryScope) {
+  const changeScope = useMemoizedFn((scope: HistoryScope) => {
     if (scope === state.historyScope || (scope === "current" && !state.currentScene.sceneId)) return;
     if (messages.current) scopeScroll.current[state.historyScope] = { top: messages.current.scrollTop, locked: scrollLock.current };
     releaseAnchor();
@@ -195,50 +202,28 @@ function ChatView({
     // The desktop bridge needs a fresh server view when switching scenes.
     // Standalone Loom keeps one IndexedDB cursor and filters that cache locally.
     if (window.parent !== window) void runtime.refreshHistory();
-  }
-  const dragDepth = useRef(0),
-    composing = useRef(false),
+  });
+  const composing = useRef(false),
     compositionEnd = useRef(0);
-  const [dragging, setDragging] = useState(false),
-    [highlighted, setHighlighted] = useState<string | null>(null),
+  const { dragging, dropHandlers } = useFileDrop(JSON.stringify([state.currentScene.sceneId, state.historyScope]), files => runtime.handleFiles(files));
+  const [highlighted, setHighlighted] = useState<string | null>(null),
     [panel, setPanel] = useState<ChatPanel>(null),
     [panelReturnsToSettings, setPanelReturnsToSettings] = useState(false);
-  useEffect(() => {
-    const reset=()=>{dragDepth.current=0;setDragging(false);};
-    const escape=(event:KeyboardEvent)=>{if(event.key==='Escape')reset();};
-    const hidden=()=>{if(document.hidden)reset();};
-    const released=(event:PointerEvent)=>{if(event.buttons===0 && dragDepth.current)reset();};
-    window.addEventListener('blur',reset);
-    window.addEventListener('pointermove',released,true);
-    window.addEventListener('dragend',reset,true);
-    window.addEventListener('drop',reset,true);
-    window.addEventListener('pointerup',reset,true);
-    window.addEventListener('keydown',escape,true);
-    document.addEventListener('visibilitychange',hidden);
-    reset();
-    return()=>{
-      window.removeEventListener('blur',reset);window.removeEventListener('pointermove',released,true);window.removeEventListener('dragend',reset,true);
-      window.removeEventListener('drop',reset,true);window.removeEventListener('pointerup',reset,true);
-      window.removeEventListener('keydown',escape,true);document.removeEventListener('visibilitychange',hidden);
-    };
-  },[state.currentScene.sceneId,state.historyScope]);
   const [readingSize, setReadingSize] = useState(16);
+  const [showReasoning, setShowReasoning] = useState(() => {
+    try { return localStorage.getItem("beings:show-reasoning") === "true"; } catch { return false; }
+  });
   const [theme, setTheme] = useState<"light" | "dark">(() =>
     new URLSearchParams(location.search).get("theme") === "dark"
       ? "dark"
       : "light",
   );
-  const [viewport, setViewport] = useState({ height: innerHeight, offset: 0, width: innerWidth });
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
+  const messageMenu=useMessageMenu(bridge.copyText,JSON.stringify([state.currentScene.sceneId,state.historyScope]));
+  const { selection, setSelection, addToChat } = useMessageSelection(messages, composer, nativeTouch);
+  useChatShortcuts(bridge, !contextMenuOpen && !messageMenu.isOpen && !nativeTouch ? selection?.text : undefined, addToChat, isMac);
   const [subagentEnabling, setSubagentEnabling] = useState(false);
   const [subagentEnableFailed, setSubagentEnableFailed] = useState(false);
-  const [selection, setSelection] = useState<{
-    id: string;
-    text: string;
-    role: "user" | "being";
-    left: number;
-    top: number;
-  } | null>(null);
   async function enableSubagent() {
     if (subagentEnabling) return;
     setSubagentEnabling(true);
@@ -259,6 +244,10 @@ function ChatView({
       },
       theme: setTheme,
       reading: setReadingSize,
+      reasoning: show => {
+        setShowReasoning(show);
+        try { localStorage.setItem("beings:show-reasoning", String(show)); } catch { /* In-memory preference remains usable. */ }
+      },
       search: query => {
         searchQuery = query;
         publishSearch(Boolean(query.trim()));
@@ -285,7 +274,7 @@ function ChatView({
     void runtime.start();
     composer.current?.focus();
     return () => abort.abort();
-  }, [bridge, runtime]);
+  }, [bridge, runtime, state, releaseAnchor, scrollLock, changeScope]);
   useEffect(() => {
     bridge.send({ type: "beings:history-scope-state", scope: state.historyScope, sceneId: state.currentScene.sceneId });
   }, [bridge, state.historyScope, state.currentScene.sceneId]);
@@ -296,60 +285,21 @@ function ChatView({
     if (mobileWeb) bridge.send({ type: 'beings:chat-panel', panel });
   }, [bridge, mobileWeb, panel]);
   useEffect(() => {
-    const shortcut = (event: KeyboardEvent) => {
-      if (!(event.metaKey || event.ctrlKey) || event.altKey) return;
-      if (event.shiftKey && event.key.toLowerCase() === "p") {
-        event.preventDefault();
-        event.stopPropagation();
-        bridge.send({ type: "beings:plugin-commands" });
-      } else if (event.key.toLowerCase() === "f") {
-        event.preventDefault();
-        event.stopPropagation();
-        bridge.send({ type: "beings:chat-search" });
-      } else if (event.key === ",") {
-        event.preventDefault();
-        event.stopPropagation();
-        bridge.send({ type: "beings:open-settings" });
-      }
-    };
-    // The chat is an iframe. Capture here so its inputs and panels cannot
-    // swallow desktop-level shortcuts before they reach the React root.
-    document.addEventListener("keydown", shortcut, true);
-    return () => document.removeEventListener("keydown", shortcut, true);
-  }, [bridge]);
-  useEffect(() => {
     document.documentElement.dataset.theme = theme;
   }, [theme]);
   useEffect(() => {
     document.title = "Loom · " + state.name;
   }, [state.name]);
-  useEffect(() => {
-    const resize = () =>
-      setViewport({
-        height: visualViewport?.height || innerHeight,
-        width: innerWidth,
-        offset: visualViewport?.offsetTop || 0,
-      });
-    resize();
-    window.addEventListener("resize", resize);
-    visualViewport?.addEventListener("resize", resize);
-    visualViewport?.addEventListener("scroll", resize);
-    return () => {
-      window.removeEventListener("resize", resize);
-      visualViewport?.removeEventListener("resize", resize);
-      visualViewport?.removeEventListener("scroll", resize);
-    };
-  }, []);
   useLayoutEffect(() => {
     scrollLock.current = true;
     releaseAnchor();
-  }, [state.resetScroll]);
+  }, [state.resetScroll, scrollLock, releaseAnchor]);
   useLayoutEffect(() => {
     const saved = scopeScroll.current[state.historyScope];
     releaseAnchor();
     scrollLock.current = saved?.locked ?? true;
     if (messages.current && saved) messages.current.scrollTop = saved.top;
-  }, [state.historyScope]);
+  }, [state.historyScope, scrollLock, releaseAnchor]);
   // Wait for both the scene and the history window to commit. Fixed frame
   // delays can scroll before the requested bubble has actually been mounted.
   useLayoutEffect(() => {
@@ -366,49 +316,7 @@ function ChatView({
     setHighlighted(message.id);
     pendingReveal.current = null;
     if (pending.sceneId) bridge.send({type:'beings:history-target-result', sceneId:pending.sceneId, seq:pending.seq, ok:true});
-  });
-  useEffect(() => {
-    const readSelection = () => {
-      const selected = window.getSelection();
-      if (
-        !selected ||
-        selected.isCollapsed ||
-        !selected.anchorNode ||
-        !selected.focusNode ||
-        !selected.toString().trim()
-      ) {
-        setSelection(null);
-        return;
-      }
-      for (const [id, el] of messageElements.current) {
-        if (
-          !el.contains(selected.anchorNode) ||
-          !el.contains(selected.focusNode)
-        )
-          continue;
-        const item = state.items.find((item) => item.id === id);
-        if (
-          item?.kind !== "message" ||
-          (item.role !== "user" && item.role !== "being")
-        )
-          break;
-        const text = selected.toString().trim(),
-          rect = selected.getRangeAt(0).getBoundingClientRect();
-        setSelection({
-          id,
-          role: item.role,
-          text:
-            text.length > 2000 ? text.slice(0, 2000) + "\n[引用已截取]" : text,
-          left: Math.max(8, Math.min(rect.left, innerWidth - 140)),
-          top: Math.max(8, Math.min(rect.bottom + 6, innerHeight - 44)),
-        });
-        return;
-      }
-      setSelection(null);
-    };
-    document.addEventListener("selectionchange", readSelection);
-    return () => document.removeEventListener("selectionchange", readSelection);
-  }, [state]);
+  }, [state.historyLoading, state.currentScene.sceneId, state.items, timelineItems, releaseAnchor, scrollLock, bridge, historyWindow]);
   const openPlace = useCallback(
     (target: import("../shared/lib/navigation").PlaceTarget) =>
       bridge.send({ type: "beings:open-place", ...target }),
@@ -456,27 +364,7 @@ function ChatView({
           if (panel) close();
         }
       }}
-      onDragEnter={(event) => {
-        if (!event.dataTransfer.types.includes("Files")) return;
-        event.preventDefault();
-        dragDepth.current++;
-        setDragging(true);
-      }}
-      onDragLeave={(event) => {
-        if (!dragDepth.current) return;
-        event.preventDefault();
-        if (--dragDepth.current <= 0) {
-          dragDepth.current = 0;
-          setDragging(false);
-        }
-      }}
-      onDragOver={(event) => event.preventDefault()}
-      onDrop={(event) => {
-        event.preventDefault();
-        dragDepth.current = 0;
-        setDragging(false);
-        runtime.handleFiles(event.dataTransfer.files);
-      }}
+      {...dropHandlers}
       onPaste={(event) => {
         const files = [...event.clipboardData.items]
           .filter((item) => item.kind === "file")
@@ -578,11 +466,13 @@ function ChatView({
               <ChatActivity
                 key={item.id}
                 run={item}
+                showDetails={showReasoning}
                 sceneLabel={state.historyScope === "all" ? sceneName(item, state.currentScene, state.sceneNames) : undefined}
               />
             ) : (
+              <Fragment key={item.id}>
+              {timeGroups.has(item.id)&&item.createdAt!==undefined&&<time className="message-time-divider" dateTime={new Date(item.createdAt).toISOString()}>{messageTimeLabel(item.createdAt)}</time>}
               <div
-                key={item.id}
                 ref={(el) => {
                   for (const id of item.sourceMessageIds || [item.id]) {
                     if (el) messageElements.current.set(id, el);
@@ -595,15 +485,14 @@ function ChatView({
                 className={`message ${item.role}${item.persistedFrom === "partial" ? " message-partial" : ""}${item.consecutive ? " consecutive" : ""}${(highlighted === item.id || item.sourceMessageIds?.includes(highlighted || "")) ? " index-target" : ""}`}
               >
                 <div className={`meta${item.consecutive ? " time-only" : ""}`}>
-                  {!item.consecutive && <span>{item.label} · </span>}
-                  <span className="message-time-actions">
-                    <time>{item.timestamp}</time>
-                  </span>
+                  {item.role === "system" && <span>系统消息</span>}
                   {item.persistedFrom === "partial" && <span className="message-scene">已中断</span>}
                   {(state.historyScope === "all" || isGlobalBeingMessage(item)) && <span className="message-scene" title={isGlobalBeingMessage(item) ? "Being 发出的无场景消息，在各场景共享显示；包含自主醒来消息" : item.sceneId || "这条历史消息未提供场景标记"}>{isGlobalBeingMessage(item) ? "全局消息" : sceneName(item, state.currentScene, state.sceneNames)}</span>}
                 </div>
                 <div className="message-bubble-row">
-                  <div className="message-bubble-body">
+                  <div className="message-bubble-body" tabIndex={0} role="group" aria-label={`${item.role === "user" ? "你" : item.label}的消息`} aria-haspopup="menu"
+                    onContextMenu={event=>messageMenu.openMenu(event,{text:splitSchedulingHint(originalMessageText(item)).text,time:item.createdAt,fallbackTime:item.timestamp})}
+                    onKeyDown={event=>messageMenu.openMenu(event,{text:splitSchedulingHint(originalMessageText(item)).text,time:item.createdAt,fallbackTime:item.timestamp})}>
                     {hasAttachmentMessage(item) ? <AttachmentMessageContent message={item} /> : <ImageGenerationAnswer
                       text={item.role === 'being' ? item.text : ''}
                       streaming={item.streaming}
@@ -639,6 +528,7 @@ function ChatView({
                   {item.retry && <button className="retry-btn" type="button" onClick={()=>void item.retry?.()}>{item.retryLabel}</button>}
                 </>}
               </div>
+              </Fragment>
             ),
           )}
         </div>
@@ -657,7 +547,7 @@ function ChatView({
         </div>}
         <div id="input-area">
           {state.intelligentUIForMessage && state.intelligentUITargetTitle && <div className="iui-context-target" role="status"><span>修改「{state.intelligentUITargetTitle}」<small>将携带原界面和当前选择</small></span><button type="button" aria-label="取消本条界面修改" onClick={() => state.setIntelligentUIForMessage(false)}>×</button></div>}
-          {!state.historyLoading && <JumpToLatest container={messages} scrollLock={scrollLock} clearAnchor={releaseAnchor} />}
+          {!state.historyLoading && <JumpToLatest trimHistory={historyWindow.toLatest} status={reader} container={messages} scrollLock={scrollLock} clearAnchor={releaseAnchor} />}
           <div
             id="pending-files"
             className={state.files.length ? "active" : ""}
@@ -742,7 +632,7 @@ function ChatView({
               type="button"
               title={showStop ? "停止处理" : `${sendLabel}（Enter）；${queueShortcut} 排队，Shift Enter 换行`}
               aria-label={state.stopping ? "正在停止" : showStop ? "停止处理" : sendLabel}
-              disabled={state.stopping}
+              disabled={state.stopping || (!showStop && !state.draft.trim() && !state.files.length)}
               aria-busy={state.stopping}
               onClick={() => {
                 if (showStop) void runtime.stopCurrentTurn();
@@ -750,7 +640,9 @@ function ChatView({
                 composer.current?.focus();
               }}
             >
-              ↵
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                {showStop ? <rect x="7" y="7" width="10" height="10" rx="2"/> : <path d="M12 20V4m-7 7 7-7 7 7"/>}
+              </svg>
             </button>
           </div>
           <input
@@ -777,25 +669,20 @@ function ChatView({
         back={panelReturnsToSettings ? () => bridge.send({ type: "beings:return-settings" }) : undefined}
       />
       <ChatInfoPanels state={state} panel={panel} close={close} />
+      {messageMenu.menu}
       {!nativeTouch && <EditContextMenu edit={bridge.edit} onOpenChange={setContextMenuOpen} />}
       <button
         id="scene-selection-action"
         type="button"
-        hidden={!selection || parent === window || contextMenuOpen || nativeTouch}
+        hidden={!selection || contextMenuOpen || messageMenu.isOpen || nativeTouch}
         style={
           selection ? { left: selection.left, top: selection.top } : undefined
         }
         onMouseDown={(event) => event.preventDefault()}
-        onClick={() => {
-          if (selection) {
-            const { id, text, role } = selection;
-            bridge.send({ type: "beings:scene-select", id, text, role });
-          }
-          setSelection(null);
-          window.getSelection()?.removeAllRanges();
-        }}
+        onClick={() => { if(selection)addToChat(selection.text); }}
+        aria-keyshortcuts={isMac ? 'Meta+L' : 'Control+L'}
       >
-        一起看这段 ↗
+        添加到聊天 <kbd aria-hidden="true">{isMac?'⌘L':'Ctrl L'}</kbd>
       </button>
     </div>
     </LocalFileAction.Provider>

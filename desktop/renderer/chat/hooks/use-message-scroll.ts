@@ -1,8 +1,22 @@
+import useEventListener from 'ahooks/es/useEventListener';
 import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject, type WheelEvent } from 'react';
 import type { ChatItem, Message } from '../models/chat';
+import {firstAfter} from '../models/scroll-position';
 
 /** One controller handles stream growth and late artifact sizes; user scrolling always wins. */
 export function useMessageScroll(items: ChatItem[], container: RefObject<HTMLDivElement | null>, elements: RefObject<Map<string, HTMLDivElement>>) {
+  const ordered=useRef<HTMLDivElement[]>([]);
+  const snapshot=useRef({away:false,count:0}),listeners=useRef(new Set<()=>void>());
+  const subscribe=useCallback((listener:()=>void)=>{listeners.current.add(listener);return()=>{listeners.current.delete(listener);};},[]);
+  const getSnapshot=useCallback(()=>snapshot.current,[]);
+  const publish=useCallback(()=>{
+    const el=container.current;if(!el)return;
+    const away=el.clientHeight>0&&el.scrollHeight-el.scrollTop-el.clientHeight>24;
+    const bottom=away?el.getBoundingClientRect().top+el.clientHeight:0;
+    const count=away?ordered.current.length-firstAfter(ordered.current.length,bottom+2,index=>ordered.current[index].getBoundingClientRect().bottom):0;
+    if(snapshot.current.away===away&&snapshot.current.count===count)return;
+    snapshot.current={away,count};listeners.current.forEach(listener=>listener());
+  },[container]);
   const scrollLock = useRef(true), anchor = useRef<string | null>(null), followedTurn = useRef<string | null>(null);
   const tracked = useRef<string | null>(null), accumulated = useRef(0), frame = useRef(0);
   const reading = useRef<{node:HTMLDivElement;offset:number;width:number;scrollTop:number}|null>(null);
@@ -10,11 +24,12 @@ export function useMessageScroll(items: ChatItem[], container: RefObject<HTMLDiv
     const el=container.current;if(!el)return;
     if(reading.current && reading.current.width!==el.clientWidth)return;
     const top=el.getBoundingClientRect().top;
-    for(const node of elements.current.values()){
-      const rect=node.getBoundingClientRect();
-      if(rect.bottom>top+1 && rect.top<top+el.clientHeight){reading.current={node,offset:rect.top-top,width:el.clientWidth,scrollTop:el.scrollTop};break;}
+    const node=ordered.current[firstAfter(ordered.current.length,top+1,index=>ordered.current[index].getBoundingClientRect().bottom)];
+    if(node){
+      const offset=node.getBoundingClientRect().top-top;
+      if(offset<el.clientHeight)reading.current={node,offset,width:el.clientWidth,scrollTop:el.scrollTop};
     }
-  },[container,elements]);
+  },[container]);
   const currentItems = useRef(items); currentItems.current = items;
   const releaseAnchor = useCallback(() => {
     anchor.current = null;
@@ -53,23 +68,30 @@ export function useMessageScroll(items: ChatItem[], container: RefObject<HTMLDiv
     if (reply && tracked.current !== reply.id) { tracked.current = reply.id; if (scrollLock.current || followedTurn.current === turn) followedTurn.current = turn; }
     if (anchor.current && (!reply || reply.id !== anchor.current)) { anchor.current = null; accumulated.current = 0; }
     // An anchored reply is a reading position, not a repeated scroll-to-top instruction.
-    if (anchor.current) { remember(); return; }
+    if (anchor.current) { remember(); publish(); return; }
     if (reply && followedTurn.current === turn) {
       const node = elements.current.get(reply.id);
       if (node) {
         const offset = node.getBoundingClientRect().top - el.getBoundingClientRect().top;
         const bottom = Math.max(0, el.scrollHeight - el.clientHeight);
-        if (offset + el.scrollTop - bottom < 20) { anchor.current = reply.id; scrollLock.current = false; el.scrollTop += offset - 20; remember(); return; }
+        if (offset + el.scrollTop - bottom < 20) { anchor.current = reply.id; scrollLock.current = false; el.scrollTop += offset - 20; remember(); publish(); return; }
       }
     }
     if (scrollLock.current) el.scrollTop = el.scrollHeight;
     remember();
-  }, [container, elements, remember, compensate]);
+    publish();
+  }, [container, elements, remember, compensate, publish]);
   const schedule = useCallback(() => { if (!frame.current) frame.current = requestAnimationFrame(() => { frame.current = 0; layout(); }); }, [layout]);
   // Content growth is handled by ResizeObserver before paint. Draft/status
   // renders do not need another synchronous geometry scan of every message.
   const structure = items.map(item => item.id).join('\u0000');
-  useLayoutEffect(layout, [structure, layout]);
+  useLayoutEffect(()=>{
+    ordered.current=currentItems.current.flatMap(item=>{
+      const node=item.kind==='message'?elements.current.get(item.id):undefined;
+      return node?[node]:[];
+    });
+    layout();
+  }, [structure, layout, elements]);
   useEffect(() => {
     const el = container.current;
     if (!el) return;
@@ -84,19 +106,20 @@ export function useMessageScroll(items: ChatItem[], container: RefObject<HTMLDiv
     };
     const mutation = new MutationObserver(observe);
     mutation.observe(el, { childList: true }); observe();
-    const keyboard = (event: KeyboardEvent) => {
-      if (['PageDown','PageUp','Home','End','ArrowDown','ArrowUp',' '].includes(event.key) && !(event.target as HTMLElement).closest('input,textarea,select,button')) { releaseAnchor(); scrollLock.current = false; remember(); }
-    };
-    el.addEventListener('keydown', keyboard);
-    return () => { observer.disconnect(); mutation.disconnect(); el.removeEventListener('keydown', keyboard); cancelAnimationFrame(frame.current); frame.current = 0; };
+    return () => { observer.disconnect(); mutation.disconnect(); cancelAnimationFrame(frame.current); frame.current = 0; };
   }, [container, schedule, layout, releaseAnchor, remember]);
+  useEventListener('keydown', (event: KeyboardEvent) => {
+    if (['PageDown','PageUp','Home','End','ArrowDown','ArrowUp',' '].includes(event.key) && event.target instanceof HTMLElement && !event.target.closest('input,textarea,select,button,[contenteditable=true],[role=menu]')) {
+      releaseAnchor(); scrollLock.current = false; remember();
+    }
+  }, { target: container });
   return {
-    scrollLock, releaseAnchor,
+    scrollLock, releaseAnchor, subscribe, getSnapshot,
     onWheel(event: WheelEvent) {
       if (anchor.current) { accumulated.current += Math.abs(event.deltaY); if (accumulated.current <= 30) return; }
       releaseAnchor(); scrollLock.current = false; remember();
     },
     onTouchMove() { releaseAnchor(); scrollLock.current = false; remember(); },
-    onScroll() { compensate(); remember(); const el = container.current; if (el && el.clientWidth && el.scrollHeight - el.scrollTop - el.clientHeight <= 2) scrollLock.current = true; },
+    onScroll() { compensate(); remember(); const el = container.current; if (el && el.clientWidth) scrollLock.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 2; publish(); },
   };
 }

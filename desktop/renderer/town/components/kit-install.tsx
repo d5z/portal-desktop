@@ -9,6 +9,7 @@ export function KitInstall({ model }: { model: TownModel }) {
     <Dialog
       open={Boolean(plan)}
       busy={town.installBusy}
+      aria-labelledby="kit-install-title"
       onClose={() => town.closeInstall()}
     >
       {plan && (
@@ -20,7 +21,7 @@ export function KitInstall({ model }: { model: TownModel }) {
           }}
         >
           <div className="dialog-heading">
-            <h2>安装 {plan.name}</h2>
+            <h2 id="kit-install-title">安装 {plan.name}</h2>
             <button
               className="close"
               type="button"

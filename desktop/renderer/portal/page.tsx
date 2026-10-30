@@ -1,40 +1,32 @@
-import { useLayoutEffect, useRef } from "react";
+import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useModel } from "../shared/hooks/use-model";
 import type { AppModel } from "../app/models/app";
-const labels = {
-  running: "运行中",
-  stopped: "未启动",
-  starting: "启动中",
-  connected: "已连接",
-  reconnecting: "重连中",
-  stopping: "停止中",
-  external: "实例冲突",
-  error: "启动失败",
-};
-export function Portal({ model }: { model: AppModel }) {
+import { PortalStatus } from './status';
+export function Portal({ model, embedded = false, configuration }: { model: AppModel; embedded?: boolean; configuration?: ReactNode }) {
   const app = useModel(model),
     snapshot = app.snapshot,
     state = snapshot?.portal;
+  const [logsOpen, setLogsOpen] = useState(false);
   const log = useRef<HTMLPreElement>(null),
     atBottom = useRef(true);
   useLayoutEffect(() => {
     if (atBottom.current && log.current)
       log.current.scrollTop = log.current.scrollHeight;
-  }, [state?.logs]);
+  }, [state?.logs, logsOpen]);
   const stopped =
     !state || ["stopped", "error", "external"].includes(state.phase);
   return (
-    <section id="portal-view" className="view" hidden={app.view !== "portal"}>
+    <section id={embedded ? "portal-settings-page" : "portal-view"} className={embedded ? "embedded-portal-settings" : "view"} hidden={!embedded && app.view !== "portal"}>
       <div className="portal-content">
         <div className="section-heading">
           <div>
-            <h1>Portal 设置</h1>
+            {!embedded && <h1>Portal 设置</h1>}
             <p>连接这台电脑，供 Being 使用文件、命令和工具。</p>
           </div>
         </div>
         <div className="portal-card">
           <div className="portal-card-top">
-            <span className="portal-symbol">⌘</span>
+            <svg className="portal-symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H4zM8 20h8m-4-4v4" /></svg>
             <div>
               <h2 id="portal-name">
                 {snapshot?.settings.portalName || "Heart Portal"}
@@ -43,9 +35,7 @@ export function Portal({ model }: { model: AppModel }) {
                 {state?.message || "本机 Portal 尚未启动"}
               </span>
             </div>
-            <span className="status-pill" id="portal-phase">
-              {state ? labels[state.phase] : "未启动"}
-            </span>
+            <PortalStatus id="portal-phase" state={state} />
           </div>
           <div className="portal-details">
             <div>
@@ -103,13 +93,14 @@ export function Portal({ model }: { model: AppModel }) {
             >
               {app.portalAction === "restart" ? "正在重启…" : "重启 Portal"}
             </button>
-            <button
+            {!configuration && <button
               className="text-button"
               id="portal-settings"
-              onClick={() => app.showSettings()}
+              onClick={() => app.openConnectionSettings('portal')}
             >
-              本机设置 ↗
-            </button>
+              本机配置
+            </button>}
+            {configuration && <button type="button" className="text-button" onClick={() => void app.run(() => app.api.openWorkspace())}>打开工作目录</button>}
           </div>
           {app.api.platform === "win32" && <div className="portal-recovery">
             <button className="text-button" id="force-start-portal"
@@ -128,14 +119,15 @@ export function Portal({ model }: { model: AppModel }) {
             {app.portalError}
           </p>
         </div>
+        {configuration}
         <div className="capabilities">
           <div>
-            <span>▱</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h7l2 2h9v12H3z" /></svg>
             <strong>文件与搜索</strong>
             <small>{snapshot?.settings.permissionMode === 'read-only' ? '旧版只读限制' : snapshot?.settings.permissionMode === 'full-access' ? '使用系统账户权限读写文件' : '读取普通文件；工作区外编辑需批准'}</small>
           </div>
           <div>
-            <span>⌘</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 8 4 4-4 4m8 0h6" /></svg>
             <strong>命令执行</strong>
             <small id="exec-label">
               {!snapshot?.settings.allowExec ? '未启用' : snapshot.settings.permissionMode === 'read-only'
@@ -143,7 +135,7 @@ export function Portal({ model }: { model: AppModel }) {
             </small>
           </div>
           <div>
-            <span>◇</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8v5h5v8h-5v5H8v-5H3V8h5z" /></svg>
             <strong>扩展工具</strong>
             <small id="kits-label">
               {snapshot?.settings.kitsEnabled
@@ -161,9 +153,9 @@ export function Portal({ model }: { model: AppModel }) {
               onClick={() => void app.sharePortalLogs()}>{app.logsLoading ? "正在读取…" : "一起看日志"}</button>
           </div>
         </div>
-        <details>
+        <details onToggle={event => setLogsOpen(event.currentTarget.open)}>
           <summary>查看最近运行日志 · 凭据已脱敏</summary>
-        <pre
+        {logsOpen && <pre
           ref={log}
           id="portal-logs"
           role="log"
@@ -176,7 +168,7 @@ export function Portal({ model }: { model: AppModel }) {
         >
           {state?.logs.join("\n") ||
             "启动 Portal 后，连接与工具运行状态会显示在这里。"}
-        </pre>
+        </pre>}
         </details>
         <p className="portal-foot" id="background-status">
           {state?.managed === false

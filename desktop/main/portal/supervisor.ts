@@ -34,12 +34,19 @@ export class PortalSupervisor extends EventEmitter {
   private stopPromise: Promise<void> | null = null;
   private run: { settings: Settings; connection: Connection; configPath: string; environment: Record<string, string> } | null = null;
   private launchNonce = '';
+  private logPublishTimer: ReturnType<typeof setTimeout> | null = null;
   state: PortalState = { phase: 'stopped', message: '本机 Portal 尚未启动', logs: [] };
 
   get managing() { return Boolean(this.child || this.wanted); }
 
   constructor(private directory: string, private spawnProcess: typeof spawn = spawn) { super(); }
   private publish(patch: Partial<PortalState>) {
+    const logsPending = this.logPublishTimer !== null;
+    if (this.logPublishTimer) clearTimeout(this.logPublishTimer);
+    this.logPublishTimer = null;
+    // Heartbeats verify ownership every second, but an unchanged sample is
+    // not a UI update. State transitions also flush any buffered log refresh.
+    if (!logsPending && Object.entries(patch).every(([key, value]) => this.state[key as keyof PortalState] === value)) return;
     this.state = { ...this.state, ...patch };
     this.emit('state', this.state);
   }
@@ -47,8 +54,12 @@ export class PortalSupervisor extends EventEmitter {
     const output = redact(raw, this.secrets);
     this.emit('log', output);
     const line = output.slice(0, 4000);
-    this.state.logs = [...this.state.logs.slice(-299), line];
-    this.publish({});
+    this.state = { ...this.state, logs: [...this.state.logs.slice(-299), line] };
+    // Keep every diagnostic line immediately; only batch the renderer snapshot.
+    if (!this.logPublishTimer) {
+      this.logPublishTimer = setTimeout(() => this.publish({}), 250);
+      this.logPublishTimer.unref?.();
+    }
   }
   async start(settings: Settings, connection: Connection, environment: Record<string, string> = {}) {
     if (this.stopPromise) await this.stopPromise;

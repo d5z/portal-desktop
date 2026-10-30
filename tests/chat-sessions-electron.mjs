@@ -20,7 +20,7 @@ try {
     import {SbsControl} from './desktop/renderer/shared/components/sbs-control';
     import {useChatBridge} from './desktop/renderer/app/hooks/use-chat-bridge';
     import './desktop/renderer/app/styles.css';
-    const app = new AppModel(window.beings); (window as any).fixtureApp = app;
+    const app = new AppModel(window.beings); app.showReasoning = true; (window as any).fixtureApp = app;
     function Shell() {
       useSyncExternalStore(app.subscribe, app.getVersion);
       const frame = useRef(null); useChatBridge(app, frame);
@@ -114,7 +114,13 @@ try {
   const commandInput = chat.getByRole('textbox',{name:'message input'});
   for (const trigger of ['plus', 'slash', 'enter', 'send', 'queue']) {
     const draft = trigger === 'plus' ? '保留已有要求' : trigger === 'slash' ? '/sub' : '/子代理 保留已有要求';
-    await commandInput.fill(draft);
+    // Let the rich editor handle paste through its transaction pipeline.
+    await commandInput.press('ControlOrMeta+a');
+    await commandInput.press('Backspace');
+    await commandInput.evaluate((el, text) => {
+      const clipboardData = new DataTransfer(); clipboardData.setData('text/plain', text);
+      el.dispatchEvent(new ClipboardEvent('paste', {bubbles:true,cancelable:true,clipboardData}));
+    }, draft);
     if (trigger === 'plus') {
       await chat.getByRole('button',{name:'添加附件和工具'}).click();
       await subagentSetup.click();
@@ -239,6 +245,7 @@ try {
   // One Being owns one live breath. Messages from other scenes queue locally
   // in FIFO order, then dispatch after the active stream finishes.
   await page.getByRole('button',{name:'切换到场景：桌面·测试设备'}).click();
+  await page.waitForFunction(scene => !window.fixtureApp.chatLoading && window.fixtureApp.snapshot.chatScene.scene_id === scene, original);
   await chat.locator('#input').fill('并发 A');
   await chat.locator('#send-btn').click();
   await chat.getByText('【新消息来自 scene「桌面·测试设备 · ID: '+original+'」】',{exact:true}).waitFor();

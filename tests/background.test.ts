@@ -255,7 +255,7 @@ it.skipIf(process.platform === 'win32')('rebuilds background policy on every per
 it('replaces a stale or missing background engine at the same source path before reusing settings', async () => {
   const f = await fixture();
   const binary = path.join(f.root, 'source-engine');
-  await writeFile(binary, 'old-engine');
+  await writeFile(binary, 'old-engine', { mode: 0o700 });
   const settings = { ...f.settings, portalBinary: binary, permissionMode: 'auto-review' as const };
   await f.service.enable(settings, f.connection);
   const original = f.service.installedService!.root;

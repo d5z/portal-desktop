@@ -1,4 +1,5 @@
 import './rich-composer.css';
+import { appendChatText } from '../models/message-time';
 import { useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type RefObject, type TextareaHTMLAttributes, type KeyboardEventHandler, type CompositionEventHandler } from 'react';
 import { HighlightedCode } from './markdown';
 import { detectStructuredText } from './structured-text';
@@ -55,7 +56,10 @@ export function RichComposer({ textareaRef, value, onChange, onKeyDown, onCompos
 
 function SourceEditor({ inputRef, value, language, onChange, ...props }: Omit<RichComposerProps, 'textareaRef'> & { inputRef: RefObject<ComposerHandle | null>; language: string }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  useImperativeHandle(inputRef, () => ({ focus: () => { const el = textareaRef.current; if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } } }), []);
+  useImperativeHandle(inputRef, () => ({
+    focus: () => { const el = textareaRef.current; if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } },
+    appendText: text => onChange(appendChatText(textareaRef.current?.value || '', text)),
+  }), [onChange]);
   const paint = useRef<HTMLPreElement>(null);
   const syncScroll = () => {
     if (paint.current && textareaRef.current) {

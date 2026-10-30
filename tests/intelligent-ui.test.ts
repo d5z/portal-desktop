@@ -1,11 +1,29 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import { marked } from 'marked';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { compileUI, evaluate, reconcileState } from '../desktop/renderer/shared/intelligent-ui/runtime';
 import { demoSource } from '../desktop/renderer/shared/intelligent-ui/examples';
 import { Markdown } from '../desktop/renderer/shared/components/markdown';
+import { IntelligentAnswer } from '../desktop/renderer/shared/intelligent-ui/answer';
 
 describe('local intelligent UI', () => {
+  it('lexes ordinary answers once and retains forward reference links', () => {
+    const text = '## 回复\n\n请参阅[说明][guide]。\n\n- 第一项\n- 第二项\n\n[guide]: https://example.com/guide';
+    const lexer = vi.spyOn(marked.Lexer.prototype, 'lex');
+    try {
+      const html = renderToStaticMarkup(createElement(IntelligentAnswer, { text, streaming: true }));
+      expect(html).toContain('href="https://example.com/guide"');
+      expect(html).toContain('<li>第一项</li>');
+      expect(lexer.mock.calls.filter(([input]) => input === text)).toHaveLength(1);
+    } finally { lexer.mockRestore(); }
+  });
+  it('retains references across prose and an intelligent UI block', () => {
+    const text = '[说明][guide]\n\n```intelligent-ui\n' + demoSource + '\n```\n\n[guide]: https://example.com/guide';
+    const html = renderToStaticMarkup(createElement(IntelligentAnswer, { text, streaming: false }));
+    expect(html).toContain('href="https://example.com/guide"');
+    expect(html).toContain('type="range"');
+  });
   it('calculates price from local state and handles arithmetic failures', () => {
     const doc = compileUI(demoSource);
     const total = doc.body.find(n => n.id === 'total')!.value;

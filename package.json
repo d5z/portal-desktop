@@ -1,7 +1,7 @@
 {
   "name": "portal-desktop",
   "productName": "Portal Desktop",
-  "version": "0.1.11",
+  "version": "0.1.12",
   "description": "A desktop home for your Being, with Heart Portal built in.",
   "author": "Beings contributors",
   "license": "MIT",
@@ -25,6 +25,11 @@
     "test:all": "node scripts/test-all.mjs",
     "test:e2e": "node tests/electron-smoke.mjs",
     "test:workspace-ui": "npm run build:chat && node tests/workspace-layout.mjs",
+    "test:settings-navigation": "node tests/settings-navigation.mjs",
+    "test:message-flow": "npm run build:chat && node tests/chat-message-flow.mjs",
+    "test:chat-surface-interaction": "node tests/chat-surface-interaction.mjs",
+    "test:ui-interaction": "node tests/ui-interaction.mjs",
+    "test:pdf-preview": "node tests/pdf-preview.mjs",
     "test:town-ui": "node tests/town-ui.mjs",
     "test:town-civic": "node tests/town-civic.mjs",
     "test:portal-e2e": "node tests/portal-runtime-e2e.mjs",
@@ -61,7 +66,10 @@
     "test:chat-scene-loading": "npm run build:chat && node tests/chat-scene-loading.mjs",
     "test:chat-render-performance": "npm run build:chat && node tests/chat-render-performance.mjs && node tests/chat-lazy-resources.mjs",
     "test:chat-history-recovery": "npm run build:chat && node tests/history-cache.mjs && node tests/chat-history-recovery.mjs && node tests/chat-history-window.mjs",
-    "test:plugins-packaged": "npm run build:chat && node tests/plugins-electron.mjs --packaged"
+    "test:plugins-packaged": "npm run build:chat && node tests/plugins-electron.mjs --packaged",
+    "lint:chat-hooks": "eslint desktop/renderer/chat/page.tsx desktop/renderer/chat/hooks desktop/renderer/chat/components/navigation.tsx desktop/renderer/shared/hooks/use-menu-dismiss.ts desktop/renderer/shared/components/message-menu.tsx desktop/renderer/shared/components/context-menu.tsx --max-warnings=0",
+    "test:chat-hooks": "node tests/chat-hooks.mjs",
+    "test:town-feed-layout": "node tests/town-feed-layout.mjs"
   },
   "devDependencies": {
     "@electron-forge/cli": "^7.11.2",
@@ -76,9 +84,12 @@
     "electron": "44.2.0",
     "electron-builder": "^26.15.3",
     "esbuild": "^0.25.0",
+    "eslint": "^10.13.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "fflate": "^0.8.3",
     "playwright": "^1.58.0",
     "typescript": "^5.9.3",
+    "typescript-eslint": "^8.72.1",
     "vite": "^6.4.1",
     "vitest": "^3.2.4",
     "ws": "^8.21.3"
@@ -92,6 +103,7 @@
     "@tiptap/pm": "^3.31.4",
     "@tiptap/react": "^3.31.4",
     "@tiptap/starter-kit": "^3.31.4",
+    "ahooks": "^3.11.0",
     "exceljs": "^4.4.0",
     "highlight.js": "11.11.1",
     "marked": "^15.0.12",

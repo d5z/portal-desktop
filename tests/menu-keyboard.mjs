@@ -40,15 +40,10 @@ try {
   page = await browser.newPage(); page.setDefaultTimeout(15000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:' + server.address().port);
-  assert.equal(await page.locator('#local-portal-status').getAttribute('aria-label'), '本机 Portal：工作室 Mac Portal，已连接');
-  assert.equal(await page.locator('#local-portal-status').getAttribute('title'), null);
-  assert.equal(await page.locator('#local-portal-status .local-portal-name').textContent(), '工作室 Mac Portal');
+  assert.equal(await page.locator('#open-browser,.options-sbs,.rail-portal-status').count(),0);
+  await page.locator('#local-portal-status').waitFor({state:'hidden'});
   await page.locator('#options-trigger').click();
-  await page.locator('#local-portal-status').hover();
-  await page.waitForFunction(() => getComputedStyle(document.querySelector('.local-portal-name')).opacity === '1');
-  await page.locator('#local-portal-status').click();
-  assert.equal(await page.evaluate(() => window.navigated), 'portal');
-  await page.locator('#options-trigger').click();
+  await page.locator('#options-home > #local-portal-status:first-child').waitFor({state:'visible'});
   await page.waitForFunction(() => document.querySelector('.options-menu').getAnimations().length === 0);
   const blurred = await page.evaluate(async () => {
     const details = document.querySelector('#conversation-options');
@@ -104,6 +99,11 @@ try {
   }
   assert.deepEqual(errors, []);
   await page.locator('#options-trigger').click();
+  await mkdir('test-results', {recursive:true});
+  await page.locator('.options-menu').screenshot({path:'test-results/portal-menu-light.png'});
+  await page.setViewportSize({width:435,height:500});
+  await page.evaluate(()=>document.documentElement.dataset.theme='dark');
+  await page.screenshot({path:'test-results/portal-menu-dark-narrow.png'});
   await page.getByRole('button', { name: '收集日志', exact: true }).click();
   assert.equal(await page.evaluate(() => window.logsCollected), 1);
   console.log('PASS: blur closes without flashing; submenu Escape and Back restore focus after rendering; double Escape, keyboard entry, interrupted motion and reduced motion close correctly.');

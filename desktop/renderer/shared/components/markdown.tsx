@@ -3,7 +3,8 @@ import { RemoteImage } from './remote-image';
 import { MarkdownReferences } from './markdown-references';
 import { localFileReference } from '../../../shared/local-file';
 import { IntelligentUI } from "../intelligent-ui/view";
-import hljs, { type Emitter } from "highlight.js";
+import hljs from "highlight.js/lib/common";
+import type { Emitter } from "highlight.js";
 import { Fragment, memo, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { detectStructuredText, formatJSON } from './structured-text';
 import { marked, type Token, type Tokens } from "marked";
@@ -562,9 +563,9 @@ export function HighlightedCode({
 }) {
   const nodes = useMemo(() => {
     try {
-      const result = highlighter.getLanguage(language)
-        ? highlighter.highlight(text, { language })
-        : highlighter.highlightAuto(text);
+      // Unknown languages remain readable without scanning every grammar.
+      if (!highlighter.getLanguage(language)) return text;
+      const result = highlighter.highlight(text, { language });
       // Safe mode returns errors with a partial emitter instead of throwing.
       // React must fall back to the source, not the incomplete token tree.
       if (result.errorRaised || result.illegal) return text;

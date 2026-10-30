@@ -53,11 +53,16 @@ try {
   page=await application.firstWindow();page.setDefaultTimeout(20000);
   await page.getByRole('button',{name:'连接我的 Being'}).click();
   await page.locator('#connection-link').fill(`http://127.0.0.1:${server.address().port}/fixture/?token=permission-test`);
+  await page.getByRole('tab',{name:'Portal',exact:true}).click();
+  await page.locator('.settings-disclosure > summary').filter({hasText:'本机配置'}).click();
   await page.locator('#portal-name-input').fill('permission-test');
   await page.locator('#workspace-input').fill(workspace);
   await page.locator('#background-input').uncheck();
+  await page.getByRole('tab',{name:'Being',exact:true}).click();
   await page.getByRole('button',{name:'保存、连接并启动'}).click();
-  await page.waitForFunction(()=>!document.querySelector('#settings-dialog').open);
+  await page.waitForFunction(async () => (await window.beings.snapshot()).settings.hasToken && !document.querySelector('#save-settings').disabled, null, { timeout: 15000 });
+  await page.locator('#close-client-settings').click();
+  await page.locator('#client-settings-dialog').waitFor({state:'hidden'});
   await waitForChatReady(page);
   const chat=page.frameLocator('#chat-frame');
   await chat.getByRole('button',{name:'快捷设置工作权限'}).waitFor();

@@ -1,0 +1,23 @@
+/* Shared feedback across the shell and embedded conversation. No layout animation. */
+:root{-webkit-tap-highlight-color:transparent;--ui-motion-fast:120ms;--ui-motion-surface:140ms;--ui-ease:cubic-bezier(.2,.8,.2,1)}
+:where(button,a,input,select,textarea,summary,[role=tab],[role=menuitem],[contenteditable=true]):focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+/* Closing releases the top layer immediately; only entry is animated. */
+[data-ui-dialog]{opacity:0;transform:translateY(4px)}
+[data-ui-dialog][open]{opacity:1;transform:none;transition:opacity var(--ui-motion-surface) ease,transform var(--ui-motion-surface) var(--ui-ease)}
+[data-ui-dialog]:not([open]){display:none;pointer-events:none}
+[data-ui-dialog]::backdrop{opacity:0}
+[data-ui-dialog][open]::backdrop{opacity:1;transition:opacity var(--ui-motion-surface) ease}
+/* Non-modal menus never dim the page behind them. */
+[popover]::backdrop{background:transparent}
+@starting-style{
+  [data-ui-dialog][open]{opacity:0;transform:translateY(4px)}
+  [data-ui-dialog][open]::backdrop{opacity:0}
+}
+@media(prefers-reduced-motion:no-preference){
+  :is(.permission-menu,.chat-context-menu,.message-context-menu):popover-open{animation:ui-menu-enter var(--ui-motion-fast) ease-out}
+  @keyframes ui-menu-enter{from{opacity:0}to{opacity:1}}
+}
+@media(prefers-reduced-motion:reduce){
+  [data-ui-dialog],[data-ui-dialog]::backdrop{transition:none;transform:none}
+  *,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}
+}

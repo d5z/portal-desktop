@@ -34,11 +34,13 @@
 
 ## 设计与历史资料
 
+- [交互优化与 UI skills](design/UI-SKILLS-AND-INTERACTION.md)：Muse / Grok 交互参考、性能改动与技能选型。
 - [智能 UI 设计](design/INTELLIGENT-UI-DESIGN.md)：设计取舍、演进与验收目标。
 - [目标插件设计](design/GOALS-PLUGIN-DESIGN.md)：通用宿主与独立插件的分工。
 - [共同工作空间探索](design/SHARED-WORKSPACE.md)：已落地部分与待协商协议。
 - [Visualize 接入设计](design/VISUALIZE-INTEGRATION.md)：产物、技能与运行时的后续提案。
 - [历史核查与验收](archive/README.md)：保留当时的证据、限制和问题记录。
+- [2026-10-30 同步与整体审查](archive/SYNC-REVIEW-2026-10-30.md)：主仓库/子模块同步、修复、回归结果与验证缺口。
 - [网关实验原型](../experiments/gateway/README.md)：未接入客户端构建的 Python 原型。
 
 ## 维护约定与整理结论

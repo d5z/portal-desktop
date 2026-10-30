@@ -57,6 +57,8 @@ try {
   await persist();
   await requirePortalSource();
   await npm('typecheck', ['run', 'typecheck']);
+  await npm('chat-hooks-lint', ['run', 'lint:chat-hooks']);
+  await npm('chat-hooks', ['run', 'test:chat-hooks']);
   // Native Windows unit tests exercise the bundled Portal from resources/.
   // Build it before Vitest; a clean CI checkout has no generated binary yet.
   if (!flags.has('--reuse-package')) await npm('build-portal', ['run', 'build:portal']);
@@ -72,6 +74,7 @@ try {
   await npm('chat-history-target', ['run', 'test:chat-history-target']);
   await npm('chat-scene-loading', ['run', 'test:chat-scene-loading']);
   await npm('chat-render-performance', ['run', 'test:chat-render-performance']);
+  await npm('settings-navigation', ['run', 'test:settings-navigation']);
   // Some engine tests share process-level environment variables; serialize Rust tests.
   // The sub-agent fixture suite uses Unix-only `/bin/sh` paths and assumes a
   // real `pi` binary. Keep those fixtures out of the Windows hosted job; the
@@ -102,6 +105,8 @@ try {
   }
   await npm('model-catalog', ['run', 'test:model-catalog']);
   await npm('chat-react', ['run', 'test:chat-react']);
+  await npm('chat-surface-interaction', ['run', 'test:chat-surface-interaction']);
+  await npm('town-feed-layout', ['run', 'test:town-feed-layout']);
   await npm('attachments-ui', ['run', 'test:attachments-ui']);
   await npm('chat-scroll', ['run', 'test:chat-scroll']);
   await npm('chat-context-menu', ['run', 'test:chat-context-menu']);

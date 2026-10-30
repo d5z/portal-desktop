@@ -45,7 +45,7 @@ export function App({ model }: { model: AppModel }) {
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
       const dialog = document.querySelector("dialog[open]");
-      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'p') {
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'p' && !dialog) {
         event.preventDefault(); app.plugins.showCommands(true); return;
       }
       if (
@@ -56,7 +56,7 @@ export function App({ model }: { model: AppModel }) {
         event.preventDefault();
         app.openSearch();
       }
-      if ((event.metaKey || event.ctrlKey) && event.key === "1") {
+      if ((event.metaKey || event.ctrlKey) && event.key === "1" && !dialog) {
         event.preventDefault();
         app.navigate("chat");
       }
@@ -167,27 +167,26 @@ export function App({ model }: { model: AppModel }) {
             </div>
           </div>
           <AttachmentFileViewer key={`${app.chatSource}:${app.snapshot?.chatScene?.scene_id || ''}`} frame={frame}/>
-          {!app.subagentSettingsOpen && <BeingInfo app={app} />}
-          {app.subagentSettingsOpen && <SubagentModelSettings app={app} />}
+          {(!app.subagentSettingsOpen || Boolean(app.settingsRoute)) && <BeingInfo app={app} />}
+          {app.subagentSettingsOpen && !app.settingsRoute && <SubagentModelSettings app={app} />}
           <Companion model={app.workspace} />
-          {app.view === "chat" && !app.subagentSettingsOpen && <PluginSidebar model={app.plugins} theme={app.theme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />}
+          {app.view === "chat" && (!app.subagentSettingsOpen || Boolean(app.settingsRoute)) && <PluginSidebar model={app.plugins} theme={app.theme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />}
           <Browser model={app} />
         </div>
       </main>
-      <Diagnostics model={app} />
+      {!app.settingsRoute && <Diagnostics model={app} />}
       <ChatSearch model={app} />
       <PluginCommands model={app.plugins} />
       <TownComposer model={app.town} />
-      <TownAuth model={app.town} returnToSettings={app.settingsRoute === "town"}
-        onReturnToSettings={app.returnToClientSettings} onDismissSettingsRoute={app.dismissSettingsRoute} />
+      {app.settingsRoute !== "town" && <TownAuth model={app.town} />}
       <ClientSettings model={app} />
-      <ConnectionSettings model={app} />
+      {!app.settingsRoute && <ConnectionSettings model={app} />}
       <KitInstall model={app.town} />
       <PermissionSettings app={app}/>
       <ToolApprovalDialog app={app}/>
       <Toast message={app.toastMessage} />
       <EditContextMenu edit={app.api.editSelection} rootSelector="#client-main, dialog[open]"
-        selectionSelector=".reading-text, .dialog-body, #town-body" />
+        selectionSelector=".reading-text, .dialog-body pre" />
     </>
   );
 }

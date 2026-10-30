@@ -2,9 +2,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { DiagnosticReport } from "../../../shared/types";
 import type { AppModel } from "../models/app";
 import { useModel } from "../../shared/hooks/use-model";
-import { Dialog } from "../../shared/components/dialog";
+import { SettingsSurface } from "../../shared/components/settings-surface";
 import { NavigationControls } from "../../shared/components/navigation-controls";
-export function Diagnostics({ model }: { model: AppModel }) {
+export function Diagnostics({ model, embedded = false }: { model: AppModel; embedded?: boolean }) {
   const app = useModel(model),
     [state, setState] = useState<DiagnosticReport>(),
     [busy, setBusy] = useState(false),
@@ -34,7 +34,7 @@ export function Diagnostics({ model }: { model: AppModel }) {
     };
   }, [app.diagnosticsOpen, run]);
   return (
-    <Dialog
+    <SettingsSurface embedded={embedded}
       id="diagnostics-dialog"
       className="utility-dialog"
       aria-labelledby="diagnostics-heading"
@@ -45,7 +45,7 @@ export function Diagnostics({ model }: { model: AppModel }) {
         app.changed();
       }}
     >
-      <div className="dialog-heading">
+      {!embedded && <div className="dialog-heading">
         <div className="dialog-heading-main">
           <h2 id="diagnostics-heading">连接诊断</h2>
           <NavigationControls back={app.settingsRoute === "diagnostics" ? app.returnToClientSettings : undefined} />
@@ -60,7 +60,7 @@ export function Diagnostics({ model }: { model: AppModel }) {
             app.changed();
           }}
         />
-      </div>
+      </div>}
       <p id="diagnostics-version" className="utility-subtitle">
         {state
           ? `Portal Desktop ${state.version} · ${state.platform}\n构建 ${state.build}\n主进程 ${state.pid} · 启动 ${new Date(state.startedAt).toLocaleString()}`
@@ -114,6 +114,6 @@ export function Diagnostics({ model }: { model: AppModel }) {
           导出诊断…
         </button>
       </div>
-    </Dialog>
+    </SettingsSurface>
   );
 }

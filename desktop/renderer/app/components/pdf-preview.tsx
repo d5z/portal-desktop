@@ -1,6 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
-import {getDocument,GlobalWorkerOptions,type PDFDocumentProxy} from 'pdfjs-dist';
-GlobalWorkerOptions.workerSrc=new URL('pdf.worker.min.js',location.href).href;
+import type {getDocument,PDFDocumentProxy} from 'pdfjs-dist';
 function PdfPage({pdf,page}:{pdf:PDFDocumentProxy;page:number}) {
   const host=useRef<HTMLDivElement>(null),canvas=useRef<HTMLCanvasElement>(null);
   const [visible,setVisible]=useState(false),[ratio,setRatio]=useState(.707),[error,setError]=useState('');
@@ -23,8 +22,10 @@ export function PdfPreview({blob}:{blob:Blob}) {
   const [pdf,setPdf]=useState<PDFDocumentProxy|null>(null),[error,setError]=useState('');
   useEffect(()=>{
     let disposed=false,task:ReturnType<typeof getDocument>|undefined;
-    void blob.arrayBuffer().then(data=>{
+    setPdf(null);setError('');
+    void Promise.all([import('pdfjs-dist'),blob.arrayBuffer()]).then(([{getDocument,GlobalWorkerOptions},data])=>{
       if(disposed)return;
+      GlobalWorkerOptions.workerSrc=new URL('pdf.worker.min.js',location.href).href;
       task=getDocument({data:new Uint8Array(data),useWasm:false,cMapUrl:new URL('pdf-cmaps/',location.href).href,cMapPacked:true,standardFontDataUrl:new URL('pdf-fonts/',location.href).href});
       return task.promise.then(doc=>{if(!disposed)setPdf(doc);});
     }).catch(()=>{if(!disposed)setError('PDF 无法预览（文件可能加密或损坏），请打开原文件。');});

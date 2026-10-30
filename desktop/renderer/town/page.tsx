@@ -13,6 +13,7 @@ import {
   type Data,
 } from "./models/town";
 import { useModel } from "../shared/hooks/use-model";
+import { navigateTabs } from "../shared/components/tab-navigation";
 import {
   TownHome,
   Catalog,
@@ -60,12 +61,17 @@ export function Town({ model }: { model: TownModel }) {
             id="town-tabs"
             className="segmented"
             role="tablist"
+            aria-label={definition?.title || "内容分类"}
+            onKeyDown={navigateTabs}
             hidden={Boolean(town.directId) || !definition?.tabs.length}
           >
             {definition?.tabs.filter(([value]) => value !== 'local' || town.supportsLocalKits).map(([value, label]) => (
               <button
                 key={value}
                 role="tab"
+                id={`town-tab-${value}`}
+                aria-controls="town-body"
+                tabIndex={value === town.tab ? 0 : -1}
                 aria-selected={value === town.tab}
                 className={value === town.tab ? "selected" : ""}
                 onClick={() => town.selectTab(value)}
@@ -99,8 +105,8 @@ export function Town({ model }: { model: TownModel }) {
               </option>
             ))}
           </select>
-          {town.view === "kits" && town.tab === "grove" && <div className="segmented grove-kind-filter" role="tablist" aria-label="Grove 类型">
-            {([["", "全部"], ["app", "App"], ["kit", "Kit"], ["plugin", "Plugin"]] as const).map(([value, label]) => <button key={value} role="tab" aria-selected={town.groveKind === value} className={town.groveKind === value ? "selected" : ""} onClick={() => { town.groveKind = value; town.offset = 0; town.toolSelection = ""; town.selectedId = ""; town.localKit = undefined; town.changed(); }}>{label}</button>)}
+          {town.view === "kits" && town.tab === "grove" && <div className="segmented grove-kind-filter" role="tablist" aria-label="Grove 类型" onKeyDown={navigateTabs}>
+            {([["", "全部"], ["app", "App"], ["kit", "Kit"], ["plugin", "Plugin"]] as const).map(([value, label]) => <button key={value} role="tab" id={`grove-kind-${value || 'all'}`} aria-controls="town-body" tabIndex={town.groveKind === value ? 0 : -1} aria-selected={town.groveKind === value} className={town.groveKind === value ? "selected" : ""} onClick={() => { town.groveKind = value; town.offset = 0; town.toolSelection = ""; town.selectedId = ""; town.localKit = undefined; town.changed(); }}>{label}</button>)}
           </div>}
           {town.view === 'kits' && !town.directId && <>
             <label className="tools-local-filter"><input type="checkbox" checked={town.localOnly} onChange={e => { town.localOnly = e.target.checked; town.offset = 0; town.toolSelection = ""; town.localKit = undefined; town.changed(); }} />仅本机存在</label>
@@ -155,7 +161,7 @@ export function Town({ model }: { model: TownModel }) {
               <svg viewBox="0 0 20 20" aria-hidden="true">
                 <path d="m12.5 3.5 4 4M4 12l9-9a1.4 1.4 0 0 1 2 0l2 2a1.4 1.4 0 0 1 0 2l-9 9-5 1 1-5Z" />
               </svg>
-              {town.view === "mail" ? "写私信" : "写一句"}
+              <span className="town-write-label">{town.view === "mail" ? "写私信" : "写一句"}</span>
             </button>
             <button
               id="town-auth-button"
@@ -172,7 +178,7 @@ export function Town({ model }: { model: TownModel }) {
               aria-label="刷新内容"
               onClick={() => void town.load(true)}
             >
-              ↻
+              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M16 6a7 7 0 1 0 1 7M16 2v5h-5" /></svg>
             </button>
           </div>
         </div>
@@ -215,6 +221,8 @@ export function Town({ model }: { model: TownModel }) {
         {town.view === "bonfire" && <BonfireAnnouncements town={town} />}
         <div
           id="town-body"
+          role={!town.directId && definition?.tabs.length ? "tabpanel" : undefined}
+          aria-labelledby={!town.directId && definition?.tabs.length ? `town-tab-${town.tab}${town.view === "kits" && town.tab === "grove" ? ` grove-kind-${town.groveKind || 'all'}` : ''}` : undefined}
           className={
             town.view === "firesides" && !town.directId
               ? "fireside-body"
@@ -410,29 +418,24 @@ function FiresideThread({ town, room }: { town: TownModel; room?: Data }) {
   );
   if (town.detailLoading && !data)
     return (
-      <>
+      <div className="feed-header">
         {heading}
         <div className="feed-controls fireside-loading-controls" role="status">
           正在切换围炉…
         </div>
-        <div className="feed-summary fireside-loading-summary" aria-hidden="true">
-          &nbsp;
-        </div>
-      </>
+      </div>
     );
   if (town.detailError && !data)
     return <>{heading}<DetailError town={town} /></>;
   if (!data) return heading;
   return (
-    <>
-      {heading}
-      <TownFeed
-        key={`${town.ringData?.id}:${town.live?.generation}`}
-        town={town}
-        data={data}
-        filterKey="firesides"
-      />
-    </>
+    <TownFeed
+      heading={heading}
+      key={`${town.ringData?.id}:${town.live?.generation}`}
+      town={town}
+      data={data}
+      filterKey="firesides"
+    />
   );
 }
 function FiresideMembers({

@@ -5,19 +5,20 @@ import { mkdir, readFile } from 'node:fs/promises';
 import { build } from 'esbuild';
 import { chromium } from 'playwright';
 const preview = process.env.PORTAL_LAYOUT_PREVIEW === '1';
+const museOnly = process.env.PORTAL_LAYOUT_MUSE_ONLY === '1';
 const assets = new Map(await Promise.all(['loom.html','chat.js','chat.css','highlight.css'].map(async file => ['/' + file, await readFile('desktop/generated/' + file)])));
-const bundle = await build({ plugins:[{name:'preview-chat-origin',setup(build){build.onLoad({filter:/app[\\/]hooks[\\/]use-chat-bridge\.tsx?$/},async args=>({contents:(await readFile(args.path,'utf8')).replaceAll('"beings://chat"','location.origin'),loader:'ts'}));}}], stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
+const bundle = await build({ plugins:[{name:'preview-chat-origin',setup(build){build.onLoad({filter:/renderer[\\/]app[\\/].*\.tsx?$/},async args=>({contents:(await readFile(args.path,'utf8')).replace(/(['"])beings:\/\/chat\1/g,'location.origin'),loader:args.path.endsWith('.tsx')?'tsx':'ts'}));}}], stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
   import {createRoot} from 'react-dom/client';
   import {App} from './desktop/renderer/app/page';
   import {AppModel} from './desktop/renderer/app/models/app';
   import './desktop/renderer/app/styles.css';
-  const app = new AppModel({platform:'darwin',appearance:async theme=>theme || 'light',notifications:async()=>({supported:true,message:'',preferences:{enabled:false,mail:true,firesides:true,bonfire:false}}),clientStartup:async()=>({supported:true,enabled:false,message:''}),browserBounds:async()=>{},browserState:async()=>({open:false,address:'',tabs:[]}),onBrowser:()=>()=>{}});
+  const app = new AppModel({platform:'darwin',appearance:async theme=>theme || 'light',notifications:async()=>({supported:true,message:'',preferences:{enabled:false,mail:true,firesides:true,bonfire:false}}),clientStartup:async()=>({supported:true,enabled:false,message:''}),browserBounds:async()=>{},browserState:async()=>({open:false,address:'',tabs:[]}),onBrowser:listener=>{window.fixtureBrowserState=listener;return()=>{delete window.fixtureBrowserState;};}});
   app.start = () => () => {};
   app.startup = 'ready';
   app.snapshot = {settings:{hasToken:false,being:'Willow'},portal:{phase:'stopped',logs:[]},kits:[]};
   const showTown = app.town.show.bind(app.town);
   app.town.show = view => {app.town.view = view;app.town.visible = view !== 'chat';app.town.changed();};
-  if (${preview}) {
+  if (${preview || museOnly}) {
     app.town.show = showTown;
     app.api.localKits = async () => ({directory:'',enabled:false,kits:[]});
     app.api.localApps = async () => [];
@@ -39,13 +40,19 @@ const bundle = await build({ plugins:[{name:'preview-chat-origin',setup(build){b
         query.kind === 'grove' ? {kits:[],count:0} : {services:{'🌱 seed garden':{what:'记录和分享经验。'},'📚 scrolls':{what:'阅读来自小镇的笔记。'}},whats_new:[]};
       return {ok:true,data,fetchedAt:new Date().toISOString()};
     };
-    app.snapshot.settings.hasToken = true;
+    Object.assign(app.snapshot.settings,{hasToken:true,portalName:'willow-mac',workspace:'/Users/example/Projects',endpoint:'https://example.invalid/willow',autoStart:true,allowExec:false,kitsEnabled:true,permissionMode:'supervised'});
     app.connection = 'online'; app.sbsKnown = true;
     app.chatSource = new URL('/loom.html?scene_id=desktop-fixture&scene_scope=current&scene_strict=1', location.href).href; app.frameLoaded = () => {};
     app.snapshot.chatScene = {scene_id:'desktop-fixture',scene_meta:{scene_label:'日常对话',client:'portal-desktop'}};
     app.snapshot.chatSessions = [app.snapshot.chatScene];
   }
+  app.api.downloadDirectory = async choose => choose ? '/Users/example/Downloads' : '';
+  app.api.diagnostics = async () => ({version:'0.1.11',platform:'darwin',build:'fixture',pid:123,startedAt:Date.now(),checks:[{status:'ok',name:'本机配置',detail:'读取正常'}]});
+  app.api.connectionDefaults = async () => ({portalName:'fixture',workspace:'/fixture'});
   app.api.beingModelConfig = async () => ({provider:'self-hosted',model:'glm-5.3',thinking:'medium',presets:[]});
+  app.api.beingModelCatalog = async input => ({status:200,data:input.kind==='routes'
+    ? {routes:[{id:'self-hosted',name:'本机模型线路',base_url:'https://example.invalid/v1',has_key:true}]}
+    : {models:[{id:'glm-5.3',name:'GLM 5.3',context:262144,reasoning:true,tool_call:true},{id:'fixture-next',name:'示例备用模型'}]}});
   app.api.subagentConfig = async () => ({provider:'openai',model:'local-fixture',thinking:'medium'});
   window.fixtureApp = app;
   createRoot(document.getElementById('root')).render(<App model={app} />);
@@ -82,9 +89,234 @@ try {
   page.setDefaultTimeout(30000);
   const errors=[]; page.on('pageerror',error=>{errors.push(error.message);console.error(error.message);});
   await page.goto(`http://127.0.0.1:${server.address().port}`);
-  await page.getByRole('heading',{name:'从一个想法开始'}).waitFor();
+  if (museOnly) await page.locator('#chat-frame').waitFor();
+  else await page.getByRole('heading',{name:'从一个想法开始'}).waitFor();
   assert.equal(await page.locator('#chat-session-panel').count(),0);
   await mkdir('test-results',{recursive:true});
+  if (museOnly) {
+    const hiddenChanges = await page.evaluate(async () => {
+      const app = window.fixtureApp, original = app.readingSize;
+      const records = [], observer = new MutationObserver(changes => records.push(...changes));
+      observer.observe(document.querySelector('#client-settings-dialog'),{subtree:true,attributes:true,childList:true,characterData:true});
+      for (let i=0;i<20;i++) {
+        app.readingSize = 13+i%9; app.changed();
+        await new Promise(resolve => requestAnimationFrame(resolve));
+      }
+      observer.disconnect(); app.readingSize=original; app.changed();
+      return records.length;
+    });
+    console.log('Closed settings DOM mutations during 20 global updates:',hiddenChanges);
+    if (process.env.PORTAL_LAYOUT_BASELINE === '1') break testRun;
+    assert.equal(hiddenChanges,0,'Closed settings must not reconcile controls on global updates');
+  }
+  // Tab contents may differ in length; the shell and close target stay still.
+  for (const viewport of [{width:1440,height:960},{width:760,height:500},{width:435,height:746}]) {
+    await page.setViewportSize(viewport);
+    await page.keyboard.press('Meta+,');
+    const settings = page.locator('#client-settings-dialog');
+    await settings.waitFor({state:'visible'});
+    const bounds = await settings.boundingBox();
+    const closeBounds = await page.locator('#close-client-settings').boundingBox();
+    for (const tab of ['外观与阅读','通用','Being']) {
+      await settings.getByRole('tab',{name:tab,exact:true}).click();
+      assert.deepEqual(await settings.boundingBox(),bounds,'Settings tabs must not resize or recenter the shell');
+      assert.deepEqual(await page.locator('#close-client-settings').boundingBox(),closeBounds);
+    }
+    assert.ok(bounds.y>=0 && bounds.y+bounds.height<=viewport.height);
+    await settings.getByRole('tab',{name:'通用',exact:true}).click();
+    await page.screenshot({path:`test-results/settings-stable-${viewport.width}.png`});
+    await page.keyboard.press('Escape');
+    await settings.waitFor({state:'hidden'});
+  }
+  await page.setViewportSize({width:1440,height:960});
+  if (museOnly) {
+    await page.keyboard.press('Meta+,');
+    const settings = page.locator('#client-settings-dialog');
+    await page.screenshot({path:'test-results/muse-connections.png'});
+    // All categories expose controls directly; longer sections expand in place.
+    const destinations = [
+      ['Being','#connection-link','being'],
+      ['模型','#subagent-enabled-input','models'],
+      ['Portal','#portal-settings-page','portal'],
+      ['Town','#town-auth-form','town'],
+      ['外观与阅读','#show-reasoning','appearance'],
+      ['通用','#notification-enabled','general'],
+    ];
+    for (const viewport of [{width:1440,height:960},{width:760,height:500},{width:435,height:746}]) {
+      await page.setViewportSize(viewport);
+      const bounds = await settings.boundingBox(), closeBounds = await settings.locator('#close-client-settings').boundingBox();
+      for (const [category,selector,kind] of destinations) {
+        const workspace = await page.evaluate(()=>window.fixtureApp.view);
+        await settings.getByRole('tab',{name:category,exact:true}).click();
+        await settings.locator(selector).waitFor({state:'visible'});
+        assert.equal(await page.locator('dialog[open]').count(),1);
+        assert.deepEqual(await settings.boundingBox(),bounds);
+        assert.deepEqual(await settings.locator('#close-client-settings').boundingBox(),closeBounds);
+        assert.equal(await page.evaluate(()=>window.fixtureApp.view),workspace);
+        assert.equal(await settings.evaluate(node=>node.scrollWidth>node.clientWidth),false);
+        assert.equal(await settings.getByRole('button',{name:'回退',exact:true}).count(),0);
+        if (kind==='being') assert.equal(await settings.locator('#workspace-input, #subagent-enabled-input').count(),0);
+        if (kind==='portal') {
+          const summary=settings.locator('.settings-disclosure > summary').filter({hasText:'本机配置'});
+          await summary.click();
+          await settings.locator('#workspace-input').waitFor({state:'visible'});
+          assert.equal(await settings.locator('#connection-link, #subagent-enabled-input').count(),0);
+          assert.equal(await settings.locator('.settings-page-title').innerText(),category);
+          await settings.locator('#save-settings').scrollIntoViewIfNeeded();
+          const save=await settings.locator('#save-settings').boundingBox();
+          assert.ok(save.y+save.height<=bounds.y+bounds.height);
+          await summary.click();
+          assert.equal(await settings.locator('#portal-logs').count(),0);
+          await settings.getByText('查看最近运行日志 · 凭据已脱敏',{exact:true}).click();
+          await settings.locator('#portal-logs').waitFor({state:'visible'});
+          await settings.getByText('查看最近运行日志 · 凭据已脱敏',{exact:true}).click();
+        }
+        if (kind==='models') {
+          await settings.getByRole('tab',{name:'subagent',exact:true}).click();
+          await settings.locator('#subagent-model-panel').waitFor({state:'visible'});
+          assert.equal(await settings.locator('#subagent-enabled-input').isVisible(),true);
+          await settings.getByRole('button',{name:'编辑配置',exact:true}).click();
+          await settings.locator('#subagent-s2-model').waitFor({state:'visible'});
+          assert.equal(await settings.locator('#subagent-llm-step1').isVisible(),true,'Overview stays while editing');
+          await settings.getByRole('button',{name:'收起配置',exact:true}).click();
+        }
+        if (kind==='general') {
+          await settings.locator('#open-diagnostics').click();
+          await settings.getByText('读取正常',{exact:true}).waitFor();
+          assert.equal(await settings.locator('#notification-enabled').isVisible(),true);
+          await settings.locator('#open-diagnostics').click();
+        }
+        await settings.locator('.settings-inline-body').evaluate(node=>{node.scrollTop=0;});
+        await page.screenshot({path:`test-results/inline-settings-${kind}-${viewport.width}.png`});
+      }
+    }
+    await page.setViewportSize({width:1440,height:960});
+    // Saving blocks navigation, surfaces errors in place and keeps the frame after retry.
+    await page.evaluate(()=>{
+      const app=window.fixtureApp;
+      app.api.save=()=>new Promise((resolve,reject)=>{window.finishSettingsSave={resolve,reject};});
+    });
+    await settings.getByRole('tab',{name:'Portal',exact:true}).click();
+    await settings.locator('.settings-disclosure > summary').filter({hasText:'本机配置'}).click();
+    await settings.locator('#portal-name-input').fill('saved-machine');
+    await settings.locator('#save-settings').click();
+    await page.waitForFunction(()=>Boolean(window.finishSettingsSave));
+    assert.equal(await settings.locator('#close-client-settings').isEnabled(),false);
+    assert.equal(await settings.locator('#portal-name-input').isEnabled(),false);
+    await page.keyboard.press('Escape');
+    assert.equal(await settings.isVisible(),true,'Escape cannot interrupt a save');
+    await page.evaluate(()=>window.finishSettingsSave.reject(new Error('测试连接失败，请重试。')));
+    await settings.getByText('测试连接失败，请重试。',{exact:true}).waitFor();
+    assert.equal(await settings.locator('#portal-name-input').inputValue(),'saved-machine');
+    await settings.locator('#save-settings').click();
+    await page.waitForFunction(()=>window.fixtureApp.saving);
+    await page.evaluate(()=>window.finishSettingsSave.resolve(window.fixtureApp.snapshot));
+    await settings.locator('.settings-disclosure > summary').filter({hasText:'本机配置'}).waitFor({state:'visible'});
+    assert.equal(await page.locator('dialog[open]').count(),1);
+    // Town credential submission keeps errors in this frame and returns on success.
+    await page.evaluate(()=>{window.fixtureApp.api.pairTown=async()=>{throw new Error('配对码无效，请重试。');};});
+    await settings.getByRole('tab',{name:'Town',exact:true}).click();
+    await settings.locator('#town-being').fill('t_Fixture');
+    await settings.locator('#town-pair-code').fill('ABC123');
+    await settings.getByRole('button',{name:'确认配对',exact:true}).click();
+    await settings.getByText('配对码无效，请重试。',{exact:true}).waitFor();
+    assert.equal(await settings.locator('#town-pair-code').inputValue(),'ABC123');
+    await page.evaluate(()=>{window.fixtureApp.api.pairTown=async()=>({});});
+    await settings.getByRole('button',{name:'确认配对',exact:true}).click();
+    await settings.getByText('已连接 Town。',{exact:true}).waitFor();
+    assert.equal(await settings.locator('#clear-town-token').isEnabled(),true);
+    assert.equal(await page.locator('dialog[open]').count(),1);
+    // Escape from a focused model control uses the same close behavior.
+    await settings.getByRole('tab',{name:'模型',exact:true}).click();
+    await settings.getByRole('tab',{name:'Being 模型',exact:true}).press('Escape');
+    await settings.waitFor({state:'hidden'});
+    await page.keyboard.press('Meta+,');
+    await settings.getByRole('tab',{name:'外观与阅读',exact:true}).click();
+    await settings.locator('#reading-size').fill('19');
+    assert.equal(await settings.locator('.reading-sample p').evaluate(el=>getComputedStyle(el).fontSize),'19px');
+    await settings.locator('#reading-reset').click();
+    assert.equal(await settings.locator('.reading-sample p').evaluate(el=>getComputedStyle(el).fontSize),'16px');
+    const toggle = settings.getByRole('switch',{name:'显示思考链路',exact:true});
+    assert.equal(await toggle.isChecked(),false);
+    await toggle.check();
+    assert.equal(await page.evaluate(()=>localStorage.getItem('beings:show-reasoning')),'true');
+    await toggle.uncheck();
+    assert.equal(await page.evaluate(()=>window.fixtureApp.showReasoning),false);
+    await page.screenshot({path:'test-results/muse-settings.png'});
+    await settings.locator('#chat-history-limit').fill('150');
+    await settings.locator('.history-setting button[type=submit]').click();
+    assert.equal(await page.evaluate(()=>window.fixtureApp.chatHistoryLimit),150);
+    await page.evaluate(()=>{
+      const app=window.fixtureApp;
+      app.api.clientStartup=async enabled=>({supported:true,enabled:enabled ?? false,message:''});
+      app.api.notifications=async patch=>({supported:true,message:'测试通知可用',preferences:{...app.notificationSettings.preferences,...patch}});
+      app.changed();
+    });
+    await settings.getByRole('tab',{name:'外观与阅读',exact:true}).press('ArrowDown');
+    assert.equal(await settings.getByRole('tab',{name:'通用',exact:true}).getAttribute('aria-selected'),'true');
+    await settings.getByRole('button',{name:'设置下载位置',exact:true}).click();
+    await settings.getByText('/Users/example/Downloads',{exact:true}).waitFor();
+    await settings.locator('#client-startup-input').check();
+    await page.waitForFunction(()=>window.fixtureApp.clientStartup.enabled);
+    await settings.locator('#notification-enabled').check();
+    await settings.locator('#notification-bonfire').check();
+    await page.waitForFunction(()=>window.fixtureApp.notificationSettings.preferences.bonfire);
+    await page.keyboard.press('Escape');
+    await page.locator('#options-trigger').click();
+    assert.equal(await page.locator('#options-home #open-browser, .rail-portal-status, #options-home .options-sbs').count(),0);
+    await page.locator('#options-home > #local-portal-status:first-child').waitFor({state:'visible'});
+    await page.screenshot({path:'test-results/muse-menu.png'});
+    await page.locator('#local-portal-status').click();
+    await settings.locator('#portal-settings-page').waitFor({state:'visible'});
+    assert.equal(await settings.getByRole('tab',{name:'Portal',exact:true}).getAttribute('aria-selected'),'true');
+    assert.equal(await page.locator('dialog[open]').count(),1);
+    await page.keyboard.press('Escape');
+    const rail = page.getByRole('navigation',{name:'主导航'});
+    for (const name of ['篝火','围炉']) {
+      await rail.getByRole('button',{name,exact:true}).click();
+      if (name==='围炉') await page.getByRole('heading',{name:'日常灵感',exact:true}).waitFor();
+      await page.locator('.social-bubble').first().waitFor();
+      const expand = page.getByRole('button',{name:'展开全文',exact:true}).first();
+      await page.emulateMedia({reducedMotion:'no-preference'});
+      await expand.click();
+      const collapse = page.getByRole('button',{name:'收起全文',exact:true}).first();
+      const contentId = await collapse.getAttribute('aria-controls');
+      assert.equal(await page.locator(`[id="${contentId}"]`).isVisible(),true);
+      assert.equal(await page.locator('.social-expansion').evaluateAll(nodes=>nodes.some(node=>node.getAnimations({subtree:true}).some(animation=>animation.effect?.getKeyframes().some(frame=>'height' in frame)))),false,'Expansion must not animate layout height');
+      await collapse.click();
+      assert.equal(await page.locator(`[id="${contentId}"]`).isVisible(),false);
+      await page.emulateMedia({reducedMotion:'reduce'});
+      await page.locator('#town-search').fill('没有这种内容的查询');
+      await page.getByText('没有符合条件的消息',{exact:true}).waitFor();
+      await page.getByRole('button',{name:'清空搜索与筛选',exact:true}).click();
+      assert.equal(await page.locator('#town-search').inputValue(),'');
+      await page.locator('.social-bubble').first().waitFor();
+      await page.screenshot({path:`test-results/muse-${name==='篝火'?'bonfire':'fireside'}.png`});
+      assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    }
+    await page.evaluate(()=>{const app=window.fixtureApp;app.theme='dark';app.changed();});
+    await page.keyboard.press('Meta+,');
+    await settings.getByRole('tab',{name:'Portal',exact:true}).click();
+    assert.equal(await page.evaluate(()=>window.fixtureApp.view),'firesides');
+    await page.screenshot({path:'test-results/unified-settings-portal-dark.png'});
+    await settings.getByRole('tab',{name:'模型',exact:true}).click();
+    await settings.locator('#settings-panel .settings-body').waitFor({state:'visible'});
+    assert.equal(await page.evaluate(()=>window.fixtureApp.view),'firesides');
+    await page.screenshot({path:'test-results/unified-settings-model-dark.png'});
+    await page.keyboard.press('Escape');
+    await page.screenshot({path:'test-results/muse-fireside-dark.png'});
+    await page.setViewportSize({width:435,height:746});
+    await page.screenshot({path:'test-results/muse-fireside-narrow.png'});
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+    assert.deepEqual(errors,[]);
+    console.log('PASS: unified settings routes at 3 sizes, no nested modals/workspace jumps, staged drafts, save/retry guards, general preferences, keyboard/focus, collapsed logs, menu, message expansion, dark layouts.');
+    break testRun;
+  }
+  if (process.env.PORTAL_LAYOUT_SETTINGS_ONLY === '1') {
+    assert.deepEqual(errors,[]);
+    console.log('PASS: stable settings bounds, close target, viewport containment and Escape dismissal.');
+    break testRun;
+  }
   await page.evaluate(()=>{const app=window.fixtureApp;app.update={phase:'available',currentVersion:'0.1.7',latestVersion:'0.1.8'};app.changed();});
   const updateButton=page.locator('.rail-update #client-update');
   await updateButton.waitFor();
@@ -130,6 +362,7 @@ try {
   await page.getByRole('tooltip').getByText('篝火',{exact:true}).waitFor();
   await page.screenshot({animations:'disabled',path:'test-results/workspace-tooltip.png'});
   await page.mouse.move(500,80);
+  await page.getByRole('button',{name:'Being 信息',exact:true}).click();
   const infoDivider = page.getByRole('separator',{name:'调整 Being 信息宽度'});
   await infoDivider.focus(); await page.keyboard.press('ArrowLeft');
   assert.equal(Math.round((await page.locator('#being-info').boundingBox()).width),344);
@@ -239,7 +472,7 @@ try {
   assert.equal(await page.locator('#place-panel').count(),0);
   assert.equal(await page.locator('#chat-view').isVisible(),true);
   assert.equal(await page.frameLocator('#chat-frame').locator('#messages').evaluate(node=>getComputedStyle(node).scrollbarWidth),'none');
-  assert.equal(await page.frameLocator('#chat-frame').locator('#input').evaluate(node=>getComputedStyle(node).scrollbarWidth),'none');
+  assert.equal(await page.frameLocator('#chat-frame').locator('#input').evaluate(node=>getComputedStyle(node).scrollbarWidth),'thin');
   const searchTrigger = page.getByRole('button',{name:'查找对话',exact:true});
   await searchTrigger.click();
   await page.locator('#chat-search-input').press('Escape');
@@ -252,40 +485,35 @@ try {
   await page.evaluate(()=>window.fixtureApp.openModelSettings());
   await page.getByRole('heading',{name:'glm-5.3',exact:true}).waitFor();
   const beforeSettingsFrame = await page.locator('#chat-frame').elementHandle();
-  const modelBounds=await page.locator('#subagent-model-panel').boundingBox();
-  assert.equal(modelBounds.width,profileWidth,"Profile and model settings must share their width");
-  const chatBounds=await page.locator('#chat-view').boundingBox();
-  assert.ok(chatBounds.x+chatBounds.width<=modelBounds.x+1,'Settings must occupy a sibling column without covering chat');
-  assert.equal(await page.locator('#being-info').count(),0);
-  await page.getByRole('separator',{name:'调整模型设置宽度'}).press('ArrowLeft');
-  await page.waitForFunction(expected => Math.round(document.querySelector('#subagent-model-panel').getBoundingClientRect().width) === expected, Math.round(profileWidth+24));
+  assert.equal(await page.locator('dialog[open]').count(),1);
+  assert.equal((await page.locator('#being-info').boundingBox()).width,profileWidth,'Opening model settings keeps the background sidebar');
+  assert.equal(await page.getByRole('separator',{name:'调整模型设置宽度'}).count(),0);
   await page.screenshot({path:'test-results/workspace-model-settings.png'});
   await page.setViewportSize({width:435,height:746});
   assert.equal(await page.locator('#chat-view').isVisible(),true);
-  const narrowModelWidth=(await page.locator('#subagent-model-panel').boundingBox()).width;
-  assert.ok(await page.locator('#subagent-model-panel').evaluate(n=>n.scrollWidth<=n.clientWidth));
+  assert.ok(await page.locator('#client-settings-dialog').evaluate(n=>n.scrollWidth<=n.clientWidth));
   await page.screenshot({path:'test-results/workspace-model-settings-narrow.png'});
-  await page.getByRole('button',{name:'关闭模型设置'}).click();
-  assert.equal((await page.locator('#being-info').boundingBox()).width,narrowModelWidth);
+  await page.getByRole('button',{name:'关闭客户端设置'}).click();
   assert.ok(await beforeSettingsFrame.evaluate(n=>n===document.querySelector('#chat-frame')));
   assert.equal(await page.locator('#chat-view').isVisible(),true);
   await page.setViewportSize({width:1440,height:960});
   // Long settings forms must scroll internally, keeping the footer inside the window.
-  await page.evaluate(()=>window.fixtureApp.openConnectionSettings());
-  await page.locator('#settings-dialog[open]').waitFor();
+  await page.evaluate(()=>window.fixtureApp.openConnectionSettings('portal'));
+  await page.locator('#client-settings-dialog[open] #settings-dialog').waitFor();
   assert.equal(await page.locator('#settings-dialog .navigation-controls button:disabled').count(),0);
   for (const height of [800,500]) {
     await page.setViewportSize({width:1100,height});
-    const body=page.locator('#settings-form .dialog-body');
+    const body=page.locator('.settings-inline-body');
     assert.ok(await body.evaluate(n=>n.scrollHeight>n.clientHeight),'Settings body should overflow into its own scrollport');
+    await page.locator('#save-settings').scrollIntoViewIfNeeded();
     const footer=await page.locator('#settings-form .dialog-footer').boundingBox();
     assert.ok(footer.y+footer.height<=height-20,'Save actions must stay visible');
     await body.hover();
     await page.mouse.wheel(0,2000);
-    await page.waitForFunction(()=>document.querySelector('#settings-form .dialog-body').scrollTop>0);
+    await page.waitForFunction(()=>document.querySelector('.settings-inline-body').scrollTop>0);
   }
   await page.screenshot({path:'test-results/workspace-connection-scroll.png'});
-  await page.getByRole('button',{name:'关闭设置',exact:true}).click();
+  await page.getByRole('button',{name:'关闭客户端设置',exact:true}).click();
   await page.setViewportSize({width:1440,height:960});
   for (const [name,title] of [['篝火','篝火'],['围炉','围炉'],['私信','私信'],['种子花园','种子花园'],['书架','书架'],['卷轴','卷轴'],['工具库','工具库'],['公告','公告'],['通讯录','通讯录'],['小镇广场','小镇广场']]) {
     const pinned = rail.getByRole('button',{name,exact:true});
@@ -308,7 +536,7 @@ try {
       open: async () => ({ token: 'layout-plugin', url: 'data:text/html,' + encodeURIComponent('<h1>Plugin layout fixture</h1><script>parent.postMessage({channel:"layout-plugin",type:"grove:ready"},"*")</script>') }),
       close: async () => {},
     };
-    app.plugins.library = { problems: [], plugins: [{ enabled: true, placements: { goals: 'navigation' },
+    app.plugins.library = { problems: [], plugins: [{ enabled: true, visibleSidebarSlots: ['details'], placements: { goals: 'navigation' },
       manifest: { id: 'fixture.goals', name: '目标插件', capabilities: [], contributes: { views: [{ id: 'goals', title: '目标插件' }],
         slots: [{ id: 'details', title: '查看目标', view: 'goals', location: 'right-sidebar' }] } } }] };
     app.plugins.changed();

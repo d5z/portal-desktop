@@ -100,19 +100,13 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.pa
     await page.waitForFunction(view => document.body.dataset.view === view && document.querySelector('#place-panel'), name);
     await page.waitForFunction(() => !document.querySelector('#town-body')?.hasAttribute('aria-busy'));
   };
-  // Settings destinations retain a single, explicit route back to the settings hub.
+  // Settings expose controls in one frame without a secondary navigation step.
   await page.locator('#options-trigger').click();
   await page.locator('#client-settings-button').click();
-  const settingsTitleInset = await page.locator('#client-settings-title').evaluate(el => el.getBoundingClientRect().left - el.closest('dialog').getBoundingClientRect().left);
-  await page.locator('#settings-button').click();
-  assert.equal(await page.locator('#settings-dialog .dialog-heading h2').evaluate((el, inset) => Math.abs(el.getBoundingClientRect().left - el.closest('dialog').getBoundingClientRect().left - inset) < 1, settingsTitleInset), true);
-  assert.equal(await page.locator('#settings-dialog .dialog-heading').evaluate(el => {
-    const title = el.querySelector('h2').getBoundingClientRect(), navigation = el.querySelector('.navigation-controls').getBoundingClientRect(), close = el.querySelector('.close').getBoundingClientRect();
-    return navigation.left >= title.right && navigation.left - title.right <= 12 && close.left > navigation.right;
-  }), true);
-  await page.getByRole('button', { name: '回退', exact: true }).click();
-  await page.locator('#client-settings-dialog[open]').waitFor();
-  assert.equal(await page.getByRole('button', { name: '前进', exact: true }).isEnabled(), true);
+  await page.getByRole('tab',{name:'Being',exact:true}).click();
+  await page.locator('#connection-link').waitFor({state:'visible'});
+  assert.equal(await page.locator('dialog[open]').count(),1);
+  assert.equal(await page.getByRole('button',{name:'回退',exact:true}).count(),0);
   await page.locator('#close-client-settings').click();
   await page.locator('#options-trigger').click();
   await page.locator('#client-settings-button').click();

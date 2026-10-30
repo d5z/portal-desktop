@@ -35,6 +35,39 @@ const response = (value: unknown) =>
 const flush = () => vi.advanceTimersByTimeAsync(0);
 
 describe("React chat runtime lifecycle", () => {
+  it.each([false, true])('coalesces token bursts per frame and preserves the final text (early stop: %s)', async earlyStop => {
+    let stream!: ReadableStreamDefaultController<Uint8Array>;
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => url.includes('/chat/stream')
+      ? new Response(new ReadableStream({ start(controller) { stream = controller; } }), { headers: { 'Content-Type': 'text/event-stream' } })
+      : response({ messages: [] })));
+    const state = new ChatState(), runtime = createChatRuntime(state);
+    const emit = (type: string, data: unknown) => stream.enqueue(new TextEncoder().encode(`event: ${type}\ndata: ${JSON.stringify(data)}\n\n`));
+    const replies = () => state.items.filter(item => item.kind === 'message' && item.role === 'being');
+    const listener = vi.fn();
+    const unsubscribe = state.subscribe(listener);
+    try {
+      await runtime.send('测试流式输出');
+      await flush();
+      emit('content_block_delta', { delta: { text: '第一段' } });
+      await flush();
+      await vi.advanceTimersByTimeAsync(16);
+      listener.mockClear();
+      for (const text of ['，第二段', '，第三段', '。']) {
+        emit('content_block_delta', { delta: { text } });
+        await flush();
+      }
+      expect(listener).not.toHaveBeenCalled();
+      if (!earlyStop) {
+        await vi.advanceTimersByTimeAsync(16);
+        expect(listener).toHaveBeenCalledTimes(1);
+        expect(replies()).toEqual([expect.objectContaining({ text: '第一段，第二段，第三段。', streaming: true })]);
+      }
+      emit('message_stop', {});
+      stream.close();
+      await flush();
+      expect(replies()).toEqual([expect.objectContaining({ text: '第一段，第二段，第三段。', streaming: false })]);
+    } finally { unsubscribe(); runtime.dispose(); }
+  });
   it('reconciles a server-stored scene Portal notice with the original local message', async () => {
     vi.stubGlobal('location', new URL('beings://chat/loom.html?scene_id=desktop-fixture'));
     const scene = { scene_id: 'desktop-fixture', scene_meta: { client: 'test', scene_label: '桌面', portal_name: 'laptop', portal_status: 'connected' as const } };

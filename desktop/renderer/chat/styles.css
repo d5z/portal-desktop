@@ -1,8 +1,10 @@
+@import "../shared/styles/message-flow.css";
+@import "../shared/styles/interaction.css";
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
 
-/* Suppress native focus rings; controls retain their explicit focus styles. */
-:focus { outline: none; }
+/* Keep a visible keyboard focus fallback for every control. */
+:focus:not(:focus-visible) { outline: none; }
 
 :root {
   /* ── 色彩 ── */
@@ -850,83 +852,6 @@ html, body {
 }
 .btn-attach svg { width: 20px; height: 20px; display: block; }
 
-/* Send button — SVG paper-plane, filled circle when input has text */
-#send-btn {
-  flex-shrink: 0;
-  width: 44px; height: 44px;
-  min-width: 44px; min-height: 44px;
-  padding: 0;
-  border-radius: 50%;
-  font-size: 0; /* hide the "↵" textContent set by JS */
-  color: var(--text);
-  background: var(--bg-softer);
-  border: 1px solid var(--border);
-  position: relative;
-  transition: background 0.2s ease, border-color 0.2s ease,
-              color 0.2s ease, transform 0.12s ease, box-shadow 0.2s ease;
-  align-self: flex-end;
-}
-#send-btn::before {
-  content: '';
-  position: absolute; inset: 0;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%237d8590' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M12 20V5'/><path d='M5 12l7-7 7 7'/></svg>");
-  background-repeat: no-repeat;
-  background-position: center;
-  background-size: 18px 18px;
-  border-radius: 50%;
-  transition: background-image 0.15s ease, opacity 0.2s ease;
-  pointer-events: none;
-}
-#send-btn:hover {
-  color: var(--text);
-  background: var(--bg-soft);
-  border-color: var(--text-muted);
-}
-#send-btn:active { transform: scale(0.92); }
-#send-btn:focus-visible {
-  outline: none;
-  box-shadow: 0 0 0 3px rgba(var(--accent-rgb),0.35);
-}
-
-/* Filled/accent state when textarea has content.
-   :placeholder-shown = empty; :not(:placeholder-shown) = has text. */
-#input-row:has(#input:not(:placeholder-shown)) #send-btn {
-  background: rgba(var(--accent-rgb), 0.15);
-  border-color: rgba(var(--accent-rgb), 0.3);
-}
-#input-area:has(#pending-files.active) #send-btn {
-  background: rgba(var(--accent-rgb), 0.15);
-  border-color: rgba(var(--accent-rgb), 0.3);
-}
-#input-row:has(#input:not(:placeholder-shown)) #send-btn::before {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2358a6ff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'><path d='M12 20V5'/><path d='M5 12l7-7 7 7'/></svg>");
-}
-#input-row:has(#input:not(:placeholder-shown)) #send-btn:hover {
-  background: rgba(var(--accent-rgb), 0.25);
-  border-color: rgba(var(--accent-rgb), 0.45);
-}
-
-/* Streaming pulse — driven by .queued proxy (only class exposed to CSS
-   while being is responding, without touching JS). */
-@keyframes send-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb),0.35); }
-  50%      { box-shadow: 0 0 0 6px rgba(var(--accent-rgb),0.0); }
-}
-#input-row:has(#input.queued) #send-btn {
-  animation: send-pulse 1.6s ease-in-out infinite;
-}
-
-#send-btn.stop {
-  background: transparent;
-  border-color: var(--red);
-  animation: none;
-  box-shadow: none;
-}
-#send-btn.stop::before {
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='%23f85149'><rect x='7' y='7' width='10' height='10' rx='1.5'/></svg>");
-  background-size: 16px 16px;
-}
-
 @media (max-width: 640px) {
   #app { max-width: none; }
   #messages { padding: 14px 12px; }
@@ -1005,10 +930,6 @@ body{-webkit-font-smoothing:antialiased;background:var(--bg)}
 #subagent-setup-hint .subagent-hint-close{display:grid;place-items:center;width:22px;height:22px;padding:0;border-radius:5px;color:var(--text-muted);font-size:15px}
 #subagent-setup-hint .subagent-hint-close:hover{background:var(--hover-overlay);color:var(--text)}
 #subagent-setup-hint button:focus-visible{outline:2px solid var(--accent-border);outline-offset:1px}
-#send-btn,#input-row:has(#input:not(:placeholder-shown)) #send-btn{grid-row:2;width:30px;height:30px;min-width:30px;min-height:30px;border:0;border-radius:50%;padding:0;margin:0;background:var(--text);color:var(--bg);box-shadow:none;align-self:center}
-#send-btn:before,#input-row:has(#input:not(:placeholder-shown)) #send-btn:before{background-image:none;background-color:var(--bg);mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 19V5m-6 6 6-6 6 6' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center/18px no-repeat}
-#send-btn:hover:not(:disabled),#input-row:has(#input:not(:placeholder-shown)) #send-btn:hover:not(:disabled){background:var(--text);opacity:.8}
-#input-row:has(#input.queued) #send-btn{background:var(--text)}
 #tui-wrapper{width:calc(100% - 64px);max-width:760px;margin:0 auto 8px}
 #tui-bar,#activity-log{border-color:var(--border);background:var(--bg-soft)}
 #reconnect-banner{width:calc(100% - 64px);max-width:760px;margin:0 auto 10px;border-radius:6px;font-size:11px}
@@ -1024,8 +945,6 @@ body{-webkit-font-smoothing:antialiased;background:var(--bg)}
 #scene-selection-action{position:fixed;z-index:1000;padding:8px 13px;border:1px solid var(--border);border-radius:8px;background:var(--bg-soft);color:var(--text);font-family:inherit;font-size:12px;line-height:1.5;box-shadow:0 4px 18px #0002;cursor:pointer}
 #scene-selection-action[hidden]{display:none}
 @media(max-width:880px){#messages{padding-left:54px;padding-right:24px}}
-#send-btn.stop::before,#input-row:has(#input:not(:placeholder-shown)) #send-btn.stop::before{mask:none;background-image:none;background-color:var(--bg);inset:10px;border-radius:2px}
-#input-row:has(#input.queued) #send-btn{animation:none}
 /* One 16px icon column and 8px gap throughout the process summary and details. */
 #tui-wrapper,.message.thinking-indicator{display:none!important}
 .run-activity{--run-icon:16px;--run-gap:8px;margin:8px 0 24px;min-width:0;color:var(--text-dim);font:13px/1.6 var(--font-sans);letter-spacing:normal;text-align:left}
@@ -1092,7 +1011,6 @@ body{-webkit-font-smoothing:antialiased;background:var(--bg)}
 #input-area:focus-within{border-color:var(--accent-border)}
 #input{min-height:46px;padding:0 0 8px;font-size:15px;background:transparent}
 #input-row{row-gap:8px}
-#send-btn{opacity:.86}
 @media(max-width:680px){#messages{padding:20px 28px 22px 38px}#input-area{width:calc(100% - 48px);padding:14px 0 0;margin-bottom:20px}}
 
 /* One unobtrusive doorway per mentioned place in a message. */
@@ -1198,10 +1116,6 @@ label.chat-scope-switch input{margin:0;accent-color:var(--accent)}
 #input-row{grid-template-columns:32px minmax(0,1fr) 36px;gap:4px 10px;align-items:center}
 #input{grid-column:2;grid-row:1;min-height:42px;max-height:180px;padding:9px 0;font-size:15px;line-height:24px}
 #input-row>.btn-icon:not(#send-btn){grid-column:1;grid-row:1;width:32px;height:32px;border-radius:50%}
-#send-btn,#input-row:has(#input:not(:placeholder-shown)) #send-btn{grid-row:1;width:36px;height:36px;background:var(--chat-sent);color:var(--text);opacity:1}
-#send-btn:before,#input-row:has(#input:not(:placeholder-shown)) #send-btn:before{background-color:var(--text)}
-#send-btn.stop::before,#input-row:has(#input:not(:placeholder-shown)) #send-btn.stop::before{background-color:var(--text)}
-#send-btn:hover:not(:disabled),#input-row:has(#input:not(:placeholder-shown)) #send-btn:hover:not(:disabled){background:var(--chat-sent);opacity:.75}
 @media(max-width:680px){#messages{padding:18px 20px 20px}#input-area{width:calc(100% - 28px);margin-bottom:14px;padding:10px 12px 7px}.message.being .content{max-width:96%;padding:13px 16px}.message.user .content{max-width:92%}}
 @media(prefers-reduced-motion:reduce){#input-area{transition:none}}
 
@@ -1232,10 +1146,12 @@ label.chat-scope-switch input{margin:0;accent-color:var(--accent)}
   #messages{padding-left:38px;padding-right:18px}
 }
 
-#chat-jump-latest{position:absolute;bottom:calc(100% + 14px);left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;max-width:calc(100% - 24px);padding:10px 15px;border:1px solid var(--accent-border);border-radius:24px;background:var(--chat-sent);color:var(--text);box-shadow:0 4px 16px #00000012;font-size:12px;font-weight:550;white-space:nowrap;cursor:pointer;z-index:15}
+#chat-jump-latest{position:absolute;bottom:calc(100% + 14px);left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:12px;min-height:44px;max-width:calc(100% - 24px);padding:10px 18px;border:0;border-radius:999px;background:#b9dcff;color:#15212d;box-shadow:0 5px 18px #00000010;font-family:inherit;font-size:14px;font-weight:600;line-height:24px;font-variant-numeric:tabular-nums;white-space:nowrap;cursor:pointer;z-index:15}
 #chat-jump-latest[hidden]{display:none}
-#chat-jump-latest svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-#chat-jump-latest:hover{filter:brightness(.97)}
+#chat-jump-latest svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#chat-jump-latest:hover{background:#acd5fc}
+:root[data-theme=dark] #chat-jump-latest{background:#365a78;color:#edf6ff}
+:root[data-theme=dark] #chat-jump-latest:hover{background:#416b8e}
 #chat-jump-latest:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
 
 /* Compact turn index, with its own space beside the message bubbles. */
@@ -2076,3 +1992,20 @@ label.chat-scope-switch input{margin:0;accent-color:var(--accent)}
   color: var(--text-muted);
   overflow-wrap: anywhere;
 }
+
+/* Quiet progress uses CSS only; hidden trace rows never mount their timers. */
+.quiet-activity{display:flex;align-items:center;gap:10px;max-width:100%;margin:8px 0 16px}
+.thinking-bubble{display:inline-flex;align-items:center;justify-content:center;min-width:60px;min-height:40px;padding:12px 17px;border-radius:16px 16px 16px 5px;background:var(--chat-reply);color:var(--text-dim)}
+.thinking-dots{display:flex;gap:5px}
+.thinking-dots i{display:block;width:5px;height:5px;border-radius:50%;background:currentColor;animation:thinking-dot 1.4s ease-in-out infinite}
+.thinking-dots i:nth-child(2){animation-delay:.16s}.thinking-dots i:nth-child(3){animation-delay:.32s}
+@keyframes thinking-dot{0%,60%,100%{opacity:.35;transform:translateY(0)}30%{opacity:1;transform:translateY(-2px)}}
+.quiet-activity-scene,.quiet-activity-notice{font-size:12px;line-height:1.6;color:var(--text-dim);overflow-wrap:anywhere}
+.thinking-bubble svg{width:18px;height:18px}
+@media(prefers-reduced-motion:reduce){.thinking-dots i{animation:none;opacity:.65}}
+
+/* Quiet grouped timestamps and a selection action beside the selected passage. */
+.message .meta:empty{display:none}
+#scene-selection-action{display:flex;align-items:center;gap:12px;min-height:40px;padding:8px 16px;border:0;border-radius:24px;background:var(--bg);font-size:14px;font-weight:500;box-shadow:0 6px 22px #0002}
+#scene-selection-action kbd{padding:2px 6px;border:1px solid var(--border);border-radius:6px;background:var(--bg-soft);font:12px/1.5 inherit;color:var(--text-dim)}
+.message-bubble-body:focus-visible{outline:2px solid var(--accent);outline-offset:4px;border-radius:16px}

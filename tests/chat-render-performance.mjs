@@ -39,6 +39,8 @@ try {
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   const origin='http://127.0.0.1:'+server.address().port;
   await page.addInitScript(()=>{const original=window.fetch;window.fetch=(input,init)=>original(typeof input==='string'&&input.startsWith('beings://chat/')?location.origin+input.slice('beings://chat'.length):input,init);});
+
+  await page.addInitScript(() => localStorage.setItem('beings:show-reasoning','true'));
   await page.goto(origin+'/seed');
   await page.evaluate(rows=>new Promise((resolve,reject)=>{
     const request=indexedDB.open('loom-history-'+encodeURIComponent(location.origin),2);
@@ -89,7 +91,9 @@ try {
     requestAnimationFrame(tick);
   }));
   await page.evaluate(()=>{
-    window.samples=[];window.longTasks=[];window.measuring=true;
+    window.samples=[];window.longTasks=[];window.measuring=true;window.messageLayoutReads=0;
+    const bounds=Element.prototype.getBoundingClientRect;
+    Element.prototype.getBoundingClientRect=function(){if(window.measuring&&this.classList.contains('message'))window.messageLayoutReads++;return bounds.call(this);};
     new PerformanceObserver(list=>{if(window.measuring)window.longTasks.push(...list.getEntries().map(entry=>entry.duration));}).observe({type:'longtask',buffered:false});
     let last=performance.now();function tick(now){if(!window.measuring)return;window.samples.push(now-last);last=now;requestAnimationFrame(tick);}requestAnimationFrame(tick);
   });
@@ -103,7 +107,7 @@ try {
   emit('message_stop',{});stream.end();
   await page.getByText('流式段落 89。',{exact:true}).waitFor();
   await page.locator('.message.being').last().locator('code .hljs-keyword').first().waitFor();
-  const metrics=await page.evaluate(()=>{window.measuring=false;const values=window.samples.slice(2).sort((a,b)=>a-b);return{frames:values.length,p95FrameMs:values[Math.floor(values.length*.95)],maxLongTaskMs:Math.max(0,...window.longTasks),mountedMessages:document.querySelectorAll('.message').length};});
+  const metrics=await page.evaluate(()=>{window.measuring=false;const values=window.samples.slice(2).sort((a,b)=>a-b);return{frames:values.length,messageLayoutReads:window.messageLayoutReads,p95FrameMs:values[Math.floor(values.length*.95)],maxLongTaskMs:Math.max(0,...window.longTasks),mountedMessages:document.querySelectorAll('.message').length};});
   metrics.idleP95FrameMs=idleP95FrameMs;
   metrics.frameBudgetMs=Math.max(100,idleP95FrameMs+50);
   await mkdir('test-results',{recursive:true});await writeFile('test-results/chat-render-performance.json',JSON.stringify(metrics,null,2));

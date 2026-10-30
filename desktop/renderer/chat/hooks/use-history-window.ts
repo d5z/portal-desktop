@@ -58,5 +58,11 @@ export function useHistoryWindow(items:ChatItem[],scope:string,loadOlder:(before
     const index=latest.current.findIndex(item=>item.id===id);
     if(index>=0)setWindows(old=>({...old,[scope]:latest.current[historyRevealStart(latest.current,old[scope],id)].id}));
   }
-  return {items:items.slice(start),more,reveal,loading,hasMore:start>0 || !exhausted[scope]};
+  function toLatest() {
+    // A late older-page result must not reopen history after explicit navigation to the latest messages.
+    boundary.current=null;
+    const first=latest.current[Math.max(0,latest.current.length-HISTORY_WINDOW_PAGE)];
+    if(first)setWindows(old=>old[scope]===first.id?old:{...old,[scope]:first.id});
+  }
+  return {items:items.slice(start),more,reveal,toLatest,loading,hasMore:start>0 || !exhausted[scope]};
 }

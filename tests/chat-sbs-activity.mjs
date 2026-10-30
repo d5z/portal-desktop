@@ -33,6 +33,8 @@ let browser;
 try {
   browser = await chromium.launch({headless:true,channel:process.env.PLAYWRIGHT_CHANNEL || 'chrome'});
   const page = await browser.newPage();
+  await page.addInitScript(() => localStorage.setItem('beings:show-reasoning','true'));
+
   page.setDefaultTimeout(15000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/loom.html?scene_id=room&scene_label=Room&scene_strict=1`);

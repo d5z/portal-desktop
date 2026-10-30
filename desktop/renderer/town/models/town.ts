@@ -298,6 +298,7 @@ export class TownModel extends Store {
     private post: (data: unknown) => void,
     private onLiveChange: () => void = () => {},
     private hasChat: () => boolean = () => Boolean(this.scenes.being),
+    private onAuthOpen: () => void = () => {},
   ) {
     super();
     try {
@@ -1194,6 +1195,7 @@ export class TownModel extends Store {
     }
   }
   async auth() {
+    this.onAuthOpen();
     if (this.authOpen) return;
     const revision = ++this.authRequest;
     this.authOpen = true;
@@ -1266,6 +1268,8 @@ export class TownModel extends Store {
       if (revision !== this.authRequest) return;
       this.resetIdentity();
       this.authLabel = 'Town 连接';
+      this.authConfigured = true;
+      this.authState = '已连接 Town。';
       this.authOpen = false;
       this.token = ''; this.pairCode = '';
       if (definitions[this.view]) await this.load();
@@ -1300,6 +1304,8 @@ export class TownModel extends Store {
       }
       this.resetIdentity();
       this.authLabel = clear ? "配对 Being" : "Town 连接";
+      this.authConfigured = !clear;
+      this.authState = clear ? "已断开本机配对。" : "已连接 Town。";
       this.token = "";
       this.pairCode = "";
       this.authOpen = false;

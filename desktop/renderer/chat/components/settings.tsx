@@ -54,6 +54,7 @@ function LegacyChatSettings({
   onTarget,
   staged = false,
   contentOnly = false,
+  inlineEditing = false,
   onBusy,
   copyPreset,
   catalogHint,
@@ -69,6 +70,7 @@ function LegacyChatSettings({
   onTarget?: (target: "Heart" | "subagent") => void;
   staged?: boolean;
   contentOnly?: boolean;
+  inlineEditing?: boolean;
   onBusy?: (busy: boolean) => void;
   copyPreset?: Preset;
   catalogHint?: string;
@@ -231,9 +233,12 @@ function LegacyChatSettings({
       aria-label="模型设置"
       data-mobile-page={mobilePage || undefined}
       onKeyDown={(event) => {
-        if (event.key === "Escape") {
+        if (event.key === "Escape" && (draft || !contentOnly)) {
+          event.preventDefault();
           event.stopPropagation();
-          if (!disabled) close();
+          if (disabled) return;
+          if (draft) { setDraft(null); setError(""); }
+          else close();
         }
       }}
     >
@@ -268,7 +273,7 @@ function LegacyChatSettings({
             {busy ? '正在启动…' : '启动 subagent'}
           </button>}
         </div>}
-        <div id={fieldId("llm-step1")}  hidden={!!draft}>
+        <div id={fieldId("llm-step1")}  hidden={!!draft && !inlineEditing}>
           {subagent && <div className="subagent-copy-being">
             <button type="button" className="btn-apply" disabled={disabled || !copyPreset} onClick={() => { if (copyPreset) select(copyPreset); }}>使用 Being 当前模型</button>
             {catalogHint && <p className="hint">{catalogHint}</p>}
@@ -514,9 +519,9 @@ function LegacyChatSettings({
                 setDraft(null);
                 setError("");
               }}
-              aria-label="返回模型列表"
+              aria-label={inlineEditing ? "收起配置" : "返回模型列表"}
             >
-              ← 返回模型列表
+              {inlineEditing ? "收起配置" : "← 返回模型列表"}
             </button>
             <div className="model-form-heading">
               <h3 id={fieldId("step2-title")} >{draft.preset.label}</h3>
@@ -654,7 +659,7 @@ function LegacyChatSettings({
               <select id={fieldId("subagent-thinking")}  className="field-input" value={thinking} disabled={disabled} onChange={event => setThinking(event.target.value)}>
                 {["off", "minimal", "low", "medium", "high", "xhigh", "max"].map(value => <option key={value} value={value}>{value}</option>)}
               </select>
-              <p className="hint">{staged ? "返回后点击保存、连接并启动，才会安装并保存配置。" : "保存后自动重启 Portal，无需重启 Desktop；运行中的任务可能中断。"}安装需要本机 npm。</p>
+              <p className="hint">{staged ? (inlineEditing ? "加入待保存配置后，点击本页上方保存按钮应用。" : "返回后点击保存、连接并启动，才会安装并保存配置。") : "保存后自动重启 Portal，无需重启 Desktop；运行中的任务可能中断。"}安装需要本机 npm。</p>
             </div>}
             {error && (
               <div id={fieldId("s2-error")}  className="step2-error" role="alert">
@@ -668,7 +673,7 @@ function LegacyChatSettings({
               disabled={disabled}
               onClick={() => void apply()}
             >
-              {busy ? "正在应用…" : subagent && staged ? "使用此配置并返回" : "保存并使用"}
+              {busy ? "正在应用…" : subagent && staged ? (inlineEditing ? "加入待保存配置" : "使用此配置并返回") : "保存并使用"}
             </button>
           </div>
         )}

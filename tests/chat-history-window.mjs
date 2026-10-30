@@ -119,6 +119,12 @@ try {
     assert.equal(await frame.locator(`[data-message-id="${stable}"]`).count(),1);
   }
   assert.ok(await count()>before);
+  await frame.locator('#chat-jump-latest').click();
+  await page.waitForFunction(()=>{
+    const doc=document.querySelector('#chat').contentDocument,el=doc.querySelector('#messages');
+    return doc.querySelectorAll('.message').length<=40&&el.scrollHeight-el.scrollTop-el.clientHeight<2;
+  });
+  await frame.getByText('being 历史 99',{exact:true}).waitFor();
   await page.reload();
   await frame.getByText('being 历史 99',{exact:true}).waitFor();
   assert.ok(await count()<=60,'Cached reload must also bound initial history');

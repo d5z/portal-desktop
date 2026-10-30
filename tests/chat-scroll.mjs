@@ -1,7 +1,7 @@
 // Exercise the actual bundled React chat against a local protocol fixture.
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
+import { readFile, mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
 const assets = new Map(await Promise.all(['loom.html', 'chat.js', 'chat.css', 'highlight.css'].map(async file => ['/' + file, await readFile('desktop/generated/' + file)])));
 let seq = 1, heldResponse = null;
@@ -53,6 +53,29 @@ try {
   const child = () => page.frames().find(frame => frame.url().includes('/loom.html'));
   const post = data => page.evaluate(data => document.querySelector('iframe').contentWindow.postMessage(data, location.origin), data);
   await frame.locator('.message.user').nth(11).waitFor();
+  const jump=frame.locator('#chat-jump-latest');
+  await jump.waitFor({state:'hidden'});
+  await frame.locator('#messages').evaluate(el=>{
+    const nodes=el.querySelectorAll('.message');
+    el.scrollTop+=nodes[nodes.length-11].getBoundingClientRect().bottom-el.getBoundingClientRect().top-el.clientHeight+1;
+  });
+  await child().waitForFunction(()=>document.querySelector('#chat-jump-latest').textContent==='10条消息');
+  assert.equal(await jump.evaluate(node=>getComputedStyle(node).borderWidth),'0px');
+  await mkdir('test-results',{recursive:true});
+  await page.screenshot({path:'test-results/chat-jump-muse-light.png'});
+  await child().evaluate(()=>document.documentElement.dataset.theme='dark');
+  await page.screenshot({path:'test-results/chat-jump-muse-dark.png'});
+  await child().evaluate(()=>document.documentElement.dataset.theme='light');
+  await page.setViewportSize({width:435,height:746});
+  await child().waitForFunction(()=>{
+    const el=document.querySelector('#messages'),bottom=el.getBoundingClientRect().top+el.clientHeight;
+    const count=[...el.querySelectorAll('.message')].filter(node=>node.getBoundingClientRect().bottom>bottom+2).length;
+    return document.querySelector('#chat-jump-latest').textContent===`${count}条消息`;
+  });
+  const bounds=await jump.boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=435);
+  await page.screenshot({path:'test-results/chat-jump-muse-narrow.png'});
+  await jump.click();await jump.waitFor({state:'hidden'});
+  await page.setViewportSize({width:1100,height:850});
   await frame.locator('#input').fill('hold');
   await frame.locator('#send-btn').click();
   await frame.locator('#send-btn.stop').waitFor();
@@ -69,6 +92,7 @@ try {
     event(heldResponse, 'content_block_delta', { delta: { text: `\n\n锚定测试段落 ${i}，用于填充足够的内容让回复开头超出视口。` } });
   }
   await frame.getByText('锚定测试段落 29').waitFor();
+  await child().waitForFunction(()=>document.querySelector('#chat-jump-latest').textContent==='1条消息');
   const anchoredOffset = await replyOffset();
   const anchorMetrics = await messages.evaluate((el, offset) => ({
     anchoredOffset: offset,
@@ -97,6 +121,7 @@ try {
   for (let i = 0; i < 5; i++) {
     event(heldResponse, 'content_block_delta', { delta: { text: `\n\n滚动回归段落 ${i}` } });
     await frame.getByText(`滚动回归段落 ${i}`, { exact: true }).waitFor();
+    assert.match(await jump.innerText(),/^(1条消息|最新消息)$/,'Streaming text in the same bubble does not increment the message count');
     assert.ok(Math.abs(await messages.evaluate(el => el.scrollTop) - readingTop) < 2,
       'Streaming must preserve the reading position after a small upward scroll');
   }

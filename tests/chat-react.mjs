@@ -258,10 +258,11 @@ try {
   }
   assert.equal(await frame.locator('#messages .message').count(), 25);
   const messageFor = text => frame.getByText(text, { exact: true }).locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " message ")][1]');
-  const oldMessageTime = await messageFor('历史问题 1').locator('.meta').textContent();
-  const todayMessageTime = await messageFor('历史问题 2').locator('.meta').textContent();
-  assert.match(oldMessageTime, /2024年\d{2}月\d{2}日 \d{2}:\d{2}:\d{2}/, 'Messages from another day show year, month and day');
-  assert.doesNotMatch(todayMessageTime, /年\d{2}月\d{2}日/, 'Messages from today only show the time');
+  assert.equal(await frame.locator('.message .meta time').count(),0,'Bubble metadata no longer repeats timestamps');
+  assert.ok(await frame.locator('.message-time-divider').count()>=2,'Calendar gaps retain timeline labels');
+  await messageFor('历史问题 1').locator('.message-bubble-body').click({button:'right'});
+  assert.match(await frame.locator('.message-menu-info time').getAttribute('title'),/2024/,'Full time stays available in the message menu');
+  await page.keyboard.press('Escape');
   assert.equal(await frame.locator('#messages img').count(), 0);
   assert.equal(await frame.locator('#messages a[href^="javascript:"]').count(), 0);
   assert.ok(await frame.locator('.hljs-keyword').count());
@@ -295,7 +296,7 @@ try {
   assert.equal(await frame.locator('#input').evaluate(el => el instanceof HTMLTextAreaElement ? el.value : el.textContent), '保留草稿');
   await frame.locator('#messages').evaluate(el=>{el.scrollTop=0;el.dispatchEvent(new Event('scroll'));});
   await frame.locator('#chat-jump-latest').waitFor();
-  assert.equal(await frame.locator('#chat-jump-latest').innerText(), '回到底部');
+  assert.match(await frame.locator('#chat-jump-latest').innerText(), /^[1-9]\d*条消息$/);
   await frame.locator('#chat-jump-latest').click();
   await child().waitForFunction(()=>{const el=document.querySelector('#messages');return el.scrollHeight-el.scrollTop-el.clientHeight<2;});
   await frame.locator('#chat-jump-latest').waitFor({state:'hidden'});
@@ -384,6 +385,9 @@ try {
       transcript: await frame.locator('#messages').innerText() }));
     throw error;
   });
+  assert.equal(await frame.locator('.run-activity').count(), 0, 'Detailed reasoning is hidden by default');
+  assert.equal(await frame.locator('.quiet-activity').count(), 0, 'Successful turns leave no thinking indicator');
+  await post({type:'beings:reasoning-display',show:true});
   await frame.locator('.run-activity[data-outcome="done"]').waitFor();
   assert.equal(requests.length, 1); assert.equal(requests[0].attachments[0].media_type, 'image/png'); assert.equal(requests[0].attachments[0].data, image.toString('base64'));
   assert.equal(await frame.locator('.run-activity').count(), 1, 'One process record per completed turn');
@@ -417,7 +421,24 @@ try {
   const continuationReplies = await frame.locator('.message.being:not(.thinking-indicator)').allTextContents();
   assert.equal(continuationReplies.length, repliesBeforeContinuation + 2,
     `A reply boundary must split continuation bubbles: ${JSON.stringify(continuationReplies.slice(-4))}`);
+  await post({type:'beings:reasoning-display',show:false});
   await pasteDraft('hold'); await frame.locator('#send-btn').click(); await frame.locator('#send-btn.stop').waitFor();
+  await frame.locator('.thinking-dots').waitFor();
+  assert.equal(await frame.locator('.run-activity').count(), 0);
+  await frame.locator('.thinking-bubble').screenshot({path:'test-results/thinking-dots.png'});
+  const lightBubble = await frame.locator('.thinking-bubble').evaluate(el => getComputedStyle(el).backgroundColor);
+  await post({type:'beings:appearance',theme:'dark'});
+  await child().waitForFunction(() => document.documentElement.dataset.theme === 'dark');
+  assert.notEqual(await frame.locator('.thinking-bubble').evaluate(el => getComputedStyle(el).backgroundColor),lightBubble);
+  await frame.locator('.thinking-bubble').screenshot({path:'test-results/thinking-dots-dark.png'});
+  await page.emulateMedia({reducedMotion:'reduce'});
+  assert.equal(await frame.locator('.thinking-dots i').first().evaluate(el => getComputedStyle(el).animationName),'none');
+  await page.emulateMedia({reducedMotion:'no-preference'});
+  await post({type:'beings:appearance',theme:'light'});
+
+  await post({type:'beings:reasoning-display',show:true});
+  await frame.locator('.run-activity.running').waitFor();
+
   assert.equal(await frame.locator('.run-stop').count(), 0, 'Stop belongs in the composer');
   await pasteDraft('   ');
   assert.equal(await frame.locator('#send-btn').getAttribute('aria-label'), '停止处理');

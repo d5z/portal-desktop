@@ -99,6 +99,7 @@ export function createChatBridge(state: ChatState) {
       panel(value: ChatPanel, returnToSettings?: boolean): void;
       theme(value: "light" | "dark"): void;
       reading(value: number): void;
+      reasoning?(show: boolean): void;
       search(query: string): void;
       jump(id: string): void;
       reveal(seq: number, sceneId: string): void;
@@ -235,6 +236,9 @@ export function createChatBridge(state: ChatState) {
           if (data.theme === "light" || data.theme === "dark")
             ui.theme(data.theme);
           return;
+        case "beings:reasoning-display":
+          if (typeof data.show === "boolean") ui.reasoning?.(data.show);
+          return;
         case "beings:reading":
           if (Number.isInteger(data.size) && data.size >= 13 && data.size <= 21)
             ui.reading(data.size);
@@ -319,6 +323,7 @@ export function createChatBridge(state: ChatState) {
     };
     void refreshSbs();
     publishActivity();
+    send({ type: 'beings:appearance-request' });
     send({ type: 'beings:scene-tasks-request' });
     send({ type: 'beings:permission-state-request' });
   }

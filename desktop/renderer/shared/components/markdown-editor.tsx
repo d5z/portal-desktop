@@ -9,7 +9,7 @@ import { safeLink } from './markdown';
 import { EditorState } from '@tiptap/pm/state';
 import type { Extensions } from '@tiptap/core';
 
-export interface ComposerHandle { focus: () => void }
+export interface ComposerHandle { focus: () => void; appendText: (text: string) => void }
 
 export function MarkdownEditor({ value, onChange, inputRef, id, label, placeholder, disabled, suggestions, extensions = [] }: {
   value: string; onChange: (value: string) => void; inputRef: RefObject<ComposerHandle | null>;
@@ -71,7 +71,27 @@ export function MarkdownEditor({ value, onChange, inputRef, id, label, placehold
       latest.current(source);
     },
   });
-  useImperativeHandle(inputRef, () => ({ focus: () => { wantsFocus.current = true; editor?.commands.focus('end'); } }), [editor]);
+  useImperativeHandle(inputRef, () => ({
+    focus: () => { wantsFocus.current = true; editor?.commands.focus('end'); },
+    appendText: (text: string) => {
+      if (!editor || !text.trim()) return;
+      // Explicit text nodes keep Markdown-looking selections literal and preserve undo history.
+      const paragraphs = text.trim().split(/\r?\n(?:[ \t]*\r?\n)+/).map(block => ({
+        type: 'paragraph',
+        content: block.split(/\r?\n/).flatMap((line, index) => [
+          ...(index ? [{ type: 'hardBreak' }] : []),
+          ...(line ? [{ type: 'text', text: line }] : []),
+        ]),
+      }));
+      const doc = editor.state.doc, last = doc.lastChild;
+      // Reuse the empty input/trailing paragraph instead of surrounding the text
+      // with empty blocks. Keep this one transaction so Undo restores the draft.
+      const end = doc.content.size;
+      const from = last?.type.name === 'paragraph' && last.content.size === 0
+        ? end - last.nodeSize : end;
+      editor.commands.insertContentAt({ from, to: end }, paragraphs);
+    },
+  }), [editor]);
   useEffect(() => { if (editor && wantsFocus.current) editor.commands.focus('end'); }, [editor]);
   useLayoutEffect(() => {
     if (!editor || value === lastValue.current) return;

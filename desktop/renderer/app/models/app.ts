@@ -39,7 +39,7 @@ export class AppModel extends Store {
   };
   chatSplitOpen = false;
   toggleChatSplit = () => { this.chatSplitOpen = !this.chatSplitOpen; this.changed(); };
-  beingInfoOpen = true;
+  beingInfoOpen = false;
   toggleBeingInfo = () => {
     this.beingInfoOpen = !this.beingInfoOpen;
     if (this.beingInfoOpen) this.chatSplitOpen = false;
@@ -87,8 +87,8 @@ export class AppModel extends Store {
   openSubagentSettings(fromConnection = false) {
     this.modelSettingsTarget = "subagent";
     this.subagentFromConnection = fromConnection;
-    if (fromConnection) this.settingsOpen = false;
-    else this.post({ type: "beings:chat-action", action: "close" });
+    if (fromConnection) this.settingsOpen = true;
+    else { this.beginSettingsRoute("model"); this.post({ type: "beings:chat-action", action: "close" }); }
     this.subagentSettingsOpen = true;
     this.changed();
   }
@@ -109,6 +109,7 @@ export class AppModel extends Store {
   }
   clientSettingsOpen = false;
   settingsRoute: SettingsRoute = "";
+  connectionSettingsSection: 'being' | 'portal' | 'subagent' = 'being';
   settingsForwardRoute: SettingsRoute = "";
   diagnosticsOpen = false;
   searchOpen = false;
@@ -117,6 +118,7 @@ export class AppModel extends Store {
   searchLoading = false;
   searchError = "";
   readingSize = 16;
+  showReasoning = false;
   chatHistoryLimit = DEFAULT_CHAT_HISTORY_LIMIT;
   update?: UpdateState;
   updateChecking = false;
@@ -181,6 +183,21 @@ export class AppModel extends Store {
   startupBusy = false;
   clientError = "";
   form?: SaveSettings;
+  connectionFormRevision = 0;
+  private formBaseline?: SaveSettings;
+  private formIdentity = "";
+  private connectionIdentity() {
+    const settings = this.snapshot?.settings;
+    return JSON.stringify([settings?.endpoint, settings?.being, settings?.hasToken]);
+  }
+  get hasConnectionDraft() {
+    return Boolean(this.form && this.formBaseline && this.formIdentity === this.connectionIdentity()
+      && JSON.stringify(this.form) !== JSON.stringify(this.formBaseline));
+  }
+  discardConnectionDraft() {
+    this.formBaseline = undefined;
+    this.showSettings(true);
+  }
   saving = false;
   formError = "";
   portalNameHelp = "";
@@ -217,6 +234,7 @@ export class AppModel extends Store {
       (data) => this.post(data),
       () => this.changed(),
       () => Boolean(this.chatSource && !this.chatLoading),
+      () => { if (this.settingsRoute !== "town") this.beginSettingsRoute("town"); },
     );
     this.town.plugins = this.plugins;
   }
@@ -236,6 +254,7 @@ export class AppModel extends Store {
     }
     try {
       this.chatHistoryLimit = chatHistoryLimit(Number(localStorage.getItem(CHAT_HISTORY_LIMIT_KEY)));
+      this.showReasoning = localStorage.getItem("beings:show-reasoning") === "true";
       const size = Number(localStorage.getItem("beings:reading-size"));
       if (Number.isInteger(size) && size >= 13 && size <= 21)
         this.readingSize = size;
@@ -329,6 +348,8 @@ export class AppModel extends Store {
     }
   };
   navigate = (view: string, id?: string) => {
+    // Chat links and settings entries use the same Portal surface.
+    if (view === 'portal') { this.openPortalSettings(); return; }
     if (view === 'plugin-library') { view = 'kits'; this.town.groveKind = 'plugin'; }
     this.view = view;
     const scene = this.snapshot?.chatScene?.scene_id;
@@ -464,6 +485,7 @@ export class AppModel extends Store {
   postAppearance() {
     this.post({ type: "beings:appearance", theme: this.theme });
     this.post({ type: "beings:reading", size: this.readingSize });
+    this.post({ type: "beings:reasoning-display", show: this.showReasoning });
     if (this.chatSource) this.post({ type: 'beings:history-limit', limit: this.chatHistoryLimit, revision: new URL(this.chatSource).searchParams.get('revision') });
   }
   setChatHistoryLimit(limit: number) {
@@ -483,6 +505,13 @@ export class AppModel extends Store {
       this.postAppearance();
       this.changed();
     });
+  }
+  setShowReasoning(show: boolean) {
+    try { localStorage.setItem("beings:show-reasoning", String(show)); }
+    catch { this.toast("无法保存思考链路设置，请重试。"); return; }
+    this.showReasoning = show;
+    this.post({ type: "beings:reasoning-display", show });
+    this.changed();
   }
   setReadingSize(size: number) {
     this.readingSize = size;
@@ -513,7 +542,8 @@ export class AppModel extends Store {
     this.clientSettingsOpen = false;
     this.changed();
   }
-  openConnectionSettings() {
+  openConnectionSettings(section: 'being' | 'portal' | 'subagent' = 'being') {
+    this.connectionSettingsSection = section;
     this.beginSettingsRoute("connection");
     this.showSettings(true);
   }
@@ -523,7 +553,6 @@ export class AppModel extends Store {
   }
   openModelSettings() {
     this.beginSettingsRoute("model");
-    this.navigate("chat");
     this.subagentFromConnection = false;
     this.modelSettingsTarget = "Heart";
     this.subagentSettingsOpen = true;
@@ -531,7 +560,6 @@ export class AppModel extends Store {
   }
   openPortalSettings() {
     this.beginSettingsRoute("portal");
-    this.navigate("portal");
   }
   openDiagnostics() {
     this.beginSettingsRoute("diagnostics");
@@ -548,29 +576,31 @@ export class AppModel extends Store {
     if (!route) return;
     this.settingsRoute = "";
     this.settingsForwardRoute = route;
-    if (this.settingsOpen) {
+    if (this.settingsOpen || route === "connection") {
       this.settingsOpen = false;
       ++this.defaultsRevision;
       clearTimeout(this.defaultsTimer);
-      if (this.form) { this.form.connectionLink = ""; this.form.subagentSetup = undefined; }
     }
     this.diagnosticsOpen = false;
     this.subagentSettingsOpen = false;
     if (route === "model")
       this.post({ type: "beings:chat-action", action: "close" });
-    if (this.view !== "chat") this.navigate("chat");
     void this.openClientSettings(true);
   };
   forwardSettingsRoute = () => {
     const route = this.settingsForwardRoute;
     if (!route) return;
-    if (route === "connection") this.openConnectionSettings();
+    if (route === "connection") this.openConnectionSettings(this.connectionSettingsSection);
     else if (route === "town") this.openTownSettings();
     else if (route === "model") this.openModelSettings();
     else if (route === "portal") this.openPortalSettings();
     else if (route === "diagnostics") this.openDiagnostics();
   };
   closeClientSettings = () => {
+    this.closeSettings();
+    this.subagentSettingsOpen = false;
+    this.subagentFromConnection = false;
+    this.diagnosticsOpen = false;
     this.clientSettingsOpen = false;
     this.settingsRoute = "";
     this.settingsForwardRoute = "";
@@ -598,9 +628,10 @@ export class AppModel extends Store {
     const request = this.logsRequest = crypto.randomUUID();
     this.changed();
     const endpoint = this.snapshot.settings.endpoint, source = this.chatSource;
+    const fromSettings = this.settingsRoute === "portal";
     try {
       const logs = await this.api.portalLogReference();
-      if (this.logsRequest !== request) return;
+      if (this.logsRequest !== request || fromSettings && this.settingsRoute !== "portal") return;
       if (logs.endpoint !== endpoint || this.snapshot?.settings.endpoint !== endpoint || this.chatSource !== source) {
         throw new Error("连接已切换，请重新选择 Portal 日志。");
       }
@@ -608,6 +639,7 @@ export class AppModel extends Store {
       this.workspace.scenes.select({ id: `portal-logs:${request}`, title: "Portal 日志",
         author: "本机 Portal", excerpt: logs.text, private: true });
       this.workspace.scenes.pin();
+      if (fromSettings) this.closeClientSettings();
       this.navigate("chat");
       this.workspace.toggle(true);
     } catch (error) {
@@ -741,12 +773,14 @@ export class AppModel extends Store {
   }
   showSettings(fromClientSettings = false) {
     if (!this.snapshot) return;
-    if (!fromClientSettings) {
-      this.settingsRoute = "";
-      this.settingsForwardRoute = "";
-    }
+    if (!fromClientSettings) { this.connectionSettingsSection = 'being'; this.beginSettingsRoute("connection"); }
     this.clientSettingsOpen = false;
     this.settingsOpen = true;
+    if (this.hasConnectionDraft) {
+      this.changed();
+      void this.fillDefaults();
+      return;
+    }
     const s = this.snapshot.settings;
     this.form = {
       connectionLink: "",
@@ -761,6 +795,9 @@ export class AppModel extends Store {
       portalConfigPath: s.portalConfigPath,
       portalEnvironmentPath: s.portalEnvironmentPath,
     };
+    ++this.connectionFormRevision;
+    this.formIdentity = this.connectionIdentity();
+    this.formBaseline = { ...this.form };
     this.nameEdited = false;
     this.formError = "";
     this.portalNameHelp = "已有本机 Portal 时默认沿用名称，也可以自行修改。";
@@ -768,6 +805,7 @@ export class AppModel extends Store {
     void this.fillDefaults();
   }
   closeSettings() {
+    this.formBaseline = undefined;
     this.settingsOpen = false;
     this.settingsRoute = "";
     this.settingsForwardRoute = "";
@@ -801,8 +839,10 @@ export class AppModel extends Store {
         !this.form
       )
         return;
-      if (!this.nameEdited)
+      if (!this.nameEdited) {
         this.form = { ...this.form, portalName: defaults.portalName };
+        if (this.formBaseline) this.formBaseline = { ...this.formBaseline, portalName: defaults.portalName };
+      }
       this.portalNameHelp = defaults.source
         ? `检测到原 Portal 名称：${defaults.portalName}。${this.nameEdited ? "保留你填写的名称。" : "已默认沿用，可修改。"}`
         : "未发现同一 Being 的本机 Portal，可设置新名称。";
@@ -826,8 +866,15 @@ export class AppModel extends Store {
         if ((persisted.enabled !== false) !== expectedSubagent)
           throw new Error('subagent 开关未写入配置，请完全退出并重新打开客户端后重试。');
       }
-      this.closeSettings();
-      this.navigate("chat");
+      this.formBaseline = undefined;
+      if (this.form) { this.form.connectionLink = ""; this.form.subagentSetup = undefined; }
+      if (this.settingsRoute === "connection") {
+        this.showSettings(true);
+        this.toast("连接设置已保存，Portal 正在启动。");
+      } else {
+        this.closeSettings();
+        this.navigate("chat");
+      }
     } catch (error) {
       this.formError = errorText(error);
     } finally {

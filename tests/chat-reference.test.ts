@@ -9,14 +9,15 @@ function fixture() {
   vi.stubGlobal('location', new URL('beings://chat/?revision=fixture'));
   const state = new ChatState(), bridge = createChatBridge(state);
   const runtime = { loadSbsState: async () => false, send: vi.fn(), refreshHistory: vi.fn(async () => {}) };
-  bridge.start(runtime as unknown as ChatRuntime, { panel() {}, theme() {}, reading() {}, search() {}, jump() {}, reveal() {}, focus() {}, scope() {} });
+  const reasoning = vi.fn();
+  bridge.start(runtime as unknown as ChatRuntime, { reasoning, panel() {}, theme() {}, reading() {}, search() {}, jump() {}, reveal() {}, focus() {}, scope() {} });
   const send = (data: Record<string, unknown> = {}, origin = 'beings://desktop', source: unknown = parent) => {
     window.dispatchEvent(Object.assign(new Event('message'), { source, origin, data: {
       type: 'beings:scene-draft', id: 'fixture-request', text: '一起看 Portal 日志\n> fixture', expiresAt: Date.now() + 2500, ...data,
     } }));
   };
   const results = () => parent.postMessage.mock.calls.map(call => call[0]).filter(message => message.type === 'beings:scene-draft-result');
-  return { state, bridge, runtime, send, results, parent };
+  return { state, bridge, runtime, send, results, parent, reasoning };
 }
 it('copies complete Markdown through the desktop bridge and waits for a trusted acknowledgement', async () => {
   const f = fixture();
@@ -134,4 +135,22 @@ it('publishes SBS activity changes to the header without repeating unchanged sta
   expect(activity().at(-1)).toMatchObject({origin:null});
   f.bridge.dispose();f.state.sbsStreamingOrigin='callback';f.state.changed();
   expect(activity()).toHaveLength(4);
+});
+
+it('accepts only boolean reasoning preferences from the trusted parent', () => {
+  const f = fixture();
+  f.send({type: 'beings:reasoning-display', show: true}, 'https://untrusted.example');
+  f.send({type: 'beings:reasoning-display', show: true}, 'beings://desktop', {});
+  f.send({type: 'beings:reasoning-display', show: 'true'});
+  expect(f.reasoning).not.toHaveBeenCalled();
+  f.send({type: 'beings:reasoning-display', show: true});
+  f.send({type: 'beings:reasoning-display', show: false});
+  expect(f.reasoning.mock.calls).toEqual([[true], [false]]);
+  f.bridge.dispose();
+});
+
+it('requests shell preferences after the chat listener is ready', () => {
+  const f = fixture();
+  expect(f.parent.postMessage.mock.calls.map(call => call[0])).toContainEqual({type:'beings:appearance-request',revision:'fixture'});
+  f.bridge.dispose();
 });

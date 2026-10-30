@@ -50,6 +50,8 @@ export function NavigationControls({
       }, gestureReleaseDelay);
     };
     const wheel = (event: WheelEvent) => {
+      // A nested page owns its gesture; hidden retained panels never navigate.
+      if (event.defaultPrevented || !element?.checkVisibility()) return;
       if (
         event.ctrlKey ||
         event.deltaMode !== WheelEvent.DOM_DELTA_PIXEL ||
@@ -68,6 +70,7 @@ export function NavigationControls({
         return;
       }
       event.preventDefault();
+      event.stopPropagation();
       resetLater();
       if (locked) return;
       if (distance && Math.sign(distance) !== Math.sign(event.deltaX))

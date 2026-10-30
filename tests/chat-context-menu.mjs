@@ -49,7 +49,7 @@ await bundle('shell.js', `
   createRoot(document.getElementById('root')).render(<Shell />);
 `, 'browser');
 await bundle('main.cjs', `
-  import { app, BrowserWindow, ipcMain, protocol } from 'electron';
+  import { app, BrowserWindow, ipcMain, protocol, clipboard } from 'electron';
   import { readFile } from 'node:fs/promises';
   import path from 'node:path';
   import { editChat } from './desktop/main/app/context-menu';
@@ -83,6 +83,10 @@ await bundle('main.cjs', `
     ipcMain.handle('beings:selection-edit', (event, command) => {
       if (event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame || event.senderFrame.url !== 'beings://desktop/') throw new Error('Untrusted sender');
       return editChat(win, command, 'shell');
+    });
+    ipcMain.handle('beings:clipboard-copy', (event, text) => {
+      if (event.sender !== win.webContents || event.senderFrame !== win.webContents.mainFrame || typeof text !== 'string') throw new Error('Untrusted sender');
+      clipboard.writeText(text);
     });
     await win.loadURL('beings://desktop/');
   });
@@ -121,7 +125,8 @@ try {
     await clipboard.clear();
     const empty = await globalThis.snapshotClipboard();
     await clipboard.write(empty);
-    return empty.map(item => item.types);
+    // macOS may retain Electron's private find-text format after clear().
+    return empty.map(item => item.types.filter(type => !type.startsWith("electron "))).filter(types => types.length);
   }), []);
   assert.deepEqual(await app.evaluate(async ({ clipboard, ClipboardItem }) => {
     await clipboard.write([new ClipboardItem({
@@ -141,6 +146,10 @@ try {
     const el = document.querySelector('#input');
     return (el.value ?? el.editor.getMarkdown()) === text;
   }, text); }
+  for(const selector of ['#messages','.message-time-divider','#send-btn']){
+    await frame.locator(selector).first().dispatchEvent('contextmenu',{button:2,clientX:2,clientY:2});
+    assert.equal(await frame.getByRole('menu').count(),0,'No custom menu on blank space or controls');
+  }
   await input.fill('保留草稿与选区');
   await open();
   assert.equal(await menu.getByRole('menuitem').count(), 4);
@@ -180,14 +189,10 @@ try {
   });
   await open(); await choose('粘贴'); await frame.locator('#pending-files.active').waitFor();
   const message = frame.locator('.message.being .content').first();
-  // Exercise read-only Select All through the actual menu. Triple-clicking a
-  // block paragraph can hit blank space to the right of its short text.
-  await open(message);
-  await choose('全选');
-  await child.waitForFunction(() => getSelection().toString().includes('右键选择文字，复制到剪贴板。'));
-  await open(message);
-  assert.equal(await menu.getByRole('menuitem').count(), 2);
-  await choose('复制');
+  const bubbleMenu=frame.getByRole('menu',{name:'消息操作'});
+  await message.click({button:'right'});await bubbleMenu.waitFor();
+  await bubbleMenu.getByRole('menuitem',{name:'复制',exact:true}).click();
+  await bubbleMenu.waitFor({state:'hidden'});
   assert.match(await app.evaluate(({ clipboard }) => clipboard.readText()), /右键选择文字/);
 
   await open(); await page.keyboard.press('Escape'); await menu.waitFor({ state: 'hidden' });
@@ -211,23 +216,21 @@ try {
     await page.evaluate(theme => { document.documentElement.dataset.theme = theme; }, theme);
     await page.getByRole('button', { name: '打开' + place }).click();
     const dialog = page.locator('#place-sheet'), body = dialog.locator('.reading-text');
+    await dialog.locator('h2').dispatchEvent('contextmenu',{button:2});
+    assert.equal(await page.getByRole('menu').count(),0,'No context menu on dialog headings');
     const popup = page.getByRole('menu', { name: '编辑菜单' });
-    await body.click({ button: 'right' });
-    await popup.waitFor();
-    assert.equal(await popup.getByRole('menuitem').count(), 2);
-    assert.equal(await popup.evaluate(el => el === document.activeElement && el.matches(':popover-open') && getComputedStyle(el).outlineStyle === 'none'), true);
-    await popup.getByRole('menuitem', { name: /^全选/ }).click();
-    assert.equal(await page.evaluate(() => getSelection().toString().trim()), '弹窗正文 可以复制。');
-    await body.click({ button: 'right' });
+    const bubblePopup=page.getByRole('menu',{name:'消息操作'});
+    await body.click({button:'right'});await bubblePopup.waitFor();
+    assert.equal(await bubblePopup.evaluate(el=>el.matches(':popover-open')&&!!el.closest('dialog[open]')),true);
     await page.screenshot({ path: 'test-results/dialog-context-menu-' + theme + '.png', animations: 'disabled' });
-    await popup.getByRole('menuitem', { name: /^复制/ }).click();
-    assert.equal((await app.evaluate(({ clipboard }) => clipboard.readText())).trim(), '弹窗正文 可以复制。');
+    await bubblePopup.getByRole('menuitem',{name:'复制',exact:true}).click();
+    assert.equal((await app.evaluate(({ clipboard }) => clipboard.readText())).trim(), '**弹窗正文** 可以复制。');
     const draft = dialog.getByRole('textbox', { name: '弹窗草稿' });
     await draft.click({ button: 'right' });
     await popup.getByRole('menuitem', { name: /^全选/ }).click();
     await draft.click({ button: 'right' });
     await popup.getByRole('menuitem', { name: /^粘贴/ }).click();
-    await page.waitForFunction(() => document.querySelector('textarea').value.trim() === '弹窗正文 可以复制。');
+    await page.waitForFunction(() => document.querySelector('textarea').value.trim() === '**弹窗正文** 可以复制。');
     await draft.click({ button: 'right' });
     await page.keyboard.press('Escape');
     await popup.waitFor({ state: 'hidden' });

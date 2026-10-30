@@ -63,6 +63,10 @@ export function useChatBridge(
       }
       if (message.revision !== new URL(target.src).searchParams.get("revision"))
         return;
+      if (message.type === 'beings:appearance-request') {
+        app.postAppearance();
+        return;
+      }
       if (app.localHistory.receive(message)) return;
       if (message.type === 'beings:history-target-result' && typeof message.sceneId === 'string' && Number.isSafeInteger(message.seq)) {
         app.finishHistoryTarget(message.sceneId, message.seq, message.ok === true);

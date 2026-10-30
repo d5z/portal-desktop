@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile, copyFile, rm, cp } from "node:fs/promises";
+import { mkdir, writeFile, copyFile, rm, cp } from "node:fs/promises";
 import path from "node:path";
 import { build } from "esbuild";
 import { writeThirdPartyLicenses } from './third-party-licenses.mjs';
@@ -36,14 +36,21 @@ await copyFile(
   "node_modules/highlight.js/styles/github-dark.min.css",
   path.join(output, "highlight.css"),
 );
-await writeFile(path.join(output, "chat.css"),
-  await readFile("desktop/renderer/shared/typography.css", "utf8") + "\n" +
-  await readFile("desktop/renderer/shared/components/sbs-control.css", "utf8") + "\n" +
-  await readFile("desktop/renderer/shared/components/remote-image.css", "utf8") + "\n" +
-  await readFile("desktop/renderer/chat/styles.css", "utf8") + "\n" +
-  await readFile("desktop/renderer/shared/components/rich-composer.css", "utf8") + "\n" +
-  await readFile("desktop/renderer/chat/components/intelligent-ui-examples.css", "utf8") + "\n" +
-  await readFile("desktop/renderer/shared/model-settings.css", "utf8"));
+// Bundle imports as CSS rather than concatenating source: imports that follow
+// ordinary rules are ignored by browsers, and relative URLs change in generated/.
+const chatStyles = await build({
+  stdin: { loader: "css", resolveDir: process.cwd(), contents: [
+    "desktop/renderer/shared/typography.css",
+    "desktop/renderer/shared/components/sbs-control.css",
+    "desktop/renderer/shared/components/remote-image.css",
+    "desktop/renderer/chat/styles.css",
+    "desktop/renderer/shared/components/rich-composer.css",
+    "desktop/renderer/chat/components/intelligent-ui-examples.css",
+    "desktop/renderer/shared/model-settings.css",
+  ].map(file => `@import ${JSON.stringify("./" + file)};`).join("\n") },
+  bundle: true, write: false,
+});
+await writeFile(path.join(output, "chat.css"), chatStyles.outputFiles[0].contents);
 await writeThirdPartyLicenses(
   path.join(output, "THIRD-PARTY-LICENSES.txt"),
   [...Object.keys(chatBuild.metafile.inputs), ...Object.keys(pptxBuild.metafile.inputs), 'node_modules/pdfjs-dist/build/pdf.mjs', 'node_modules/exceljs/dist/exceljs.min.js'],

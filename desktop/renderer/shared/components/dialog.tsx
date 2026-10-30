@@ -35,12 +35,20 @@ export function Dialog({
     <dialog
       {...props}
       ref={ref}
+      data-ui-dialog
+      aria-busy={busy || undefined}
       onCancel={(event) => {
         event.preventDefault();
         if (!busy) onClose();
       }}
       onClose={() => {
-        if (open && !busy && !ref.current?.open) onClose();
+        const dialog = ref.current;
+        if (!open || !dialog || dialog.open) return;
+        // Chromium may force a native close after repeated Escape requests.
+        // Keep the controlled dialog visible until the owner accepts dismissal
+        // (for example after resolving an unsaved draft or an in-flight save).
+        dialog.showModal();
+        if (!busy) onClose();
       }}
       onClick={(event) => {
         if (!dismissOnBackdrop || busy || event.target !== event.currentTarget)

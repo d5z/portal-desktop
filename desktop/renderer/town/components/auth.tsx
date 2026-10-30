@@ -1,10 +1,12 @@
 import type { TownModel } from "../models/town";
 import { useModel } from "../../shared/hooks/use-model";
-import { Dialog } from "../../shared/components/dialog";
+import { SettingsSurface } from "../../shared/components/settings-surface";
 import { NavigationControls } from "../../shared/components/navigation-controls";
 import { townPairPrompt } from '../../../shared/town-pairing';
-export function TownAuth({ model, pairPrompt = townPairPrompt, returnToSettings = false, onReturnToSettings = () => {}, onDismissSettingsRoute = () => {} }: {
+export function TownAuth({ model, embedded = false, inline = false, pairPrompt = townPairPrompt, returnToSettings = false, onReturnToSettings = () => {}, onDismissSettingsRoute = () => {} }: {
   model: TownModel;
+  embedded?: boolean;
+  inline?: boolean;
   pairPrompt?: string;
   returnToSettings?: boolean;
   onReturnToSettings?: () => void;
@@ -19,8 +21,8 @@ export function TownAuth({ model, pairPrompt = townPairPrompt, returnToSettings 
   };
 
   return (
-    <Dialog
-      open={town.authOpen}
+    <SettingsSurface embedded={embedded} className={inline ? 'settings-inline-form' : undefined}
+      open={inline || town.authOpen}
       busy={town.authBusy && !town.autoPairId}
       onClose={() => void close(false)}
       id="town-auth-dialog"
@@ -33,7 +35,7 @@ export function TownAuth({ model, pairPrompt = townPairPrompt, returnToSettings 
           else void town.autoPair();
         }}
       >
-        <div className="dialog-heading">
+        {!embedded && <div className="dialog-heading">
           <div className="dialog-heading-main">
             <h2>连接 Beings Town</h2>
             <NavigationControls back={returnToSettings && (!town.authBusy || Boolean(town.autoPairId)) ? () => void close(true) : undefined} />
@@ -46,7 +48,7 @@ export function TownAuth({ model, pairPrompt = townPairPrompt, returnToSettings 
             disabled={town.authBusy && !town.autoPairId}
             onClick={() => void close(false)}
           ></button>
-        </div>
+        </div>}
         <div className="dialog-body">
         <p className="connection-description">
           {town.authLoading ? '正在读取连接信息…' : town.authManual
@@ -146,6 +148,6 @@ export function TownAuth({ model, pairPrompt = townPairPrompt, returnToSettings 
           </button>
         </div>
       </form>
-    </Dialog>
+    </SettingsSurface>
   );
 }

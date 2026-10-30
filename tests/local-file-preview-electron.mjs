@@ -69,7 +69,7 @@ try {
   await card.waitFor();
   if (process.env.LOCAL_PREVIEW_TOOL_ACTIVITY === '1') {
     assert.equal(await chat.locator('.run-artifacts .chat-local-file-card').count(),1,'Tool completion produces a file card without an assistant link');
-    assert.equal(await chat.locator('.run-activity').getAttribute('open'),null,'Artifact stays visible with its activity collapsed');
+    assert.equal(await chat.locator('.run-activity').count(),0,'Artifact stays visible when the reasoning chain is hidden');
   }
   if (process.env.LOCAL_FILE_CARD_SCREENSHOT) {
     await chat.locator('.message.being .content').screenshot({path:process.env.LOCAL_FILE_CARD_SCREENSHOT});

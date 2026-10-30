@@ -157,8 +157,8 @@ try {
   const openPortal = async () => {
     await page.locator('#options-trigger').click();
     await page.locator('#client-settings-button').click();
-    await page.locator('#client-settings-dialog [data-view="portal"]').click();
-    await page.locator('#portal-view').waitFor({ state: 'visible' });
+    await page.getByRole('tab',{name:'Portal',exact:true}).click();
+    await page.locator('#portal-settings-page').waitFor({ state: 'visible' });
   };
   await openPortal();
   // Recover a stalled relay through the visible control, preserving runtime mode.
@@ -235,14 +235,16 @@ try {
   await until(async () => (await state()).phase === 'connected');
   for (const enabled of [true, false]) {
     await openPortal();
-    await page.locator('#portal-settings').click();
+    await page.locator('.settings-disclosure > summary').filter({hasText:'本机配置'}).click();
     assert.equal(await page.locator('#screenshot-input').count(), 0);
     assert.equal(await page.locator('#exec-input').isEnabled(), true);
     assert.equal(await page.locator('#kits-input').isEnabled(), true);
     await page.locator('#exec-input').setChecked(enabled);
     await page.locator('#kits-input').setChecked(enabled);
     await page.locator('#save-settings').click();
-    await page.locator('#settings-dialog').waitFor({ state: 'hidden' });
+    await page.waitForFunction(async enabled => (await window.beings.snapshot()).settings.allowExec === enabled && !document.querySelector('#save-settings').disabled, enabled);
+    await page.locator('#close-client-settings').click();
+    await page.locator('#client-settings-dialog').waitFor({ state: 'hidden' });
     await until(async () => (await state()).phase === 'connected');
     const result = await rpc('tools/call', { name: 'portal_status', arguments: {} });
     const status = JSON.parse(result.content.find(item => item.type === 'text').text);

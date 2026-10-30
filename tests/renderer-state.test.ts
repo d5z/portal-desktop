@@ -122,6 +122,26 @@ const settle = async () => {
 };
 afterEach(() => vi.useRealTimers());
 describe("React desktop state lifecycle", () => {
+  it('defaults to quiet thinking, persists the preference and restores it on startup', async () => {
+    const saved = new Map<string, string>();
+    vi.stubGlobal('localStorage', {getItem: (key: string) => saved.get(key) ?? null, setItem: (key: string, value: string) => saved.set(key, value)});
+    const app = new AppModel(api().value);
+    app.post = vi.fn();
+    try {
+      expect(app.showReasoning).toBe(false);
+      app.setShowReasoning(true);
+      expect(saved.get('beings:show-reasoning')).toBe('true');
+      expect(app.post).toHaveBeenCalledWith({type: 'beings:reasoning-display', show: true});
+      const restored = new AppModel(api().value), stop = restored.start();
+      try {
+        await settle();
+        expect(restored.showReasoning).toBe(true);
+        restored.setShowReasoning(false);
+        expect(saved.get('beings:show-reasoning')).toBe('false');
+      } finally { stop(); }
+    } finally { vi.unstubAllGlobals(); }
+  });
+
   it('persists the history limit and sends it to the current and next chat frames without reloading drafts', async () => {
     const saved = new Map<string, string>();
     vi.stubGlobal('localStorage', { getItem: (key: string) => saved.get(key) ?? null, setItem: (key: string, value: string) => saved.set(key, value) });
@@ -349,6 +369,7 @@ describe("React desktop state lifecycle", () => {
     app.post = post;
     app.applySnapshot(state()); app.frameLoaded(); app.connection = 'online';
     post.mockClear();
+    app.openPortalSettings();
     const selecting = app.sharePortalLogs();
     await app.sharePortalLogs();
     expect(getLogs).toHaveBeenCalledOnce();
@@ -356,6 +377,8 @@ describe("React desktop state lifecycle", () => {
     await selecting;
     expect(messages()).toEqual([]);
     expect(app.logsLoading).toBe(false);
+    expect(app.settingsRoute).toBe('');
+    expect(app.clientSettingsOpen).toBe(false);
     expect(app.view).toBe('chat');
     expect(app.workspace.open).toBe(true);
     expect(app.workspace.scenes.reference).toMatchObject({ view: 'portal', title: 'Portal 设置',
@@ -535,7 +558,7 @@ describe("React desktop state lifecycle", () => {
     app.editForm("connectionLink", "https://fixture.test/?token=draft");
     const form = app.form;
     app.openSubagentSettings(true);
-    expect(app.settingsOpen).toBe(false);
+    expect(app.settingsOpen).toBe(true);
     expect(app.subagentSettingsOpen).toBe(true);
     app.closeSubagentSettings();
     expect(app.settingsOpen).toBe(true);
@@ -546,6 +569,51 @@ describe("React desktop state lifecycle", () => {
     expect(post).toHaveBeenCalledWith({ type: "beings:chat-action", action: "close" });
     app.closeSubagentSettings();
     expect(app.settingsOpen).toBe(false);
+  });
+  it("preserves a connection draft through navigation and discards it explicitly", async () => {
+    const app = new AppModel(api().value);
+    app.applySnapshot(state());
+    app.openConnectionSettings();
+    await settle();
+    app.editForm("workspace", "/draft-directory");
+    app.editForm("connectionLink", "https://fixture.test/?token=draft");
+    expect(app.hasConnectionDraft).toBe(true);
+    app.returnToClientSettings();
+    app.openPortalSettings();
+    app.returnToClientSettings();
+    app.openConnectionSettings();
+    expect(app.form?.workspace).toBe("/draft-directory");
+    expect(app.form?.connectionLink).toContain("token=draft");
+    app.discardConnectionDraft();
+    expect(app.form?.workspace).toBe("/workspace");
+    expect(app.form?.connectionLink).toBe("");
+    expect(app.hasConnectionDraft).toBe(false);
+    app.closeClientSettings();
+  });
+  it("does not restore another Being's draft or a discarded secret", () => {
+    const app = new AppModel(api().value);
+    app.applySnapshot(state());
+    app.openConnectionSettings();
+    app.editForm("connectionLink", "https://fixture.test/?token=old");
+    app.returnToClientSettings();
+    app.applySnapshot(state("river"));
+    app.openConnectionSettings();
+    expect(app.form?.connectionLink).toBe("");
+    expect(app.hasConnectionDraft).toBe(false);
+    app.editForm("workspace", "/discard-me");
+    app.closeClientSettings();
+    app.openConnectionSettings();
+    expect(app.form?.workspace).toBe("/workspace");
+    app.closeClientSettings();
+  });
+  it("routes direct Town authentication requests through the shared settings frame", async () => {
+    const app = new AppModel(api().value);
+    app.applySnapshot(state());
+    await app.town.auth();
+    expect(app.settingsRoute).toBe("town");
+    expect(app.town.authOpen).toBe(true);
+    await app.town.closeAuth();
+    app.closeClientSettings();
   });
   it("starts an already configured subagent directly", async () => {
     const subagentConfig = vi.fn()
@@ -576,6 +644,7 @@ describe("React desktop state lifecycle", () => {
     expect(app.settingsOpen).toBe(true);
     app.returnToClientSettings();
 
+    app.view = "bonfire";
     app.openModelSettings();
     expect(app.subagentSettingsOpen).toBe(true);
     expect(app.modelSettingsTarget).toBe("Heart");
@@ -583,10 +652,11 @@ describe("React desktop state lifecycle", () => {
     expect(app.subagentSettingsOpen).toBe(false);
     expect(app.clientSettingsOpen).toBe(true);
 
-    app.openPortalSettings();
-    expect(app.view).toBe("portal");
+    app.navigate("portal");
+    expect(app.settingsRoute).toBe("portal");
+    expect(app.view).toBe("bonfire");
     app.returnFromPlace();
-    expect(app.view).toBe("chat");
+    expect(app.view).toBe("bonfire");
     expect(app.clientSettingsOpen).toBe(true);
     expect(app.settingsForwardRoute).toBe("portal");
 

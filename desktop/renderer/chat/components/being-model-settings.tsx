@@ -53,6 +53,7 @@ export function BeingModelSettings({
   close,
   back,
   contentOnly = false,
+  inlineEditing = false,
   onBusy,
   mobilePage = false,
   fallback,
@@ -64,6 +65,7 @@ export function BeingModelSettings({
   close: () => void;
   back?: () => void;
   contentOnly?: boolean;
+  inlineEditing?: boolean;
   onBusy?: (busy: boolean) => void;
   mobilePage?: boolean;
   fallback: ReactNode;
@@ -423,7 +425,8 @@ export function BeingModelSettings({
       aria-label="模型设置"
       data-mobile-page={mobilePage || undefined}
       onKeyDown={(event) => {
-        if (event.key === "Escape") {
+        if (event.key === "Escape" && (!contentOnly || selected || picker)) {
+          event.preventDefault();
           event.stopPropagation();
           if (disabled) return;
           if (selected) {
@@ -458,7 +461,7 @@ export function BeingModelSettings({
         </div>
       )}
       <div className="settings-body llm-route-settings" aria-busy={disabled}>
-        {!picker ? (
+        {(!picker || inlineEditing) && (
           <div id={id("llm-overview")}>
             <div className="settings-section-heading">
               <h3>模型</h3>
@@ -528,7 +531,8 @@ export function BeingModelSettings({
               </div>
             </div>
           </div>
-        ) : (
+        )}
+        {picker && (
           <div id={id("llm-picker")}>
             <button
               type="button"
@@ -536,7 +540,7 @@ export function BeingModelSettings({
               disabled={disabled}
               onClick={leavePicker}
             >
-              ← 返回模型
+              {inlineEditing ? "收起模型选择" : "← 返回模型"}
             </button>
             <div className="settings-section-heading">
               <h3>线路</h3>

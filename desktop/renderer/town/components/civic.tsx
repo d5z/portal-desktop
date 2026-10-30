@@ -209,7 +209,7 @@ function ContactDeclaration({ town, identity, close }: { town: TownModel; identi
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   return <Dialog id="town-contact-dialog" open busy={busy} onClose={close} aria-labelledby="town-contact-title">
-    <form onSubmit={async event => {
+    <form className="dialog-form" onSubmit={async event => {
       event.preventDefault();
       if (busy) return;
       setError(''); setBusy(true);

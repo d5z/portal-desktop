@@ -56,7 +56,26 @@ function ToolDetails({ entry, expanded }: { entry: ActivityEntry; expanded: bool
     </details>}
   </>;
 }
-export function ChatActivity({
+export function ChatActivity({ run, sceneLabel, showDetails = true }: { run: Run; sceneLabel?: string; showDetails?: boolean }) {
+  if (showDetails) return <DetailedChatActivity run={run} sceneLabel={sceneLabel} />;
+  const status = run.status || run.outcome || "thinking";
+  const attention = ["error", "timeout", "stopped"].includes(status);
+  const artifacts = [...new Set(run.entries.flatMap(entry => entry.artifactPath ? [entry.artifactPath] : []))];
+  return <>
+    {(!run.end || attention) && <div className={`quiet-activity${attention ? " needs-attention" : ""}`} data-status={status}>
+      <div className="thinking-bubble" role="status" aria-label={CHAT_SCENE_ACTIVITY_LABELS[status]}>
+        {attention ? <Icon name={status === "stopped" ? "stop" : "error"} /> : <span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span>}
+      </div>
+      {sceneLabel && <span className="quiet-activity-scene">{sceneLabel}</span>}
+      {attention && <span className="quiet-activity-notice">{run.hint || run.label}</span>}
+    </div>}
+    {artifacts.length > 0 && <div className="run-artifacts" aria-label="生成的文件">
+      {artifacts.map(path => <LocalFileLink key={path} path={path} card={/\.html?$/i.test(path)}>{path.split(/[\\/]/).pop() || path}</LocalFileLink>)}
+    </div>}
+  </>;
+}
+
+function DetailedChatActivity({
   run,
   sceneLabel,
 }: {

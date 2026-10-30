@@ -5,6 +5,17 @@ import type { AppModel } from "../models/app";
 import { useModel } from "../../shared/hooks/use-model";
 import { ChatSceneIndicator } from "./chat-scene";
 import { UpdateProgress } from "./update-progress";
+import { PortalStatus, portalStatus } from '../../portal/status';
+const menuIcons = {
+  settings: "M4 7h16M4 17h16M8 4v6m8 4v6",
+  help: "M9 8a3 3 0 0 1 6 0c0 2-3 2-3 5m0 3h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z",
+  update: "M19 7a8 8 0 1 0 1 8M19 3v5h-5",
+  logs: "M6 3h9l4 4v14H6V3Zm9 0v5h4M9 12h7m-7 4h5",
+  exit: "M10 4H4v16h6m4-12 4 4-4 4m-6-4h12",
+} as const;
+function MenuIcon({ name }: { name: keyof typeof menuIcons }) {
+  return <svg className="options-icon" viewBox="0 0 24 24" aria-hidden="true"><path d={menuIcons[name]} /></svg>;
+}
 export function Topbar({ model }: { model: AppModel }) {
   const app = useModel(model);
   const town = useModel(model.town);
@@ -123,24 +134,10 @@ export function Topbar({ model }: { model: AppModel }) {
     };
   }, []);
   const hasToken = Boolean(app.snapshot?.settings.hasToken);
-  const portal = app.snapshot?.portal;
-  const portalLabels = {
-    running: "运行中",
-    stopped: "未启动",
-    starting: "启动中",
-    connected: "已连接",
-    reconnecting: "重连中",
-    stopping: "停止中",
-    external: "实例冲突",
-    error: "启动失败",
-  } as const;
-  const portalPhase = portal?.phase || "stopped";
-  const portalLabel = portal?.managed === false
-    ? "外部运行"
-    : portalLabels[portalPhase];
-  const portalName = app.snapshot?.settings.portalName?.trim() || "Heart Portal";
   const checkingUpdate = app.updateChecking || app.update?.phase === "checking";
   const updateActivity = app.update?.activity;
+  const portal = app.snapshot?.portal;
+  const localStatus = portalStatus(portal);
   const downloadUpdate = () => {
     toggle(false, true);
     void app.downloadClientUpdate();
@@ -265,64 +262,21 @@ export function Topbar({ model }: { model: AppModel }) {
           </summary>
           <div className="options-menu" ref={menu} inert={!expanded}>
             <div id="options-home" hidden={help}>
-        <button
-          id="local-portal-status"
-          className="local-portal-status"
-          type="button"
-          data-phase={portalPhase}
-          aria-label={`本机 Portal：${portalName}，${portalLabel}`}
-          onClick={() => app.navigate("portal")}
-        >
-          <span className="local-portal-dot" aria-hidden="true" />
-          <span className="local-portal-copy" aria-hidden="true">
-            <span className="local-portal-label local-portal-state-label">
-              本机 Portal · {portalLabel}
-            </span>
-            <span className="local-portal-label local-portal-name">
-              {portalName}
-            </span>
-          </span>
-        </button>
-
-
-
-<div className="options-sbs"><span>自主醒来</span>        <button
-          className={`sbs-header-switch${app.sbsKnown && app.sbsEnabled ? " enabled" : ""}`}
-          type="button"
-          aria-label="切换 SBS 自主醒来"
-          aria-pressed={app.sbsKnown ? app.sbsEnabled : undefined}
-          title={app.sbsKnown ? (app.sbsEnabled ? "SBS 自主醒来：开" : "SBS 自主醒来：关") : "SBS 状态未同步，可刷新重试"}
-          disabled={!hasToken || !app.sbsKnown || app.chatLoading}
-          onClick={() => app.toggleSbs()}
-        >
-          <span className="sbs-header-dot" aria-hidden="true" />
-        </button>
-</div>
-<div className="options-divider" />
-              <button
-                id="open-browser"
-                onClick={() =>
-                  void app.run(async () => {
-                    await app.api.openBrowser();
-                    requestAnimationFrame(() => {
-                      document.getElementById("browser-address")?.focus();
-                      (
-                        document.getElementById(
-                          "browser-address",
-                        ) as HTMLInputElement
-                      )?.select();
-                    });
-                  })
-                }
-              >
-                浏览器
+              <button type="button" id="local-portal-status" className="options-portal-status"
+                aria-label={`本机 Portal：${localStatus.label}，查看运行状态`}
+                title={`${app.snapshot?.settings.portalName || '本机 Portal'} · ${localStatus.label}${portal?.message ? `\n${portal.message}` : ''}`}
+                onClick={() => app.openPortalSettings()}>
+                <span className="options-portal-copy">
+                  <strong>{app.snapshot?.settings.portalName || '本机 Portal'}</strong>
+                  <span className="options-portal-meta"><span>本机 Portal</span><PortalStatus state={portal} /></span>
+                </span>
+                <svg className="options-portal-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m8 5 5 5-5 5" /></svg>
               </button>
-              <div className="options-divider" />
               <button
                 id="client-settings-button"
                 onClick={() => void app.openClientSettings()}
               >
-                设置 <small>⌘ ,</small>
+                <MenuIcon name="settings" /><span>设置</span><small>⌘ ,</small>
               </button>
               <button
                 id="options-help"
@@ -331,7 +285,7 @@ export function Topbar({ model }: { model: AppModel }) {
                 aria-expanded={help}
                 onClick={() => showHelp(true)}
               >
-                对话与帮助 <span aria-hidden="true">›</span>
+                <MenuIcon name="help" /><span>对话与帮助</span><span className="options-trailing" aria-hidden="true">›</span>
               </button>
               <button
                 id="check-updates"
@@ -345,10 +299,10 @@ export function Topbar({ model }: { model: AppModel }) {
                   } else void app.checkClientUpdates();
                 }}
               >
-                {updateActivity?.phase === "ready" ? "安装更新"
+                <MenuIcon name="update" /><span>{updateActivity?.phase === "ready" ? "安装更新"
                   : updateActivity ? updateActivity.phase === "installing" ? "正在安装…" : "正在下载更新…"
                   : checkingUpdate ? "正在检查更新…"
-                  : app.update?.phase === "available" ? "下载更新" : "手动检查更新"}
+                  : app.update?.phase === "available" ? "下载更新" : "手动检查更新"}</span>
                 {app.update?.phase === "available" && <small>v{app.update.latestVersion}</small>}
               </button>
               <button
@@ -356,13 +310,13 @@ export function Topbar({ model }: { model: AppModel }) {
                 disabled={app.collectingLogs}
                 onClick={() => void app.collectLogs()}
               >
-                {app.collectingLogs ? '正在收集日志…' : '收集日志'}
+                <MenuIcon name="logs" /><span>{app.collectingLogs ? '正在收集日志…' : '收集日志'}</span>
               </button>
               <button
                 id="quit-client"
                 onClick={() => void app.run(() => app.api.quit())}
               >
-                退出客户端
+                <MenuIcon name="exit" /><span>退出客户端</span>
               </button>
               <span id="client-version" aria-label="当前客户端版本">
                 {app.update?.currentVersion ? `v${app.update.currentVersion}` : "正在读取版本…"}

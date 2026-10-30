@@ -1,47 +1,30 @@
-import { useEffect, useMemo, useRef, useLayoutEffect, useState, type CSSProperties, type RefObject } from "react";
+import useMemoizedFn from 'ahooks/es/useMemoizedFn';
+import { useEffect, useSyncExternalStore, useMemo, useRef, useLayoutEffect, useState, type CSSProperties, type RefObject } from "react";
 import { splitSchedulingHint } from "../models/scheduling";
 import { markdownText } from "../../shared/components/markdown";
+import {firstAfter} from '../models/scroll-position';
+import type {useMessageScroll} from '../hooks/use-message-scroll';
 import type { ChatItem, Message } from "../models/chat";
 
-export function JumpToLatest({ container, scrollLock, clearAnchor }: {
+export function JumpToLatest({ container, scrollLock, clearAnchor, status, trimHistory }: {
+  trimHistory: () => void;
+  status: Pick<ReturnType<typeof useMessageScroll>, "subscribe" | "getSnapshot">;
   container: RefObject<HTMLDivElement | null>;
   scrollLock: RefObject<boolean>;
   clearAnchor: () => void;
 }) {
-  const [away, setAway] = useState(false);
-  useLayoutEffect(() => {
-    const node = container.current;
-    if (!node) return;
-    let frame = 0;
-    const measure = () => {
-      frame = 0;
-      const distant = node.scrollHeight - node.scrollTop - node.clientHeight > 24;
-      setAway(distant);
-    };
-    const schedule = () => { if (!frame) frame = requestAnimationFrame(measure); };
-    const observer = new ResizeObserver(schedule);
-    observer.observe(node);
-    const observed = new Set<Element>();
-    const observe = () => {
-      for (const child of observed) if (child.parentElement !== node) { observer.unobserve(child); observed.delete(child); }
-      for (const child of node.children) if (!observed.has(child)) { observer.observe(child); observed.add(child); }
-      schedule();
-    };
-    const mutation = new MutationObserver(observe);
-    mutation.observe(node, { childList: true }); observe();
-    node.addEventListener("scroll", schedule, { passive: true });
-    schedule();
-    return () => { cancelAnimationFrame(frame); mutation.disconnect(); observer.disconnect(); node.removeEventListener("scroll", schedule); };
-  }, [container]);
+  const {away,count}=useSyncExternalStore(status.subscribe,status.getSnapshot);
+  const label=count?`${count}条消息`:'最新消息';
   return <button id="chat-jump-latest" type="button" hidden={!away}
-    aria-label="回到底部"
+    aria-label="回到底部" aria-description={count?`下方还有${count}条消息`:undefined} title={count?`下方还有${count}条消息`:'回到底部'}
     onClick={() => {
       clearAnchor();
       scrollLock.current = true;
+      trimHistory();
       container.current?.scrollTo({ top: container.current.scrollHeight,
         behavior: "instant" });
     }}>
-    <span>回到底部</span>
+    <span>{label}</span>
     <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7.5 5 5 5-5" /></svg>
   </button>;
 }
@@ -61,27 +44,16 @@ export function ChatIndex({
   clearAnchor: () => void;
   highlight: (id: string | null) => void;
 }) {
-  const signature = items
-    .filter(
-      (item): item is Message =>
-        item.kind === "message" && item.role === "user",
-    )
-    .map((item) => `${item.id}:${item.text}`)
-    .join("\n");
-  const turns = useMemo(
-    () =>
-      items
-        .filter(
-          (item): item is Message =>
-            item.kind === "message" && item.role === "user",
-        )
-        .map((item) => ({
-          id: item.id,
-          messageId: item.id,
-          text: markdownText(splitSchedulingHint(item.text).text).slice(0, 240) || "附件消息",
-        })),
-    [signature],
-  );
+  // Serialize the user-turn snapshot: streaming reply mutations must not reparse every title.
+  const signature = JSON.stringify(items.filter((item): item is Message => item.kind === 'message' && item.role === 'user').map(({ id, text }) => ({ id, text })));
+  const turns = useMemo(() => {
+    const users: { id: string; text: string }[] = JSON.parse(signature);
+    return users.map(item => ({
+      id: item.id,
+      messageId: item.id,
+      text: markdownText(splitSchedulingHint(item.text).text).slice(0, 240) || '附件消息',
+    }));
+  }, [signature]);
   const nav = useRef<HTMLElement>(null),
     ticks = useRef<HTMLDivElement>(null),
     buttons = useRef(new Map<string, HTMLButtonElement>()),
@@ -90,23 +62,15 @@ export function ChatIndex({
     [hovered, setHovered] = useState<string | null>(null),
     [top, setTop] = useState(12);
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  function updateActive() {
+  const updateActive = useMemoizedFn(() => {
     const messages = container.current;
     if (!messages) return;
     const top = messages.getBoundingClientRect().top + 44;
-    let next = 0;
-    for (let i = 0; i < turns.length; i++) {
-      if (
-        (elements.current.get(turns[i].messageId)?.getBoundingClientRect()
-          .top ?? Infinity) > top
-      )
-        break;
-      next = i;
-    }
+    let next=Math.max(0,firstAfter(turns.length,top,index=>elements.current.get(turns[index].messageId)?.getBoundingClientRect().top??Infinity)-1);
     if (messages.scrollHeight - messages.scrollTop - messages.clientHeight < 8)
       next = turns.length - 1;
     setActive(next);
-  }
+  });
   function jump(id: string) {
     const turn = turns.find((turn) => turn.id === id),
       messages = container.current;
@@ -132,18 +96,20 @@ export function ChatIndex({
   useLayoutEffect(() => {
     const messages = container.current;
     if (!messages) return;
-    const observer = new ResizeObserver(updateActive);
+    let frame=0;
+    const schedule=()=>{if(!frame)frame=requestAnimationFrame(()=>{frame=0;updateActive();});};
+    const observer = new ResizeObserver(schedule);
     observer.observe(messages);
-    messages.addEventListener("scroll", updateActive, { passive: true });
+    messages.addEventListener("scroll", schedule, { passive: true });
     updateActive();
     return () => {
-      observer.disconnect();
-      messages.removeEventListener("scroll", updateActive);
+      cancelAnimationFrame(frame);observer.disconnect();
+      messages.removeEventListener("scroll", schedule);
     };
-  }, [turns]);
+  }, [container, updateActive]);
   useLayoutEffect(() => {
     updateActive();
-  }, [items.length]);
+  }, [items.length, turns, updateActive]);
   useEffect(() => {
     const button = buttons.current.get(turns[active]?.id);
     if (
@@ -168,6 +134,7 @@ export function ChatIndex({
       if (item.role === "being") replies.push(markdownText(splitSchedulingHint(item.text).text));
       if (replies.join(" ").length >= 240) break;
     }
+  const replyPreview = replies.join(" ");
   useLayoutEffect(() => {
     if (!hovered) return;
     const rect = buttons.current.get(hovered)?.getBoundingClientRect();
@@ -181,7 +148,7 @@ export function ChatIndex({
           ),
         ),
       );
-  }, [hovered, replies.join(" ")]);
+  }, [hovered, replyPreview]);
   return (
     <>
       <nav
@@ -251,7 +218,7 @@ export function ChatIndex({
         style={{ top }}
       >
         <strong>{turn?.text}</strong>
-        <p>{replies.join(" ").slice(0, 240) || "暂无回复"}</p>
+        <p>{replyPreview.slice(0, 240) || "暂无回复"}</p>
       </div>
     </>
   );

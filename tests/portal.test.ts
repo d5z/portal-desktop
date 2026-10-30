@@ -24,6 +24,27 @@ async function fixture() {
   return { dir, portal, spawn, children };
 }
 describe('Portal supervision', () => {
+  it('batches log snapshots without losing lines and flushes them on a state transition', async () => {
+    const f = await fixture();
+    await f.portal.start(settings, connection);
+    vi.useFakeTimers();
+    const states = vi.fn(), logs = vi.fn();
+    f.portal.on('state', states); f.portal.on('log', logs);
+    try {
+      for (let i = 0; i < 100; i++) f.children[0].stdout.write(`line ${i}\n`);
+      expect(logs).toHaveBeenCalledTimes(100);
+      expect(f.portal.state.logs).toHaveLength(100);
+      expect(states).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(250);
+      expect(states).toHaveBeenCalledTimes(1);
+      f.children[0].stdout.write('last line\n');
+      f.children[0].emit('exit', 0);
+      expect(states).toHaveBeenCalledTimes(2);
+      expect(states.mock.calls[1][0]).toMatchObject({ phase: 'reconnecting', logs: expect.arrayContaining(['last line']) });
+      await vi.advanceTimersByTimeAsync(250);
+      expect(states).toHaveBeenCalledTimes(2);
+    } finally { await f.portal.stop(); }
+  });
   it('reuses an existing config without overwriting tools or environment', async () => {
     const f = await fixture();
     const config = path.join(f.dir, 'existing.toml');
@@ -63,6 +84,10 @@ describe('Portal supervision', () => {
     await writeFile(call[2].env.HEART_PORTAL_STATUS_FILE, JSON.stringify(status));
     await vi.waitFor(() => expect(f.portal.state.phase).toBe('connected'), { timeout: 2500 });
     expect(f.portal.state).toMatchObject({ pid: child.pid, managed: true, runtimePath: f.dir, conflict: false });
+    const unchanged = vi.fn(); f.portal.on('state', unchanged);
+    await new Promise(resolve => setTimeout(resolve, 1100));
+    expect(unchanged).not.toHaveBeenCalled();
+    f.portal.off('state', unchanged);
     child.stdout.write('private-'); child.stdout.write('token\n');
     expect(f.portal.state.logs.join('\n')).not.toContain('private-token');
     child.stdout.write('relay session error after 20s: retry in 2s\n'); expect(f.portal.state.phase).toBe('connected');

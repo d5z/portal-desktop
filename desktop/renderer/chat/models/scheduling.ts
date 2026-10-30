@@ -17,6 +17,9 @@ export function splitSchedulingHint(text: string) {
  */
 export function withScheduling(items: ChatItem[], tasks: SceneTask[]): ChatItem[] {
   const users = items.filter((item): item is Message => item.kind === 'message' && item.role === 'user');
+  // Most turns have no scheduling metadata. Avoid matching every historical
+  // run to a user (and allocating another timeline) on each streamed frame.
+  if (!tasks.length && !users.some(user => splitSchedulingHint(user.text).hint)) return items;
   const owner = (sceneId: string | undefined, at: number) => users
     .filter(user => user.sceneId === sceneId && user.createdAt != null && user.createdAt <= at)
     .sort((a, b) => b.createdAt! - a.createdAt!)[0];

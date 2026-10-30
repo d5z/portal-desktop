@@ -140,7 +140,7 @@ async function openChatSearch(page) {
 }
 async function openPlace(page, view) {
   if (view === 'chat') { await page.locator('#back-to-chat').click(); return; }
-  if (view === 'portal') { await openClientSettings(page); await page.locator('#client-settings-dialog [data-view="portal"]').click(); }
+  if (view === 'portal') { await openClientSettings(page); await page.getByRole('tab',{name:'Portal',exact:true}).click(); }
   else await page.getByRole('navigation',{name:'主导航'}).getByRole('button',{name:({town:'小镇广场',kits:'工具库',bonfire:'篝火',firesides:'围炉',mail:'私信'})[view],exact:true}).click();
 }
 function cleanup() {
@@ -170,11 +170,16 @@ try {
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.getByRole('button', { name: '连接我的 Being' }).click();
   await page.locator('#connection-link').fill(`http://127.0.0.1:${port}/willow/?token=${token}`);
+  await page.getByRole('tab',{name:'Portal',exact:true}).click();
+  await page.locator('.settings-disclosure > summary').filter({hasText:'本机配置'}).click();
   await page.locator('#portal-name-input').fill('react-smoke');
   await page.locator('#workspace-input').fill(path.join(dir, '工作目录'));
   await page.locator('#background-input').uncheck();
+  await page.getByRole('tab',{name:'Being',exact:true}).click();
   await page.getByRole('button', { name: '保存、连接并启动' }).click();
-  await page.waitForFunction(() => !document.querySelector('#settings-dialog').open, { timeout: 15000 });
+  await page.waitForFunction(async () => (await window.beings.snapshot()).settings.hasToken && !document.querySelector('#save-settings').disabled, null, { timeout: 15000 });
+  await page.locator('#close-client-settings').click();
+  await page.locator('#client-settings-dialog').waitFor({state:'hidden'});
   const frame = page.frameLocator('#chat-frame');
   await frame.getByText('你好，我在这里。我们可以从一个想法开始。').waitFor();
   const childFrame = page.frames().find(frame => frame.url().startsWith('beings://chat'));
@@ -301,6 +306,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   await page.screenshot({ path: 'test-results/chat.png' });
   // Model settings and the compact options menu preserve the draft.
   await openClientSettings(page);
+  await page.getByRole('tab',{name:'模型',exact:true}).click();
   await page.locator('[data-chat-action="model"]').click();
   const modelPanel = page.locator('#subagent-model-panel #settings-panel');
   await modelPanel.waitFor();
@@ -415,11 +421,11 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
     pid = reattached.portal.pid;
     await openPlace(reopened, 'portal');
     await reopened.screenshot({ path: 'test-results/background-portal.png' });
-    await reopened.locator('#portal-settings').click();
+    await reopened.locator('.settings-disclosure > summary').filter({hasText:'本机配置'}).click();
     assert.equal(await reopened.locator('#background-input').isChecked(), true);
     assert.match(await reopened.locator('#portal-startup-help').textContent(), /打开客户端时自动启动 Portal/);
     await reopened.screenshot({ path: 'test-results/background-settings.png' });
-    await reopened.locator('#close-settings').click();
+    await reopened.locator('#close-client-settings').click();
     const stableHandshakes = handshakeCount;
     await reopened.waitForTimeout(1000); assert.equal(handshakeCount, stableHandshakes, 'reopening must not restart the existing background service');
     pid = (await reopened.evaluate(() => window.beings.snapshot())).portal.pid;

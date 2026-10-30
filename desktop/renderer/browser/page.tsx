@@ -5,7 +5,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { BrowserAction, BrowserState } from "../../shared/types";
+import type { BrowserAction, BrowserState, BrowserBounds } from "../../shared/types";
 import type { AppModel } from "../app/models/app";
 import { useBrowserSplit } from "./hooks/use-browser-split";
 export function Browser({ model: app }: { model: AppModel }) {
@@ -23,22 +23,18 @@ export function Browser({ model: app }: { model: AppModel }) {
     input = useRef<HTMLInputElement>(null),
     divider = useRef<HTMLDivElement>(null),
     dragging = useRef(false);
+  const lastBounds = useRef<BrowserBounds | null>(null);
   const sendBounds = useCallback(() => {
     if (!viewport.current || !app.api) return;
-    const { x, y, width, height } = viewport.current.getBoundingClientRect();
+    const visible = !dragging.current && !panel.current?.hidden && app.startup === "ready" && !document.querySelector("dialog[open]");
+    const { x, y, width, height } = visible ? viewport.current.getBoundingClientRect() : { x:0, y:0, width:0, height:0 };
+    const bounds = { x, y, width, height, visible };
+    const previous = lastBounds.current;
+    if (previous && previous.x === x && previous.y === y && previous.width === width && previous.height === height && previous.visible === visible) return;
+    lastBounds.current = bounds;
     void app.api
-      .browserBounds({
-        x,
-        y,
-        width,
-        height,
-        visible:
-          !dragging.current &&
-          !panel.current?.hidden &&
-          app.startup === "ready" &&
-          !document.querySelector("dialog[open]"),
-      })
-      .catch(app.toast);
+      .browserBounds(bounds)
+      .catch(error => { if (lastBounds.current === bounds) lastBounds.current = null; app.toast(error); });
   }, [app]);
   const setDragging = useCallback(
     (active: boolean) => {
@@ -72,8 +68,9 @@ export function Browser({ model: app }: { model: AppModel }) {
       stop();
     };
   }, [app]);
-  useLayoutEffect(sendBounds, [sendBounds, state.open, split.width]);
+  useLayoutEffect(sendBounds, [sendBounds, state.open, split.width, app.startup]);
   useEffect(() => {
+    if (!state.open) return;
     let scheduled = 0;
     const layout = () => {
       if (!scheduled)
@@ -84,13 +81,16 @@ export function Browser({ model: app }: { model: AppModel }) {
     };
     const resize = new ResizeObserver(layout);
     if (viewport.current) resize.observe(viewport.current);
-    const mutation = new MutationObserver(layout);
+    const mutation = new MutationObserver(records => {
+      if (records.some(record => record.target instanceof HTMLDialogElement ||
+        [...record.addedNodes, ...record.removedNodes].some(node => node instanceof Element && (node.matches('dialog') || node.querySelector('dialog'))))) layout();
+    });
     // Dynamic Kit dialogs must also hide the native WebContentsView.
     mutation.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ["open", "hidden"],
+      attributeFilter: ["open"],
     });
     window.addEventListener("resize", layout);
     return () => {
@@ -99,7 +99,7 @@ export function Browser({ model: app }: { model: AppModel }) {
       window.removeEventListener("resize", layout);
       cancelAnimationFrame(scheduled);
     };
-  }, [sendBounds]);
+  }, [sendBounds, state.open]);
   const act = (action: BrowserAction) =>
     void app.run(() => app.api.browserAction(action));
   return (
