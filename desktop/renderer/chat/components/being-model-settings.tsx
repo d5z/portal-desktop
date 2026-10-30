@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import type { ChatRuntime, ChatState, ConfigResult } from "../models/chat";
 import { useModel } from "../../shared/hooks/use-model";
 import { NavigationControls } from "../../shared/components/navigation-controls";
+import type { PublicModelProfile } from "../../../shared/types";
 
 interface Route {
   id: string;
@@ -57,6 +58,7 @@ export function BeingModelSettings({
   onBusy,
   mobilePage = false,
   fallback,
+  profileFor,
 }: {
   state: ChatState;
   runtime: Pick<ChatRuntime, "loadLlmConfig" | "applyConfigChange"> &
@@ -69,6 +71,7 @@ export function BeingModelSettings({
   onBusy?: (busy: boolean) => void;
   mobilePage?: boolean;
   fallback: ReactNode;
+  profileFor?: (provider: string) => PublicModelProfile | undefined;
 }) {
   useModel(state);
   const [legacy, setLegacy] = useState(false);
@@ -88,7 +91,8 @@ export function BeingModelSettings({
   const [custom, setCustom] = useState({
     base_url: "",
     model: "",
-    provider: "openai",
+    provider: "portal-custom",
+    api: "openai-completions",
   });
   const [reload, setReload] = useState(0);
   const cache = useRef(new Map<string, ModelList>());
@@ -106,6 +110,7 @@ export function BeingModelSettings({
   }, []);
   const id = (name: string) => `${contentOnly ? "Heart-" : ""}${name}`;
   const route = routes.find((item) => item.id === routeId);
+  const remembered = routeId && routeId !== "custom" ? profileFor?.(routeId) : undefined;
   const currentRoute = routes.find((item) => item.id === state.config.provider);
   const current = cache.current
     .get(state.config.provider || "")
@@ -114,7 +119,7 @@ export function BeingModelSettings({
   const showKey =
     routeId !== "custom" &&
     route &&
-    (needsKey || (!route.has_key && !route.keyless_in_loom));
+    (needsKey || (!route.has_key && !route.keyless_in_loom && !remembered?.hasKey));
   useEffect(() => {
     onBusy?.(busy);
   }, [busy, onBusy]);
@@ -164,7 +169,11 @@ export function BeingModelSettings({
     if (!open || !picker || routeId === "custom" || !routeId) return;
     let cancelled = false;
     const cached = cache.current.get(routeId);
-    setList(cached || { models: [] });
+    const rememberedModel = profileFor?.(routeId)?.model;
+    const withRemembered = (value: ModelList): ModelList => rememberedModel && !value.models.some(model => model.id === rememberedModel)
+      ? { ...value, models: [{ id: rememberedModel, name: rememberedModel }, ...value.models] }
+      : value;
+    setList(cached ? withRemembered(cached) : { models: rememberedModel ? [{ id: rememberedModel, name: rememberedModel }] : [] });
     if (cached) {
       setLoading(false);
       return;
@@ -177,7 +186,7 @@ export function BeingModelSettings({
         const data = await response.json();
         if (cancelled) return;
         if (!response.ok) throw new Error(data.error || "无法读取模型列表。");
-        const value: ModelList = {
+        const value: ModelList = withRemembered({
           models: (Array.isArray(data.models) ? data.models : [])
             .slice()
             .sort(
@@ -186,7 +195,7 @@ export function BeingModelSettings({
                 a.id.localeCompare(b.id),
             ),
           reason: data.reason,
-        };
+        });
         cache.current.set(routeId, value);
         setList(value);
       })
@@ -199,7 +208,7 @@ export function BeingModelSettings({
     return () => {
       cancelled = true;
     };
-  }, [open, picker, routeId, runtime, reload]);
+  }, [open, picker, routeId, runtime, reload, profileFor]);
   useEffect(() => {
     if (picker && routeId !== "custom") searchInput.current?.focus();
   }, [picker, routeId]);
@@ -215,16 +224,29 @@ export function BeingModelSettings({
     }
   }, [picker, disabled, routeLoading]);
   function chooseRoute(value: string) {
+    const saved = value === "custom"
+      ? profileFor?.(custom.provider)
+      : profileFor?.(value);
     setRouteId(value);
     setQuery("");
-    setSelected(null);
+    setSelected(saved?.model ? { id: saved.model, name: saved.model } : null);
     setKey("");
     setNeedsKey(false);
     setFailure(null);
+    if (value === "custom" && saved) {
+      setCustom(previous => ({
+        ...previous,
+        model: saved.model,
+        base_url: saved.base_url || "",
+        api: saved.api || previous.api,
+      }));
+    }
   }
   function showPicker() {
+    const currentProvider = state.config.provider;
     chooseRoute(
       routes.find((item) => item.id === state.config.provider)?.id ||
+        (currentProvider && currentProvider === custom.provider ? "custom" : undefined) ||
         routes[0]?.id ||
         "custom",
     );
@@ -251,7 +273,6 @@ export function BeingModelSettings({
       if (!response.ok || !data.ok)
         throw new Error(data.error || "密钥保存失败。");
       if (!mounted.current) return;
-      setKey("");
       setNeedsKey(false);
       setRoutes((items) =>
         items.map((item) =>
@@ -274,7 +295,10 @@ export function BeingModelSettings({
     const patch =
       routeId === "custom"
         ? {
-            ...custom,
+            provider: custom.provider,
+            ...((custom.provider === "portal-custom" || profileFor?.(custom.provider)?.api)
+              ? { api: custom.api }
+              : {}),
             base_url: custom.base_url.trim(),
             model: custom.model.trim(),
             ...(key.trim() ? { api_key: key.trim() } : {}),
@@ -283,9 +307,11 @@ export function BeingModelSettings({
           ? {
               provider: route.id,
               model: modelId,
-              ...(route.base_url !== undefined
-                ? { base_url: route.base_url }
+              ...(remembered?.base_url || route.base_url
+                ? { base_url: remembered?.base_url || route.base_url }
                 : {}),
+              ...(remembered?.api ? { api: remembered.api } : {}),
+              ...(key.trim() ? { api_key: key.trim() } : {}),
             }
           : null;
     if (!patch) return;
@@ -557,11 +583,11 @@ export function BeingModelSettings({
                   onClick={() => chooseRoute(item.id)}
                 >
                   <span
-                    className={`model-indicator${item.has_key || item.keyless_in_loom ? "" : " missing-key"}`}
+                    className={`model-indicator${item.has_key || item.keyless_in_loom || profileFor?.(item.id)?.hasKey ? "" : " missing-key"}`}
                     title={
                       item.keyless_in_loom
                         ? "无需密钥"
-                        : item.has_key
+                        : item.has_key || profileFor?.(item.id)?.hasKey
                           ? "已有密钥"
                           : "缺少密钥"
                     }
@@ -663,18 +689,30 @@ export function BeingModelSettings({
                     className="field-input"
                     disabled={disabled}
                     value={custom.provider}
-                    onChange={(event) =>
-                      setCustom((value) => ({
+                    onChange={(event) => {
+                      const provider = event.target.value;
+                      const saved = profileFor?.(provider);
+                      setCustom(value => ({
                         ...value,
-                        provider: event.target.value,
-                      }))
-                    }
+                        provider,
+                        ...(saved ? {
+                          model: saved.model,
+                          base_url: saved.base_url || "",
+                          api: saved.api || value.api,
+                        } : {}),
+                      }));
+                      setKey("");
+                      setFailure(null);
+                    }}
                   >
                     {[
                       ["openai", "OpenAI 兼容"],
                       ["anthropic", "Anthropic"],
                       ["google", "Google"],
                       ["openai-responses", "OpenAI Responses"],
+                      ["glm", "智谱"],
+                      ["self-hosted", "自部署"],
+                      ["portal-custom", "自定义接口"],
                     ].map(([value, label]) => (
                       <option key={value} value={value}>
                         {label}
@@ -682,6 +720,14 @@ export function BeingModelSettings({
                     ))}
                   </select>
                 </div>
+                {custom.provider === "portal-custom" && <div className="settings-section">
+                  <label className="field-label" htmlFor={id("llm-custom-api")}>接口协议</label>
+                  <select id={id("llm-custom-api")} className="field-input" disabled={disabled} value={custom.api}
+                    onChange={event => setCustom(value => ({ ...value, api: event.target.value }))}>
+                    {["openai-completions", "openai-responses", "anthropic-messages", "google-generative-ai"].map(value =>
+                      <option key={value} value={value}>{value}</option>)}
+                  </select>
+                </div>}
                 <div className="settings-section">
                   <label className="field-label" htmlFor={id("llm-custom-key")}>
                     API 密钥
@@ -697,7 +743,9 @@ export function BeingModelSettings({
                     onChange={(event) => setKey(event.target.value)}
                   />
                   <p className="hint">
-                    已有密钥时可留空沿用，无认证接口可不填。
+                    {profileFor?.(custom.provider)?.hasKey
+                      ? "已记住本机密钥，留空即可沿用。"
+                      : "已有密钥时可留空沿用，无认证接口可不填。"}
                   </p>
                 </div>
                 <button

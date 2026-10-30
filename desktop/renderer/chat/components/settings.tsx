@@ -3,6 +3,8 @@ import { useEffect, useRef, useState } from "react";
 import type { ChatRuntime, ChatState, Preset } from "../models/chat";
 import { useModel } from "../../shared/hooks/use-model";
 import { NavigationControls } from "../../shared/components/navigation-controls";
+import { useModelProfiles } from "./model-profiles";
+import type { PublicModelProfile } from "../../../shared/types";
 
 const baseUrls: Record<string, string> = {
   anthropic: "https://api.anthropic.com",
@@ -60,6 +62,7 @@ function LegacyChatSettings({
   catalogHint,
   onEnableSubagent,
   mobilePage = false,
+  profileFor,
 }: {
   state: ChatState;
   runtime: Pick<ChatRuntime, "loadLlmConfig" | "applyConfigChange"> & Partial<Pick<ChatRuntime, "request">>;
@@ -76,6 +79,7 @@ function LegacyChatSettings({
   catalogHint?: string;
   onEnableSubagent?: () => Promise<void>;
   mobilePage?: boolean;
+  profileFor?: (provider: string) => PublicModelProfile | undefined;
 }) {
   useModel(state);
   const subagent = target === "subagent";
@@ -155,12 +159,14 @@ function LegacyChatSettings({
     }
     setError("");
     setThinking(state.config.thinking || "medium");
+    const provider = subagent && preset.base_url ? "portal-custom" : preset.provider;
+    const remembered = profileFor?.(provider);
     setDraft({
       preset,
-      model: preset.model,
-      provider: subagent && preset.base_url ? "portal-custom" : preset.provider,
-      baseUrl: preset.base_url || baseUrls[preset.provider] || "",
-      api: preset.api || "openai-completions",
+      model: remembered?.model || preset.model,
+      provider,
+      baseUrl: remembered?.base_url || preset.base_url || baseUrls[preset.provider] || "",
+      api: remembered?.api || preset.api || "openai-completions",
       apiKey: "",
       route: "official",
     });
@@ -170,10 +176,12 @@ function LegacyChatSettings({
     setDraft(null);
     setError("");
     try {
+      const remembered = profileFor?.(preset.provider);
       await runtime.applyConfigChange({
-        model: preset.model,
+        model: remembered?.model || preset.model,
         provider: preset.provider,
-        base_url: baseUrls["self-hosted"],
+        base_url: remembered?.base_url || baseUrls["self-hosted"],
+        ...(remembered?.api ? { api: remembered.api } : {}),
       });
       // applyConfigChange owns the confirmed config and error status.
       // Never promote a failed or rolled-back switch to the current model.
@@ -202,7 +210,9 @@ function LegacyChatSettings({
         model,
         ...(draft.provider.trim() ? { provider: draft.provider.trim() } : {}),
         ...((!subagent || draft.provider === "portal-custom") && draft.baseUrl.trim() ? { base_url: draft.baseUrl.trim() } : {}),
-        ...(subagent && draft.provider === "portal-custom" ? { api: draft.api || "openai-completions" } : {}),
+        ...((draft.provider === "portal-custom" || profileFor?.(draft.provider)?.api)
+          ? { api: draft.api || "openai-completions" }
+          : {}),
         ...(subagent ? { thinking } : {}),
         ...(draft.apiKey.trim() ? { api_key: draft.apiKey.trim() } : {}),
       });
@@ -569,20 +579,18 @@ function LegacyChatSettings({
                     className={draft.route === route ? "active" : ""}
                     aria-pressed={draft.route === route}
                     disabled={disabled}
-                    onClick={() =>
+                    onClick={() => {
+                      const provider = route === "openrouter" ? "openrouter" : draft.preset.provider;
+                      const remembered = profileFor?.(provider);
                       update({
                         route,
-                        apiKey: route === draft.route ? draft.apiKey : "",
-                        provider:
-                          route === "openrouter"
-                            ? "openrouter"
-                            : draft.preset.provider,
-                        baseUrl:
-                          route === "openrouter"
-                            ? "https://openrouter.ai/api/v1"
-                            : baseUrls[draft.preset.provider] || "",
-                      })
-                    }
+                        apiKey: "",
+                        provider,
+                        model: remembered?.model || draft.model,
+                        baseUrl: remembered?.base_url || (route === "openrouter" ? "https://openrouter.ai/api/v1" : baseUrls[draft.preset.provider] || ""),
+                        api: remembered?.api || draft.api,
+                      });
+                    }}
                   >
                     {route === "official" ? "服务商直连" : "OpenRouter"}
                   </button>
@@ -639,7 +647,9 @@ function LegacyChatSettings({
                 onChange={(event) => update({ apiKey: event.target.value })}
               />
               <p id={fieldId("s2-key-hint")}  className="hint">
-                {subagent ? "Being 服务端密钥不会自动复制。同一接口的本机已有密钥可留空沿用；无认证接口可不填。" : custom || draft.route === "openrouter"
+                {subagent ? "Being 服务端密钥不会自动复制。同一接口的本机已有密钥可留空沿用；无认证接口可不填。" : profileFor?.(draft.provider)?.hasKey
+                  ? "已记住本机密钥，留空即可沿用。"
+                  : custom || draft.route === "openrouter"
                   ? "填写服务商提供的密钥；已有密钥时可留空。"
                   : draft.preset.has_key === false
                     ? "此服务商尚未配置密钥，请填写后应用。"
@@ -648,7 +658,7 @@ function LegacyChatSettings({
                       : "如需更新密钥，可在此填写。"}
               </p>
             </div>
-            {subagent && draft.provider === 'portal-custom' && <div className="settings-section">
+            {draft.provider === 'portal-custom' && <div className="settings-section">
               <label className="field-label" htmlFor={fieldId('s2-api')}>接口协议</label>
               <select id={fieldId('s2-api')} className="field-input" value={draft.api} disabled={disabled} onChange={event => update({ api: event.target.value })}>
                 {['openai-completions', 'openai-responses', 'anthropic-messages', 'google-generative-ai'].map(value => <option key={value} value={value}>{value}</option>)}
@@ -692,6 +702,11 @@ function LegacyChatSettings({
 }
 
 export function ChatSettings(props: Parameters<typeof LegacyChatSettings>[0]) {
-  if (props.target === "subagent" || !props.runtime.request) return <LegacyChatSettings {...props} />;
-  return <BeingModelSettings {...props} fallback={<LegacyChatSettings {...props} />} />;
+  const profiles = useModelProfiles({
+    runtime: props.runtime, open: props.open,
+    enabled: props.target !== "subagent",
+  });
+  const panelProps = { ...props, runtime: profiles.runtime, profileFor: profiles.profileFor };
+  if (props.target === "subagent" || !props.runtime.request) return <LegacyChatSettings {...panelProps} />;
+  return <BeingModelSettings {...panelProps} fallback={<LegacyChatSettings {...panelProps} />} />;
 }

@@ -105,6 +105,7 @@ const api: DesktopAPI = {
   },
   beingModelCatalog: input => ipcRenderer.invoke('beings:model-catalog', input),
   beingModelConfig: patch => ipcRenderer.invoke("beings:model-config", patch),
+  modelProfiles: input => ipcRenderer.invoke('beings:model-profiles', input),
   sceneTasks: () => ipcRenderer.invoke('beings:scene-tasks'),
   recentChatHistory: endpoint => ipcRenderer.invoke('beings:recent-chat-history', endpoint),
   onSceneTasks: callback => {

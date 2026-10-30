@@ -29,6 +29,21 @@ export interface Settings {
   portalEnvironmentPath?: string;
 }
 export interface SubagentSetup { enabled?: boolean; base_url?: string; api?: string; provider: string; model: string; api_key: string; thinking: string }
+export interface ModelProfileInput {
+  provider: string;
+  base_url?: string;
+  api?: string;
+  model: string;
+  thinking?: string;
+  api_key?: string;
+}
+export interface PublicModelProfile extends Omit<ModelProfileInput, 'api_key'> { hasKey: boolean }
+export interface ModelProfilesInput { action: 'list' }
+export interface ModelProfilesResult {
+  ok: boolean;
+  profiles: PublicModelProfile[];
+  error?: string;
+}
 export interface SaveSettings {
   permissionMode?: import('./security').PermissionMode;
   subagentEnabled?: boolean;
@@ -126,6 +141,7 @@ export interface DesktopAPI {
   save(input: SaveSettings): Promise<Snapshot>;
   beingModelCatalog?(input: { kind: 'routes' | 'models' | 'keys'; route?: string; api_key?: string }): Promise<{ status: number; data: Record<string, unknown> }>;
   beingModelConfig(patch?: Record<string, string | number | boolean>): Promise<Record<string, unknown>>;
+  modelProfiles?(input: ModelProfilesInput): Promise<ModelProfilesResult>;
   recentChatHistory(endpoint: string): Promise<RecentChatMessage[]>;
   sceneTasks(): Promise<SceneTaskSnapshot>;
   onSceneTasks(callback: (snapshot: SceneTaskSnapshot) => void): () => void;
