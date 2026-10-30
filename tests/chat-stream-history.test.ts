@@ -37,6 +37,31 @@ describe("stream progress and persisted replies", () => {
     };
   }
 
+  it.each(['finished', 'gone', 'streaming'])('rechecks a startup replay snapshot after history hydration (%s)', async latest => {
+    let probes = 0;
+    vi.stubGlobal('fetch', vi.fn(async (input: string) => {
+      const url = new URL(input);
+      if (url.pathname === '/api/history') return Response.json({messages: [{seq:1,role:'assistant',scene_id:'desktop-test',content:'已经完整落库的回复。'}]});
+      if (url.pathname === '/health') return new Response('OK fixture');
+      if (url.pathname === '/api/stream/active') {
+        probes++;
+        if (probes > 1 && latest === 'gone') return new Response(null,{status:204});
+        return Response.json({stream_id:'startup',scene_id:'desktop-test',origin:'human',finished:probes>1&&latest==='finished',
+          events:[{seq:1,event:'content_block_delta',data:{scene_id:'desktop-test',delta:{text:probes===1?'已经完整':'下一段'}}},
+            {seq:2,event:'content_block_delta',data:{scene_id:'desktop-test',delta:{text:'仍在输出'}}}],next_seq:3});
+      }
+      return Response.json({sbs_enabled:false});
+    }));
+    const state = new ChatState(), runtime = createChatRuntime(state);
+    try {
+      await runtime.start();
+      const replies = state.items.filter((item): item is Message => item.kind==='message'&&item.role==='being');
+      expect(probes).toBeGreaterThanOrEqual(2);
+      expect(replies.map(reply=>reply.text)).toEqual(latest==='streaming'?['已经完整落库的回复。','下一段仍在输出']:['已经完整落库的回复。']);
+      expect(state.streaming).toBe(latest==='streaming');
+    } finally {runtime.dispose();}
+  });
+
   it.each([false, true])('uses the tool result error flag even with PowerShell stderr (error=%s)', async isError => {
     const f = fixture();
     try {
@@ -145,6 +170,36 @@ describe("stream progress and persisted replies", () => {
         { historySeq: 11, text: "终稿落库", persistedFrom: "final" },
       ]);
     } finally { f.runtime.dispose(); }
+  });
+
+  it('keeps the continuation marker before the interrupt through history acknowledgement', async () => {
+    const f = fixture();
+    try {
+      await f.runtime.start();
+      await f.runtime.send('first');
+      await vi.advanceTimersByTimeAsync(20);
+      f.event('content_block_delta', {delta:{text:'partial'}});
+      await vi.advanceTimersByTimeAsync(20);
+      await f.runtime.send('interrupt', [], {mode:'interrupt'});
+      const submitted = new Date().toISOString();
+      f.event('message_stop', {});
+      f.event('meta', {continuation:true});
+      await vi.advanceTimersByTimeAsync(20);
+      const marker = f.state.items.find(item => item.kind === 'separator' && item.handoffMarker)!;
+      const user = f.state.items.find(item => item.kind === 'message' && item.text === 'interrupt')!;
+      expect(marker).toBeDefined();
+      expect(f.state.items.indexOf(marker)).toBeLessThan(f.state.items.indexOf(user));
+      const before = f.state.items.filter(item => item.kind !== 'run').map(item => item.id);
+      f.history.push(
+        {seq:1,from:'system',type:'marker',content:'[breath yielded]',scene_id:'desktop-test',at:submitted},
+        {seq:2,role:'user',content:'interrupt',scene_id:'desktop-test',at:submitted},
+      );
+      await f.runtime.refreshHistory();
+      f.event('meta', {continuation:true});
+      await vi.advanceTimersByTimeAsync(20);
+      expect(f.state.items.filter(item => item.kind !== 'run').map(item => item.id)).toEqual(before);
+      expect(f.state.items.filter(item => item.kind === 'separator' && item.handoffMarker)).toHaveLength(1);
+    } finally { f.close(); f.runtime.dispose(); }
   });
 
   // DevTools sample: partial 13349 -> stop -> continuation -> final 13352.

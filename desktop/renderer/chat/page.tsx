@@ -14,7 +14,7 @@ import { SurfaceTimeline } from '../shared/intelligent-ui/surfaces';
 import { useMessageScroll } from "./hooks/use-message-scroll";
 import { IntelligentUIExamples, type UIExampleId } from "./components/intelligent-ui-examples";
 import { ConversationSearch, searchEntries } from "./services/conversation-search";
-import { replyBubbles, historyTargetBubble } from "./models/reply-bubbles";
+import { replyBubbles, historyTargetBubble, quietProgressRuns } from "./models/reply-bubbles";
 import { ScheduledMessage } from './components/scheduling';
 import { splitSchedulingHint, withScheduling } from './models/scheduling';
 import {
@@ -143,6 +143,7 @@ function ChatView({
   const timelineItems = replyBubbles(sceneItems(withScheduling(state.items.filter(item => item.kind !== "message" || !item.queued || !!item.attachmentViews?.length || !!item.attachmentUploads?.length), state.sceneTasks), state.historyScope, state.currentScene, state.showSbsMessages));
   const historyWindow=useHistoryWindow(state.historyLoading ? [] : timelineItems,JSON.stringify([state.historyScope,state.currentScene.sceneId,state.showSbsMessages]),before=>runtime.loadOlderHistory(before));
   const visibleItems=historyWindow.items;
+  const progressRuns = quietProgressRuns(timelineItems);
   const timeGroups=new Set<string>();
   let previousMessageTime:number|undefined;
   for(const item of visibleItems) if(item.kind==='message') {
@@ -467,8 +468,14 @@ function ChatView({
                 key={item.id}
                 run={item}
                 showDetails={showReasoning}
+                showProgress={progressRuns.has(item.id)}
                 sceneLabel={state.historyScope === "all" ? sceneName(item, state.currentScene, state.sceneNames) : undefined}
               />
+            ) : item.notice === 'stop' ? (
+              <div key={item.id} className="chat-inline-notice" role="status">
+                <span>{item.text}</span>
+                {item.retry && <button type="button" onClick={() => void item.retry?.()}>{item.retryLabel}</button>}
+              </div>
             ) : (
               <Fragment key={item.id}>
               {timeGroups.has(item.id)&&item.createdAt!==undefined&&<time className="message-time-divider" dateTime={new Date(item.createdAt).toISOString()}>{messageTimeLabel(item.createdAt)}</time>}
@@ -486,7 +493,6 @@ function ChatView({
               >
                 <div className={`meta${item.consecutive ? " time-only" : ""}`}>
                   {item.role === "system" && <span>系统消息</span>}
-                  {item.persistedFrom === "partial" && <span className="message-scene">已中断</span>}
                   {(state.historyScope === "all" || isGlobalBeingMessage(item)) && <span className="message-scene" title={isGlobalBeingMessage(item) ? "Being 发出的无场景消息，在各场景共享显示；包含自主醒来消息" : item.sceneId || "这条历史消息未提供场景标记"}>{isGlobalBeingMessage(item) ? "全局消息" : sceneName(item, state.currentScene, state.sceneNames)}</span>}
                 </div>
                 <div className="message-bubble-row">

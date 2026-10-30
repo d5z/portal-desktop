@@ -126,7 +126,7 @@ function createStreamRuntime(state: any, options: any): any {
     }
     const path = new URL(input, location.href).pathname;
     const chatSend = path.endsWith('/api/chat/stream') && init.method === 'POST';
-    const traced = chatSend || path.endsWith('/api/stream/active');
+    const traced = chatSend || path.endsWith('/api/stream/active') || path.endsWith('/api/stop');
     const startedAt = Date.now();
     if (chatSend) { chatRequestRevision++; chatRequestsInFlight++; }
     if (traced) traceNetwork('request', {path, method: init.method || 'GET', after: new URL(input, location.href).searchParams.get('after')});
@@ -310,6 +310,9 @@ function createStreamRuntime(state: any, options: any): any {
     if (replayingSettledReply) return;
     if (replayTransportOnly && !pendingReply) return;
     if (replyRunSettled) return;
+    // The HTTP receipt can finish the run before the aborted SSE reader cleans
+    // up its thinking state. That cleanup must not create a second stopped run.
+    if (userStoppedStream && currentRun?.end) return;
     if (!currentRun || currentRun.end) {
       if ((!isStreaming && !pendingReply) || finished) return;
       currentRun = {
@@ -914,7 +917,10 @@ function createStreamRuntime(state: any, options: any): any {
          // Heart persists the yield marker immediately BEFORE the inserted user row.
          (user.historySeq && item.historySeq === user.historySeq - 1))))) return;
     const now = Date.now();
-    state.items.push({ ...scene, kind: "separator", id: `marker-${options.nextId()}`,
+    // Heart persists the yield marker before the interrupting input. Match that
+    // order immediately so history acknowledgement cannot move the separator
+    // across the user's bubble and shift the visible conversation a second time.
+    state.items.splice(state.items.indexOf(user), 0, { ...scene, kind: "separator", id: `marker-${options.nextId()}`,
       marker: true, handoffMarker: true, continuationMarker: true, continuationTurn: key,
       interruptStartedAt: user.createdAt, createdAt: now,
       text: `· 放下手头的事，转向你 · ${formatTime()} ·` });
@@ -928,12 +934,14 @@ function createStreamRuntime(state: any, options: any): any {
       id: `marker-${options.nextId()}`,
       marker: true,
       handoffMarker: /^\[breath yielded/i.test(text || ''),
+      stopMarker: /^\[breath interrupted/i.test(text || ''),
       text: `· ${breathMarkerLabel(text)} · ${timestamp || formatTime()} ·`,
     };
     const index = Number.isFinite(scene.createdAt) ? state.items.findIndex((item: any) =>
       (item.createdAt ?? item.start ?? -Infinity) > scene.createdAt) : -1;
     state.items.splice(index < 0 ? state.items.length : index, 0, marker);
     orderHistoryItem(marker);
+    if (marker.stopMarker) options.onStopMarker?.(marker);
     lastRole = "system";
     changed();
   }
@@ -2433,6 +2441,19 @@ function createStreamRuntime(state: any, options: any): any {
 
   // ---- Stop turn ----
   let stopNotice: { streamId: string | null; message: any } | undefined;
+  let stopAttempt: { request: number; at: number; historyFloor: number; run: any; confirmed: boolean; confirm: () => void } | undefined;
+  function acceptStopMarker(marker: any) {
+    const attempt = stopAttempt;
+    if (!attempt || disposed || attempt.request !== chatRequestRevision || !marker.stopMarker ||
+        !marker.historySeq || marker.historySeq <= attempt.historyFloor ||
+        !Number.isFinite(marker.createdAt) || marker.createdAt < Math.floor(attempt.at / 1000) * 1000 ||
+        !echoScenesMatch(marker, attempt.run || state.currentScene)) return;
+    // Only a durable interruption marker acknowledges a stop whose HTTP receipt
+    // was lost. A partial reply or an ordinary message_stop is not confirmation.
+    if (attempt.run) attempt.run.stopHistorySeq = marker.historySeq;
+    attempt.confirm();
+    changed();
+  }
   async function stopCurrentTurn() {
     if (!isStreaming || state.stopping) return;
     const targetStreamId = currentStreamId;
@@ -2448,35 +2469,15 @@ function createStreamRuntime(state: any, options: any): any {
       targetRun.hint = '';
       targetRun.waitingForReply = false;
     };
-    const sameTurn = () => !disposed && isStreaming && (targetStreamId
+    const sameTurn = () => !disposed && isStreaming && chatRequestRevision === targetRequest && (targetStreamId
       ? currentStreamId === targetStreamId
       : !currentStreamId && currentAbortController === targetReader && chatRequestRevision === targetRequest);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
-    state.stopping = true;
-    changed();
-    try {
-      if (targetStreamId) {
-        const response = await fetch(apiUrl("/api/stop"), {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ stream_id: targetStreamId }),
-          signal: controller.signal,
-        });
-        // 202 is only admission, not confirmation. Keep observing the live turn.
-        if (!response.ok || response.status === 202) {
-          await response.body?.cancel();
-          throw new Error('Stop not confirmed');
-        }
-        if (response.status !== 204) {
-          const receipt = await response.json();
-          if (!receipt || (receipt.ok !== true && receipt.stopped !== true) || receipt.ok === false || receipt.stopped === false ||
-              (receipt.stream_id && receipt.stream_id !== targetStreamId)) throw new Error('Invalid stop receipt');
-        }
-      }
+    const attempt = { request: targetRequest, at: Date.now(), historyFloor: lastHistorySeq, run: targetRun, confirmed: false, confirm: () => {} };
+    attempt.confirm = () => {
+      if (attempt.confirmed) return;
+      attempt.confirmed = true;
       if (stopNotice && stopNotice.streamId === targetStreamId) {
-        stopNotice.message.text = "服务端已确认停止本轮处理。";
-        stopNotice.message.retry = undefined;
+        removeMessage(stopNotice.message);
         stopNotice = undefined;
       }
       // A late acknowledgement must not abort a newer reader/turn.
@@ -2510,11 +2511,48 @@ function createStreamRuntime(state: any, options: any): any {
       if (!targetStreamId) {
         addMessage("system", "已取消本次等待；尚未取得执行标识，服务端是否已接收消息仍待核对。");
       }
+      changed();
+    };
+    stopAttempt = attempt;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    state.stopping = true;
+    changed();
+    try {
+      if (targetStreamId) {
+        const response = await fetch(apiUrl("/api/stop"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ stream_id: targetStreamId }),
+          signal: controller.signal,
+        });
+        // 202 is only admission, not confirmation. Keep observing the live turn.
+        if (!response.ok || response.status === 202) {
+          await response.body?.cancel();
+          throw new Error('Stop not confirmed');
+        }
+        if (response.status !== 204) {
+          const rawReceipt = await response.text();
+          traceNetwork('stop-response', {contentType: response.headers.get('content-type'), length: rawReceipt.length});
+          // Deployed Heart returns an empty 200 after stopping the breath.
+          // JSON receipts still require an explicit positive acknowledgement;
+          // a 202 or an arbitrary non-JSON body must never imply success.
+          if (rawReceipt.trim() || response.status !== 200) {
+            const receipt = JSON.parse(rawReceipt);
+            if (!receipt || (receipt.ok !== true && receipt.stopped !== true) || receipt.ok === false || receipt.stopped === false ||
+                (receipt.stream_id && receipt.stream_id !== targetStreamId)) throw new Error('Invalid stop receipt');
+          }
+        }
+      }
+      attempt.confirm();
     } catch {
-      if (sameTurn()) {
+      for (const item of state.items) if (item.stopMarker) acceptStopMarker(item);
+      if (!attempt.confirmed && sameTurn()) {
         const notice = stopNotice && stopNotice.streamId === targetStreamId ? stopNotice.message
-          : addMessage("system", "停止未确认，任务可能仍在执行。你可以再次停止；客户端将继续接收进展。");
+          : addMessage("system", "停止尚未确认，仍在接收回复");
         stopNotice = { streamId: targetStreamId, message: notice };
+        notice.notice = "stop";
+        notice.statusRunId = targetRun?.id;
         notice.retryLabel = "再次停止";
         notice.retry = async () => {
           if (sameTurn()) await stopCurrentTurn();
@@ -2878,7 +2916,7 @@ function createStreamRuntime(state: any, options: any): any {
         : cleanContent(role === "user" ? stripSceneTransition(stripClientMessageContext(message.content)) : message.content);
       if (!text) continue;
       const item = isHistoryMarker(message)
-        ? { ...identity, kind: "separator", id: `marker-${options.nextId()}`, marker: true, handoffMarker: /^\[breath yielded/i.test(message.content || ''), text }
+        ? { ...identity, kind: "separator", id: `marker-${options.nextId()}`, marker: true, handoffMarker: /^\[breath yielded/i.test(message.content || ''), stopMarker: /^\[breath interrupted/i.test(message.content || ''), text }
         : { ...identity, kind: "message", id: `message-${options.nextId()}`, role, text,
             streaming: false, label: role === "user" ? "you" : beingName, consecutive: false };
       // Insert old records in sequence order without rebuilding live bubbles,
@@ -2889,6 +2927,7 @@ function createStreamRuntime(state: any, options: any): any {
             (existing.createdAt ?? existing.start ?? Infinity) >= identity.createdAt));
       state.items.splice(index < 0 ? state.items.length : index, 0, item);
       orderHistoryItem(item);
+      if ('stopMarker' in item && item.stopMarker) options.onStopMarker?.(item);
       options.restoredHistory?.add(item);
       present.add(message.seq);
       added = true;
@@ -3179,14 +3218,22 @@ function createStreamRuntime(state: any, options: any): any {
   async function checkActiveStream() {
     const epoch = writerEpoch;
     try {
-      const res =
-        (await takePrefetch("active")) ||
+      const prefetched = await takePrefetch("active");
+      const res = prefetched ||
         (await fetch(apiUrl("/api/stream/active"), {
           cache: "no-store",
           signal: timeoutSignal(8000),
         }));
       if (!res || res.status === 204 || !res.ok) return;
-      const data = await res.json();
+      let data = await res.json();
+      // Startup loads history after requesting this snapshot. A reply can finish
+      // between the two responses: replaying that older buffer would briefly
+      // duplicate the answer already restored from history.
+      if (prefetched && !data.finished && state.items.some((item: any) => item.kind === 'message' && item.role === 'being' && item.historySeq)) {
+        const fresh = await fetch(apiUrl('/api/stream/active'), {cache: 'no-store', signal: timeoutSignal(8000)});
+        if (fresh.status === 204) return;
+        if (fresh.ok) data = await fresh.json();
+      }
       // A local send or another recovery may have taken ownership while the
       // discovery request was in flight. Do not replace that newer transport.
       if (disposed || epoch !== writerEpoch || isStreaming) return;
@@ -3306,7 +3353,14 @@ function createStreamRuntime(state: any, options: any): any {
     }
 
     const visibleText = cleanContent(streamText);
-    if (visibleText && !streamMessage) streamMessage = addMessage("being", visibleText, true);
+    // Replay consumes a whole buffer synchronously. Flush its final text before
+    // polling takes a new writer epoch and invalidates the queued render frame.
+    // Otherwise only the first token is visible until another network event.
+    if (renderTimer) { cancelAnimationFrame(renderTimer); renderTimer = null; }
+    if (visibleText) {
+      if (streamMessage) updateMessage(streamMessage, visibleText);
+      else streamMessage = addMessage("being", visibleText, true);
+    }
 
     setStatus("thinking");
     if (toolCount > 0) {
@@ -3704,6 +3758,7 @@ function createStreamRuntime(state: any, options: any): any {
     activeAutonomousOrigin: () => isStreaming && !autonomousHandedOff ? autonomousOrigin : undefined,
     autonomousPhase: () => livePhase === "tool" ? "working" : livePhase === "text" ? "replying" : "thinking",
     settleHistoryReply: () => { if (pendingReplyArrived()) finishPendingReply(); },
+    acceptStopMarker,
     captureActivity,
     reconcileActivity,
     discoverActiveStream,

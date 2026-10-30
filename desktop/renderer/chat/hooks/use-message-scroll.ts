@@ -120,6 +120,19 @@ export function useMessageScroll(items: ChatItem[], container: RefObject<HTMLDiv
       releaseAnchor(); scrollLock.current = false; remember();
     },
     onTouchMove() { releaseAnchor(); scrollLock.current = false; remember(); },
-    onScroll() { compensate(); remember(); const el = container.current; if (el && el.clientWidth) scrollLock.current = el.scrollHeight - el.scrollTop - el.clientHeight <= 2; publish(); },
+    onScroll() {
+      const el = container.current;
+      const savedTop = reading.current?.scrollTop;
+      // A programmatic scroll event can arrive after the next content update.
+      // A new bottom gap alone is not evidence that the reader scrolled away.
+      const moved = el && savedTop !== undefined && Math.abs(el.scrollTop - savedTop) > 0.5;
+      compensate();
+      remember();
+      if (el && el.clientWidth) {
+        if (el.scrollHeight - el.scrollTop - el.clientHeight <= 2) scrollLock.current = true;
+        else if (moved) scrollLock.current = false;
+      }
+      publish();
+    },
   };
 }

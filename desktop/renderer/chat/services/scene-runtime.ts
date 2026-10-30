@@ -466,6 +466,9 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
       selectedScene: () => state.currentScene,
       activeAutonomousOrigin: () => [...sessions.values()].map(s => s.runtime?.activeAutonomousOrigin?.()).find(Boolean),
       restoredHistory,
+      onStopMarker(marker: any) {
+        for (const target of sessions.values()) target.runtime?.acceptStopMarker?.(marker);
+      },
       routeEvent(type: any, data: any, settled = false) {
         if (!Object.hasOwn(data, "scene_id")) return false;
         const scene = messageScene(data);

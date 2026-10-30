@@ -17,11 +17,12 @@ afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks(
 async function fixture() {
   let stream!: ReadableStreamDefaultController<Uint8Array>, signal!: AbortSignal;
   let active: any = null, sends = 0;
+  const history: any[] = [];
   let stop: (signal: AbortSignal) => Promise<Response> = async () => Response.json({ ok: true });
   const fetcher = vi.fn(async (input: string, init?: RequestInit) => {
     const url = new URL(input);
     if (url.pathname === '/health') return new Response('OK fixture');
-    if (url.pathname === '/api/history') return Response.json({ messages: [] });
+    if (url.pathname === '/api/history') return Response.json({ messages: history });
     if (url.pathname === '/api/stream/active') return active ? Response.json(active) : new Response(null, { status: 204 });
     if (url.pathname === '/api/stop') return stop(init!.signal!);
     if (url.pathname === '/api/chat/stream') {
@@ -39,7 +40,7 @@ async function fixture() {
   vi.stubGlobal('fetch', fetcher);
   const state = new ChatState(), runtime = createChatRuntime(state);
   await runtime.start();
-  return { state, runtime, fetcher,
+  return { state, runtime, fetcher, history,
     signal: () => signal,
     setStop: (handler: typeof stop) => { stop = handler; },
     setActive: (value: any) => { active = value; },
@@ -162,5 +163,65 @@ it('records a confirmed stop when the server closes SSE before sending its recei
     resolve(Response.json({ ok: true })); await pending;
     expect(f.state.streaming).toBe(false);
     expect(f.state.items.find(item => item.kind === 'run')).toMatchObject({ outcome: 'stopped', status: 'stopped', label: '已停止' });
+  } finally { f.runtime.dispose(); }
+});
+
+it.each(['same-scene', 'other-scene', 'old-marker'])('reconciles an unconfirmed stop from a %s durable marker', async kind => {
+  const f = await fixture();
+  try {
+    await f.runtime.send('stop with lost receipt');
+    await vi.advanceTimersByTimeAsync(20);
+    f.emit('content_block_delta', {delta:{text:'partial answer'}});
+    await vi.advanceTimersByTimeAsync(20);
+    f.setStop(async () => Response.json({accepted:true}, {status:202}));
+    const requestedAt = Date.now();
+    await f.runtime.stopCurrentTurn();
+    expect(f.state.items.some(item=>item.kind==='message' && item.notice==='stop')).toBe(true);
+    f.history.push({seq:1,role:'system',from:'system',type:'marker',content:'[breath interrupted]',
+      scene_id:kind==='other-scene'?'other':'room',at:new Date(requestedAt-(kind==='old-marker'?60000:0)).toISOString()});
+    await f.runtime.refreshHistory();
+    await vi.advanceTimersByTimeAsync(20);
+    if(kind==='same-scene') {
+      expect(f.state.streaming).toBe(false);
+      expect(f.state.items.some(item=>item.kind==='message' && item.notice==='stop')).toBe(false);
+      expect(f.state.items.find(item=>item.kind==='run')).toMatchObject({status:'stopped',waitingForReply:false,stopHistorySeq:1});
+    } else {
+      expect(f.signal().aborted).toBe(false);
+      expect(f.state.items.some(item=>item.kind==='message' && item.notice==='stop')).toBe(true);
+    }
+  } finally {f.runtime.dispose();}
+});
+
+it.each([200, 204])('accepts the deployed empty HTTP %s stop acknowledgement', async status => {
+  const f = await fixture();
+  try {
+    await f.runtime.send('stop'); await vi.advanceTimersByTimeAsync(20);
+    f.setStop(async()=>new Response(null,{status}));
+    await f.runtime.stopCurrentTurn(); await vi.advanceTimersByTimeAsync(20);
+    expect(f.signal().aborted).toBe(true);
+    expect(f.state.streaming).toBe(false);
+    expect(f.state.items.some(item=>item.kind==='message' && item.notice==='stop')).toBe(false);
+    expect(f.state.items.find(item=>item.kind==='run')).toMatchObject({status:'stopped'});
+    expect(f.state.items.filter(item=>item.kind==='run')).toHaveLength(1);
+  } finally {f.runtime.dispose();}
+});
+
+it.each(['before', 'after'])('deduplicates stop history arriving %s the HTTP receipt', async order => {
+  const f = await fixture();
+  let resolve!: (response: Response) => void;
+  try {
+    await f.runtime.send('stop'); await vi.advanceTimersByTimeAsync(20);
+    f.emit('content_block_delta', {delta:{text:'partial answer'}});
+    await vi.advanceTimersByTimeAsync(20);
+    f.setStop(() => new Promise(done => { resolve = done; }));
+    const requestedAt = Date.now(), pending = f.runtime.stopCurrentTurn();
+    await vi.advanceTimersByTimeAsync(0);
+    if (order === 'after') { resolve(new Response(null,{status:200})); await pending; }
+    f.history.push({seq:1,role:'system',from:'system',type:'marker',content:'[breath interrupted]',scene_id:'room',at:new Date(requestedAt).toISOString()});
+    await f.runtime.refreshHistory();
+    if (order === 'before') { resolve(new Response(null,{status:200})); await pending; }
+    await vi.advanceTimersByTimeAsync(20);
+    expect(f.state.items.find(item=>item.kind==='run')).toMatchObject({status:'stopped',stopHistorySeq:1});
+    expect(f.state.items.filter(item=>item.kind==='run')).toHaveLength(1);
   } finally { f.runtime.dispose(); }
 });

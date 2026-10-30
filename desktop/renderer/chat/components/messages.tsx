@@ -56,17 +56,18 @@ function ToolDetails({ entry, expanded }: { entry: ActivityEntry; expanded: bool
     </details>}
   </>;
 }
-export function ChatActivity({ run, sceneLabel, showDetails = true }: { run: Run; sceneLabel?: string; showDetails?: boolean }) {
+export function ChatActivity({ run, sceneLabel, showDetails = true, showProgress = true }: { run: Run; sceneLabel?: string; showDetails?: boolean; showProgress?: boolean }) {
   if (showDetails) return <DetailedChatActivity run={run} sceneLabel={sceneLabel} />;
   const status = run.status || run.outcome || "thinking";
-  const attention = ["error", "timeout", "stopped"].includes(status);
+  const attention = ["error", "timeout", "stopped"].includes(status) && (status !== "stopped" || !run.stopHistorySeq);
   const artifacts = [...new Set(run.entries.flatMap(entry => entry.artifactPath ? [entry.artifactPath] : []))];
   return <>
-    {(!run.end || attention) && <div className={`quiet-activity${attention ? " needs-attention" : ""}`} data-status={status}>
-      <div className="thinking-bubble" role="status" aria-label={CHAT_SCENE_ACTIVITY_LABELS[status]}>
+    {((!run.end && showProgress) || attention) && <div className={`quiet-activity${attention ? " needs-attention" : ""}`} data-status={status}>
+      {!attention && sceneLabel && <span className="quiet-activity-scene">{sceneLabel}</span>}
+      <div className={attention ? "quiet-activity-status-icon" : "thinking-bubble"} role="status" aria-label={CHAT_SCENE_ACTIVITY_LABELS[status]}>
         {attention ? <Icon name={status === "stopped" ? "stop" : "error"} /> : <span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span>}
       </div>
-      {sceneLabel && <span className="quiet-activity-scene">{sceneLabel}</span>}
+      {attention && sceneLabel && <span className="quiet-activity-scene">{sceneLabel}</span>}
       {attention && <span className="quiet-activity-notice">{run.hint || run.label}</span>}
     </div>}
     {artifacts.length > 0 && <div className="run-artifacts" aria-label="生成的文件">

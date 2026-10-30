@@ -52,6 +52,8 @@ export interface Message extends MessageScene {
   attachmentUploads?: {name:string; size:number; mime?:string; blob?:Blob; progress?: import('../services/attachment-transfer').UploadProgress}[];
   retry?: () => void | Promise<void>;
   retryLabel?: string;
+  notice?: 'stop';
+  statusRunId?: string;
   queued?: boolean;
   queueNotice?: string;
   cancelQueued?: () => void;
@@ -100,12 +102,13 @@ export interface Run extends MessageScene {
   status?: import("../../../shared/types").ChatSceneActivity;
   scheduling?: { hint: string; tasks: import("../../../shared/types").SceneTask[] };
   synthetic?: boolean;
+  stopHistorySeq?: number;
   outcome?: "stopped" | "error" | "timeout" | "done";
 }
 export type ChatItem =
   | Message
   | Run
-  | ({ kind: "separator"; id: string; text: string; marker?: boolean; handoffMarker?: boolean } & MessageScene);
+  | ({ kind: "separator"; id: string; text: string; marker?: boolean; handoffMarker?: boolean; stopMarker?: boolean } & MessageScene);
 export interface Preset {
   base_url?: string;
   api?: string;
