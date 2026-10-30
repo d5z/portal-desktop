@@ -645,17 +645,17 @@ async function ready() {
       await portal.stop();
       try {
         await background.enable(store.settings, store.connection);
-        if (replacing) await new RuntimeUpdater(directory, background).waitReady(background.installedService!);
+        await new RuntimeUpdater(directory, background).waitReady(background.installedService!);
       } catch (error) {
-        // A failed takeover stays stopped; never resurrect the old supervisor.
-        if (replacing) await background.disable();
+        // A failed readiness check must not leave a retrying guardian behind.
+        await background.disable();
         throw error;
       }
       await publishBackground();
     } else {
       if (background.state.enabled) await background.disable();
       await portal.start(store.settings, store.connection);
-      if (replacing) await portal.waitReady();
+      await portal.waitReady();
     }
   };
   const publishCurrentPortal = async () => { if (takeover.holdMessage || !portal.managing) await publishBackground(); };
@@ -749,6 +749,8 @@ async function ready() {
     if (input.subagentSetup) validateSubagentSetup(input.subagentSetup);
     cancelTownPairing?.();
     const previous = { ...store.settings }; const previousConnection = store.connection;
+    // A pending grant belongs to the old workspace/connection as well as its mode.
+    approvalDialogs.cancel();
     await store.save(input);
     try {
       await verifyConnection();
@@ -926,7 +928,8 @@ async function ready() {
                 await portal.start(store.settings, connection);
                 await portal.waitReady();
               },
-                runtimeUpdate.phase === 'updated' || Boolean(installIntent));
+                true);
+              if (store.settings.backgroundEnabled) await updater.waitReady(background.installedService!);
               if (installIntent) await finishClientInstall();
             }
             await publishCurrentPortal();
@@ -936,14 +939,9 @@ async function ready() {
           await store.save({ ...store.settings, portalBinary: bundledBinary });
           runtimeUpdate = { phase: 'current', message: '已选择随客户端附带的 Portal，下次启动按原配置运行。', portalVersion: bundle.portalVersion };
         }
-        if (installIntent || store.settings.backgroundEnabled || store.settings.autoStart) {
-          if (store.settings.backgroundEnabled) {
-            await background.enable(store.settings, connection); await publishBackground();
-          } else {
-            await portal.start(store.settings, connection);
-            if (installIntent) await portal.waitReady();
-          }
-        }
+        // Opening the client starts its Portal. Login startup and keeping it
+        // alive after the client exits are separate preferences.
+        await startClientPortal(false);
         if (installIntent) await finishClientInstall();
       });
       await publishCurrentPortal();

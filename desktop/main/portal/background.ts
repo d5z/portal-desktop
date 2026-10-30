@@ -353,7 +353,14 @@ if ([string]$t.State -eq 'Running' -and (Test-Path -LiteralPath $pidFile)) {
     const signature = fingerprint(settings, connection);
     const previous = this.service;
     if (previous?.existing || previous?.kind === 'portable') throw new Error('请先停止旧 Portal，再启动客户端 Portal。');
-    if (previous && previous.fingerprint === signature) {
+    // Settings can stay identical while a development rebuild replaces the engine.
+    // Compare the actual installed copy, including services written by older clients.
+    const sourceBytes = await readFile(settings.portalBinary);
+    const installedBytes = previous && previous.fingerprint === signature
+      ? await readFile(path.join(previous.root, this.platform === 'win32' ? 'heart-portal.exe' : 'heart-portal'))
+        .catch((error: NodeJS.ErrnoException) => { if (error.code === 'ENOENT') return null; throw error; })
+      : null;
+    if (previous && installedBytes?.equals(sourceBytes)) {
       await this.load(previous); return this.refresh();
     }
     await access(settings.portalBinary, this.platform === 'win32' ? constants.F_OK : constants.X_OK);
@@ -369,6 +376,7 @@ if ([string]$t.State -eq 'Running' -and (Test-Path -LiteralPath $pidFile)) {
     try {
       const binary = path.join(root, this.platform === 'win32' ? 'heart-portal.exe' : 'heart-portal');
       await copyFile(settings.portalBinary, binary); await chmod(binary, 0o700);
+      if (!(await readFile(binary)).equals(sourceBytes)) throw new Error('Portal 引擎在启动准备期间发生变化，请重试。');
       const config = settings.portalConfigPath || path.join(root, 'portal.toml');
       service.configPath = config; service.generatedConfig = !settings.portalConfigPath; service.cwd = settings.workspace;
       if (!settings.portalConfigPath) await atomic(config, portalConfig(settings));

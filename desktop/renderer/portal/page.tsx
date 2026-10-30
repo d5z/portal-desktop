@@ -132,14 +132,14 @@ export function Portal({ model }: { model: AppModel }) {
           <div>
             <span>▱</span>
             <strong>文件与搜索</strong>
-            <small>{snapshot?.settings.permissionMode === 'read-only' ? '仅允许读取选定工作目录' : '读写选定的工作目录'}</small>
+            <small>{snapshot?.settings.permissionMode === 'read-only' ? '旧版只读限制' : snapshot?.settings.permissionMode === 'full-access' ? '使用系统账户权限读写文件' : '读取普通文件；工作区外编辑需批准'}</small>
           </div>
           <div>
             <span>⌘</span>
             <strong>命令执行</strong>
             <small id="exec-label">
               {!snapshot?.settings.allowExec ? '未启用' : snapshot.settings.permissionMode === 'read-only'
-                ? '只读模式下禁止' : snapshot.settings.permissionMode === 'full-access' ? '已允许本机命令' : '每次执行需要审批'}
+                ? '只读模式下禁止' : snapshot.settings.permissionMode === 'full-access' ? '已允许本机命令' : '沙箱内直接执行，突破沙箱需批准'}
             </small>
           </div>
           <div>

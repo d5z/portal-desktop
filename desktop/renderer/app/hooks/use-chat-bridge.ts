@@ -18,7 +18,7 @@ export function useChatBridge(
     };
   }, [app, frame]);
   useEffect(() => {
-    app.post({ type: 'beings:permission-state', mode: app.snapshot?.settings.permissionMode ?? 'supervised', open: app.permissionSettingsOpen,
+    app.post({ type: 'beings:permission-state', mode: app.snapshot?.settings.permissionMode ?? 'auto-review', open: app.permissionSettingsOpen,
       revision: new URL(frame.current?.src || 'https://invalid').searchParams.get('revision') });
   }, [app, frame, app.snapshot?.settings.permissionMode, app.permissionSettingsOpen, app.chatSource]);
   useEffect(() => {
@@ -171,7 +171,7 @@ export function useChatBridge(
         return;
       }
       if (message.type === 'beings:permission-state-request') {
-        app.post({ type: 'beings:permission-state', mode: app.snapshot?.settings.permissionMode ?? 'supervised', open: app.permissionSettingsOpen, revision: message.revision });
+        app.post({ type: 'beings:permission-state', mode: app.snapshot?.settings.permissionMode ?? 'auto-review', open: app.permissionSettingsOpen, revision: message.revision });
         return;
       }
       if (message.type === 'beings:permission-dismiss') { app.closePermissionSettings(); return; }

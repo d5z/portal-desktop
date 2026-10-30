@@ -239,7 +239,7 @@ it.skipIf(process.platform === 'win32')('shows terminal startup failure and expl
 
 it.skipIf(process.platform === 'win32')('rebuilds background policy on every permission change and reuses equivalent default settings', async () => {
   const f = await fixture();
-  for (const mode of ['full-access', 'read-only', 'supervised'] as const) {
+  for (const mode of ['full-access', 'read-only', 'supervised', 'auto-review'] as const) {
     const previousRoot = f.service.installedService?.root;
     await f.service.enable({ ...f.settings, permissionMode: mode }, f.connection);
     const service = f.service.installedService!;
@@ -247,7 +247,27 @@ it.skipIf(process.platform === 'win32')('rebuilds background policy on every per
     expect(await readFile(path.join(service.root, 'run.sh'), 'utf8')).toContain(`'--permission-mode' '${mode}'`);
     expect(await readFile(service.configPath!, 'utf8')).toContain(`permission_mode = "${mode}"`);
   }
-  const supervisedRoot = f.service.installedService!.root;
+  const defaultRoot = f.service.installedService!.root;
   await f.service.enable(f.settings, f.connection);
-  expect(f.service.installedService!.root).toBe(supervisedRoot);
+  expect(f.service.installedService!.root).toBe(defaultRoot);
+});
+
+it('replaces a stale or missing background engine at the same source path before reusing settings', async () => {
+  const f = await fixture();
+  const binary = path.join(f.root, 'source-engine');
+  await writeFile(binary, 'old-engine');
+  const settings = { ...f.settings, portalBinary: binary, permissionMode: 'auto-review' as const };
+  await f.service.enable(settings, f.connection);
+  const original = f.service.installedService!.root;
+  await writeFile(binary, 'new-engine');
+  await f.service.enable(settings, f.connection);
+  const updated = f.service.installedService!.root;
+  expect(updated).not.toBe(original);
+  expect(await readFile(path.join(updated, 'heart-portal'), 'utf8')).toBe('new-engine');
+  await f.service.enable(settings, f.connection);
+  expect(f.service.installedService!.root).toBe(updated);
+  await rm(path.join(updated, 'heart-portal'));
+  await f.service.enable(settings, f.connection);
+  expect(f.service.installedService!.root).not.toBe(updated);
+  expect(await readFile(path.join(f.service.installedService!.root, 'heart-portal'), 'utf8')).toBe('new-engine');
 });

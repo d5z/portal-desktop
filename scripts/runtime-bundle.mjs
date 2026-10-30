@@ -2,9 +2,11 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
+import { checkPortalCapabilities } from './portal-capabilities.mjs';
 const sha = bytes => createHash('sha256').update(bytes).digest('hex');
 export async function writeRuntimeBundle() {
   const binary = path.resolve('resources', process.platform === 'win32' ? 'heart-portal.exe' : 'heart-portal');
+  checkPortalCapabilities(binary);
   const pkg = JSON.parse(await readFile('package.json', 'utf8'));
   const portalVersion = /\b(\d+\.\d+\.\d+)\b/.exec(execFileSync(binary, ['--version'], { encoding: 'utf8', timeout: 15000 }))?.[1];
   if (!portalVersion) throw new Error('Cannot identify bundled Portal');

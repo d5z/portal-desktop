@@ -473,22 +473,7 @@ export function ConnectionSettings({ model }: { model: AppModel }) {
                 }
               />
             </label>
-            <label>
-              <span>
-                <strong>仅随客户端启动 Portal</strong>
-                <small>未启用后台常驻时生效，退出客户端后停止</small>
-              </span>
-              <input
-                id="autostart-input"
-                type="checkbox"
-                role="switch"
-                checked={Boolean(form?.autoStart)}
-                disabled={Boolean(form?.backgroundEnabled)}
-                onChange={(event) =>
-                  app.editForm("autoStart", event.target.checked)
-                }
-              />
-            </label>
+            <p id="portal-startup-help">打开客户端时自动启动 Portal；未启用后台常驻时，退出客户端后停止。</p>
             <label>
               <span>
                 <strong>允许命令执行</strong>
@@ -507,7 +492,7 @@ export function ConnectionSettings({ model }: { model: AppModel }) {
             <label>
               <span>
                 <strong>启用 Kits 与自定义工具</strong>
-                <small>默认开启，与 Portal 一同加载已安装的扩展和工具配置</small>
+                <small>允许调用已安装的扩展和工具</small>
               </span>
               <input
                 id="kits-input"
@@ -520,8 +505,8 @@ export function ConnectionSettings({ model }: { model: AppModel }) {
               />
             </label>
             <section className="permission-settings-section"><div className="permission-section-heading"><strong>工作权限</strong><small>主助手与子代理共用</small></div>
-              <PermissionPicker value={form?.permissionMode ?? 'supervised'} onChange={mode => app.editForm('permissionMode', mode)}/>
-              <p className="permission-note">Windows 安全协作使用系统命令沙箱。联网与扩展操作单独审批；其他平台不会自动回退为无沙箱命令。</p>
+              <PermissionPicker value={form?.permissionMode ?? 'auto-review'} onChange={mode => app.editForm('permissionMode', mode)}/>
+              <p className="permission-note">仅适用于 Portal 调用，主助手和子代理共用。</p>
             </section>
             <div className="subagent-switch-row">
               <label htmlFor="subagent-enabled-input">

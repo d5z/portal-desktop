@@ -34,6 +34,7 @@
     "test:windows-upgrade": "powershell.exe -NoProfile -ExecutionPolicy Bypass -File scripts/test-windows-upgrade.ps1",
     "test:taskbar-icons": "node tests/taskbar-icons-native.mjs",
     "test:town-sdk": "node tests/town-sdk.mjs",
+    "test:portal-permissions": "node tests/portal-permissions-native.mjs",
     "test:notifications": "node tests/notifications-electron.mjs",
     "test:menu-keyboard": "node tests/menu-keyboard.mjs",
     "test:logs-ui": "npm run build:chat && node tests/logs-electron.mjs",

@@ -64,7 +64,7 @@ try {
   // An explicit profile must not import a real Being's global Portal config.
   app = await launchDesktop({ executablePath: await desktopExecutable(), timeout: 30_000,
     env: { ...process.env, PORTAL_DESKTOP_USER_DATA: path.join(temporary, 'profile') } });
-  const page = await app.firstWindow();
+  let page = await app.firstWindow();
   await page.waitForFunction(() => Boolean(window.beings));
   const defaults = (await page.evaluate(() => window.beings.snapshot())).settings;
   assert.equal(defaults.allowExec, true); assert.equal(defaults.kitsEnabled, true);
@@ -75,6 +75,26 @@ try {
   }, { connectionLink: `http://127.0.0.1:${server.address().port}/fixture/?token=${token}`, workspace: path.join(temporary, '中文 workspace') });
   const state = async () => (await page.evaluate(() => window.beings.snapshot())).portal;
   await until(async () => (await state()).phase === 'connected');
+  // Login startup/background retention must not suppress starting Portal when
+  // the user explicitly opens the client with an existing connection.
+  const beforeReopen = handshakes;
+  const previousPid = (await state()).pid;
+  await app.close(); app = undefined;
+  await until(async () => { try { process.kill(previousPid,0); return false; } catch { return true; } });
+  app = await launchDesktop({ executablePath: await desktopExecutable(), timeout: 30_000,
+    env: { ...process.env, PORTAL_DESKTOP_USER_DATA: path.join(temporary, 'profile') } });
+  page = await app.firstWindow();
+  await page.waitForFunction(() => Boolean(window.beings));
+  await until(async () => (await state()).phase === 'connected');
+  const reopened = await page.evaluate(() => window.beings.snapshot());
+  assert.equal(reopened.settings.autoStart,false); assert.equal(reopened.settings.backgroundEnabled,false);
+  assert.equal(reopened.portal.managed,true); assert.notEqual(reopened.portal.pid,previousPid);
+  assert(handshakes > beforeReopen);
+  assert.equal([...wss.clients].filter(socket=>socket.readyState===1).length,1,'Only one Portal may own the test Being');
+  const ownedPid = reopened.portal.pid;
+  await app.evaluate(({app})=>app.emit('second-instance',{},['portal-desktop.exe']));
+  assert.equal((await state()).pid,ownedPid,'Opening an existing client must reuse its Portal');
+  console.log('PASS: reopening a foreground-only client starts its bundled Portal without enabling login/background startup or creating duplicate engines.');
   const connected = await state();
   const pid = connected.pid;
   const startupSettings = (await page.evaluate(() => window.beings.snapshot())).settings;
@@ -98,6 +118,7 @@ try {
     globalThis.loomTargets = [];
     shell.openExternal = async url => { globalThis.loomTargets.push(url); };
   });
+  await waitForChatReady(page);
   await page.locator('#options-trigger').click();
   await page.screenshot({ path: path.join(os.tmpdir(), 'beings-open-loom.png') });
   await page.locator('#options-help').click();
@@ -121,8 +142,9 @@ try {
   await app.evaluate(({ app }) => { app.emit('activate'); });
   assert.equal(await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0].isVisible()), true);
   assert.equal(await page.evaluate(() => document.body.dataset.lifecycleDraft), '保留窗口状态');
+  const beforeReconnect = handshakes;
   relay.terminate();
-  await until(() => handshakes >= 2);
+  await until(() => handshakes > beforeReconnect);
   await until(async () => (await state()).phase === 'connected');
   assert.equal((await state()).pid, pid, 'network reconnect must not restart Portal');
   await rpc('ping');

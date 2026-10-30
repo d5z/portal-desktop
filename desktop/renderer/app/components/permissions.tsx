@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Dialog } from '../../shared/components/dialog';
-import { PermissionIcon, permissionChoices } from '../../shared/components/permission-picker';
+import { PermissionIcon, choicesFor } from '../../shared/components/permission-picker';
 import type { AppModel } from '../models/app';
 import type { PermissionMode, ToolApprovalView } from '../../../shared/security';
 
@@ -8,7 +8,7 @@ export function PermissionSettings({ app }: { app: AppModel }) {
   const menu = useRef<HTMLDivElement>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const mode = app.snapshot?.settings.permissionMode ?? 'supervised';
+  const mode = app.snapshot?.settings.permissionMode ?? 'auto-review';
   useLayoutEffect(() => {
     const element = menu.current!;
     if (!app.permissionSettingsOpen) { if (element.matches(':popover-open')) element.hidePopover(); return; }
@@ -37,7 +37,6 @@ export function PermissionSettings({ app }: { app: AppModel }) {
     catch (e) { setError(e instanceof Error ? e.message : '无法应用权限设置'); }
     finally { setBusy(false); }
   };
-  const details = { 'read-only': '查看文件，不修改或执行命令', supervised: '允许工作区编辑，执行命令前询问', 'full-access': '不再询问，使用本机权限执行' };
   return <div ref={menu} popover="auto" role="menu" aria-label="工作权限" aria-busy={busy} className="permission-menu"
     onToggle={event => { if (event.newState === 'closed' && app.permissionSettingsOpen) app.closePermissionSettings(); }}
     onKeyDown={event => {
@@ -49,10 +48,10 @@ export function PermissionSettings({ app }: { app: AppModel }) {
       const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
       items[next].focus();
     }}>
-    <div className="permission-menu-heading">工作权限</div>
-    {permissionChoices.map(choice => <button key={choice.value} type="button" role="menuitemradio" aria-checked={choice.value === mode}
+    <div className="permission-menu-heading">Portal 调用权限</div>
+    {choicesFor(mode).map(choice => <button key={choice.value} type="button" role="menuitemradio" aria-checked={choice.value === mode}
       tabIndex={choice.value === mode ? 0 : -1} data-mode={choice.value} disabled={busy || !app.snapshot?.settings.hasToken} onClick={() => void apply(choice.value)}>
-      <PermissionIcon kind={choice.icon}/><span className="permission-menu-copy"><strong>{choice.title}</strong><small>{details[choice.value]}</small></span>
+      <PermissionIcon kind={choice.icon}/><span className="permission-menu-copy"><strong>{choice.title}</strong><small>{choice.detail}</small></span>
       <span className="permission-menu-check" aria-hidden="true">{choice.value === mode ? '✓' : ''}</span>
     </button>)}
     <div className="permission-menu-note" role="status">{busy ? '正在切换…' : '切换会重启运行时，中断当前本机任务'}</div>

@@ -84,6 +84,15 @@ try {
   result = run("if ($env:PORTAL_SANDBOX_TEST_SECRET) { exit 17 }; Write-Output 'clean-env'", true);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /clean-env/);
+  for (const secret of ['.aws/credentials','.azure/accessTokens.json','.gnupg/private.key','auth.json']) {
+    const target = path.join(root,secret); mkdirSync(path.dirname(target),{recursive:true}); writeFileSync(target,'DUMMY_CREDENTIAL');
+    const quoted = "'" + secret.replaceAll("'", "''") + "'";
+    const denied = run(`$ErrorActionPreference='Stop'; Get-Content -LiteralPath ${quoted}`,true);
+    assert.notEqual(denied.status,0,`${secret} must be unreadable`);
+    assert.doesNotMatch(denied.stdout,/DUMMY_CREDENTIAL/);
+    assert.notEqual(run(`$ErrorActionPreference='Stop'; Set-Content -LiteralPath ${quoted} changed`,true).status,0);
+    assert.equal(readFileSync(target,'utf8'),'DUMMY_CREDENTIAL');
+  }
   result = run(`$client = $null; try { $client = New-Object Net.Sockets.TcpClient -ErrorAction Stop; $task = $client.ConnectAsync('127.0.0.1', ${server.address().port}); if ($task.Wait(3000) -and $client.Connected) { exit 18 }; Write-Output 'network-blocked' } catch { Write-Output 'network-blocked' } finally { if ($client) { $client.Dispose() } }`, true);
   assert.equal(result.status, 0, result.stderr);
   assert.match(result.stdout, /network-blocked/);

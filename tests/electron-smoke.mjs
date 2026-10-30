@@ -417,7 +417,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
     await reopened.screenshot({ path: 'test-results/background-portal.png' });
     await reopened.locator('#portal-settings').click();
     assert.equal(await reopened.locator('#background-input').isChecked(), true);
-    assert.equal(await reopened.locator('#autostart-input').isDisabled(), true);
+    assert.match(await reopened.locator('#portal-startup-help').textContent(), /打开客户端时自动启动 Portal/);
     await reopened.screenshot({ path: 'test-results/background-settings.png' });
     await reopened.locator('#close-settings').click();
     const stableHandshakes = handshakeCount;

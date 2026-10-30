@@ -1,5 +1,5 @@
 import { LocalFileAction, requestLocalFilePreview } from '../shared/components/local-file-link';
-import { PermissionIcon, permissionChoices } from '../shared/components/permission-picker';
+import { PermissionIcon, choicesFor } from '../shared/components/permission-picker';
 import { SbsControl } from "../shared/components/sbs-control";
 import {useHistoryWindow} from './hooks/use-history-window';
 import { AttachmentMessageContent, hasAttachmentMessage, originalMessageText } from "./components/message-content";
@@ -692,10 +692,10 @@ function ChatView({
           </div>
           {editingQueued && <div className="composer-editing-queue" role="status"><span>正在编辑排队消息</span><button type="button" onClick={() => { state.draft = ""; state.changed(); setEditingQueued(null); composer.current?.focus(); }}>取消编辑</button></div>}
           <div id="input-row">
-            {parent !== window && location.protocol === 'beings:' && <button type="button" className="btn-icon permission-quick-trigger" data-mode={state.permissionMode} title={`工作权限 · ${permissionChoices.find(choice => choice.value === state.permissionMode)?.title ?? '加载中'}`} aria-label="快捷设置工作权限" aria-haspopup="menu" aria-expanded={state.permissionMenuOpen} onClick={event => {
+            {parent !== window && location.protocol === 'beings:' && <button type="button" className="btn-icon permission-quick-trigger" data-mode={state.permissionMode} title={`工作权限 · ${choicesFor(state.permissionMode ?? 'auto-review').find(choice => choice.value === state.permissionMode)?.title ?? '加载中'}`} aria-label="快捷设置工作权限" aria-haspopup="menu" aria-expanded={state.permissionMenuOpen} onClick={event => {
               const rect = event.currentTarget.getBoundingClientRect();
               bridge.send({ type: 'beings:permission-settings', anchor: { left: rect.left, top: rect.top, bottom: rect.bottom } });
-            }}><PermissionIcon kind={permissionChoices.find(choice => choice.value === state.permissionMode)?.icon}/><span>{permissionChoices.find(choice => choice.value === state.permissionMode)?.title ?? '权限'}</span><svg className="permission-chevron" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></button>}
+            }}><PermissionIcon kind={choicesFor(state.permissionMode ?? 'auto-review').find(choice => choice.value === state.permissionMode)?.icon}/><span>{choicesFor(state.permissionMode ?? 'auto-review').find(choice => choice.value === state.permissionMode)?.title ?? '权限'}</span><svg className="permission-chevron" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></button>}
             <ChatComposer
               state={state}
               onExamples={openExamples}

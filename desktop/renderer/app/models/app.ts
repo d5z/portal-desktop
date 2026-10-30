@@ -756,7 +756,7 @@ export class AppModel extends Store {
       autoStart: s.autoStart,
       backgroundEnabled: Boolean(s.backgroundEnabled),
       allowExec: s.allowExec,
-      permissionMode: s.permissionMode ?? 'supervised',
+      permissionMode: s.permissionMode ?? 'auto-review',
       kitsEnabled: s.kitsEnabled,
       portalConfigPath: s.portalConfigPath,
       portalEnvironmentPath: s.portalEnvironmentPath,

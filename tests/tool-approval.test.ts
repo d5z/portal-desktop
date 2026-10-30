@@ -5,8 +5,8 @@ import { permissionMode, type PermissionMode } from '../desktop/shared/security'
 const request = { endpoint: 'https://fixture.test/being', verb: 'security-approve', sceneId: 'scene-a',
   args: JSON.stringify({ tool: 'portal_exec', arguments: { command: 'echo hello' }, workspace: 'D:\\work' }) };
 
-it('defaults to supervised and rejects unknown policy values', () => {
-  expect(permissionMode(undefined)).toBe('supervised');
+it('defaults to automatic review and rejects unknown policy values', () => {
+  expect(permissionMode(undefined)).toBe('auto-review');
   expect(() => permissionMode('auto-approve')).toThrow();
 });
 

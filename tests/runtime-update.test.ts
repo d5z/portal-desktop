@@ -207,7 +207,7 @@ for (const platform of ['darwin', 'win32'] as const) {
     });
     await restoreRuntimeMode(f.background, settings, start, true);
     expect(start).toHaveBeenCalledTimes(1);
-    // A later ordinary launch must respect the user's disabled startup option.
+    // A settings-only restoration (start=false) does not initiate a foreground process.
     await restoreRuntimeMode(f.background, settings, start, false);
     expect(start).toHaveBeenCalledTimes(1);
   });

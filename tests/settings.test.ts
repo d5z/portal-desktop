@@ -18,8 +18,8 @@ it('persists credentials encrypted, reloads and preserves them on workspace-only
   try {
     const store = new SettingsStore(dir, storage, process.execPath);
     await store.load(); expect(store.connection).toBeNull();
-    expect(store.settings.permissionMode).toBe('supervised');
-    expect(parse(portalConfig(store.settings))).toMatchObject({ security: { permission_mode: 'supervised' } });
+    expect(store.settings.permissionMode).toBe('auto-review');
+    expect(parse(portalConfig(store.settings))).toMatchObject({ security: { permission_mode: 'auto-review' } });
     expect(store.settings.allowExec).toBe(true);
     expect(store.settings.kitsEnabled).toBe(true);
     expect(parse(portalConfig(store.settings))).toMatchObject({ kits_enabled: true, tools: { exec: true, screenshot: true, custom_tools_enabled: true } });
@@ -52,6 +52,11 @@ it('persists credentials encrypted, reloads and preserves them on workspace-only
     await store.save({ ...store.settings, permissionMode: 'read-only' });
     const restricted = new SettingsStore(dir, storage, process.execPath); await restricted.load();
     expect(restricted.settings.permissionMode).toBe('read-only');
+    await restricted.save({ ...restricted.settings, permissionMode: 'auto-review' });
+    const automatic = new SettingsStore(dir, storage, '/client/heart-portal');
+    await automatic.load();
+    expect(automatic.settings.permissionMode).toBe('auto-review');
+    expect(parse(portalConfig(automatic.settings))).toMatchObject({ security: { permission_mode: 'auto-review' } });
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 

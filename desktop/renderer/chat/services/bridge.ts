@@ -163,7 +163,7 @@ export function createChatBridge(state: ChatState) {
           runtime.updateSceneTasks(data.tasks, data.subagentReady === true);
           return;
         case 'beings:permission-state':
-          if (data.revision !== revision || !['read-only', 'supervised', 'full-access'].includes(data.mode)) return;
+          if (data.revision !== revision || !['read-only', 'supervised', 'auto-review', 'full-access'].includes(data.mode)) return;
           state.permissionMode = data.mode;
           state.permissionMenuOpen = data.open === true;
           state.changed();
