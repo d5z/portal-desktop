@@ -98,9 +98,10 @@ it.skipIf(process.platform !== 'win32').each([
     await new Promise<void>(resolve => server.once('listening', resolve));
     // This fixture checks host tool compatibility without an approval UI.
     // Restricted modes are covered by the approval and sandbox suites.
-    await portal.start({ endpoint: '', being: '', hasToken: true, workspace, portalBinary: binary, portalName: 'native-tools-fixture',
-      autoStart: false, allowExec: true, kitsEnabled: false, permissionMode: 'full-access', ...(restricted ? { portalEnvironmentPath: workspace } : {}) },
-    parseConnection(`http://127.0.0.1:${server.address().port}/${path.basename(root)}/?token=local-fixture`));
+    const settings = { endpoint: '', being: '', hasToken: true, workspace, portalBinary: binary, portalName: 'native-tools-fixture',
+      autoStart: false, allowExec: true, kitsEnabled: false, ...(restricted ? { portalEnvironmentPath: workspace } : {}) };
+    const connection = parseConnection(`http://127.0.0.1:${server.address().port}/${path.basename(root)}/?token=local-fixture`);
+    await portal.start({ ...settings, permissionMode: 'full-access' }, connection);
     await vi.waitFor(() => expect(portal.state.phase, portal.state.message).toBe('connected'), { timeout: 15_000 });
     expect(launched).toBe(true);
     const tools = (await rpc('tools/list')).tools.map((tool: any) => tool.name);
@@ -144,10 +145,25 @@ it.skipIf(process.platform !== 'win32').each([
     const image = (await call('portal_file_read', { path: screenshot.path })).content.find((item: any) => item.type === 'image');
     expect(image.mimeType).toBe('image/png');
     expect(Buffer.from(image.data, 'base64')).toEqual(await readFile(path.join(workspace, screenshot.path)));
+    // Full access deliberately allows host paths; verify the actual image is
+    // written and readable instead of asserting the old workspace-only policy.
     const outside = path.join(root, 'outside.png');
-    expect((await rpc('tools/call', { name: 'portal_screenshot', arguments: { path: outside } })).isError).toBe(true);
-    expect((await rpc('tools/call', { name: 'portal_file_read', arguments: { path: outside } })).isError).toBe(true);
-    expect(await readFile(outside).catch(() => null)).toBeNull();
+    const externalCapture = data(await call('portal_screenshot', { path: outside, region: '0,0,24,24' }));
+    expect(externalCapture.dimensions).toEqual({ width: 24, height: 24 });
+    const externalImage = (await call('portal_file_read', { path: outside })).content.find((item: any) => item.type === 'image');
+    expect(externalImage.mimeType).toBe('image/png');
+    expect(Buffer.from(externalImage.data, 'base64')).toEqual(await readFile(outside));
+
+    // Keep negative coverage in a mode that actually restricts these operations.
+    await portal.stop();
+    await portal.start({ ...settings, permissionMode: 'read-only' }, connection);
+    await vi.waitFor(() => expect(portal.state.phase, portal.state.message).toBe('connected'), { timeout: 15_000 });
+    const deniedPath = path.join(root, 'denied.png');
+    const deniedCapture = await rpc('tools/call', { name: 'portal_screenshot', arguments: { path: deniedPath, region: '0,0,24,24' } });
+    expect(deniedCapture.isError, JSON.stringify(deniedCapture)).toBe(true);
+    const deniedRead = await rpc('tools/call', { name: 'portal_file_read', arguments: { path: outside } });
+    expect(deniedRead.isError, JSON.stringify(deniedRead)).toBe(true);
+    expect(await readFile(deniedPath).catch(() => null)).toBeNull();
     expect(portal.state.phase).toBe('connected');
   } catch (error) {
     await mkdir('test-results', { recursive: true });

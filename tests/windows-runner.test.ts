@@ -100,6 +100,13 @@ public class Fixture {
   expect((await readFile(path.join(f.root, 'supervisor.log'), 'utf8')).match(/engine-start/g)).toHaveLength(1);
   await rm(path.join(f.root, '.portal-start-failure'));
   await writeFile(path.join(f.root, 'mode'), 'crash');
+  // Six crashes include five production backoffs (25s) plus PowerShell startup
+  // and pipe draining. Accelerate only this disposable fixture's delays so the
+  // 30s command deadline tests recovery rather than runner scheduling speed.
+  const script = path.join(f.root, 'run.ps1');
+  const runner = await readFile(script, 'utf8');
+  expect(runner).toContain('Start-Sleep -Seconds 5');
+  await writeFile(script, runner.replace('Start-Sleep -Seconds 5', 'Start-Sleep -Milliseconds 20'));
   await f.run();
   expect(await readFile(path.join(f.root, '.portal-start-failure'), 'utf8')).toBe('crash-limit');
   const events = await readFile(path.join(f.root, 'supervisor.log'), 'utf8');
