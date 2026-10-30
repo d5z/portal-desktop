@@ -9,7 +9,11 @@ const dirs: string[] = [];
 afterEach(async () => { for (const dir of dirs.splice(0)) await rm(dir, { recursive: true, force: true }); });
 async function fixture() {
   const root = await mkdtemp(path.join(os.tmpdir(), 'beings-background-')); dirs.push(root);
-  const settings: Settings = { endpoint: '', being: '', hasToken: true, portalName: 'test', portalBinary: process.execPath, workspace: root, autoStart: false, backgroundEnabled: true, allowExec: false, kitsEnabled: false };
+  // Commands are mocked below. A small executable fixture still exercises real
+  // copying/hashing without repeatedly copying the host's entire Node runtime.
+  const binary = path.join(root, 'fixture-engine');
+  await writeFile(binary, '#!/bin/sh\nexit 0\n', { mode: 0o700 });
+  const settings: Settings = { endpoint: '', being: '', hasToken: true, portalName: 'test', portalBinary: binary, workspace: root, autoStart: false, backgroundEnabled: true, allowExec: false, kitsEnabled: false };
   const connection = parseConnection('https://example.org/test/?token=secret-credential');
   let loaded = false, disabled = false, fail = false, running = true;
   const calls: string[][] = [];

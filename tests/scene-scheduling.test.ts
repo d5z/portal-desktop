@@ -25,7 +25,9 @@ it('observes atomic ledger replacement without polling and stops on dispose', as
     expect((await observer.configure(config))[0].status).toBe('running');
     await writeFile(path.join(directory,'ledger.tmp'),JSON.stringify({tasks:[{...task,status:'done',ended_ms:20}]}));
     await rename(path.join(directory,'ledger.tmp'),path.join(directory,'ledger.json'));
-    await vi.waitFor(()=>expect(listener).toHaveBeenCalledWith([expect.objectContaining({status:'done'})]));
+    // OS file events can be coalesced/delayed on busy hosted macOS runners;
+    // this checks event-driven delivery, not a one-second latency budget.
+    await vi.waitFor(()=>expect(listener).toHaveBeenCalledWith([expect.objectContaining({status:'done'})]), { timeout: 3000 });
     observer.close(); listener.mockClear();
     await writeFile(path.join(directory,'ledger.json'),'{}');
     await new Promise(resolve=>setTimeout(resolve,150)); expect(listener).not.toHaveBeenCalled();
