@@ -6,6 +6,7 @@ import { SceneTaskObserver } from './portal/subagent-tasks';
 import { setupSubagent, validateSubagentSetup, readSubagentConfig, setSubagentEnabled } from './portal/subagent-setup';
 import { ClientCommandServer } from './chat/client-server';
 import { ToolApproval } from './chat/tool-approval';
+import { ApprovalGrants } from './chat/approval-grants';
 import { ApprovalDialogs } from './chat/approval-dialogs';
 import { permissionMode } from '../shared/security';
 import { ClientContextReader } from './chat/client-context';
@@ -340,11 +341,14 @@ async function ready() {
     if (window && !window.isDestroyed()) window.webContents.send('beings:tool-approval', request);
   });
   app.once('before-quit', () => approvalDialogs.cancel());
+  const approvalGrants = new ApprovalGrants(path.join(directory, 'tool-approval-grants.json'));
+  try { await approvalGrants.load(); }
+  catch (error) { errorLog.report('tool-approval-grants', error, '无法读取已记住的授权，将重新询问。'); }
   const toolApproval = new ToolApproval(() => permissionMode(store.settings.permissionMode), async input => {
     if (!window || window.isDestroyed()) return false;
     window.show();
     return approvalDialogs.request(input);
-  });
+  }, approvalGrants);
   const clientCommands = new ClientCommandServer(path.join(directory, '.portal-client.json'),
     () => store.connection?.endpoint, (request, signal) => request.verb === 'security-approve'
       ? toolApproval.request(request, signal)

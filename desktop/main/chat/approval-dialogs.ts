@@ -10,7 +10,7 @@ export class ApprovalDialogs {
   request(input: ApprovalPrompt): Promise<boolean> {
     if (input.signal.aborted || this.pending) return Promise.resolve(false);
     return new Promise(resolve => {
-      const view = { id: randomUUID(), title: input.title, message: input.message, detail: input.detail, expiresAt: Date.now() + 120000 };
+      const view = { id: randomUUID(), title: input.title, message: input.message, detail: input.detail, rememberScope: input.rememberScope, expiresAt: Date.now() + 120000 };
       const abort = () => finish(false);
       const finish = (allowed: boolean) => {
         clearTimeout(timer); input.signal.removeEventListener('abort', abort);

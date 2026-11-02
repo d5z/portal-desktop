@@ -10,7 +10,7 @@ it('defaults to automatic review and rejects unknown policy values', () => {
   expect(() => permissionMode('auto-approve')).toThrow();
 });
 
-it('shows the exact operation and never caches approvals', async () => {
+it('shows the exact operation and keeps supervised approvals one-shot', async () => {
   const prompt = vi.fn(async () => true);
   const approval = new ToolApproval(() => 'supervised', prompt);
   const signal = new AbortController().signal;

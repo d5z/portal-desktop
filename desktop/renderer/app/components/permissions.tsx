@@ -79,9 +79,10 @@ export function ToolApprovalDialog({ app }: { app: AppModel }) {
     finally { setBusy(false); }
   }
   return <Dialog open={Boolean(request)} busy={busy} onClose={() => void answer(false)} className="permissions-dialog tool-approval-dialog" aria-labelledby="tool-approval-title">
-    <header className="permission-dialog-header"><span className="permission-header-icon"><PermissionIcon/></span><div><h2 id="tool-approval-title">此操作需要你的允许</h2><p>仅对当前这一次调用生效</p></div></header>
+    <header className="permission-dialog-header"><span className="permission-header-icon"><PermissionIcon/></span><div><h2 id="tool-approval-title">此操作需要你的允许</h2><p>{request?.rememberScope ? '允许后记住授权，范围内的重复操作不再询问' : '仅对当前这一次调用生效'}</p></div></header>
     <div className="permission-dialog-body"><strong className="approval-action">{request?.message}</strong><pre className="approval-request">{request?.detail}</pre>
-      <p className="permission-note">关闭即拒绝 · 2 分钟后自动过期 · 不会记住此授权</p>{error && <p role="alert" className="form-error">{error}</p>}</div>
-    <footer className="permission-dialog-footer"><button type="button" className="permission-manage" disabled={busy} onClick={() => { void answer(false).then(answered => { if (answered) app.openPermissionSettings(); }); }}>调整权限…</button><button type="button" ref={denyButton} onClick={() => void answer(false)} disabled={busy}>拒绝</button><button type="button" className="primary" onClick={() => void answer(true)} disabled={busy}>允许这一次</button></footer>
+      {request?.rememberScope && <p className="permission-note">{request.rememberScope}</p>}
+      <p className="permission-note">关闭即拒绝 · 2 分钟后自动过期{request?.rememberScope ? ' · 切换为“请求批准”可恢复逐次询问' : ' · 不会记住此授权'}</p>{error && <p role="alert" className="form-error">{error}</p>}</div>
+    <footer className="permission-dialog-footer"><button type="button" className="permission-manage" disabled={busy} onClick={() => { void answer(false).then(answered => { if (answered) app.openPermissionSettings(); }); }}>调整权限…</button><button type="button" ref={denyButton} onClick={() => void answer(false)} disabled={busy}>拒绝</button><button type="button" className="primary" onClick={() => void answer(true)} disabled={busy}>{request?.rememberScope ? '允许并记住' : '允许这一次'}</button></footer>
   </Dialog>;
 }
