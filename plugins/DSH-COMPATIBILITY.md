@@ -22,7 +22,7 @@ Town 使用自己的 Electron 外壳、导航、工具库和 Being 聊天界面�
 | Bundle / Loader | 使用原生 `applyEntryPatches` 和 Loader：insert、id 覆盖、独立行配置、嵌套 group、disabled、inject、isolate、intercept、`!!js` 表达式。表达式在宿主激活时求值。单包最多 100 行。 |
 | Cordis 生命周期 | apply、Config、服务注入/提供、事件、effect/dispose、原生 timer；消费者可等待后安装的提供者。 |
 | HTTP / Fetch | `webServer.register`、Node req/res、exact 优先及最长 prefix；`connection.fetch.register` 适配 Fetch Request/Response；query、请求体、流式响应和取消。监听回环地址，通过 Town 主进程私有令牌代理。 |
-| 页面注入 | 结构化 global/style/html/script/script-src/script-preload 先合成页面，再执行全部 tapIndex，保留插件自己的去重逻辑。嵌套 HTML 脚本及 module 类型保留。 |
+| 页面注入 | 宿主将 global/style/html/script/script-src/script-preload 合成页面并执行 tapIndex，再统一输出 HTML 与同源 script-src 给前端；保留插件去重逻辑、嵌套脚本及 module 类型。 |
 | HTML 与 module | 插件 HTML / srcdoc 的可执行内联脚本转为同源资源；相对静态 import、字符串形式动态 import、import.meta.url 按原文档地址重定位；JSON script 保留为数据。 |
 | Slot / store | 原生 renderer、ui-slots、store：注册与注销、children、store/actions、locale、inject、root hooks、过滤、keyed 入口和错误边界。无需复制一套简化的 slot React props。 |
 | Town 挂载位置 | settings.section/general.item/plugins.tab/header/action/close/trigger/launcher/onboarding，plugins.bundle.config、settings.plugin.item，main、sidebar/panellist/footer/footer.action、rightbar、shell.overlay/overlay/app.overlay。Town 提供入口、关闭、导航与布局状态。 |
@@ -59,7 +59,6 @@ Town 使用自己的 Electron 外壳、导航、工具库和 Being 聊天界面�
 - 插件入口直接显示在左侧主导航，不再使用“插件工具”抽屉；紧凑模式保留插件图标，纯文字按钮使用统一后备图标，悬停和键盘聚焦显示名称。只有主题、启动动画或设置分区时不占导航位置。安装后即时出现，列表与 Town 导航一起滚动，管理入口保留在设置／工具库。右栏在窗口宽度不足 1100px 时不挤压聊天内容。面板使用不透明背景，避免壁纸插件让设置文字难读。
 - 设置关闭按钮始终由 Town 提供；Escape、Tab 循环与焦点恢复可用，背景 Town 暂停接收键盘/鼠标。设置使用普通层，让插件的全屏预览和模板编辑器能够显示在上方；它们保留自己的键盘行为。
 - 通用配置表单保护未保存更改，逐字段记录 JSON 错误，不能通过编辑其他字段绕过校验；插件自带设置的草稿策略仍由插件自己实现。
-- 托管客户端的启停即时清理和恢复；全局注入变化或清理失败明确显示“等待重新加载”，其他插件继续可用。需要重新加载时，关闭再打开管理页仍保留提示；点击重新加载确实进入当前 Town 页面。主窗口仍阻止跳转到其他地址。
 - 暗色主题使用白色 Town 标识；插件标题允许换行，关闭/返回入口不随长表单滚动。
 - 外观与阅读的明暗指示跟随实际插件主题；点击客户端浅色/深色会明确切回内置配色。针对 VS Code Themes 1.x 的独立持久化和启动恢复定时器，适配层同步其选择记录，避免旧主题重新覆盖客户端选择。其跨深浅预览卡片的收藏按钮使用独立配套背景，以保持可见性；未改写社区插件包。
 
@@ -69,16 +68,9 @@ Town 使用自己的 Electron 外壳、导航、工具库和 Being 聊天界面�
 
 全部使用 Town 用户目录的 `third-party-plugins/`：`plugins.json`、独立包副本 `packages/`、`DSH_HOME=data/`、配置 `data/config-forms.json`、有大小上限的 `host.log`。不读写已有 `~/.dsh`。卸载保留配置及包副本；重新安装可恢复配置。
 
-## 实测样本与复现
+## 测试与复现
 
-社区插件源码保持原样，在临时测试用户目录安装，不发送 Being 消息。
-
-| 插件 | 版本 / commit | 验证 |
-| --- | --- | --- |
-| [dsh-boot-suite](https://github.com/LeeRolling/dsh-boot-suite) | 2.15.17 / `418bb180ea4aa46855a459b7c8563bcbfc7e2a53` | 同页安装后全屏启动、授权、身份确认、自然结束；连续安装不重播、不重复注入壁纸；原生设置、模板编辑器、预览/SKIP、Town/Being 壁纸、停用与卸载。 |
-| [dsh-theme-native](https://github.com/BarneyZhaoooo/dsh-theme-native) | 0.1.2 / `faaf3a8edb9b5625ac46ea11df081600ff6d036a` | 同页安装即时加载、原生主题设置页、主题 token 注册，与另外两款插件共存。未覆盖所有自定义字体。 |
-| [dsh-vscode-themes2](https://github.com/zxbc/dsh-vscode-themes2) | 1.1.0 / `cd60561fffbebc5900aa04a5cdf64685c8eee679` | 同页安装后的内置主题列表、Dracula 即时应用及偏好写入；不代表市场联网搜索/下载已全测。 |
-| [dsh-pomodoro](https://github.com/causebefore/dsh-pomodoro) | 0.5.5 / `33c4491059f929b19006624fa74574a459213579` | 同页安装后原生设置将 25 分钟改为 7 分钟并持久化；侧栏入口、浮层、开始/暂停；浏览器通知权限随 Town 开关。Computer Use 实际验证倒计时、暂停和迷你模式。未验证 OS 提醒最终送达。 |
+社区插件的版本、实测结果和已知问题保存在[历史验收记录](../docs/archive/DSH-COMMUNITY-VALIDATION.md)。以下命令用于验证当前代码。
 
 ```sh
 npm run typecheck
@@ -97,7 +89,5 @@ npm run test:settings-navigation
 `test:dsh-appearance` 在隔离 Electron 配置中安装原版 VS Code Themes，验证 Dracula / GitHub Light、13/21 阅读字号、页面导航、重载、设置选中状态、侧栏/弹窗配色、聊天 iframe 主题同步、恢复内置配色与再次应用插件主题，以及收藏图标对比度。
 
 宿主测试覆盖真实子进程、鉴权、精确/前缀路由、依赖生命周期、配置与 secret、更新回退、显式构建、混合注入、module 重定位、Remote、group/isolate/表达式，以及超过 30 秒的流与取消。
-
-原版 boot-suite 在跳过/移除播放媒体时仍观察到未处理的 `AbortError`；未修改原插件或吞掉错误，页面退出与恢复通过。其联网更新、所有媒体/音色和系统文件夹打开等功能不在本次验证范围内。
 
 参考基线：[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness/tree/dsh-v0.2.1-rc.5)。

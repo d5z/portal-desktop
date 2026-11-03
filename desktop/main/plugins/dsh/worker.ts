@@ -1,6 +1,6 @@
 import { Loader, Group, interpolate, type EntryOptions } from '@deepseek-ai/cordis-plugin-loader';
 import { installLocalServices } from './local-services';
-import { compileIndexInjections } from './injections';
+import { compileIndexInjections, type IndexInjection } from './injections';
 /** Minimal Town-owned DSH host: Cordis kernel + routes. No Harness app or agents. */
 import { Context, type Fiber } from '@deepseek-ai/cordis';
 import { Readable } from 'node:stream';
@@ -124,7 +124,7 @@ async function boot(entries: { root: string; plugin: DshPluginState['plugins'][n
       record.status = 'blocked'; record.error = String(error);
     }
   }
-  const injections: DshPluginState['injections'] = [];
+  const injections: IndexInjection[] = [];
   await (ctx as any).parallel('webserver/index-inject', injections);
   const compiled = compileIndexInjections(injections, taps, inlineScripts);
   const state: DshPluginState = { plugins, clients, injections: compiled, routes: routes.map(({ kind, path }) => ({ kind, path })) };

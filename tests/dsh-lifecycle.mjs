@@ -2,8 +2,7 @@ import { build } from 'esbuild';
 import { chromium } from 'playwright';
 import { browserAssets } from './support/browser-assets.mjs';
 import assert from 'node:assert/strict';
-import { mkdir, readFile } from 'node:fs/promises';
-import path from 'node:path';
+import { mkdir } from 'node:fs/promises';
 
 // Real Cordis + published slot renderer; the transport substitutes deterministic
 // host snapshots so lifecycle races do not depend on npm or a live Being.
@@ -42,10 +41,7 @@ const result = await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', 
   const original=dshRuntime.script.bind(dshRuntime);
   dshRuntime.script=async(src,type)=>{if(location.search.includes('delay')&&src.startsWith('data:')&&atob(src.split(',')[1]).includes('id: "@deepseek-ai/dsh-client-ui-settings"')){window.settingsPending=true;await new Promise(r=>window.releaseSettings=r)}return original(src,type)};
   createRoot(document.getElementById('root')).render(<DshPluginSurfaces/>);void dshRuntime.start();
-` }, bundle: true, format: 'iife', platform: 'browser', write: false, outfile: 'lifecycle.js', plugins: [
-  ...(process.env.DSH_LIFECYCLE_BASELINE ? [{name:'review-baseline',setup(build){
-    build.onLoad({filter:/plugins\/dsh\/(runtime|page|navigation)\.tsx$/},async args=>({loader:'tsx',contents:await readFile(path.join(process.env.DSH_LIFECYCLE_BASELINE,path.relative(process.cwd(),args.path)),'utf8')}));
-  }}] : []), browserAssets()], loader: { '.css': 'empty', '.scss': 'empty' } });
+` }, bundle: true, format: 'iife', platform: 'browser', write: false, outfile: 'lifecycle.js', plugins: [browserAssets()], loader: { '.css': 'empty', '.scss': 'empty' } });
 const code = result.outputFiles.find(f => f.path.endsWith('.js')).text;
 const browser = await chromium.launch({ headless: true, channel: 'chrome' });
 try {
@@ -100,7 +96,7 @@ try {
   await open();await card('switchable').getByRole('button',{name:'停用',exact:true}).click();await close();
   await page.reload();await ready();assert.equal(await page.getByRole('button',{name:'healthy',exact:true}).count(),1);
   console.log('PASS disable/re-enable loops, sidebar fallback, active panel cleanup, remove/reinstall, update, reload and unaffected instance retention');
-  reset();injections=[{kind:'style',text:':root { --lifecycle-injection: 1; }'}];
+  reset();injections=[{kind:'html',placement:'head',html:'<style>:root { --lifecycle-injection: 1; }</style>'}];
   sources.newcomer=client('newcomer');
   await page.goto('http://lifecycle.test/');await ready();
   injections=[];
@@ -110,7 +106,7 @@ try {
   await page.getByLabel('npm 包名、Git URL 或本地包路径').fill('newcomer');await page.getByRole('button',{name:'安装',exact:true}).click();await close();
   assert.equal(await page.getByRole('button',{name:'newcomer',exact:true}).count(),1,'pending global reload must not block a new independent client');
   assert.equal(await page.getByRole('button',{name:'healthy',exact:true}).count(),1);
-  injections=[{kind:'style',text:':root { --lifecycle-injection: 1; }'}];
+  injections=[{kind:'html',placement:'head',html:'<style>:root { --lifecycle-injection: 1; }</style>'}];
   await open();await card('switchable').getByRole('button',{name:'启用',exact:true}).click();
   await page.waitForFunction(()=>!document.querySelector('#third-party-plugins').hasAttribute('aria-busy'));
   assert.equal(await page.getByRole('button',{name:'重新加载页面',exact:true}).count(),0,'restoring the original snapshot cancels pending reload');

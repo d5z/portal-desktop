@@ -6,6 +6,8 @@ import path from 'node:path';
 import { DshPluginManager } from '../desktop/main/plugins/dsh/manager';
 import { containedFile, readDshPackage } from '../desktop/main/plugins/dsh/package';
 import { externalizePluginScripts } from '../desktop/main/plugins/dsh/html';
+import { compileIndexInjections } from '../desktop/main/plugins/dsh/injections';
+import { runInNewContext } from 'node:vm';
 const roots: string[] = [], managers: DshPluginManager[] = [];
 let workerDirectory: string, worker: string;
 beforeAll(async () => {
@@ -29,6 +31,25 @@ async function fixture() {
   return {home,manager,make};
 }
 describe('Town DSH compatibility host (real Cordis process)',()=>{
+ it('normalizes every supported injection before sending it to the renderer',()=>{
+   const scripts=new Map<string,string>();
+   const rows=compileIndexInjections([
+     {kind:'global',name:'greeting',value:'你好🌱'},
+     {kind:'script',text:'globalThis.copiedGreeting = globalThis.greeting;'},
+     {kind:'style',text:':root { --fixture: 1; }'},
+     {kind:'script-preload',src:'/fixture.js'},
+     {kind:'script-src',src:'/fixture.js',type:'module'},
+     {kind:'html',placement:'body',html:'<div id="fixture">ready</div>'},
+   ],[],scripts);
+   const context:Record<string,unknown>={};
+   for(const row of rows) if(row.kind==='script-src'&&scripts.has(row.src)) runInNewContext(scripts.get(row.src)!,context);
+   expect(context).toMatchObject({greeting:'你好🌱',copiedGreeting:'你好🌱'});
+   expect(rows.filter(row=>row.kind==='html').map(row=>row.html).join('')).toContain('<style>:root { --fixture: 1; }</style>');
+   expect(rows).toContainEqual({kind:'html',placement:'head',html:'<link rel="preload" as="script" href="/fixture.js">'});
+   expect(rows).toContainEqual({kind:'script-src',placement:'head',src:'/fixture.js',type:'module'});
+   expect(rows).toContainEqual({kind:'html',placement:'body',html:'<div id="fixture">ready</div>'});
+   expect(rows.every(row=>row.kind==='html'||row.kind==='script-src')).toBe(true);
+ });
  it('forwards decoded compressed assets without stale encoding or length headers',async()=>{
    const {manager,make}=await fixture();
    await manager.install(await make('compressed-assets',`import {gzipSync} from 'node:zlib';export const inject=['webServer'];export function apply(ctx){ctx.effect(()=>ctx.webServer.register({kind:'exact',path:'/compressed.js',handler(req,res){const body=gzipSync('window.greeting = "你好🌱";');res.writeHead(200,{'content-type':'text/javascript','content-encoding':'gzip','content-length':body.length});res.end(body)}}))}`));
@@ -182,7 +203,7 @@ describe('Town DSH compatibility host (real Cordis process)',()=>{
    const {manager,make}=await fixture();
    await manager.install(await make('legacy',`export const inject=['webServer'];export function apply(ctx){ctx.webServer.tapIndex(html=>html.replace('</body>','<div id="legacy-marker"></div></body>'));}`));
    await manager.install(await make('modern',`export const inject=['webServer'];export function apply(ctx){ctx.on('webserver/index-inject',rows=>rows.push({kind:'style',text:'.modern{}'},{kind:'html',placement:'body',html:'<div id="modern-marker"></div>'}));ctx.webServer.tapIndex(html=>html.includes('modern-marker')?html:html.replace('</body>','<div id="duplicate"></div></body>'));}`));
-   const html=manager.state().injections.map(row=>row.html||'').join('');
+   const html=manager.state().injections.map(row=>row.kind==='html'?row.html:'').join('');
    expect(html).toContain('legacy-marker');expect(html).toContain('modern-marker');expect(html).not.toContain('duplicate');expect(html).toContain('.modern{}');
  });
  it('rebases module imports, dynamic imports and import.meta.url against the plugin document',()=>{
@@ -222,9 +243,9 @@ describe('Town DSH compatibility host (real Cordis process)',()=>{
    const {manager,make}=await fixture();
    await manager.install(await make('nested-script',`export function apply(ctx){ctx.on('webserver/index-inject',rows=>rows.push({kind:'html',placement:'body',html:'<div id="mount"><script type="module">import \"/helper.js\";</script><script type="application/json" id="data">{"x":1}</script></div>'}));}`));
    const rows=manager.state().injections;
-   expect(rows.some(row=>row.type==='module'&&row.kind==='script-src')).toBe(true);
-   expect(rows.map(row=>row.html||'').join('')).toContain('application/json');
-   expect(rows.map(row=>row.html||'').join('')).not.toContain('type="module"');
+   expect(rows.some(row=>row.kind==='script-src'&&row.type==='module')).toBe(true);
+   expect(rows.map(row=>row.kind==='html'?row.html:'').join('')).toContain('application/json');
+   expect(rows.map(row=>row.kind==='html'?row.html:'').join('')).not.toContain('type="module"');
  });
  it('uses declared Remote methods for unary and streamed calls and rejects private members',async()=>{
    const {manager,make}=await fixture();

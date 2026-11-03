@@ -55,11 +55,6 @@ export function Example() {
 }
 ```
 
-已模块化的共享界面包括：`SbsControl`、`RemoteImage`、`ImageViewer`、
-`PermissionPicker`、`PermissionSettings`、`ToolApprovalDialog`、`EditContextMenu`、
-`useMessageMenu`、`CopyMessage`、`NavigationControls`、`RichComposer`、
-`PanelResizeHandle`、`PluginIcon`/`PluginIconEditor` 和 `IntelligentUIExamples`。
-
 ## 公共接口
 
 - `EditContextMenu`、`NavigationControls` 使用 `appearance="chat"` 选择聊天配色。

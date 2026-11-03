@@ -8,6 +8,7 @@
 | --- | --- |
 | [桌面代码目录](../desktop/README.md) | 主进程、preload、共享契约与渲染器的职责 |
 | [React 界面结构](../desktop/renderer/README.md) | 业务模块、状态、服务与组件的依赖约定 |
+| [React 样式规范](../desktop/renderer/STYLING.md) | SCSS、组件作用域与构建检查 |
 | [桌面架构](../desktop/ARCHITECTURE.md) | 连接、代理、消息场景与信任边界 |
 | [构建与交付](../desktop/BUILDING.md) | 环境、构建、安装包及平台限制 |
 | [测试说明](../desktop/TESTING.md) | 自动化入口、隔离方式和覆盖范围 |
@@ -25,6 +26,7 @@
 | [附件与多模态](../desktop/ATTACHMENTS.md) | 上传、解析、下载与本机文件预览 |
 | [本地文件预览](../desktop/LOCAL-ARTIFACTS-AND-PORTAL-HARNESS.md) | 本地路径、预览生命周期与工具协作 |
 | [图片生成](../desktop/IMAGE-GENERATION.md)、[生图引导种子](seeds/being-service-image-generation.md) | 异步任务回执及原消息渲染 |
+| [DSH 插件兼容层](../plugins/DSH-COMPATIBILITY.md) | 安装、支持范围、生命周期与测试入口 |
 | [Intelligent UI](../desktop/renderer/shared/intelligent-ui/README.md) | 当前渲染协议、状态与验证入口 |
 | [Portal 恢复](../desktop/PORTAL-RECOVERY.md) | 启动、旧实例、重连与诊断位置 |
 | [Portal 调用排查](../desktop/PORTAL-TROUBLESHOOTING.md) | 截图、路径、命令与后台会话 |

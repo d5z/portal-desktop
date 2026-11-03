@@ -11,10 +11,15 @@ export interface DshPlugin {
   status: 'disabled' | 'active' | 'blocked' | 'error';
 }
 export interface DshClientModule { id: string; owner: string; url: string; inject: string[]; immediately?: boolean }
+/** Host-normalized document contributions consumed by the renderer. */
+export type DshDocumentInjection = { placement: 'head' | 'body' } & (
+  | { kind: 'html'; html: string }
+  | { kind: 'script-src'; src: string; type?: string }
+);
 export interface DshPluginState {
   plugins: DshPlugin[];
   clients: DshClientModule[];
-  injections: { owner?: string; type?: string; kind: string; placement?: string; name?: string; value?: unknown; html?: string; src?: string; text?: string }[];
+  injections: DshDocumentInjection[];
   routes: { kind: 'exact' | 'prefix'; path: string }[];
   error?: string;
 }
@@ -25,5 +30,4 @@ export interface DshPluginAPI {
   remove(id: string): Promise<boolean>;
   configure(id: string, config: Record<string, unknown>): Promise<void>;
 }
-export const DSH_HOST_SERVICES = ['webServer', 'connection', 'timer', 'settings', 'loader'] as const;
 export const DSH_SLOTS = ['settings.section', 'settings.trigger', 'settings.header', 'settings.action', 'settings.close', 'settings.launcher', 'settings.general.item', 'settings.plugins.tab', 'settings.onboarding', 'main', 'sidebar', 'sidebar.panellist', 'sidebar.footer', 'sidebar.footer.action', 'plugins.bundle.config', 'settings.plugin.item', 'rightbar', 'shell.overlay', 'overlay', 'app.overlay'] as const;

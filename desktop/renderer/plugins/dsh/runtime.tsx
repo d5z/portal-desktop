@@ -253,7 +253,7 @@ export class DshClientRuntime extends Store {
     if (!this.injectionReloadRequired) for (const [index, row] of state.injections.entries()) {
       const key = injectionKeys[index];
       if (this.injected.has(key)) continue;
-      try { await this.inject(row); this.injected.add(key); } catch (error) { this.errors[row.owner || 'index-inject'] = String(error); }
+      try { await this.inject(row); this.injected.add(key); } catch (error) { this.errors['index-inject'] = String(error); }
     }
     ready?.resolve();
     const clients = state.clients.filter(client => !this.needsReload(client.owner));
@@ -320,10 +320,7 @@ export class DshClientRuntime extends Store {
     });
   }
   private async inject(row: DshPluginState['injections'][number]) {
-    if (row.kind === 'style' && typeof row.text === 'string') { const style = document.createElement('style'); style.textContent = row.text; document.head.append(style); return; }
-    if (row.kind === 'global' && row.name && !['__proto__', 'prototype', 'constructor'].includes(row.name)) { (window as any)[row.name] = row.value; return; }
     if (row.kind === 'script-src' && row.src) { await this.script(row.src, row.type); return; }
-    if (row.kind === 'script-preload' && row.src) { const link = document.createElement('link'); link.rel = 'preload'; link.as = 'script'; link.href = row.src; document.head.append(link); return; }
     if (row.kind === 'html' && row.html) {
       const template = document.createElement('template'); template.innerHTML = row.html;
       for (const script of template.content.querySelectorAll('script')) if (!script.type || ['module', 'text/javascript', 'application/javascript'].includes(script.type)) script.remove();

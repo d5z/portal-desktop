@@ -4,6 +4,7 @@
 
 | 历史记录 | 当前实现说明 |
 | --- | --- |
+| [DSH 社区插件验收](DSH-COMMUNITY-VALIDATION.md) | [DSH 插件兼容层](../../plugins/DSH-COMPATIBILITY.md) |
 | [Intelligent UI 官方示例核查](INTELLIGENT-UI-OFFICIAL-AUDIT.md) | [Intelligent UI](../../desktop/renderer/shared/intelligent-ui/README.md) |
 | [附件样本验收](ATTACHMENTS-TEST-REPORT.md) | [附件与多模态](../../desktop/ATTACHMENTS.md) |
 | [Muse 附件界面对照](MUSE-ATTACHMENTS-REVIEW.md) | [附件与多模态](../../desktop/ATTACHMENTS.md) |
