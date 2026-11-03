@@ -84,8 +84,10 @@ try {
   await page.getByRole('dialog',{name:'SBS 自主活动'}).waitFor();
   await page.getByRole('button',{name:'关闭 SBS 设置'}).click();
   assert.equal(await page.evaluate(()=>window.historyCalls.length),0,'Profile does not fetch history');
+  assert.deepEqual(await page.getByRole('tablist',{name:'Being 信息分类'}).getByRole('tab').allTextContents(),['详情','动态','资料库','电脑']);
   await page.getByRole('tab',{name:'动态',exact:true}).click();
   const list=page.getByRole('region',{name:'最近提问'});
+  await page.getByRole('heading',{name:'场景动态',exact:true}).waitFor();
   assert.equal(await page.getByRole('heading',{name:'场景动态',exact:true}).count(),1);
   assert.equal(await page.getByRole('heading',{name:'最近消息',exact:true}).count(),0);
   assert.equal(await page.getByText('暂时没有新的场景动态',{exact:true}).count(),0);

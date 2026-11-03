@@ -66,7 +66,103 @@
 }
 
 .being-tabs {
+  align-self: center;
+  width: 100%;
+  justify-content: center;
+  gap: 4px;
+  background: transparent;
   margin-bottom: 16px;
+}
+
+.being-tabs button {
+  flex: 0 1 auto;
+  min-height: 36px;
+  padding: 8px 10px;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.being-tabs button[aria-selected='true'] {
+  background: var(--surface);
+  box-shadow: none;
+}
+
+.being-tabs button:focus-visible,
+.being-info-content > [role='tabpanel']:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.being-computer {
+  margin: 8px 0 0;
+}
+
+.being-computer-screen {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  width: 100%;
+  min-height: 160px;
+  aspect-ratio: 16 / 10;
+  max-height: 280px;
+  padding: 20px 16px;
+  border-radius: 16px;
+  background: var(--surface);
+  text-align: center;
+}
+
+.being-computer-screen svg {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  margin-bottom: 0;
+  fill: none;
+  stroke: var(--secondary);
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.being-computer-screen strong {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--secondary);
+}
+
+.being-computer-screen p {
+  margin: 0;
+  color: var(--secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.being-computer-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 36px;
+  margin-top: 8px;
+  color: var(--secondary);
+  font-size: 12px;
+
+  > span {
+    min-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+}
+
+.being-library-empty {
+  margin: 0;
+  padding: 36px 8px;
+  color: var(--secondary);
+  font-size: 13px;
+  line-height: 1.8;
+  text-align: center;
 }
 
 .being-info-content {
@@ -355,4 +451,317 @@
 .being-privacy-content .privacy-body {
   padding: 12px;
   font-size: 13px;
+}
+
+.being-computer-screen .being-computer-primary {
+  border-radius: 24px;
+  background: var(--text);
+  color: var(--bg);
+  margin-top: 4px;
+  min-height: 34px;
+  padding: 7px 16px;
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.being-computer-confirm > div {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.being-computer-viewport {
+  background: var(--surface);
+}
+
+.being-computer-confirm,
+.being-computer-error {
+  margin: 16px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+
+.being-computer-confirm p {
+  margin-bottom: 12px;
+}
+
+.being-computer-error {
+  color: var(--text);
+}
+
+/* Preview stays in the profile; only an explicit open presents the independent pane. */
+.being-computer-preview {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 100%;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    background: rgb(128 128 128 / 40%);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 160ms ease;
+  }
+
+  &:is(:hover, :focus-within) {
+    &::after,
+    .being-computer-open { opacity: 1; }
+  }
+}
+
+.being-computer-live-preview {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1280 / 900;
+  min-height: 160px;
+  overflow: hidden;
+  background: var(--surface);
+
+  img {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+}
+
+.being-computer-preview-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  color: var(--secondary);
+  font-size: 13px;
+}
+
+.being-computer-open {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  white-space: nowrap;
+  padding: 9px 16px;
+  border-radius: 24px;
+  background: var(--text);
+  color: var(--bg);
+  font-size: 13px;
+  opacity: 0;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 3px;
+  }
+}
+
+.being-computer-controls {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+
+  .topbar-icon-button {
+    width: 32px;
+    height: 32px;
+    padding: 7px;
+    border-radius: 50%;
+    color: var(--secondary);
+    background: transparent;
+    box-shadow: none;
+    transition: background-color 120ms ease, color 120ms ease;
+
+    &:hover:not(:disabled) {
+      background: var(--surface);
+      color: var(--text);
+    }
+    &:active:not(:disabled) { background: var(--hover); }
+
+    &[aria-expanded='true'] { background: var(--surface); }
+    &:focus:not(:focus-visible) { outline: none; }
+    &:focus-visible {
+      outline: 1px solid var(--accent);
+      outline-offset: 2px;
+    }
+  }
+
+  svg {
+    width: 16px;
+    height: 16px;
+    stroke-width: 1.6;
+  }
+}
+
+.being-computer-menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  right: 0;
+  z-index: 20;
+  min-width: 148px;
+  padding: 6px;
+  color: var(--text);
+  background: var(--control);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+
+  button {
+    display: block;
+    width: 100%;
+    min-height: 36px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    text-align: left;
+    font-size: 12px;
+  }
+}
+
+.cloud-browser-pane {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  min-width: 0;
+  min-height: 0;
+  max-width: calc(100% - 396px);
+  background: var(--bg);
+  border-left: 1px solid var(--line);
+
+  .being-computer-viewport {
+    // Native WebContentsView sits above DOM hit targets. Reserve a real gutter
+    // so the full resize handle remains reachable at every screen height.
+    width: calc(100% - 24px);
+    margin-inline: 12px;
+    flex: 1;
+    min-height: 0;
+    max-height: none;
+    aspect-ratio: auto;
+    overflow: hidden;
+    position: relative;
+
+    img {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+    }
+  }
+
+  .being-computer-confirm,
+  .being-computer-error {
+    padding: 16px;
+    margin: 0;
+  }
+}
+
+.cloud-browser-heading {
+  min-height: 64px;
+  justify-content: center;
+  padding: 12px 20px;
+
+  h2 {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    margin: 0;
+    font-size: 16px;
+    font-weight: 550;
+  }
+}
+
+/* Preserve the profile's width, tab and scroll position behind the separate viewer. */
+.workspace-body:has(> .cloud-browser-pane:not([hidden])) > .being-info {
+  display: none;
+}
+
+.workspace-body:has(> .cloud-browser-pane[data-maximized]:not([hidden])) {
+  > .workspace-stage {
+    display: none;
+  }
+
+  > .cloud-browser-pane {
+    flex: 1;
+    max-width: none;
+  }
+}
+
+@media (max-width: 800px) {
+  .cloud-browser-pane:not([hidden]) {
+    position: absolute;
+    inset: 0 0 0 64px;
+    z-index: 8;
+    width: auto !important;
+    max-width: none;
+  }
+}
+
+/* A quiet pulse marks real waiting; the viewport keeps its dimensions throughout. */
+.being-computer-presence {
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  color: var(--secondary);
+
+  &[data-loading='true'] {
+    animation: computer-breathe 1.8s ease-in-out infinite;
+  }
+}
+
+@keyframes computer-breathe {
+  0%, 100% {
+    opacity: 0.55;
+    transform: scale(0.96);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.being-computer-open,
+.being-computer-primary {
+  transition: opacity 140ms ease, transform 140ms ease;
+
+  &:hover:not(:disabled) { opacity: 0.85; }
+  &:active:not(:disabled) { transform: scale(0.97); }
+  &:disabled {
+    opacity: 0.5;
+    cursor: wait;
+  }
+}
+
+.being-computer-live-preview {
+  border-radius: 12px;
+}
+
+@media (hover: none) {
+  .being-computer-preview::after,
+  .being-computer-open { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .being-computer-presence[data-loading='true'] { animation: none; }
+  .being-computer-preview::after,
+  .being-computer-open,
+  .being-computer-primary { transition: none; }
 }

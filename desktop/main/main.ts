@@ -1,3 +1,7 @@
+import { HomeClient } from './home/client';
+import { HomeService } from './home/service';
+import { HomeViewer } from './home/viewer';
+import { registerHomeIpc } from './home/ipc';
 import { DshPluginManager } from './plugins/dsh/manager';
 import { registerDshIpc } from './plugins/dsh/ipc';
 import { LocalFilePreviews } from './app/local-file-preview';
@@ -94,6 +98,7 @@ let window: BrowserWindow | null = null;
 let closePluginSessions = () => {};
 let windowReady = false;
 let browser: ClientBrowser | undefined;
+let home: HomeService | undefined;
 let portal: PortalSupervisor;
 let proxy: ChatProxy;
 let store: SettingsStore;
@@ -127,6 +132,7 @@ async function cleanupForQuit() {
   await kitInstaller?.dispose();
   await portal.stop();
   browser?.close();
+  home?.dispose();
   await errorLog.flush();
 }
 function finishQuit() {
@@ -423,6 +429,14 @@ async function ready() {
       catch (error) { throw new Error(errorLog.report(channel, error)); }
     });
   };
+  const homeClient = new HomeClient(directory, secretStorage, url => shell.openExternal(url));
+  const homeViewer = new HomeViewer(() => window, viewer => home?.update({ viewer }));
+  home = new HomeService(homeClient, homeViewer, () => store.connection, state => {
+    if (window && !window.isDestroyed()) window.webContents.send('beings:home-state', state);
+  });
+  try { await homeClient.load(); home.update(); }
+  catch { home.update({ error: '无法读取 Home 登录信息，请重新连接。' }); }
+  registerHomeIpc(handle, home, homeViewer);
   handle('beings:local-file-preview', (reference: unknown) => localFiles.preview(reference));
   handle('beings:tool-approval-pending', () => approvalDialogs.current());
   handle('beings:tool-approval-answer', (id: unknown, allowed: unknown) => approvalDialogs.answer(id, allowed));
@@ -781,6 +795,7 @@ async function ready() {
     // A pending grant belongs to the old workspace/connection as well as its mode.
     approvalDialogs.cancel();
     await store.save(input);
+    home?.contextChanged();
     try {
       await verifyConnection();
       await takeover.run(store.connection!, 'manual', async replacing => {

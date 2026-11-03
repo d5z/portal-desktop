@@ -17,9 +17,7 @@ export function PlaceHeading({ view, title, actions, navigate, onBack, onForward
     <header className="place-sheet-heading">
       <div className="place-sheet-title-row">
         <div className="place-sheet-title-main">
-          {onToggleChat && <button id="toggle-split-chat" className="split-chat-toggle" aria-label={chatExpanded ? "收起对话" : "展开对话"} title={chatExpanded ? "收起对话" : "展开对话"} aria-expanded={chatExpanded} aria-controls="chat-view" onClick={onToggleChat}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M9 4v16" /></svg>
-          </button>}
+          {onToggleChat && <SplitChatToggle expanded={!!chatExpanded} onToggle={onToggleChat} />}
           <h1 id="view-title">{title || definitions[view]?.title || (view === "plugins" ? "客户端插件" : view === "portal" ? "Portal 设置" : "对话")}</h1>
           <NavigationControls back={onBack} forward={onForward} />
         </div>
@@ -32,4 +30,11 @@ export function PlaceHeading({ view, title, actions, navigate, onBack, onForward
 
     </header>
   );
+}
+
+/** Shared by place panels and the cloud computer. */
+export function SplitChatToggle({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
+  return <button id="toggle-split-chat" className="split-chat-toggle" aria-label={expanded ? "收起对话" : "展开对话"} title={expanded ? "收起对话" : "展开对话"} aria-expanded={expanded} aria-controls="chat-view" onClick={onToggle}>
+    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M9 4v16" /></svg>
+  </button>;
 }

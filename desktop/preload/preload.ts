@@ -1,6 +1,23 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { DesktopAPI, PortalState, TownLiveState } from '../shared/types';
 const api: DesktopAPI = {
+  home: {
+    state: () => ipcRenderer.invoke('beings:home-state'),
+    refresh: () => ipcRenderer.invoke('beings:home-refresh'),
+    action: action => ipcRenderer.invoke('beings:home-action', action),
+    bounds: bounds => ipcRenderer.invoke('beings:home-bounds', bounds),
+    preview: () => ipcRenderer.invoke('beings:home-preview'),
+    onExpand: callback => {
+      const listener = () => callback();
+      ipcRenderer.on('beings:home-expand', listener);
+      return () => ipcRenderer.removeListener('beings:home-expand', listener);
+    },
+    subscribe: callback => {
+      const listener = (_event: unknown, state: import('../shared/home').HomeState) => callback(state);
+      ipcRenderer.on('beings:home-state', listener);
+      return () => ipcRenderer.removeListener('beings:home-state', listener);
+    },
+  },
   dshPlugins: {
     state: () => ipcRenderer.invoke('beings:dsh-state'),
     install: source => ipcRenderer.invoke('beings:dsh-install', source),

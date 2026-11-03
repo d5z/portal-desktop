@@ -2,12 +2,15 @@ import { dshRuntime } from "../../plugins/dsh/runtime";
 import { PluginIcon } from "../../plugins/icon";
 import { RecentHistory } from './recent-history';
 import { useNavigationSort } from "./use-navigation-sort";
-import { useEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useId, useRef, useState, type ReactNode } from "react";
 import { PrivacyContent } from "../../chat/components/panels";
 import { createPortal } from "react-dom";
 import { PanelResizeHandle, usePanelWidth } from "../../shared/components/panel-resize";
 import type { AppModel } from "../models/app";
 import { useModel } from "../../shared/hooks/use-model";
+import { BeingComputer } from "./being-computer";
+
+const beingTabs = [["profile", "详情"], ["activity", "动态"], ["library", "资料库"], ["computer", "电脑"]] as const;
 
 const destinations = [
   ["bonfire", "篝火", "M12 3c2 5 6 6 6 11a6 6 0 0 1-12 0c0-3 2-5 3-7 0 3 1 4 2 4 2-2 2-5 1-8Z"],
@@ -151,7 +154,9 @@ export function BeingInfo({ app }: { app: AppModel }) {
   const town = useModel(app.town);
   const panel = useRef<HTMLElement>(null);
   const [width, setWidth] = usePanelWidth("being", 320);
-  const [tab, setTab] = useState("profile");
+  const [browserHost, setBrowserHost] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => { setBrowserHost(panel.current?.parentElement || null); }, []);
+  const [tab, setTab] = useState<typeof beingTabs[number][0]>("profile");
   const [privacyOpen, setPrivacyOpen] = useState(false);
   const privacyEntry = useRef<HTMLButtonElement>(null);
   const privacyBack = useRef<HTMLButtonElement>(null);
@@ -159,7 +164,8 @@ export function BeingInfo({ app }: { app: AppModel }) {
   useEffect(() => { if (privacyOpen) privacyBack.current?.focus(); }, [privacyOpen]);
   const name = town.displayName || app.snapshot?.settings.being || "Being";
   const status = !app.snapshot?.settings.hasToken ? "未连接" : ({online:"已连接",connecting:"连接中",reconnecting:"重连中",offline:"已离线",degraded:"连接不稳定"}[app.connection] || "正在确认连接");
-  const hidden = !app.beingInfoOpen || app.view !== "chat";
+  const hidden = !app.beingInfoOpen || app.view !== "chat" || (app.subagentSettingsOpen && !app.settingsRoute);
+  const browserAvailable = app.view === "chat" && !(app.subagentSettingsOpen && !app.settingsRoute);
   const modelKey = JSON.stringify([app.snapshot?.settings.endpoint, app.snapshot?.settings.being, app.snapshot?.settings.hasToken]);
   const [modelPreview, setModelPreview] = useState({ key: '', label: '' });
   const currentModel = modelPreview.key === modelKey ? modelPreview.label : '';
@@ -174,11 +180,17 @@ export function BeingInfo({ app }: { app: AppModel }) {
     return () => { active = false; };
   }, [app, hidden, connected, modelKey, app.subagentSettingsOpen]);
 
-  return <aside ref={panel} style={{ width, flexBasis: width }} id="being-info" className="being-info" aria-label={privacyOpen ? "隐私说明" : "Being 信息"} hidden={hidden}>
-    <PanelResizeHandle panel={panel} label="调整 Being 信息宽度" width={width} onResize={setWidth} initial={320} reserve={396} disabled={hidden} />
+  const closeInfo = () => { app.toggleBeingInfo(); document.getElementById("toggle-being-info")?.focus(); };
+  return <aside ref={panel} style={{ width, flexBasis: width }} id="being-info" className="being-info" aria-label={privacyOpen ? "隐私说明" : "Being 信息"} hidden={hidden}
+    onKeyDown={event => {
+      if (event.key === "Escape" && !event.defaultPrevented && !privacyOpen) {
+        event.stopPropagation(); closeInfo();
+      }
+    }}>
+    <PanelResizeHandle panel={panel} label="调整 Being 信息宽度" width={width} onResize={setWidth} initial={320} max={900} reserve={396} disabled={hidden} />
     <button className="close being-info-close" aria-label={privacyOpen ? "关闭隐私说明" : "关闭 Being 信息"} onClick={() => {
       if (privacyOpen) { closePrivacy(); return; }
-      app.toggleBeingInfo(); document.getElementById("toggle-being-info")?.focus();
+      closeInfo();
     }} />
     <div className="being-overview" hidden={privacyOpen}>
     <div className="being-profile">
@@ -186,12 +198,19 @@ export function BeingInfo({ app }: { app: AppModel }) {
       <h2>{name}</h2><p className="being-status" data-online={app.connection === "online"}><span aria-hidden="true" />{status}</p>
     </div>
     <div className="being-tabs" role="tablist" aria-label="Being 信息分类">
-      {[["profile", "资料"], ["activity", "动态"]].map(([key,label]) => <button key={key} id={`being-${key}-tab`} role="tab" aria-selected={tab === key} aria-controls={`being-${key}-panel`} tabIndex={tab === key ? 0 : -1}
-        onKeyDown={event => { if (["ArrowLeft","ArrowRight","Home","End"].includes(event.key)) { event.preventDefault(); const next = event.key === "Home" ? "profile" : event.key === "End" ? "activity" : tab === "profile" ? "activity" : "profile"; setTab(next); document.getElementById(`being-${next}-tab`)?.focus(); } }}
+      {beingTabs.map(([key,label], index) => <button type="button" key={key} id={`being-${key}-tab`} role="tab" aria-selected={tab === key} aria-controls={`being-${key}-panel`} tabIndex={tab === key ? 0 : -1}
+        onKeyDown={event => {
+          if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
+          event.preventDefault();
+          const nextIndex = event.key === "Home" ? 0 : event.key === "End" ? beingTabs.length - 1
+            : (index + (event.key === "ArrowRight" ? 1 : -1) + beingTabs.length) % beingTabs.length;
+          const next = beingTabs[nextIndex][0];
+          setTab(next); document.getElementById(`being-${next}-tab`)?.focus();
+        }}
         onClick={() => setTab(key)}>{label}</button>)}
     </div>
     <div className="being-info-content">
-    <section id="being-profile-panel" role="tabpanel" aria-labelledby="being-profile-tab" hidden={tab !== "profile"}>
+    <section id="being-profile-panel" role="tabpanel" tabIndex={0} aria-labelledby="being-profile-tab" hidden={tab !== "profile"}>
       <h3>关于 Being</h3>
       <dl className="being-details">
         <div><dt>名称</dt><dd>{name}</dd></div>
@@ -205,8 +224,14 @@ export function BeingInfo({ app }: { app: AppModel }) {
       <button ref={privacyEntry} className="being-action-row" onClick={() => setPrivacyOpen(true)}>隐私说明<span aria-hidden="true">›</span></button>
       <button className="being-action-row being-connect" onClick={() => app.showSettings()}>连接设置 <span aria-hidden="true">›</span></button>
     </section>
-    <section id="being-activity-panel" role="tabpanel" aria-labelledby="being-activity-tab" hidden={tab !== "activity"}>
-      {!hidden && !privacyOpen && tab === 'activity' && <RecentHistory app={app} />}
+    <section id="being-activity-panel" role="tabpanel" tabIndex={0} aria-labelledby="being-activity-tab" hidden={tab !== "activity"}>
+      {!hidden && !privacyOpen && tab === "activity" && <RecentHistory app={app} />}
+    </section>
+    <section id="being-library-panel" role="tabpanel" tabIndex={0} aria-labelledby="being-library-tab" hidden={tab !== "library"}>
+      <p className="being-library-empty">云电脑创建的 HTML 页面和文件会显示在这里。</p>
+    </section>
+    <section id="being-computer-panel" role="tabpanel" tabIndex={0} aria-labelledby="being-computer-tab" hidden={tab !== "computer"}>
+      <BeingComputer name={name} api={app.api.home} active={!hidden && !privacyOpen && tab === "computer"} context={app.snapshot?.settings.endpoint || ""} browserHost={browserHost} available={browserAvailable} />
     </section>
     </div>
     </div>

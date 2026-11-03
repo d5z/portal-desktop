@@ -1,0 +1,10 @@
+import { build } from 'esbuild';
+import { mkdir, copyFile } from 'node:fs/promises';
+import { writeThirdPartyLicenses } from './third-party-licenses.mjs';
+await mkdir('desktop/generated', { recursive: true });
+const result = await build({ entryPoints: ['desktop/renderer/home/main.ts'], bundle: true, platform: 'browser', format: 'iife', minify: true, metafile: true, outfile: 'desktop/generated/home-viewer.js' });
+await build({ entryPoints: ['desktop/preload/home-viewer.ts'], bundle: true, platform: 'node', format: 'cjs', external: ['electron'], outfile: 'desktop/generated/home-viewer-preload.cjs' });
+await copyFile('desktop/renderer/home/home-viewer.html', 'desktop/generated/home-viewer.html');
+await copyFile('desktop/renderer/home/home-viewer.css', 'desktop/generated/home-viewer.css');
+await writeThirdPartyLicenses('desktop/generated/HOME-VIEWER-LICENSES.txt', Object.keys(result.metafile.inputs));
+console.log('Built local Home RFB viewer.');

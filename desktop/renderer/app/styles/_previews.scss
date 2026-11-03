@@ -323,18 +323,6 @@
   color: var(--secondary);
 }
 
-@container stage (max-width:620px) {
-  .workspace-stage .pair-name {
-    display: flex;
-    grid-column: 1;
-    justify-content: flex-start;
-  }
-
-  .workspace-stage .pair-name > span {
-    display: none;
-  }
-}
-
 .being-recent-history {
   margin: 0;
 }

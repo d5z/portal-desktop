@@ -24,6 +24,40 @@ html[data-platform='darwin'] .topbar {
   letter-spacing: 0.2px;
 }
 
+.conversation-identity {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 4px 14px 4px 6px;
+  border-radius: 24px;
+  background: var(--control);
+  box-shadow: 0 2px 8px #0000000a;
+  -webkit-app-region: no-drag;
+}
+
+.conversation-identity:hover,
+.conversation-identity[aria-expanded='true'] {
+  background: var(--surface);
+}
+
+.conversation-identity:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.conversation-avatar {
+  display: grid;
+  place-items: center;
+  flex: 0 0 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--secondary);
+  font-size: 15px;
+}
+
 .chat-scene-control {
   grid-column: 1;
   justify-self: start;
@@ -453,8 +487,8 @@ body[data-view='chat'].has-topic .scene-ribbon {
 
 @media (max-width: 640px) {
   .topbar {
-    padding: 0 20px !important;
-    grid-template-columns: 70px minmax(0, 1fr) 106px;
+    padding: 0 12px;
+    grid-template-columns: minmax(32px, 1fr) minmax(0, 2fr) minmax(32px, 1fr);
     gap: 10px;
     height: 60px;
   }

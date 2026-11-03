@@ -164,7 +164,13 @@ export function Topbar({ model }: { model: AppModel }) {
         })}
       />
       <div className="pair-name">
-        <span id="conversation-name">{town.displayName || app.snapshot?.settings.being || "Being"}</span>
+        <button id="toggle-being-info" type="button" className="conversation-identity"
+          hidden={app.view !== "chat" || app.subagentSettingsOpen} aria-label="Being 信息"
+          title="查看 Being 信息" aria-describedby="conversation-name" aria-controls="being-info" aria-expanded={app.beingInfoOpen}
+          onClick={app.toggleBeingInfo}>
+          <span className="conversation-avatar" aria-hidden="true">{(town.displayName || app.snapshot?.settings.being || "Being").slice(0, 1).toUpperCase()}</span>
+          <span id="conversation-name">{town.displayName || app.snapshot?.settings.being || "Being"}</span>
+        </button>
         <SbsControl known={hasToken && app.sbsKnown && !app.chatLoading} enabled={app.sbsEnabled}
           origin={app.chatSbsOrigin} phase={app.chatSbsPhase} showContent={app.chatShowSbsMessages} allScenes={app.chatHistoryScope==='all'}
           visibilityReady={hasToken && !app.chatLoading && !!app.chatSbsSceneId && app.chatSbsSceneId===app.snapshot?.chatScene?.scene_id}
@@ -185,10 +191,6 @@ export function Topbar({ model }: { model: AppModel }) {
           <svg viewBox="0 0 24 24" aria-hidden="true">
             <path d="M20 11a8 8 0 0 0-14.9-3.9L3 9m0 0V4m0 5h5M4 13a8 8 0 0 0 14.9 3.9L21 15m0 0v5m0-5h-5" />
           </svg>
-        </button>
-        <button id="toggle-being-info" hidden={app.view !== "chat" || app.subagentSettingsOpen} className="topbar-icon-button" aria-label="Being 信息" title="Being 信息"
-          aria-controls="being-info" aria-expanded={app.beingInfoOpen && !(app.view !== "chat" && app.chatSplitOpen)} onClick={app.toggleBeingInfo}>
-          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="4" /><path d="M4 21a8 8 0 0 1 16 0" /></svg>
         </button>
         {createPortal(<div className="rail-update">
         <UpdateProgress

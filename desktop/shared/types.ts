@@ -67,6 +67,7 @@ export interface BrowserBounds { x: number; y: number; width: number; height: nu
 export type BrowserAction = 'back' | 'forward' | 'reload' | 'stop' | 'external' | 'close';
 export type ChatEditCommand = 'cut' | 'copy' | 'paste';
 export interface DesktopAPI {
+  home?: import('./home').HomeAPI;
   dshPlugins?: import("./dsh-plugins").DshPluginAPI;
   toolApprovalPending?(): Promise<import('./security').ToolApprovalView | null>;
   answerToolApproval?(id: string, allowed: boolean): Promise<void>;

@@ -1,0 +1,9 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src blob: data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>云电脑画面</title><link rel="stylesheet" href="home-viewer.css"><script defer src="home-viewer.js"></script></head>
+<body class="preview"><main id="viewport" aria-label="云电脑实时画面"><div id="screen"></div><img id="frame" alt="云电脑实时画面" hidden>
+<div id="loading" role="status"><svg viewBox="0 0 48 48" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><rect x="7" y="9" width="34" height="26" rx="7"/><path d="M18 41h12m-6-6v6M19 20v5m10-5v5"/></svg><span id="loading-text">正在连接…</span></div>
+<div id="preview-overlay"><button id="expand" aria-label="放大展示云端浏览器"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4"/></svg>放大展示</button></div>
+<textarea id="keyboard" aria-label="云电脑键盘输入" autocomplete="off" autocapitalize="off" spellcheck="false" disabled></textarea></main>
+<footer><div class="control-pill"><span id="status" role="status">仅观看</span><button id="control" disabled>接管浏览器</button></div></footer><div id="notice" role="alert" hidden></div></body></html>

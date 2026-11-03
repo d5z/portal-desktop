@@ -49,7 +49,7 @@ export function PanelResizeHandle({ panel, label, width, onResize, initial, min 
   }, []);
   useEffect(() => { if (disabled) stop(); }, [disabled]);
   return <div ref={handle} className={clsx(styles.handle, styles[edge])} data-slot="panel-resize-handle" role="separator" tabIndex={0} hidden={disabled}
-    aria-label={label} aria-orientation="vertical" aria-valuemin={lower} aria-valuemax={limit}
+    aria-description="拖动调整宽度，双击恢复" aria-label={label} aria-orientation="vertical" aria-valuemin={lower} aria-valuemax={limit}
     aria-valuenow={Math.max(lower, Math.min(limit, width))} aria-valuetext={`${Math.max(lower, Math.min(limit, width))} 像素`}
     onPointerDown={event => {
       if (event.button !== 0 || !panel.current) return;

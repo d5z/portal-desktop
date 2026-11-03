@@ -1,0 +1,20 @@
+:root{--bg:#fcfcfc;--text:#242424;--secondary:#62676d;--mask:rgb(128 128 128 / 40%);color-scheme:light}
+:root[data-theme=dark]{--bg:#202124;--text:#eceef1;--secondary:#b0b3b9;color-scheme:dark}
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:var(--bg);color:var(--text);font:13px/1.5 system-ui,sans-serif}
+body{display:flex;flex-direction:column}button{appearance:none;border:0;font:inherit;cursor:pointer}button:disabled{cursor:default;opacity:.45}button:focus-visible{outline:2px solid #669cdb;outline-offset:3px}
+#viewport{margin:16px 8px 0;flex:1;position:relative;min-height:0;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.preview #viewport{margin:0}
+#screen{position:absolute;inset:0;pointer-events:none}#frame{pointer-events:none;max-width:100%;max-height:100%;object-fit:contain}#frame[hidden]{display:none}
+#loading{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;background:var(--bg);color:var(--secondary)}
+#loading[hidden]{display:none}#loading svg{width:42px;height:42px;animation:breathe 1.8s ease-in-out infinite}
+#preview-overlay{display:none;position:absolute;inset:0;place-items:center;background:var(--mask);opacity:0;transition:opacity 160ms ease}
+.preview #preview-overlay{display:grid}.preview #viewport:is(:hover,:has(button:focus-visible)) #preview-overlay{opacity:1}
+#expand,#control{display:inline-flex;align-items:center;justify-content:center;gap:8px;border-radius:24px;padding:9px 16px;background:var(--text);color:var(--bg)}
+#expand svg{width:16px;height:16px}#expand:hover,#control:hover:not(:disabled){filter:brightness(.9)}
+#keyboard{position:absolute;left:1px;bottom:1px;width:1px;height:1px;padding:0;border:0;opacity:0;resize:none;pointer-events:none}
+footer{display:flex;justify-content:center;padding:12px 16px 16px;flex:none}.preview footer{display:none}
+.control-pill{display:flex;align-items:center;gap:12px;border:1px solid color-mix(in srgb,var(--text) 12%,transparent);border-radius:28px;padding:4px 4px 4px 16px;background:var(--bg)}
+#status{color:var(--secondary);white-space:nowrap}#notice{position:absolute;bottom:78px;left:16px;right:16px;text-align:center;color:var(--text);padding:8px 12px;background:var(--bg);border-radius:8px}.preview #notice{bottom:12px}
+@keyframes breathe{0%,100%{opacity:.45;transform:scale(.96)}50%{opacity:1;transform:scale(1)}}
+@media(hover:none){.preview #preview-overlay{opacity:1}}
+@media(prefers-reduced-motion:reduce){#preview-overlay{transition:none}#loading svg{animation:none}}

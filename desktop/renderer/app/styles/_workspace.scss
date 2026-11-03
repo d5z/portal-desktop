@@ -51,7 +51,7 @@
 .workspace-stage .topbar,
 html[data-platform='darwin'] .workspace-stage .topbar {
   padding: 0 24px;
-  grid-template-columns: minmax(110px, 1fr) auto minmax(100px, 1fr);
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto) minmax(0, 1fr);
 }
 
 .chat-scene-indicator {
@@ -275,17 +275,28 @@ html[data-platform='darwin'] .workspace-stage .topbar {
 @container stage (max-width:620px) {
   .workspace-stage .topbar,
   html[data-platform='darwin'] .workspace-stage .topbar {
-    grid-template-columns: minmax(90px, 1fr) auto;
-    gap: 10px;
-    padding: 0 18px;
+    grid-template-columns: minmax(32px, 1fr) minmax(0, 2fr) minmax(32px, 1fr);
+    gap: 8px;
+    padding: 0 12px;
   }
 
   .pair-name {
-    display: none;
+    justify-self: center;
+    max-width: 100%;
+    gap: 4px;
+  }
+
+  .conversation-identity {
+    padding: 4px 8px;
+    gap: 6px;
+  }
+
+  .chat-scene-indicator {
+    padding-inline: 8px;
   }
 
   .topbar-actions {
-    grid-column: 2;
+    grid-column: 3;
   }
 }
 
