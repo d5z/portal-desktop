@@ -12,14 +12,17 @@ renderer/
 │  ├─ components/           顶栏、设置、搜索、场景面板、诊断
 │  ├─ models/               应用状态、跨页面工作场景
 │  ├─ hooks/                桌面与聊天的通信
-│  └─ styles.css            桌面文档样式入口
+│  ├─ styles.scss           桌面文档样式入口
+│  └─ styles/               按领域拆分的全局 SCSS
 ├─ chat/                    独立聊天页
 │  ├─ main.tsx / page.tsx
 │  ├─ components/           消息、过程、导航、设置和说明面板
 │  ├─ models/               消息、附件、过程状态与协议类型
 │  ├─ hooks/                会话生命周期
 │  ├─ services/             流式请求、重试、重放、frame 通信
-│  └─ styles.css            聊天文档样式入口
+│  ├─ document.scss         桌面与 Web 聊天共享样式入口
+│  ├─ styles.scss           聊天领域样式编排
+│  └─ styles/               消息、附件、智能 UI 等 SCSS 分区
 ├─ town/                    小镇、篝火、围炉、私信、阅读及 Kit
 │  ├─ page.tsx
 │  ├─ components/           身份、发送、内容阅读和安装面板
@@ -48,7 +51,8 @@ renderer/
   `desktop/shared/types.ts`。禁止 renderer 导入 `main/`、`preload/`、Electron 或 Node。
 - 文件名省略目录已表达的模块前缀。使用明确的相对导入，不添加转发用 `index.ts`
   或旧路径兼容层。
-- 两个独立文档各有一个样式入口，保留既有级联顺序，避免零散覆盖文件相互依赖。
+- 文档入口保留全局样式和既有级联顺序；新增或迁移组件使用就近的
+  `*.module.scss`，由组件直接导入。主题变量、作用域及构建约定见[样式规范](STYLING.md)。
 
 ## React 与聊天协议
 

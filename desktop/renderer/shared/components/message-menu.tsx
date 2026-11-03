@@ -1,3 +1,4 @@
+import styles from './message-menu.module.scss';
 import { useMenuDismiss } from '../hooks/use-menu-dismiss';
 import {useCallback,useEffect,useLayoutEffect,useRef,useState,type KeyboardEvent,type MouseEvent} from 'react';
 import {createPortal} from 'react-dom';
@@ -44,7 +45,7 @@ export function useMessageMenu(copy:(text:string)=>Promise<void>,scope:string) {
   };
   const timestamp=context?fullMessageTime(context.time,context.fallbackTime):'';
   const shortTime=context?.time!==undefined&&Number.isFinite(new Date(context.time).getTime())?messageTimeLabel(context.time):timestamp;
-  const content=context&&createPortal(<div ref={menu} popover="manual" className="message-context-menu" role="menu" tabIndex={-1} aria-label="消息操作" aria-busy={busy||undefined} style={{left:context.x,top:context.y}}
+  const content=context&&createPortal(<div ref={menu} popover="manual" className={styles.menu} role="menu" tabIndex={-1} aria-label="消息操作" aria-busy={busy||undefined} style={{left:context.x,top:context.y}}
     onKeyDown={event=>{
       event.stopPropagation();
       if(event.key==='Escape'||event.key==='Tab'){event.preventDefault();close(true);return;}
@@ -53,11 +54,11 @@ export function useMessageMenu(copy:(text:string)=>Promise<void>,scope:string) {
       const index=items.indexOf(document.activeElement as HTMLButtonElement),next=event.key==='Home'?0:event.key==='End'?items.length-1:(index+(event.key==='ArrowUp'?-1:1)+items.length)%items.length;
       items[next]?.focus();
     }}>
-    {timestamp&&<div className="message-menu-info"><time title={timestamp} dateTime={context.time!==undefined&&Number.isFinite(new Date(context.time).getTime())?new Date(context.time).toISOString():undefined}>{shortTime}</time></div>}
+    {timestamp&&<div className={styles.info}><time title={timestamp} dateTime={context.time!==undefined&&Number.isFinite(new Date(context.time).getTime())?new Date(context.time).toISOString():undefined}>{shortTime}</time></div>}
     <button role="menuitem" type="button" disabled={busy||!(context.selected||context.text)} onClick={()=>void copyValue(context.selected||context.text)}><CopyIcon/>复制</button>
-    {error&&<p className="message-menu-error" role="alert">{error}</p>}
+    {error&&<p className={styles.error} role="alert">{error}</p>}
   </div>,context.portal);
-  return {openMenu,closeMenu:close,isOpen:!!context,menu:<>{content}{notice&&createPortal(<div className="message-menu-notice" role="status">{notice.text}</div>,notice.portal)}</>};
+  return {openMenu,closeMenu:close,isOpen:!!context,menu:<>{content}{notice&&createPortal(<div className={styles.notice} role="status">{notice.text}</div>,notice.portal)}</>};
 }
 function CopyIcon() {
   return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="12" height="13" rx="3"/><path d="M9 8V6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-2"/></svg>;

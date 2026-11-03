@@ -1,0 +1,326 @@
+/* React owns the full chat document, including panels and process records. */
+#root,
+.chat-root {
+  height: 100%;
+  min-height: 0;
+}
+
+.chat-root [hidden] {
+  display: none !important;
+}
+
+.header-spacer {
+  flex: 1;
+}
+
+.chat-history-scope {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  width: calc(100% - 56px);
+  max-width: 720px;
+  flex-shrink: 0;
+  margin: 10px auto 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.chat-scope-switch {
+  display: flex;
+  gap: 2px;
+  flex-shrink: 0;
+  background: var(--bg-softer);
+  padding: 3px;
+  border-radius: 8px;
+}
+
+.chat-scope-switch button {
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  padding: 5px 11px;
+  font: 12px/1.5 var(--font-sans);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.chat-scope-switch button[aria-pressed='true'] {
+  color: var(--text);
+  background: var(--bg);
+  box-shadow: 0 1px 3px #0001;
+}
+
+.chat-scope-switch button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.chat-scope-switch button:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 2px;
+}
+
+.chat-scope-caption {
+  font-size: 12px;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+
+.message-scene {
+  display: inline-block;
+  max-width: 220px;
+  margin-left: 8px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: var(--bg-softer);
+  color: var(--text-dim);
+  vertical-align: bottom;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-scope-empty {
+  padding: 48px 12px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.chat-scope-empty button {
+  display: block;
+  margin: 12px auto 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+@media (max-width: 680px) {
+  .chat-history-scope {
+    width: calc(100% - 48px);
+    gap: 8px;
+  }
+
+  .chat-scope-caption {
+    font-size: 12px;
+  }
+
+  .message-scene {
+    max-width: 160px;
+  }
+}
+
+button.llm-item,
+button.llm-custom-link,
+button.step2-back {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+}
+
+button.llm-item,
+button.llm-custom-link {
+  background: transparent;
+}
+
+button.llm-custom-link,
+button.step2-back {
+  border: 0;
+  cursor: pointer;
+}
+
+.loom-version {
+  padding: 12px 16px 8px;
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+#cfg-status {
+  padding: 0 16px;
+}
+
+#pending-files .remove {
+  background: none;
+  border: 0;
+  color: inherit;
+  cursor: pointer;
+}
+
+.chat-error {
+  padding: 24px;
+}
+
+.standalone-chat #header {
+  display: flex;
+}
+
+.standalone-chat #being-name {
+  background: none;
+  border: 0;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* Reserve a side action beside the bubble so hover never shifts its content. */
+
+.message-bubble-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+}
+
+.message.user .message-bubble-row {
+  flex-direction: row-reverse;
+  max-width: min(100%, calc(85% + 40px));
+}
+
+.message-bubble-body {
+  min-width: 0;
+}
+
+/* The row owns the width limit; do not apply the role's percentage again inside it. */
+.message:is(.user, .being, .system) .message-bubble-body > .content,
+.message .message-bubble-body > .intelligent-answer > .content {
+  max-width: 100%;
+}
+
+@media (max-width: 680px) {
+  .message.user .message-bubble-row {
+    max-width: 100%;
+  }
+}
+
+.message .meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.message .meta.time-only {
+  display: flex;
+}
+
+#input:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* Process metadata lives inside the existing reasoning disclosure. */
+.scene-scheduling {
+  margin: 14px 0 24px;
+  color: var(--muted, #838b83);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.scene-scheduling h4 {
+  margin: 0;
+  font: inherit;
+  font-weight: 500;
+}
+
+.run-activity .scene-scheduling {
+  margin: 12px 0 16px 24px;
+}
+
+.scene-scheduling > p {
+  margin: 10px 0;
+}
+
+.scene-scheduling pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  padding: 12px 16px;
+  border-left: 2px solid var(--border, #e4e5dd);
+}
+
+.scene-task-list ul {
+  list-style: none;
+  padding: 0 0 0 16px;
+  border-left: 2px solid var(--border, #e4e5dd);
+}
+
+.scene-task-list li {
+  padding: 9px 0;
+}
+
+.scene-task-list small {
+  display: block;
+  overflow-wrap: anywhere;
+  opacity: 0.8;
+}
+
+.scene-task-error {
+  color: #b96859;
+  margin: 4px 0;
+}
+
+.scene-task-spinner {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border: 1.5px solid currentcolor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: scene-task-spin 1s linear infinite;
+}
+
+@keyframes scene-task-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scene-task-spinner {
+    animation: none;
+  }
+}
+
+.local-queue-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  color: var(--text-muted, #888);
+  font-size: 13px;
+}
+
+.local-queue-status button {
+  background: none;
+  border: 0;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+label.chat-scope-switch {
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+label.chat-scope-switch input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+/* Interrupted prose stays readable; the turn status is shown once below it. */

@@ -1,0 +1,124 @@
+/* Preserve keyboard focus for controls without a component-specific rule. */
+
+* {
+  box-sizing: border-box;
+}
+
+.permission-settings-section {
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+}
+
+.permission-section-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0 0 12px;
+  gap: 12px;
+}
+
+.permission-section-heading small {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.permission-note {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.7;
+  margin: 10px 0 0;
+}
+
+html,
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.5 var(--font-sans);
+}
+
+body {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+  color: inherit;
+  border: 0;
+  background: none;
+  transition:
+    background 0.15s,
+    color 0.15s;
+}
+
+button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+button:active:not(:disabled) {
+  background: var(--pressed);
+}
+
+button.selected:hover:not(:disabled) {
+  background: var(--selected);
+}
+
+button.selected:active:not(:disabled) {
+  background: var(--pressed);
+}
+
+button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+button:focus-visible,
+input:focus-visible,
+summary:focus-visible {
+  outline: 2px solid var(--secondary);
+  outline-offset: 3px;
+}
+
+[hidden] {
+  display: none !important;
+}
+
+svg {
+  display: block;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  font-size: 24px;
+  line-height: 1.4;
+  letter-spacing: -0.6px;
+  font-weight: 550;
+}
+
+h2 {
+  font-size: 15px;
+  font-weight: 550;
+  margin-bottom: 0;
+}
+
+main {
+  min-width: 0;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}

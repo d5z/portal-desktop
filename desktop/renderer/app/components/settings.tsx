@@ -10,7 +10,8 @@ import { Diagnostics } from "./diagnostics";
 import { NavigationControls } from "../../shared/components/navigation-controls";
 import { navigateTabs } from "../../shared/components/tab-navigation";
 import { MAX_CHAT_HISTORY_LIMIT, validChatHistoryLimit } from '../../../shared/chat-history';
-const settingsTabs = [
+import { dshRuntime } from '../../plugins/dsh/runtime';
+const baseSettingsTabs = [
   { id: "being", label: "Being", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0" },
   { id: "portal", label: "Portal", icon: "M5 4h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm3 16h8m-4-4v4" },
   { id: "town", label: "Town", icon: "m3 10 9-7 9 7M5 9v12h14V9m-9 12v-7h4v7" },
@@ -28,6 +29,9 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
   useSyncExternalStore(model.town.subscribe, () => model.settingsRoute === "town" ? model.town.getVersion() : -1);
   const app = model;
   const open = app.clientSettingsOpen || Boolean(app.settingsRoute);
+  useSyncExternalStore(dshRuntime.subscribe, () => open ? dshRuntime.getVersion() : -1);
+  const settingsTabs = app.api.dshPlugins ? [...baseSettingsTabs, {id:'plugins', label:'插件', icon:'M9 3h6v6h6v6h-6v6H9v-6H3V9h6V3Z'}] : baseSettingsTabs;
+  const pluginSettings = dshRuntime.slots.filter(slot => slot.name === 'settings.section').sort((a,b) => (a.order || 0) - (b.order || 0));
   const route = app.settingsRoute;
   const [modelBusy, setModelBusy] = useState(false);
   const [leaving, setLeaving] = useState(false);
@@ -151,6 +155,16 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
           <button type="button" disabled={busy} onClick={() => void leave(true, true)}>放弃并关闭</button></div>
         </div>}
         <div className="dialog-body settings-home-body settings-inline-body" ref={body}>
+        <div id="settings-panel-plugins" role="tabpanel" aria-labelledby="settings-tab-plugins" hidden={activeTab !== 'plugins'}>
+          <p className="field-help">调整插件的外观和行为。</p>
+          <div className="dsh-settings-links">
+            {pluginSettings.map((slot,index) => <button aria-label={slot.label || slot.id || slot.owner} key={`${slot.owner}:${slot.id || index}`} onClick={async () => {
+              if (!await leave(true)) return;
+              dshRuntime.panel = slot; dshRuntime.managerOpen = true; dshRuntime.changed();
+            }}><span><strong>{slot.label || slot.id || slot.owner}</strong><small>{slot.owner}</small></span><DisclosureIcon /></button>)}
+            <button aria-label="管理第三方插件" onClick={async () => { if (await leave(true)) dshRuntime.openManager(); }}><span><strong>管理第三方插件</strong><small>安装、启停与更新</small></span><DisclosureIcon /></button>
+          </div>
+        </div>
         <div id="settings-panel-being" role="tabpanel" aria-labelledby="settings-tab-being" hidden={activeTab !== 'being'}>
           {open && activeTab === 'being' && <>
             <section className="general-settings-group">
@@ -200,8 +214,8 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
               <div id="theme-toggle" className="theme-options" role="group" aria-label="主题配色">
                 {(["light", "dark"] as const).map(theme => (
                   <button key={theme} id={`theme-${theme}`} type="button"
-                    aria-pressed={app.theme === theme}
-                    onClick={() => { if (app.theme !== theme) void app.toggleTheme(); }}>
+                    aria-pressed={app.colorScheme === theme}
+                    onClick={() => void app.setTheme(theme)}>
                     <svg viewBox="0 0 20 20" aria-hidden="true">
                       {theme === "light" ? <><circle cx="10" cy="10" r="3.25" /><path d="M10 1.5v2m0 13v2M1.5 10h2m13 0h2M4 4l1.4 1.4m9.2 9.2L16 16M4 16l1.4-1.4m9.2-9.2L16 4" /></>
                         : <path d="M16.8 12.1A7 7 0 0 1 7.9 3.2a7 7 0 1 0 8.9 8.9Z" />}

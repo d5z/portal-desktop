@@ -1,0 +1,739 @@
+/* Semantic answer components: shared by generated answers and local examples. */
+.intelligent-ui {
+  container-type: inline-size;
+  box-shadow: none;
+}
+
+.intelligent-ui .iui-body {
+  gap: 22px;
+  padding: 18px 24px 28px;
+  overflow-wrap: anywhere;
+}
+
+.intelligent-ui .iui-body > h3 {
+  font-size: 24px;
+  line-height: 1.35;
+  letter-spacing: -0.5px;
+}
+
+.intelligent-ui .iui-text {
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.intelligent-ui .iui-section {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.intelligent-ui .iui-section > h4 {
+  font-size: 18px;
+  letter-spacing: -0.2px;
+}
+
+.intelligent-ui .iui-section > p,
+.iui-media p,
+.iui-list p {
+  color: var(--text-dim);
+  font-size: 14px;
+  line-height: 1.7;
+}
+
+.intelligent-ui .iui-card {
+  padding: 18px;
+  gap: 16px;
+  border-radius: 16px;
+  background: transparent;
+}
+
+.intelligent-ui .iui-card > h4 {
+  font-size: 18px;
+}
+
+.intelligent-ui .iui-heading {
+  margin: 0;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.intelligent-ui h2.iui-heading {
+  font-size: 22px;
+}
+
+.intelligent-ui h3.iui-heading {
+  font-size: 18px;
+}
+
+.intelligent-ui h4.iui-heading {
+  font-size: 16px;
+}
+
+.iui-divider {
+  width: 100%;
+  border: 0;
+  border-top: 1px solid var(--border);
+  margin: 0;
+}
+
+.iui-grid,
+.iui-gallery {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  min-width: 0;
+}
+
+.iui-layout-three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.iui-grid > *,
+.iui-gallery > * {
+  min-width: 0;
+}
+
+.iui-gallery {
+  gap: 4px;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.iui-gallery .iui-image img {
+  aspect-ratio: 4/3;
+  border-radius: 0;
+}
+
+.iui-gallery.iui-layout-collage:has(> :nth-child(3)):not(:has(> :nth-child(4))) {
+  grid-template-columns: 3fr 2fr;
+}
+
+.iui-gallery.iui-layout-collage:has(> :nth-child(3)):not(:has(> :nth-child(4))) > :first-child {
+  grid-row: span 2;
+}
+
+.iui-gallery.iui-layout-collage:has(> :nth-child(3)):not(:has(> :nth-child(4))) .iui-image img {
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+}
+
+.iui-gallery.iui-layout-collage:has(> :nth-child(3)):not(:has(> :nth-child(4))) {
+  aspect-ratio: 2/1;
+  grid-template-rows: repeat(2, minmax(0, 1fr));
+}
+
+.iui-gallery .iui-image {
+  position: relative;
+  overflow: hidden;
+}
+
+.iui-gallery figcaption {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 18px 10px 8px;
+  margin: 0;
+  color: white;
+  background: linear-gradient(transparent, #000b);
+  font-size: 12px;
+  pointer-events: none;
+}
+
+.iui-gallery .iui-image-unavailable {
+  background: var(--bg-soft);
+}
+
+.iui-gallery .iui-image-unavailable figcaption {
+  position: static;
+  color: var(--text-dim);
+  background: none;
+  padding: 12px;
+}
+
+.iui-image-note {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.iui-media {
+  display: flex;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--border);
+  min-width: 0;
+  align-items: flex-start;
+}
+
+.iui-media > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.iui-media > .iui-image {
+  flex: 0 0 80px;
+}
+
+.iui-media .iui-image img {
+  width: 80px;
+  height: 100px;
+  border-radius: 12px;
+}
+
+.intelligent-ui .iui-media h4 {
+  font-size: 16px;
+  margin-bottom: 6px;
+}
+
+.iui-grid .iui-media {
+  padding: 14px 0;
+}
+
+.intelligent-ui .iui-facts dl {
+  margin: 0;
+}
+
+.iui-facts dl > div {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 20px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.iui-facts dl > div:last-child {
+  border-bottom: 0;
+}
+
+.iui-facts dt {
+  color: var(--text-dim);
+  min-width: 0;
+}
+
+.iui-facts dd {
+  margin: 0;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  max-width: 70%;
+}
+
+.intelligent-ui .iui-list {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 14px;
+}
+
+.iui-list li::marker {
+  color: var(--text-muted);
+}
+
+.iui-list p {
+  margin-top: 4px;
+}
+
+.iui-stepper {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 0 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.iui-stepper > span {
+  color: var(--text-dim);
+}
+
+.iui-stepper > div {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.intelligent-ui .iui-stepper button {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.iui-stepper output {
+  min-width: 48px;
+  text-align: center;
+  font-size: 20px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.iui-checklist-heading {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.iui-checklist-heading > span {
+  font-size: 12px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.iui-checklist progress {
+  display: block;
+  appearance: none;
+  border: 0;
+  width: 100%;
+  height: 3px;
+  margin-top: 14px;
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--bg-soft);
+}
+
+.iui-checklist progress::-webkit-progress-bar {
+  background: var(--bg-soft);
+}
+
+.iui-checklist progress::-webkit-progress-value {
+  background: var(--green);
+}
+
+.iui-checklist progress::-moz-progress-bar {
+  background: var(--green);
+}
+
+.intelligent-ui .iui-timeline ol {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  gap: 0;
+}
+
+.iui-timeline li {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.iui-timeline li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.iui-timeline label {
+  cursor: pointer;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.iui-timeline input[type='checkbox'] {
+  appearance: none;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  border: 1px solid var(--text-ghost);
+  border-radius: 50%;
+  margin: 3px 0 0;
+  display: grid;
+  place-content: center;
+  background: var(--bg);
+  cursor: pointer;
+}
+
+.iui-timeline input:checked {
+  background: var(--text);
+  border-color: var(--text);
+}
+
+.iui-timeline input:checked::after {
+  content: '';
+  width: 8px;
+  height: 5px;
+  border-left: 1.5px solid var(--bg);
+  border-bottom: 1.5px solid var(--bg);
+  transform: translateY(-1px) rotate(-45deg);
+}
+
+.iui-task-content {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.iui-task-time {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.iui-task-content strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.iui-task-description {
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-dim);
+}
+
+.iui-timeline [data-complete='true'] .iui-task-content {
+  opacity: 0.65;
+}
+
+.iui-timeline [data-complete='true'] strong {
+  text-decoration: line-through;
+}
+
+@container (max-width: 520px) {
+  .intelligent-ui .iui-body {
+    padding: 14px 16px 22px;
+    gap: 20px;
+  }
+
+  .iui-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+
+  .intelligent-ui .iui-card {
+    padding: 14px;
+  }
+
+  .iui-stepper > div {
+    gap: 8px;
+  }
+
+  .iui-facts dl > div {
+    gap: 12px;
+  }
+}
+
+@media (forced-colors: active) {
+  .iui-timeline input[type='checkbox'] {
+    appearance: auto;
+  }
+
+  .iui-timeline input:checked::after {
+    display: none;
+  }
+}
+
+.iui-tabs {
+  display: grid;
+  gap: 18px;
+  min-width: 0;
+}
+
+.iui-tabs [role='tabpanel'][hidden] {
+  display: none;
+}
+
+.iui-tabs [role='tab'][aria-selected='true'] {
+  background: var(--text);
+  color: var(--bg);
+}
+
+.iui-breakdown {
+  display: grid;
+  gap: 14px;
+}
+
+.iui-breakdown figcaption {
+  font-weight: 500;
+  color: var(--text-dim);
+}
+
+.iui-breakdown-track {
+  height: 24px;
+  display: flex;
+  overflow: hidden;
+  border-radius: 7px;
+  background: var(--bg-soft);
+}
+
+.iui-breakdown-track span {
+  min-width: 0;
+}
+
+.iui-breakdown dl {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 14px;
+  margin: 0;
+}
+
+.iui-breakdown dt {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+
+.iui-breakdown i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.iui-breakdown dd {
+  font-size: 20px;
+  font-weight: 600;
+  margin: 4px 0 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.intelligent-ui .iui-app .iui-body {
+  padding: 0;
+}
+
+.iui-version-picker {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-dim);
+  font-size: 12px;
+  margin-top: 12px;
+}
+
+.iui-version-picker select {
+  font: inherit;
+  color: var(--text);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+}
+
+.iui-update-reference {
+  padding: 10px 0;
+  color: var(--text-dim);
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.iui-update-reference button {
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.iui-update-reference button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.composer-queue-wrap {
+  width: calc(100% - 56px);
+  max-width: 780px;
+  margin: 0 auto;
+}
+
+.composer-queue {
+  display: block;
+  width: calc(100% - 56px);
+  max-width: 100%;
+  margin: 0 auto;
+  box-sizing: border-box;
+  padding: 0;
+  max-height: 120px;
+  overflow: hidden auto;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg-soft);
+}
+
+.composer-queue-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  box-sizing: border-box;
+  padding: 2px 8px;
+  font-size: 13px;
+  min-width: 0;
+  color: var(--text);
+}
+
+.composer-queue-item {
+  touch-action: none;
+  transition:
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+.composer-queue-item.dragging {
+  opacity: 0.8;
+  background: var(--bg-soft);
+  box-shadow: 0 3px 10px color-mix(in srgb, var(--text) 12%, transparent);
+  user-select: none;
+}
+
+.composer-queue-drag-handle {
+  display: grid;
+  place-items: center;
+  flex: 0 0 26px;
+  height: 26px;
+  border-radius: 6px;
+  color: var(--text-dim);
+  cursor: grab;
+  touch-action: none;
+}
+
+.composer-queue-drag-handle:hover {
+  background: var(--bg-soft);
+  color: var(--text);
+}
+
+.composer-queue-item.dragging .composer-queue-drag-handle {
+  cursor: grabbing;
+}
+
+.composer-editing-queue {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: 0 0 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.composer-editing-queue button {
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+  padding: 3px 6px;
+}
+
+.composer-queue-item + .composer-queue-item {
+  border-top: 1px solid var(--border);
+}
+
+.composer-queue-icon {
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
+
+.composer-queue-content {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.composer-queue-edit {
+  flex: 1;
+  min-width: 0;
+  min-height: 28px;
+  max-height: 80px;
+  resize: vertical;
+  padding: 4px 6px;
+  border: 1px solid var(--border);
+  border-radius: 5px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.composer-queue-text-action {
+  width: auto !important;
+  min-width: 38px !important;
+  white-space: nowrap !important;
+  padding: 4px 7px !important;
+}
+
+.composer-queue-notice {
+  flex-shrink: 0;
+  cursor: help;
+  font-size: 12px;
+}
+
+.composer-queue button,
+.composer-queue-hint button {
+  flex-shrink: 0;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 5px;
+}
+
+.composer-queue button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+}
+
+.composer-queue button.composer-queue-steer {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  width: auto;
+  padding: 4px 6px;
+  white-space: nowrap;
+}
+
+.composer-queue button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.composer-queue button:hover,
+.composer-queue-hint button:hover {
+  background: var(--bg-soft);
+  color: var(--text);
+}
+
+.composer-queue button:disabled,
+.composer-queue-hint button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.composer-queue-hint {
+  position: absolute;
+  right: 42px;
+  bottom: 0;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  z-index: 1;
+  white-space: nowrap;
+}
+
+@media (max-width: 680px) {
+  .composer-queue-wrap {
+    width: calc(100% - 36px);
+  }
+}
+
+#input-area #input-row {
+  position: relative;
+}

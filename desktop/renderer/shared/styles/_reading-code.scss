@@ -1,0 +1,76 @@
+.reading-text .rich-code-block,
+.reading-text .markdown-code-block {
+  border: 1px solid var(--line, var(--border));
+  border-radius: 9px;
+  overflow: hidden;
+  margin: 12px 0;
+  background: var(--code, var(--bg-soft));
+}
+.reading-text .code-lang {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--line, var(--border));
+  font-size: 12px;
+  color: var(--secondary, var(--text-dim));
+}
+.reading-text .markdown-code-modes {
+  display: flex;
+  gap: 4px;
+}
+.reading-text .markdown-code-modes button {
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  padding: 3px 8px;
+}
+.reading-text .markdown-code-modes button:hover,
+.reading-text .markdown-code-modes button[aria-pressed='true'] {
+  background: var(--control, var(--bg-softer));
+  color: var(--text);
+}
+.reading-text .rich-code-block pre {
+  margin: 0;
+  border-radius: 0;
+  white-space: pre;
+  overflow: auto;
+}
+.reading-text .rich-code-block code {
+  background: transparent;
+  color: var(--text);
+}
+.reading-text .markdown-preview {
+  padding: 14px;
+}
+:is(.reading-text, [data-slot='composer-highlight']) .hljs-string {
+  color: #3a7065;
+}
+:is(.reading-text, [data-slot='composer-highlight']) .hljs-attr {
+  color: #82631d;
+}
+:is(.reading-text, [data-slot='composer-highlight']) .hljs-number,
+:is(.reading-text, [data-slot='composer-highlight']) .hljs-literal {
+  color: #2867b2;
+}
+:is(.reading-text, [data-slot='composer-highlight']) .hljs-keyword {
+  color: #99579b;
+}
+:root[data-theme='dark'] :is(.reading-text, [data-slot='composer-highlight']) .hljs-string {
+  color: #a5d6ff;
+}
+:root[data-theme='dark'] :is(.reading-text, [data-slot='composer-highlight']) .hljs-attr {
+  color: #e3b341;
+}
+:root[data-theme='dark'] :is(.reading-text, [data-slot='composer-highlight']) .hljs-number,
+:root[data-theme='dark'] :is(.reading-text, [data-slot='composer-highlight']) .hljs-literal {
+  color: #79c0ff;
+}
+:root[data-theme='dark'] :is(.reading-text, [data-slot='composer-highlight']) .hljs-keyword {
+  color: #ff7b72;
+}

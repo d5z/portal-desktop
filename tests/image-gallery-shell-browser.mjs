@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
-import { readFile } from 'node:fs/promises';
-import { build } from 'esbuild';
+import { build } from '../scripts/renderer-build.mjs';
 import { chromium } from 'playwright';
 
 // Exercise the real desktop viewer with a controlled chat-frame message/Blob transport.
@@ -11,8 +10,8 @@ const bundle=await build({stdin:{contents:`
   import {AttachmentImageViewer} from './desktop/renderer/app/components/attachment-image-viewer';
   function Fixture(){const frame=useRef(null);return <><iframe ref={frame} src="/frame?revision=current"/><AttachmentImageViewer frame={frame}/></>}
   createRoot(document.getElementById('root')).render(<Fixture/>);
-`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,format:'esm',jsx:'automatic'});
-const css=await readFile('desktop/renderer/shared/components/remote-image.css');
+`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,outfile:'fixture.js',format:'esm',jsx:'automatic'});
+const css=bundle.outputFiles.find(file=>file.path.endsWith('.css')).text;
 const server=createServer((req,res)=>{
   if(req.url==='/fixture.js'){res.setHeader('Content-Type','text/javascript');return res.end(bundle.outputFiles[0].text);}
   if(req.url==='/fixture.css'){res.setHeader('Content-Type','text/css');return res.end(css);}
@@ -51,7 +50,7 @@ try{
   await page.getByText('正在加载原图…',{exact:true}).waitFor();
   await page.keyboard.press('ArrowRight');
   await page.getByRole('dialog',{name:'图片预览：图片 2',exact:true}).waitFor();
-  await page.waitForFunction(()=>document.querySelector('.remote-image-canvas img')?.naturalWidth>0);
+  await page.waitForFunction(()=>document.querySelector('dialog[aria-label^="图片预览："] img')?.naturalWidth>0);
   await page.waitForFunction(()=>window.cancelled.length===1);
   await page.evaluate(()=>window.held.forEach(respond=>respond()));
   assert.equal(await page.getByLabel('图片位置',{exact:true}).textContent(),'2 / 2');

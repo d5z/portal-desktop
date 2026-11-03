@@ -1,0 +1,119 @@
+/* Global conversation search: readable scene titles and matching message excerpts. */
+#chat-search-panel {
+  width: min(660px, calc(100vw - 32px));
+  padding: 16px;
+  border-radius: 26px;
+  max-height: calc(100dvh - 48px);
+}
+
+.chat-search-field {
+  padding: 8px 10px 18px;
+  border-bottom: 1px solid var(--line);
+  gap: 14px;
+}
+
+.search-symbol {
+  width: 23px;
+  height: 23px;
+  flex: none;
+  fill: none;
+  stroke: var(--secondary);
+  stroke-width: 1.7;
+}
+
+#chat-search-input {
+  font-size: 20px;
+  min-width: 0;
+  padding: 8px 0;
+  box-shadow: none;
+  outline: none;
+}
+
+#chat-search-results {
+  max-height: min(58vh, 560px);
+  padding-top: 12px;
+  overscroll-behavior: contain;
+}
+
+.chat-search-result {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 13px 12px;
+  border-radius: 16px;
+  color: var(--text);
+  line-height: 1.5;
+}
+
+.chat-search-result:hover,
+.chat-search-result:focus-visible {
+  background: var(--surface);
+  outline: none;
+}
+
+.search-result-icon {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--surface);
+}
+
+.search-result-icon svg {
+  width: 23px;
+  height: 23px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.5;
+}
+
+.search-result-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 3px;
+}
+
+.search-result-copy strong {
+  font-size: 15px;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+
+.search-result-copy > span {
+  font-size: 13px;
+  color: var(--secondary);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+
+.search-result-copy time {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+@media (max-width: 520px) {
+  #chat-search-panel {
+    padding: 10px;
+    border-radius: 20px;
+  }
+
+  #chat-search-input {
+    font-size: 17px;
+  }
+
+  .chat-search-result {
+    gap: 10px;
+    padding: 12px 8px;
+  }
+
+  .search-result-icon {
+    width: 36px;
+    height: 36px;
+  }
+}

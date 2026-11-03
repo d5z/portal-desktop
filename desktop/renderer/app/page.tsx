@@ -1,8 +1,10 @@
+import { DshPluginSurfaces } from '../plugins/dsh/page';
 import {AttachmentFileViewer} from './components/attachment-file-viewer';
 import {AttachmentImageViewer} from './components/attachment-image-viewer';
 import { useEffect, useLayoutEffect, useRef } from "react";
 import type { AppModel } from "./models/app";
 import { useModel } from "../shared/hooks/use-model";
+import { presentColorScheme, renderedColorScheme } from '../shared/color-scheme';
 import { useChatBridge } from "./hooks/use-chat-bridge";
 import { WorkspaceNavigation, BeingInfo } from "./components/workspace-navigation";
 import { PanelResizeHandle, usePanelWidth } from "../shared/components/panel-resize";
@@ -30,18 +32,24 @@ export function App({ model }: { model: AppModel }) {
     frame = useRef<HTMLIFrameElement>(null);
   const chatPanel = useRef<HTMLElement>(null);
   const [chatWidth, setChatWidth] = usePanelWidth("chat", 640);
-  const themedLogo = app.theme === "dark" ? logoWhite : logo;
   useChatBridge(app, frame);
   useEffect(() => app.start(), [app]);
   useLayoutEffect(() => {
-    document.documentElement.dataset.theme = app.theme;
+    presentColorScheme(renderedColorScheme(app.theme));
+  }, [app.theme]);
+  useEffect(() => {
+    const changed = () => { app.postAppearance(); app.changed(); };
+    window.addEventListener('town:appearance-changed', changed);
+    return () => window.removeEventListener('town:appearance-changed', changed);
+  }, [app]);
+  useLayoutEffect(() => {
     document.documentElement.dataset.platform = app.api?.platform || "";
     document.documentElement.style.setProperty(
       "--reading-size",
       app.readingSize + "px",
     );
     document.body.dataset.view = app.view;
-  }, [app.theme, app.view, app.readingSize, app.api]);
+  }, [app.view, app.readingSize, app.api]);
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
       const dialog = document.querySelector("dialog[open]");
@@ -73,6 +81,7 @@ export function App({ model }: { model: AppModel }) {
   }, [app]);
   return (
     <>
+      <DshPluginSurfaces />
       <AttachmentImageViewer key={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}`} frame={frame}/>
       <section
         id="startup-screen"
@@ -82,7 +91,8 @@ export function App({ model }: { model: AppModel }) {
         hidden={app.startup === "ready"}
       >
         <div className="startup-content">
-          <img src={themedLogo} alt="Portal Desktop" width={56} height={56} />
+          <img className="town-logo-light" src={logo} alt="Portal Desktop" width={56} height={56} />
+          <img className="town-logo-dark" src={logoWhite} alt="Portal Desktop" width={56} height={56} />
           <span
             id="startup-spinner"
             className="startup-spinner"
@@ -129,12 +139,13 @@ export function App({ model }: { model: AppModel }) {
               >
                 <div className="welcome-intro">
                   <img
-                    className="welcome-logo"
-                    src={themedLogo}
+                    className="welcome-logo town-logo-light"
+                    src={logo}
                     alt="Portal Desktop"
                     width={88}
                     height={88}
                   />
+                  <img className="welcome-logo town-logo-dark" src={logoWhite} alt="Portal Desktop" width={88} height={88} />
                   <h1>从一个想法开始</h1>
                   <p>连接你的 Being，继续对话。</p>
                 </div>
@@ -170,7 +181,7 @@ export function App({ model }: { model: AppModel }) {
           {(!app.subagentSettingsOpen || Boolean(app.settingsRoute)) && <BeingInfo app={app} />}
           {app.subagentSettingsOpen && !app.settingsRoute && <SubagentModelSettings app={app} />}
           <Companion model={app.workspace} />
-          {app.view === "chat" && (!app.subagentSettingsOpen || Boolean(app.settingsRoute)) && <PluginSidebar model={app.plugins} theme={app.theme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />}
+          {app.view === "chat" && (!app.subagentSettingsOpen || Boolean(app.settingsRoute)) && <PluginSidebar model={app.plugins} theme={app.colorScheme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />}
           <Browser model={app} />
         </div>
       </main>
@@ -218,9 +229,9 @@ function PlaceContent({ app }: { app: AppModel }) {
       {app.view === "ui-examples" ? <UIExamplesPlace key={`${app.chatSource}:${app.snapshot?.chatScene?.scene_id || ""}`} app={app} /> : <div className="plugin-place-layout">
         <div className="plugin-place-main">
           {app.view === "portal" ? <Portal model={app} /> : app.view !== "plugins" && <Town model={app.town} />}
-          {app.view === 'plugins' && <Plugins model={app.plugins} theme={app.theme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />}
+          {app.view === 'plugins' && <Plugins model={app.plugins} theme={app.colorScheme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />}
         </div>
-        <PluginSidebar model={app.plugins} theme={app.theme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />
+        <PluginSidebar model={app.plugins} theme={app.colorScheme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />
       </div>}
     </>
   );

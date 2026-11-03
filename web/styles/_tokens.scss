@@ -1,0 +1,30 @@
+:root {
+  --ios-blue: #527462;
+  --ios-bg: #f5f6f3;
+  --ios-card: #fff;
+  --ios-label: #29332f;
+  --ios-secondary: #8b948f;
+  --ios-separator: #e7eae5;
+  --ios-soft-blue: #e9efe8;
+  --bg: var(--ios-bg);
+  --text: var(--ios-label);
+  --secondary: #707a73;
+  --muted: var(--ios-secondary);
+  --line: var(--ios-separator);
+  --surface: #eef1eb;
+  --control: var(--ios-card);
+  --accent: var(--ios-blue);
+  --button-text: #fff;
+}
+
+:root[data-theme='dark'] {
+  --ios-blue: #58b77d;
+  --ios-bg: #191919;
+  --ios-card: #252525;
+  --ios-label: #e5e5e5;
+  --ios-secondary: #999;
+  --ios-separator: #333;
+  --ios-soft-blue: #263b2f;
+  --secondary: #aaa;
+  --surface: #303030;
+}

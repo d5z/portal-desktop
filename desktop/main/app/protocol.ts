@@ -1,3 +1,4 @@
+import type { DshPluginManager } from '../plugins/dsh/manager';
 import { app, dialog, protocol, session, shell } from 'electron';
 import type { LocalFilePreviews } from './local-file-preview';
 import {AttachmentDownloads} from '../chat/downloads';
@@ -21,10 +22,11 @@ const CHAT_ASSETS = new Set(['loom.html', 'chat.js', 'highlight.css', 'chat.css'
 export function registerLocalProtocol(assets: string, proxy: ChatProxy, plugins?: PluginRegistry, downloads = new AttachmentDownloads(app.getPath('userData'), async current => {
   const result=await dialog.showOpenDialog({title:'选择附件下载位置',defaultPath:current || app.getPath('downloads'),properties:['openDirectory','createDirectory']});
   return result.canceled ? undefined : result.filePaths[0];
-}, file => shell.openPath(file), file => shell.showItemInFolder(file)), localFiles?: LocalFilePreviews) {
+}, file => shell.openPath(file), file => shell.showItemInFolder(file)), localFiles?: LocalFilePreviews, dshPlugins?: DshPluginManager) {
   proxy.onAttachmentUploaded = (token,endpoint,id,checksum) => downloads.bindSource(token,endpoint,id,checksum);
   protocol.handle('beings', async request => {
     const url = new URL(request.url);
+    if (url.hostname === 'desktop' && dshPlugins?.matches(url.pathname)) return dshPlugins.resource(request);
     if (url.hostname === 'chat' && url.pathname === '/api/remote-image') return remoteImage(request);
     if (url.hostname === 'preview' && localFiles) return localFiles.resource(request);
     if (url.hostname === 'chat' && url.pathname === '/api/local-downloads') return downloads.handle(request,proxy);
@@ -54,7 +56,9 @@ export function registerLocalProtocol(assets: string, proxy: ChatProxy, plugins?
   });
 }
 
-export function configureLocalSession() {
-  session.defaultSession.setPermissionRequestHandler((_contents, _permission, callback) => callback(false));
-  session.defaultSession.setPermissionCheckHandler(() => false);
+export function configureLocalSession(shellURL: () => string = () => 'beings://desktop/', notificationsAllowed: () => boolean = () => false) {
+  const trusted = (url: string | undefined) => { try { const actual = new URL(url || ''), expected = new URL(shellURL()); return actual.protocol === expected.protocol && actual.host === expected.host && actual.pathname === expected.pathname; } catch { return false; } };
+  const allow = (contents: Electron.WebContents | null, permission: string, details: { isMainFrame: boolean; requestingUrl?: string }) => permission === 'notifications' && details.isMainFrame && trusted(details.requestingUrl) && trusted(contents?.getURL()) && notificationsAllowed();
+  session.defaultSession.setPermissionRequestHandler((contents, permission, callback, details) => callback(allow(contents, permission, details)));
+  session.defaultSession.setPermissionCheckHandler((contents, permission, _origin, details) => allow(contents, permission, details));
 }

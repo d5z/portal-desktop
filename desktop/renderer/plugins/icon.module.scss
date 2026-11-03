@@ -1,0 +1,91 @@
+.icon {
+  display: block;
+  width: 24px;
+  height: 24px;
+  flex: 0 0 24px;
+  object-fit: contain;
+}
+
+dialog.dialog {
+  width: min(440px, calc(100vw - 32px));
+  padding: 24px;
+  overflow: auto;
+}
+
+.dialog h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.dialog label {
+  display: block;
+  font-size: 13px;
+}
+
+.dialog input {
+  width: 100%;
+  margin-top: 6px;
+}
+
+.text {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  line-height: 1;
+  overflow: hidden;
+}
+
+.viewEntry {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.viewEntry > button:first-child {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.edit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+}
+
+.edit .icon {
+  width: 20px;
+  height: 20px;
+  flex-basis: 20px;
+}
+
+.preview {
+  display: flex;
+  justify-content: center;
+  margin: 16px 0;
+}
+
+.preview .icon {
+  width: 40px;
+  height: 40px;
+  flex-basis: 40px;
+  font-size: 30px;
+}
+
+.file {
+  display: block;
+  margin-top: 16px;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}

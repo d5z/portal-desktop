@@ -2,16 +2,17 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdir, readFile } from 'node:fs/promises';
-import { build } from 'esbuild';
+import { build } from '../scripts/renderer-build.mjs';
+import { browserAssets } from './support/browser-assets.mjs';
 import { chromium } from 'playwright';
 const preview = process.env.PORTAL_LAYOUT_PREVIEW === '1';
 const museOnly = process.env.PORTAL_LAYOUT_MUSE_ONLY === '1';
 const assets = new Map(await Promise.all(['loom.html','chat.js','chat.css','highlight.css'].map(async file => ['/' + file, await readFile('desktop/generated/' + file)])));
-const bundle = await build({ plugins:[{name:'preview-chat-origin',setup(build){build.onLoad({filter:/renderer[\\/]app[\\/].*\.tsx?$/},async args=>({contents:(await readFile(args.path,'utf8')).replace(/(['"])beings:\/\/chat\1/g,'location.origin'),loader:args.path.endsWith('.tsx')?'tsx':'ts'}));}}], stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
+const bundle = await build({ plugins:[browserAssets(),{name:'preview-chat-origin',setup(build){build.onLoad({filter:/renderer[\\/]app[\\/].*\.tsx?$/},async args=>({contents:(await readFile(args.path,'utf8')).replace(/(['"])beings:\/\/chat\1/g,'location.origin'),loader:args.path.endsWith('.tsx')?'tsx':'ts'}));}}], stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
   import {createRoot} from 'react-dom/client';
   import {App} from './desktop/renderer/app/page';
   import {AppModel} from './desktop/renderer/app/models/app';
-  import './desktop/renderer/app/styles.css';
+  import './desktop/renderer/app/styles.scss';
   const app = new AppModel({platform:'darwin',appearance:async theme=>theme || 'light',notifications:async()=>({supported:true,message:'',preferences:{enabled:false,mail:true,firesides:true,bonfire:false}}),clientStartup:async()=>({supported:true,enabled:false,message:''}),browserBounds:async()=>{},browserState:async()=>({open:false,address:'',tabs:[]}),onBrowser:listener=>{window.fixtureBrowserState=listener;return()=>{delete window.fixtureBrowserState;};}});
   app.start = () => () => {};
   app.startup = 'ready';
@@ -500,7 +501,7 @@ try {
   // Long settings forms must scroll internally, keeping the footer inside the window.
   await page.evaluate(()=>window.fixtureApp.openConnectionSettings('portal'));
   await page.locator('#client-settings-dialog[open] #settings-dialog').waitFor();
-  assert.equal(await page.locator('#settings-dialog .navigation-controls button:disabled').count(),0);
+  assert.equal(await page.locator('#settings-dialog').getByRole('group', { name: '页面历史' }).locator('button:disabled').count(),0);
   for (const height of [800,500]) {
     await page.setViewportSize({width:1100,height});
     const body=page.locator('.settings-inline-body');

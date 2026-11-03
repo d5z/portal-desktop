@@ -2,7 +2,7 @@ import { readShellStyles } from './support/shell-styles.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdir } from 'node:fs/promises';
-import { build } from 'esbuild';
+import { build } from '../scripts/renderer-build.mjs';
 import { chromium } from 'playwright';
 
 const bundle = await build({ stdin: { contents: `

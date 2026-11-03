@@ -1,0 +1,242 @@
+@use '../../shared/styles/mixins';
+
+.menu {
+  @include mixins.menu-enter;
+
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: 300px;
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 16px);
+  overflow: auto;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 8px 32px #0002;
+  font: 12px/1.4 var(--font-sans, sans-serif);
+}
+
+.menu::backdrop {
+  background: transparent;
+}
+
+.heading {
+  padding: 5px 9px 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.menu > button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 9px;
+  border: 0;
+  border-radius: 9px;
+  text-align: left;
+  background: transparent;
+  color: var(--text);
+}
+
+.menu > button:hover,
+.menu > button:focus-visible {
+  background: var(--hover);
+}
+
+.menu > button:focus-visible {
+  outline: 1px solid var(--secondary);
+  outline-offset: -1px;
+}
+
+.menu > button > svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  color: var(--secondary);
+}
+
+.copy {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.copy strong {
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.copy small {
+  font-size: 11px;
+  color: var(--secondary);
+  line-height: 1.4;
+}
+
+.check {
+  width: 16px;
+  flex: none;
+  font-size: 15px;
+}
+
+.menu > button[data-mode='full-access'],
+.menu > button[data-mode='full-access'] > svg {
+  color: #b65122;
+}
+
+:root[data-theme='dark'] .menu > button[data-mode='full-access'],
+:root[data-theme='dark'] .menu > button[data-mode='full-access'] > svg {
+  color: #ef9a65;
+}
+
+.menuNote {
+  padding: 8px 9px 3px;
+  margin-top: 5px;
+  border-top: 1px solid var(--line);
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.menuError {
+  margin: 5px 9px;
+  color: #c44;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.dialog {
+  width: min(520px, 100vw - 32px);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 24px 100px #0003;
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+}
+
+.dialog::backdrop {
+  background: #0005;
+  backdrop-filter: blur(3px);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 24px 24px 20px;
+}
+
+.headerIcon {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: var(--selected);
+  border: 1px solid var(--line);
+}
+
+.header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+}
+
+.header p {
+  margin: 5px 0 0;
+  font-size: 12px;
+  color: var(--secondary);
+}
+
+.header > button {
+  margin-left: auto;
+  background: none;
+  border: 0;
+  color: var(--muted);
+  font-size: 24px;
+  cursor: pointer;
+}
+
+.body {
+  padding: 0 24px 20px;
+}
+
+.note {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.7;
+  margin: 10px 0 0;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  padding: 16px 24px;
+  border-top: 1px solid var(--line);
+}
+
+.footer button {
+  padding: 8px 14px;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text);
+  border: 1px solid var(--line);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.footer button:global(.primary) {
+  background: var(--accent);
+  color: var(--button-text);
+  border-color: transparent;
+}
+
+.footer button.manage {
+  margin-right: auto;
+  border: 0;
+  color: var(--secondary);
+  padding-left: 0;
+}
+
+.dialog button:disabled {
+  opacity: 0.5;
+  cursor: wait;
+}
+
+.dialog button:focus-visible {
+  @include mixins.focus-ring(var(--secondary), 3px);
+}
+
+.action {
+  display: block;
+  font-size: 13px;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.request {
+  margin: 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--code);
+  max-height: 42vh;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font:
+    12px/1.7 ui-monospace,
+    Consolas,
+    monospace;
+  unicode-bidi: plaintext;
+}

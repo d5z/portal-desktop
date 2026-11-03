@@ -1,6 +1,13 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { DesktopAPI, PortalState, TownLiveState } from '../shared/types';
 const api: DesktopAPI = {
+  dshPlugins: {
+    state: () => ipcRenderer.invoke('beings:dsh-state'),
+    install: source => ipcRenderer.invoke('beings:dsh-install', source),
+    enable: (id, enabled) => ipcRenderer.invoke('beings:dsh-enable', id, enabled),
+    remove: id => ipcRenderer.invoke('beings:dsh-remove', id),
+    configure: (id, config) => ipcRenderer.invoke('beings:dsh-configure', id, config),
+  },
   checkLocalFiles: paths => ipcRenderer.invoke('beings:local-files-check', paths),
   revealLocalFile: path => ipcRenderer.invoke('beings:local-file-reveal', path),
   previewLocalFile: path => ipcRenderer.invoke('beings:local-file-preview', path),

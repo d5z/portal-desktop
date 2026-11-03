@@ -1,0 +1,23 @@
+// Emits no CSS until included; theme colors stay as runtime CSS variables.
+@mixin focus-ring($color: var(--accent), $offset: 3px) {
+  outline: 2px solid $color;
+  outline-offset: $offset;
+}
+
+// Each consuming CSS Module owns its generated animation name.
+@mixin menu-enter {
+  @media (prefers-reduced-motion: no-preference) {
+    &:popover-open {
+      animation: menu-enter var(--ui-motion-fast, 120ms) ease-out;
+    }
+
+    @keyframes menu-enter {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+  }
+}

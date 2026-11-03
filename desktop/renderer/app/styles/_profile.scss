@@ -1,0 +1,358 @@
+#chat-search-input::-webkit-search-cancel-button {
+  display: none;
+}
+
+.search-result-copy mark {
+  color: var(--text);
+  background: color-mix(in srgb, #86baff 25%, transparent);
+  border-radius: 3px;
+}
+
+.social-expansion {
+  overflow: hidden;
+  overflow-anchor: none;
+}
+
+.social-expansion > .expand-label {
+  display: block;
+  padding: 7px 0;
+  margin-top: 3px;
+}
+
+.being-model-entry {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  margin-top: 16px;
+  padding: 14px 16px;
+  border: 0;
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+}
+
+.being-model-entry > span:first-child {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+}
+
+.being-model-entry strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.being-model-entry small {
+  font-size: 12px;
+  color: var(--secondary);
+  overflow-wrap: anywhere;
+}
+
+.being-model-entry:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+/* Keep identity and tabs in view while only the functional area scrolls. */
+.being-profile,
+.being-tabs {
+  flex-shrink: 0;
+}
+
+.being-profile {
+  padding: 8px 0 24px;
+}
+
+.being-tabs {
+  margin-bottom: 16px;
+}
+
+.being-info-content {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  padding: 0 2px 24px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted) transparent;
+}
+
+.being-privacy-content .privacy-body {
+  --text-muted: var(--muted);
+
+  padding: 14px;
+  font-size: 12px;
+  line-height: 1.75;
+  color: var(--secondary);
+  overflow-wrap: anywhere;
+}
+
+.being-privacy-content .privacy-body h3 {
+  font-size: 13px;
+  color: var(--text);
+  margin: 20px 0 8px;
+}
+
+.being-privacy-content .privacy-body p {
+  margin: 8px 0;
+}
+
+.being-privacy-content .privacy-body ul {
+  padding-left: 18px;
+  margin: 8px 0;
+}
+
+.being-privacy-content .phase {
+  padding: 12px;
+  background: var(--surface);
+  border-radius: 10px;
+  margin: 14px 0;
+}
+
+.being-privacy-content .phase-title {
+  font-weight: 550;
+  color: var(--text);
+}
+
+.being-privacy-content .principles {
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+
+@media (max-height: 650px) {
+  .being-profile {
+    padding: 0 0 16px;
+  }
+
+  .being-avatar {
+    width: 64px;
+    height: 64px;
+    font-size: 30px;
+  }
+
+  .being-profile h2 {
+    font-size: 22px;
+  }
+}
+
+/* Neutral dark controls: selected surfaces are visibly lighter than their tracks. */
+:root[data-theme='dark'] :is(.settings-tabs, .being-tabs, .model-targets) [aria-selected='true'],
+:root[data-theme='dark'] :is(.theme-options, .chat-session-scope) [aria-pressed='true'] {
+  background: #454a54;
+  color: #fff;
+  box-shadow:
+    0 1px 4px #0005,
+    inset 0 0 0 1px #ffffff16;
+  font-weight: 550;
+}
+
+:root[data-theme='dark'] input[type='checkbox'] {
+  background: #555b65;
+  box-shadow: inset 0 0 0 1px #ffffff12;
+}
+
+:root[data-theme='dark'] input[type='checkbox']::before {
+  background: #e9edf3;
+}
+
+:root[data-theme='dark'] input[type='checkbox']:checked {
+  background: #609c76;
+}
+
+:root[data-theme='dark'] .being-wake-track {
+  background: #555b65;
+}
+
+:root[data-theme='dark'] .being-wake-switch[aria-checked='true'] .being-wake-track {
+  background: #609c76;
+}
+
+:root[data-theme='dark'] input[type='checkbox']:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Profile and detail pages share one rail, with a separate scroll gutter. */
+.being-info {
+  padding: 0;
+}
+
+.being-overview {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding: 48px 20px 0;
+}
+
+.being-overview[hidden] {
+  display: none;
+}
+
+.being-info-content {
+  padding: 0 20px 24px 12px;
+  margin-left: -8px;
+  margin-right: -10px;
+  scrollbar-gutter: stable;
+}
+
+.being-profile {
+  padding: 4px 0 22px;
+}
+
+.being-profile h2 {
+  font-size: 23px;
+  margin-top: 14px;
+}
+
+.being-avatar {
+  width: 84px;
+  height: 84px;
+  font-size: 38px;
+}
+
+.being-details > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 15px 0;
+}
+
+.being-details dt {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--secondary);
+  margin: 0;
+}
+
+.being-details dd {
+  min-width: 0;
+  text-align: right;
+  font-size: 12px;
+}
+
+.being-details .being-wake-switch {
+  gap: 10px;
+  font-size: 12px;
+}
+
+.being-info .being-action-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 52px;
+  margin: 0;
+  padding: 14px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+  color: var(--text);
+  font-size: 13px;
+  text-align: left;
+  box-shadow: none;
+}
+
+.being-info .being-action-row {
+  position: relative;
+  isolation: isolate;
+}
+
+.being-info .being-action-row::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: 4px -8px;
+  border-radius: 10px;
+  background: transparent;
+  transition: background-color 0.14s ease;
+}
+
+.being-info .being-action-row:hover:not(:disabled),
+.being-info .being-action-row:active:not(:disabled) {
+  background: transparent;
+}
+
+.being-info .being-action-row:hover:not(:disabled)::before {
+  background: #00000006;
+}
+
+.being-info .being-action-row:active:not(:disabled)::before {
+  background: #0000000c;
+}
+
+:root[data-theme='dark'] .being-info .being-action-row:hover:not(:disabled)::before {
+  background: #ffffff09;
+}
+
+:root[data-theme='dark'] .being-info .being-action-row:active:not(:disabled)::before {
+  background: #ffffff14;
+}
+
+.being-info .being-action-row:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 10px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .being-info .being-action-row::before {
+    transition: none;
+  }
+}
+
+.being-info .being-action-row > span:last-child {
+  color: var(--secondary);
+  flex-shrink: 0;
+}
+
+.being-info .being-model-entry strong {
+  font-weight: 400;
+}
+
+.being-info .being-model-entry small {
+  font-size: 12px;
+}
+
+.being-privacy-panel {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  padding-top: 16px;
+}
+
+.being-privacy-panel > header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 56px;
+  padding: 0 60px 0 16px;
+  flex-shrink: 0;
+}
+
+.being-privacy-panel h2 {
+  font-size: 18px;
+  font-weight: 550;
+  margin: 0;
+}
+
+.being-privacy-content {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  padding: 0 12px 20px;
+  scrollbar-width: thin;
+}
+
+.being-privacy-content .privacy-body {
+  padding: 12px;
+  font-size: 13px;
+}

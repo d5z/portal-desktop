@@ -1,0 +1,332 @@
+/* Messages */
+#messages {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden auto;
+  padding: 16px;
+}
+
+.message {
+  margin-bottom: 14px;
+  padding: 4px 0;
+  animation: fade-in 0.2s ease;
+}
+
+.message.consecutive {
+  margin-bottom: 10px;
+}
+
+.message.consecutive {
+  margin-top: -6px;
+}
+
+.message.consecutive .meta.time-only {
+  display: none;
+}
+
+/* Scroll anchoring measures bubble geometry; entrance motion must not change it. */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+.message .meta {
+  font-size: 12px;
+  margin-bottom: 3px;
+}
+
+.message.user .meta {
+  color: var(--accent);
+}
+
+.message.being .meta {
+  color: var(--green);
+}
+
+.message .content {
+  white-space: pre-wrap;
+  word-break: normal;
+  font-size: 15px;
+  line-height: var(--lh-reading);
+}
+
+.message.thinking-indicator .content {
+  color: var(--text-dim);
+}
+
+.thinking-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--purple);
+  opacity: 0.35;
+  animation: thinking-dot 1.2s ease-in-out infinite;
+}
+
+.thinking-dot:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.thinking-dot:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes thinking-dot {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+
+  40% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+/* Markdown */
+.message .content p {
+  margin-bottom: 8px;
+  white-space: normal;
+}
+
+.message .content h1,
+.message .content h2,
+.message .content h3 {
+  margin: 12px 0 6px;
+  line-height: 1.3;
+  font-weight: 650;
+  white-space: normal;
+}
+
+.message .content h1 {
+  font-size: 20px;
+}
+
+.message .content h2 {
+  font-size: 18px;
+}
+
+.message .content h3 {
+  font-size: 16px;
+}
+
+.message .content code {
+  padding: 2px 6px;
+  font-family: var(--mono);
+  font-size: 13px;
+}
+
+.message .content pre {
+  background: transparent;
+  padding: 12px;
+  border-radius: 8px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin: 8px 0;
+}
+
+.message .content pre code {
+  background: none;
+  padding: 0;
+  font-size: 13px;
+}
+
+.message .content .code-block {
+  background: var(--bg-softer);
+  margin: 10px 0;
+  overflow: hidden;
+}
+
+.message .content .code-lang {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  padding: 5px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-muted);
+  font: 10px/1.4 var(--mono);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.message .content .code-block pre {
+  margin: 0;
+  border-radius: 0;
+}
+
+.message .content blockquote {
+  border-left: 3px solid var(--border);
+  padding-left: 12px;
+  color: var(--text-dim);
+  margin: 8px 0;
+}
+
+.message .content em {
+  font-style: italic;
+  color: var(--text-dim);
+}
+
+.message .content ul,
+.message .content ol {
+  padding-left: 22px;
+  margin: 6px 0;
+  white-space: normal;
+}
+
+.message .content li {
+  margin: 2px 0;
+}
+
+.message .content a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.message .content a:hover {
+  text-decoration: underline;
+}
+
+.message .content hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 12px 0;
+}
+
+.message .content .table-wrap {
+  max-width: 100%;
+  margin: 10px 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-tint);
+  -webkit-overflow-scrolling: touch;
+}
+
+.message .content table {
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-family: var(--mono);
+  white-space: normal;
+}
+
+.message .content th,
+.message .content td {
+  border-bottom: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  padding: 7px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.message .content th:last-child,
+.message .content td:last-child {
+  border-right: none;
+}
+
+.message .content tr:last-child td {
+  border-bottom: none;
+}
+
+.message .content th {
+  background: var(--accent-tint);
+  font-weight: 600;
+  color: var(--text);
+}
+
+.message .content tbody tr:nth-child(even) {
+  background: var(--surface-tint);
+}
+
+/* Streaming cursor */
+
+/* stream cursor removed — tui-bar provides activity feedback */
+@keyframes blink-soft {
+  0%,
+  100% {
+    opacity: 0.9;
+  }
+
+  50% {
+    opacity: 0.15;
+  }
+}
+
+/* Time gap */
+.time-gap {
+  text-align: center;
+  color: var(--text-ghost);
+  font-size: 10px;
+  padding: 16px 0 8px;
+  font-family: var(--mono);
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  opacity: 0.5;
+}
+
+/* Autonomous SBS breath markers are separators, not chat bubbles. */
+.breath-marker {
+  text-align: center;
+  color: var(--text-ghost);
+  font-size: 10px;
+  padding: 12px 0 8px;
+  font-family: var(--mono);
+  letter-spacing: 1px;
+  opacity: 0.65;
+}
+
+.message.system .retry-btn {
+  margin-left: 8px;
+  background: var(--bg-softer);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 2px 10px;
+  color: var(--text-dim);
+  cursor: pointer;
+  font-size: 12px;
+  font-family: inherit;
+  vertical-align: baseline;
+}
+
+.message.system .retry-btn:hover {
+  color: var(--text);
+  background: var(--hover-overlay);
+}
+
+/* Drop zone */
+#drop-zone {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--overlay-backdrop);
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: var(--accent);
+}
+
+#drop-zone.active {
+  display: flex;
+}
+
+/* Temperature glow */
+#temperature-glow {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 200px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 2s ease;
+  z-index: 0;
+}

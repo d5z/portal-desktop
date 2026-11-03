@@ -38,10 +38,10 @@ try {
   page.setDefaultTimeout(15000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.address().port}/loom.html?scene_id=room&scene_label=Room&scene_strict=1`);
-  await page.locator('.sbs-control-active').filter({hasText:'正在思考'}).waitFor();
+  await page.locator('[role="status"][aria-live="polite"]').filter({hasText:'正在思考'}).waitFor();
   assert.equal(await page.locator('#input-area .composer-background-status').count(),0);
   assert.equal(await page.locator('#send-btn').getAttribute('aria-label'), '发送消息');
-  await page.locator('#send-btn').click();
+  assert.equal(await page.locator('#send-btn').isDisabled(), true);
   assert.equal(stops.length, 0, 'Empty composer must never stop SBS');
   await page.getByLabel('SBS 状态与显示设置',{exact:true}).click();
   const sbs = page.getByRole('switch', {name:'显示 SBS 消息正文'});
@@ -54,11 +54,11 @@ try {
   await sbs.uncheck();
   await page.locator('.run-activity[data-autonomous-origin="callback"]').waitFor({state:'detached'});
   await page.keyboard.press('Escape');
-  assert.equal(await page.locator('.sbs-control-active').isVisible(),true);
-  assert.equal(await page.locator('.sbs-control-trigger .sbs-control-dot').evaluate(el=>getComputedStyle(el).animationName),'sbs-control-pulse');
+  assert.equal(await page.locator('[role="status"][aria-live="polite"]').isVisible(),true);
+  assert.notEqual(await page.locator('[aria-label="SBS 状态与显示设置"] > span').evaluate(el=>getComputedStyle(el).animationName),'none');
   await page.setViewportSize({width:375,height:640});
   await page.getByLabel('SBS 状态与显示设置',{exact:true}).click();
-  const bounds = await page.locator('.sbs-control-panel').boundingBox();
+  const bounds = await page.locator('[role="dialog"][aria-labelledby]').boundingBox();
   assert.ok(bounds.x>=0 && bounds.x+bounds.width<=375 && bounds.y+bounds.height<=640);
   await page.screenshot({path:'test-results/sbs-header-narrow.png'});
   await page.keyboard.press('Escape');
@@ -69,7 +69,7 @@ try {
   events.push({seq:2,event:'message_stop',data:{scene_id:null}});
   await page.waitForFunction(() => !document.querySelector('.run-activity.running'));
   events.push({seq:3,event:'tool_use',data:{scene_id:null,name:'callback-continuation'}});
-  await page.locator('.sbs-control-active').filter({hasText:'正在执行工具'}).waitFor();
+  await page.locator('[role="status"][aria-live="polite"]').filter({hasText:'正在执行工具'}).waitFor();
   assert.equal(await page.locator('.run-activity[data-autonomous-origin="callback"]').count(), 0,
     'Callback details stay out of the transcript');
   const input = page.locator('#input');
@@ -82,7 +82,7 @@ try {
   assert.equal(sends[0].scene_id, 'room');
   events.push({seq:4,event:'content_block_delta',data:{scene_id:'room',delta:{text:'当前场景回复'}}});
   await page.getByRole('button', {name:'停止处理',exact:true}).waitFor();
-  await page.locator('.sbs-control-active').waitFor({state:'detached'});
+  await page.locator('[role="status"][aria-live="polite"]').waitFor({state:'detached'});
   assert.equal(await page.locator('.run-activity.running').count(), 1);
   assert.equal(await page.locator('.composer-background-status').count(), 0);
   events.push({seq:5,event:'message_stop',data:{scene_id:'room'}});

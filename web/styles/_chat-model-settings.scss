@@ -1,0 +1,76 @@
+/* The web model editor is a full page on phones, with one scrolling surface. */
+#settings-panel .btn-close {
+  font-size: 0;
+}
+
+#settings-panel [data-slot='navigation-controls'] {
+  display: none;
+}
+
+#settings-panel[data-mobile-page] {
+  border: 0;
+  box-shadow: none;
+  overflow: hidden;
+  transition: none;
+}
+
+#settings-panel[data-mobile-page] .settings-header {
+  padding: calc(14px + env(safe-area-inset-top)) 20px 14px 8px;
+  align-items: center;
+  gap: 4px;
+}
+
+#settings-panel[data-mobile-page] .settings-header .btn-close {
+  order: -1;
+  width: 44px;
+  height: 44px;
+}
+
+#settings-panel[data-mobile-page] .settings-header .btn-close::before,
+#settings-panel[data-mobile-page] .settings-header .btn-close::after {
+  content: none;
+}
+
+#settings-panel[data-mobile-page] .settings-header h2 {
+  font-size: 19px;
+}
+
+#settings-panel[data-mobile-page] .settings-header p {
+  font-size: 11px;
+}
+
+#settings-panel[data-mobile-page] .settings-body {
+  padding: 22px 20px calc(28px + env(safe-area-inset-bottom));
+}
+
+#settings-panel[data-mobile-page] .llm-list {
+  max-height: none;
+  overflow: visible;
+}
+
+#settings-panel[data-mobile-page] .llm-current {
+  padding: 20px;
+  margin-bottom: 28px;
+}
+
+#settings-panel[data-mobile-page] .llm-item {
+  background: var(--bg-soft);
+  border-radius: 10px;
+  padding: 15px;
+}
+
+#settings-panel[data-mobile-page] .model-option-name {
+  font-size: 14px;
+}
+
+@media (max-width: 760px), (hover: none) and (pointer: coarse) {
+  #settings-panel {
+    width: 100%;
+  }
+
+  .message .content {
+    -webkit-user-select: text;
+    user-select: text;
+    -webkit-touch-callout: default;
+  }
+}

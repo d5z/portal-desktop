@@ -1,0 +1,313 @@
+/* Muse: media stands alone; documents keep a quiet, compact file card. */
+.attachment-card {
+  width: 300px;
+  border: 0;
+  background: var(--chat-received, var(--bg-softer));
+  border-radius: 18px 18px 5px;
+  padding: 10px;
+}
+
+.attachment-code-icon {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.attachment-file-action {
+  display: none;
+}
+
+.attachment-menu summary {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.attachment-card:hover .attachment-menu summary,
+.attachment-card:focus-within .attachment-menu summary {
+  opacity: 1;
+}
+
+.attachment-image-card {
+  width: fit-content;
+  max-width: 100%;
+}
+
+.attachment-image-thumbnail {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 18px 18px 5px;
+  overflow: hidden;
+  background: var(--bg-soft);
+  cursor: zoom-in;
+}
+
+.message .content .attachment-image-thumbnail img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(220px, 100%);
+  max-height: 320px;
+  object-fit: contain;
+}
+
+.attachment-image-placeholder {
+  min-height: 120px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  background: var(--bg-soft);
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+#pending-files {
+  gap: 8px;
+}
+
+.pending-file {
+  position: relative;
+  min-width: 0;
+  width: 112px;
+  height: 86px;
+  padding: 10px;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 12px;
+}
+
+.pending-file .pending-file-icon {
+  font-size: 22px;
+}
+
+.pending-file > span:not(.pending-file-icon) {
+  display: block;
+  width: 100%;
+  flex: 0;
+}
+
+.pending-file strong {
+  display: block;
+  font-size: 11px;
+  text-align: center;
+}
+
+.pending-file small {
+  display: none;
+}
+
+.pending-file .remove {
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  min-width: 20px;
+  min-height: 20px;
+  border-radius: 50%;
+  background: var(--bg) !important;
+  font-size: 11px;
+}
+
+.pending-file:has(.pending-file-preview) {
+  width: fit-content;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  background: transparent;
+  align-self: flex-start;
+}
+
+.pending-file .pending-file-preview {
+  display: block;
+  flex: none;
+  width: auto;
+  height: auto;
+  max-width: 112px;
+  max-height: 112px;
+  object-fit: contain;
+  border: 0;
+  border-radius: 12px;
+}
+
+.pending-file:has(.pending-file-preview) > span {
+  display: none;
+}
+
+.attachment-image-upload {
+  position: relative;
+  overflow: hidden;
+  border-radius: 18px 18px 5px;
+  align-self: flex-end;
+}
+
+.message .content .attachment-image-upload img {
+  display: block;
+  width: auto;
+  height: auto;
+  max-width: min(220px, 100%);
+  max-height: 320px;
+  object-fit: contain;
+}
+
+.attachment-image-upload > div {
+  position: absolute;
+  inset: auto 0 0;
+  padding: 8px 10px;
+  color: white;
+  background: #0008;
+  font-size: 11px;
+  pointer-events: none;
+}
+
+.attachment-image-upload progress {
+  display: block;
+  width: 100%;
+  height: 3px;
+  margin-top: 5px;
+  accent-color: white;
+}
+
+/* Remote images reserve a thumbnail surface while their bytes load. */
+.attachment-image-skeleton {
+  position: relative;
+  width: 220px;
+  max-width: 100%;
+  height: 160px;
+  overflow: hidden;
+  border-radius: 18px 18px 5px;
+}
+
+.attachment-image-skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 20%, var(--border) 50%, transparent 80%);
+  transform: translateX(-100%);
+  animation: attachment-image-shimmer 1.6s ease-in-out infinite;
+}
+
+@keyframes attachment-image-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .attachment-image-skeleton::after {
+    animation: none;
+    transform: none;
+    opacity: 0.35;
+  }
+}
+
+.attachment-image-skeleton {
+  min-height: 0;
+}
+
+/* The drag hint must not become a new drag target and unbalance enter/leave events. */
+#drop-zone {
+  pointer-events: none;
+}
+
+.history-page-control {
+  min-height: 28px;
+  display: flex;
+  justify-content: center;
+  margin-bottom: 12px;
+  overflow-anchor: none;
+}
+
+.history-page-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.history-page-loading > span {
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--border);
+  border-top-color: var(--text-dim);
+  border-radius: 50%;
+  animation: run-spin 0.8s linear infinite;
+}
+
+.attachment-audio-filename {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12px;
+  color: var(--text-dim);
+  margin: 0 4px 10px;
+}
+
+.attachment-processing-status > span:last-of-type {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.attachment-audio-card .attachment-audio > span {
+  white-space: nowrap;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.attachment-audio-transcript {
+  margin: 12px 4px 0;
+  padding: 10px 0 0;
+  border-top: 1px solid var(--border);
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.attachment-message-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+  max-width: 100%;
+}
+
+.attachment-message-actions .attachment-error {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.attachment-message-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  border-radius: 6px;
+}
+
+.attachment-message-actions .attachment-retry-action {
+  padding: 4px 6px;
+}
+
+.attachment-message-actions .attachment-dismiss-action {
+  padding: 4px 6px;
+  flex-shrink: 0;
+}
+
+.attachment-message-actions button:hover {
+  background: var(--hover-overlay);
+  color: var(--text);
+}
+
+.attachment-message-actions button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

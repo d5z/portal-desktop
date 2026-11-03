@@ -1,4 +1,4 @@
-import './rich-composer.css';
+import styles from './rich-composer.module.scss';
 import { appendChatText } from '../models/message-time';
 import { useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type RefObject, type TextareaHTMLAttributes, type KeyboardEventHandler, type CompositionEventHandler } from 'react';
 import { HighlightedCode } from './markdown';
@@ -37,9 +37,9 @@ export function RichComposer({ textareaRef, value, onChange, onKeyDown, onCompos
     if (restoreFocus.current) textareaRef.current?.focus();
     restoreFocus.current = false;
   }, [rich]);
-  return <div ref={root} className="rich-composer" data-code={language === 'json' || language === 'jsonl'}
+  return <div ref={root} className={styles.root} data-slot="rich-composer" data-code={language === 'json' || language === 'jsonl'}
     onKeyDownCapture={event => { if ((event.target as HTMLElement).closest('textarea, [contenteditable]')) onKeyDown?.(event); }} onCompositionStart={onCompositionStart} onCompositionEnd={onCompositionEnd}>
-    {showFormatControls && <div className="composer-format">
+    {showFormatControls && <div className={styles.format} data-slot="composer-format">
       <select aria-label="输入格式" value={format} onChange={event => setFormat(event.target.value as Format)}>
         <option value="auto">Auto ({inferred === 'markdown' ? 'Markdown' : inferred.toUpperCase()})</option>
         <option value="markdown">Markdown</option>
@@ -90,8 +90,8 @@ function SourceEditor({ inputRef, value, language, onChange, ...props }: Omit<Ri
     return () => observer.disconnect();
   }, []);
   return (
-    <div className="composer-editor">
-      <pre ref={paint} className="composer-highlight" aria-hidden="true"><code>{value.length > 50000 ? value : <HighlightedCode text={value} language={language === 'jsonl' ? 'json' : language} />}{'\n'}</code></pre>
+    <div className={styles.editor} data-slot="composer-editor">
+      <pre ref={paint} className={styles.highlight} data-slot="composer-highlight" aria-hidden="true"><code>{value.length > 50000 ? value : <HighlightedCode text={value} language={language === 'jsonl' ? 'json' : language} />}{'\n'}</code></pre>
       <textarea {...props} ref={textareaRef} value={value} onChange={event => onChange(event.target.value)} spellCheck={false} onScroll={event => { syncScroll(); props.onScroll?.(event); }} />
     </div>
   );

@@ -3,10 +3,12 @@ import { readShellStyles } from './support/shell-styles.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdir } from 'node:fs/promises';
-import { build } from 'esbuild';
+import { build } from '../scripts/renderer-build.mjs';
+import { browserAssets } from './support/browser-assets.mjs';
 import { chromium } from 'playwright';
 
 const { outputFiles } = await build({
+  plugins: [browserAssets()],
   stdin: { resolveDir: process.cwd(), sourcefile: 'town-names-fixture.tsx', loader: 'tsx', contents: `
     import React from 'react';
     import { createRoot } from 'react-dom/client';
@@ -146,7 +148,7 @@ try {
     await card.hover();
     assert.equal(await copy.evaluate(el => getComputedStyle(el).opacity), '1');
     assert.equal(await card.evaluate(el => {
-      const icon = el.querySelector('.message-copy').getBoundingClientRect();
+      const icon = el.querySelector('button[aria-label="复制正文"]').getBoundingClientRect();
       const author = el.querySelector('.social-author').getBoundingClientRect();
       const meta = el.querySelector('.social-meta').getBoundingClientRect();
       return icon.left >= author.right && icon.right <= meta.right + 1;

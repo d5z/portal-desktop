@@ -1,0 +1,18 @@
+:root {
+  --font-sans:
+    -apple-system, blinkmacsystemfont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+:root[data-theme='dark'] {
+  --bg: #191919;
+  --bg-soft: #2c2c2c;
+  --bg-softer: #263b2f;
+  --border: #ffffff12;
+  --text: #f4f4f7;
+  --text-dim: #a0a0ac;
+  --text-muted: #7e7e89;
+  --accent: #58b77d;
+  --accent-border: #344b3c;
+  --accent-tint: #263b2f;
+  --context-surface: #252525;
+}

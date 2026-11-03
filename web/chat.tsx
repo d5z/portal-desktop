@@ -1,12 +1,9 @@
 import { createRoot } from "react-dom/client";
 import { ChatApp } from "../desktop/renderer/chat/page";
 import { readConnection, deploymentConnection } from "./connection";
-import "../desktop/renderer/shared/typography.css";
-import "../desktop/renderer/shared/components/remote-image.css";
-import "../desktop/renderer/chat/styles.css";
-import "../desktop/renderer/shared/model-settings.css";
+import "../desktop/renderer/chat/document.scss";
 import "highlight.js/styles/github-dark.min.css";
-import "./chat.css";
+import "./chat.scss";
 
 const root = createRoot(document.getElementById("root")!);
 const saved = readConnection();

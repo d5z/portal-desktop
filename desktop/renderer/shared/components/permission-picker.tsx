@@ -1,3 +1,4 @@
+import styles from './permission-picker.module.scss';
 import type { PermissionMode } from '../../../shared/security';
 export const permissionChoices: { value: PermissionMode; title: string; detail: string; icon: string; tag?: string }[] = [
   { value: 'supervised', title: '请求批准', detail: '越界编辑、联网和外部工具需批准', icon: 'shield' },
@@ -15,7 +16,7 @@ export function PermissionIcon({ kind = 'shield' }: { kind?: string }) {
 }
 export function PermissionPicker({ value, onChange, disabled = false }: { value: PermissionMode; onChange: (mode: PermissionMode) => void; disabled?: boolean }) {
   const choices = choicesFor(value);
-  return <div className="permission-picker" role="radiogroup" aria-label="工具权限模式">
+  return <div className={styles.picker} role="radiogroup" aria-label="工具权限模式">
     {choices.map((choice, index) => <button key={choice.value} type="button" role="radio" aria-checked={value === choice.value} tabIndex={value === choice.value ? 0 : -1}
       onKeyDown={event => {
         if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -25,10 +26,10 @@ export function PermissionPicker({ value, onChange, disabled = false }: { value:
         onChange(choices[next].value);
         (event.currentTarget.parentElement?.children[next] as HTMLButtonElement)?.focus();
       }}
-      disabled={disabled} className={`permission-choice${value === choice.value ? ' selected' : ''}`} onClick={() => onChange(choice.value)}>
-      <span className="permission-choice-icon"><PermissionIcon kind={choice.icon}/></span>
-      <span className="permission-choice-copy"><span className="permission-choice-title">{choice.title}{choice.tag && <em>{choice.tag}</em>}</span><span className="permission-choice-detail">{choice.detail}</span></span>
-      <span className="permission-radio" aria-hidden="true">{value === choice.value ? '●' : ''}</span>
+      disabled={disabled} className={styles.choice} onClick={() => onChange(choice.value)}>
+      <span className={styles.icon}><PermissionIcon kind={choice.icon}/></span>
+      <span className={styles.copy}><span className={styles.title}>{choice.title}{choice.tag && <em>{choice.tag}</em>}</span><span className={styles.detail}>{choice.detail}</span></span>
+      <span className={styles.radio} aria-hidden="true">{value === choice.value ? '●' : ''}</span>
     </button>)}
   </div>;
 }

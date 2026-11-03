@@ -3,7 +3,8 @@ import { readShellStyles } from './support/shell-styles.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdir } from 'node:fs/promises';
-import { build } from 'esbuild';
+import { build } from '../scripts/renderer-build.mjs';
+import { browserAssets } from './support/browser-assets.mjs';
 import { chromium } from 'playwright';
 
 const queries = [];
@@ -16,7 +17,7 @@ const seeds = Array.from({ length: 26 }, (_, index) => ({
   created_at: '2026-09-14T00:00:00Z', updated_at: '2026-09-14T00:00:00Z',
   skeleton: [{ cmd_path: 'portal_process', exec: 10, ok_pct: 90, observations: ['检查副作用之后再决定重试。'] }],
 }));
-const { outputFiles } = await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', sourcefile: 'seed-garden-fixture.tsx', contents: `
+const { outputFiles } = await build({ plugins: [browserAssets()], stdin: { resolveDir: process.cwd(), loader: 'tsx', sourcefile: 'seed-garden-fixture.tsx', contents: `
   import React from 'react';
   import { createRoot } from 'react-dom/client';
   import { Town } from './desktop/renderer/town/page';

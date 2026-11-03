@@ -1,0 +1,215 @@
+@media (max-width: 760px) {
+  .ios-sidebar {
+    display: none;
+  }
+
+  .ios-mobile-chat-menu {
+    display: grid;
+  }
+
+  .web-chat-tools {
+    display: none;
+  }
+
+  :root[data-keyboard='true'] .ios-tabbar {
+    display: none;
+  }
+
+  .ios-header {
+    min-height: 72px;
+    padding: calc(14px + env(safe-area-inset-top)) 22px 14px;
+  }
+
+  .ios-header h1 {
+    font-size: 24px;
+    font-weight: 650;
+  }
+
+  .ios-header-avatar {
+    width: 36px;
+    height: 36px;
+  }
+
+  .ios-header-avatar img {
+    width: 24px;
+    height: 24px;
+  }
+
+  .ios-tabbar {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    flex-shrink: 0;
+    background: var(--ios-card);
+    border-top: 1px solid var(--ios-separator);
+    padding: 8px 12px max(8px, env(safe-area-inset-bottom));
+    z-index: 20;
+  }
+
+  .ios-tabbar button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 3px;
+    min-height: 49px;
+    padding: 3px 8px;
+    border-radius: 0;
+    color: var(--secondary);
+    font-size: 10px;
+    line-height: 1.4;
+  }
+
+  .ios-tabbar button.active {
+    color: var(--ios-blue);
+    font-weight: 500;
+  }
+
+  .ios-tabbar button.active svg {
+    stroke-width: 2;
+  }
+
+  .ios-tabbar button:hover {
+    background: transparent;
+  }
+
+  .ios-content {
+    padding: 22px 18px 30px;
+  }
+
+  .ios-list-row {
+    padding: 20px 16px;
+    gap: 14px;
+  }
+
+  .ios-row-copy small {
+    font-size: 11px;
+  }
+
+  .ios-section-heading {
+    padding: 0 3px;
+  }
+
+  .ios-profile {
+    margin-bottom: 16px;
+  }
+
+  .ios-preference-row {
+    padding: 16px;
+    gap: 12px;
+  }
+
+  .ios-segment button {
+    padding: 7px 10px;
+  }
+
+  .ios-segment button svg {
+    display: none;
+  }
+
+  .ios-detail-description {
+    padding: 16px 18px 0;
+    font-size: 12px;
+  }
+
+  .web-town .town-content {
+    padding: 16px 12px 30px;
+  }
+
+  .web-town .catalog-split {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .web-town .catalog-detail {
+    border-left: 0;
+    padding: 20px 0 0;
+  }
+
+  .web-town .service-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .web-town .town-toolbar {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+
+  .web-town .town-toolbar input {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .web-town .feed-selectors,
+  .web-town .feed-controls {
+    flex-wrap: wrap;
+  }
+
+  .web-town .feed-select {
+    max-width: 100%;
+  }
+
+  .web-town pre {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+
+  dialog {
+    max-width: calc(100vw - 24px);
+    max-height: calc(var(--web-viewport-height, 100dvh) - 24px);
+    border-radius: 20px;
+  }
+
+  dialog .dialog-heading {
+    padding: 18px;
+  }
+
+  dialog .dialog-body {
+    padding: 16px 18px;
+    overflow-y: auto;
+  }
+
+  dialog .dialog-footer {
+    padding: 16px 18px;
+    flex-wrap: wrap;
+  }
+
+  dialog button {
+    min-height: 44px;
+  }
+
+  #ios-chat-actions {
+    margin-top: auto;
+    margin-bottom: max(12px, env(safe-area-inset-bottom));
+    width: calc(100vw - 24px);
+  }
+
+  .web-toast {
+    bottom: calc(75px + env(safe-area-inset-bottom));
+  }
+
+  .web-scene-toolbar {
+    padding: 5px 22px;
+    gap: 8px;
+  }
+
+  .web-scene-toolbar .ios-segment {
+    background: transparent;
+  }
+
+  .web-scene-toolbar .ios-segment button {
+    padding: 6px 9px;
+    font-size: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  button {
+    transition: none;
+  }
+}

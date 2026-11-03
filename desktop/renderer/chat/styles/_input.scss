@@ -1,0 +1,224 @@
+/* Input area */
+#input-area {
+  z-index: 1;
+  flex-shrink: 0;
+}
+
+#pending-files {
+  display: none;
+  padding: 0 0 8px;
+  max-height: 140px;
+  overflow: hidden auto;
+  white-space: normal;
+}
+
+#pending-files.active {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.pending-file {
+  font-size: 12px;
+  color: var(--text-dim);
+  padding: 0 8px;
+  border-radius: 6px;
+  display: inline-flex;
+  flex: 0 1 auto;
+  max-width: 100%;
+  min-height: 44px;
+}
+
+.pending-file .remove {
+  cursor: pointer;
+  color: var(--text-muted);
+  margin-left: 4px;
+  min-width: 44px;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pending-file .remove:hover {
+  color: var(--red);
+}
+
+.pending-file-preview {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  object-fit: cover;
+  border: 1px solid var(--border);
+  border-radius: 7px;
+}
+
+.pending-file-icon {
+  flex: 0 0 auto;
+}
+
+.pending-file > span:not(.pending-file-icon) {
+  overflow-wrap: anywhere;
+}
+
+.pending-file .remove {
+  flex-shrink: 0;
+}
+
+#input-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+}
+
+#input {
+  flex: 1;
+  min-width: 0;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 11px 16px;
+  color: var(--text);
+  font-family: inherit;
+  line-height: 1.5;
+  resize: none;
+  min-height: 44px;
+  max-height: 120px;
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 2%),
+    inset 0 0 0 0 color-mix(in srgb, var(--accent) 0%, transparent);
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    background 0.2s ease;
+}
+
+#input:hover {
+  border-color: #2d333b;
+}
+
+#input:focus {
+  border-color: var(--accent-border);
+  background: var(--bg-softer);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 3%),
+    0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+#input.queued {
+  border-color: var(--accent);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 3%),
+    0 0 0 3px color-mix(in srgb, var(--accent) 15%, transparent);
+}
+
+#input::placeholder {
+  color: var(--text-ghost);
+  transition: color 0.2s;
+}
+
+#input:focus::placeholder {
+  color: var(--text-muted);
+}
+
+/* Paperclip / attach button (left of textarea) */
+.btn-attach {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  border-radius: 50%;
+  align-self: flex-end;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease,
+    transform 0.15s ease;
+}
+
+.btn-attach:hover {
+  color: var(--text-dim);
+  background: var(--hover-overlay);
+}
+
+.btn-attach:active {
+  transform: scale(0.92);
+}
+
+.btn-attach:focus-visible {
+  outline: none;
+  color: var(--text);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent);
+}
+
+.btn-attach svg {
+  width: 20px;
+  height: 20px;
+  display: block;
+}
+
+@media (max-width: 640px) {
+  #app {
+    max-width: none;
+  }
+
+  #messages {
+    padding: 14px 12px;
+  }
+
+  #input-area {
+    padding: 10px 10px max(10px, env(safe-area-inset-bottom));
+  }
+
+  .side-panel {
+    width: 100%;
+  }
+
+  #input-row {
+    gap: 4px;
+  }
+
+  #input {
+    max-height: calc(1.5em * 4 + 22px);
+    padding: 10px 14px;
+  }
+
+  .btn-attach {
+    width: 44px;
+    min-width: 44px;
+  }
+
+  #soul-card .card {
+    padding: 30px 18px 24px;
+  }
+
+  #soul-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .llm-item {
+    min-height: var(--touch-target);
+    display: flex;
+    align-items: center;
+  }
+
+  .toggle-group button {
+    min-height: var(--touch-target);
+  }
+
+  .step2-back {
+    min-width: var(--touch-target);
+    min-height: var(--touch-target);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}

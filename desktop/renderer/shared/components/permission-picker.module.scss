@@ -1,0 +1,100 @@
+@use '../styles/mixins';
+
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.picker .choice {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 14px;
+  padding: 15px 16px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+
+.picker .choice:hover {
+  background: var(--hover);
+}
+
+.picker .choice[aria-checked='true'] {
+  background: var(--selected);
+  border-color: var(--secondary);
+}
+
+.picker .choice[aria-checked='true']:active:not(:disabled) {
+  background: var(--pressed);
+}
+
+.icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: none;
+  color: var(--secondary);
+}
+
+.choice[aria-checked='true'] .icon {
+  color: var(--text);
+}
+
+.copy {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 550;
+}
+
+.title em {
+  padding: 2px 6px;
+  border-radius: 5px;
+  background: var(--hover);
+  color: var(--secondary);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 400;
+}
+
+.detail {
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--secondary);
+}
+
+.radio {
+  display: grid;
+  place-items: center;
+  width: 16px;
+  height: 16px;
+  border: 1px solid var(--muted);
+  border-radius: 50%;
+  font-size: 10px;
+  flex: none;
+}
+
+.choice[aria-checked='true'] .radio {
+  border-color: var(--text);
+}
+
+.picker button:focus-visible {
+  @include mixins.focus-ring(var(--secondary), 3px);
+}

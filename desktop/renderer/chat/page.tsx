@@ -495,7 +495,7 @@ function ChatView({
                   {item.role === "system" && <span>系统消息</span>}
                   {(state.historyScope === "all" || isGlobalBeingMessage(item)) && <span className="message-scene" title={isGlobalBeingMessage(item) ? "Being 发出的无场景消息，在各场景共享显示；包含自主醒来消息" : item.sceneId || "这条历史消息未提供场景标记"}>{isGlobalBeingMessage(item) ? "全局消息" : sceneName(item, state.currentScene, state.sceneNames)}</span>}
                 </div>
-                <div className="message-bubble-row">
+                <div className="message-bubble-row" data-copy-group>
                   <div className="message-bubble-body" tabIndex={0} role="group" aria-label={`${item.role === "user" ? "你" : item.label}的消息`} aria-haspopup="menu"
                     onContextMenu={event=>messageMenu.openMenu(event,{text:splitSchedulingHint(originalMessageText(item)).text,time:item.createdAt,fallbackTime:item.timestamp})}
                     onKeyDown={event=>messageMenu.openMenu(event,{text:splitSchedulingHint(originalMessageText(item)).text,time:item.createdAt,fallbackTime:item.timestamp})}>
@@ -523,7 +523,7 @@ function ChatView({
                       onPlace={item.role === "system" || !keywordNavigation ? undefined : openPlace}
                     />}</ImageGenerationAnswer>}
                   </div>
-                  <CopyMessage text={splitSchedulingHint(originalMessageText(item)).text} copy={bridge.copyText} />
+                  <CopyMessage appearance="chat" text={splitSchedulingHint(originalMessageText(item)).text} copy={bridge.copyText} />
                 </div>
                 {hasAttachmentMessage(item) ? item.retry && <div className="attachment-message-actions">
                   {item.queueNotice && <span className="attachment-error" role="alert">{item.queueNotice}</span>}
@@ -676,7 +676,7 @@ function ChatView({
       />
       <ChatInfoPanels state={state} panel={panel} close={close} />
       {messageMenu.menu}
-      {!nativeTouch && <EditContextMenu edit={bridge.edit} onOpenChange={setContextMenuOpen} />}
+      {!nativeTouch && <EditContextMenu appearance="chat" edit={bridge.edit} onOpenChange={setContextMenuOpen} />}
       <button
         id="scene-selection-action"
         type="button"

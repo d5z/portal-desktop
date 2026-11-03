@@ -1,0 +1,140 @@
+.web-town {
+  container-type: inline-size;
+  container-name: stage;
+  max-width: 1200px;
+  margin: auto;
+}
+
+.ios-detail-description {
+  padding: 20px 32px 0;
+  color: var(--ios-secondary);
+  font-size: 13px;
+  line-height: 1.8;
+}
+
+.web-town .town-content {
+  padding: 24px 32px;
+}
+
+.web-town #town-view {
+  overflow: visible;
+}
+
+.web-town .service-card,
+.web-town .social-message,
+.web-town .seed-card {
+  border-radius: 14px;
+  background: var(--ios-card);
+}
+
+.web-town .service-grid {
+  gap: 12px;
+}
+
+.web-town .segmented {
+  border: 0;
+  background: var(--surface);
+  border-radius: 5px;
+  padding: 3px;
+}
+
+.web-town .segmented button {
+  border-radius: 3px;
+}
+
+.web-town .segmented button.selected {
+  background: var(--ios-card);
+  color: var(--ios-label);
+}
+
+.web-town input,
+.web-town select {
+  border-radius: 5px;
+  background-color: var(--ios-card);
+}
+
+.web-town .catalog-split {
+  min-width: 0;
+}
+
+.web-current {
+  padding: 12px;
+  background: var(--surface);
+  border-radius: 5px;
+  overflow-wrap: anywhere;
+}
+
+#web-settings {
+  width: min(520px, calc(100vw - 32px));
+}
+
+#web-settings[open],
+#web-settings form,
+#web-search[open] {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+#web-settings form {
+  overflow: hidden;
+}
+
+#web-settings input,
+#web-search input,
+#web-scenes input {
+  width: 100%;
+  border-radius: 5px;
+  min-height: 44px;
+}
+
+.web-search-results {
+  display: grid;
+  gap: 7px;
+}
+
+.web-search-results button {
+  text-align: left;
+  padding: 14px;
+  border-radius: 5px;
+  overflow-wrap: anywhere;
+  background: var(--surface);
+}
+
+dialog {
+  border-radius: 20px;
+  background: var(--ios-card);
+  border-color: var(--ios-separator);
+}
+
+/* These dialogs have auto height capped by max-height. A zero flex basis on
+   the nested form/body can collapse their content before that height resolves. */
+:is(#web-settings, #town-auth-dialog, #town-send-dialog) > form,
+dialog .dialog-body {
+  flex: 1 1 auto;
+}
+
+dialog .dialog-footer {
+  background: var(--ios-card);
+}
+
+dialog button.primary,
+.web-town button.primary {
+  background: var(--ios-blue);
+  color: #fff;
+  border-radius: 5px;
+}
+
+.web-toast {
+  position: fixed;
+  z-index: 10000;
+  left: 50%;
+  bottom: 32px;
+  transform: translateX(-50%);
+  padding: 13px 20px;
+  max-width: calc(100vw - 32px);
+  color: #fff;
+  background: #333e;
+  border-radius: 6px;
+  font-size: 13px;
+}

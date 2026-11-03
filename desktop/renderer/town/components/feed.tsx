@@ -345,6 +345,7 @@ const Message = memo(function Message({
     <article
       id={domId}
       tabIndex={-1}
+      data-copy-group
       className={`social-message${m.mine ? " social-mine" : ""}${m.mentioned ? " mentions-me" : ""}${selected ? " scene-selected" : ""}`}
     >
       <span className="social-avatar" aria-hidden="true">

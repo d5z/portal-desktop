@@ -1,7 +1,7 @@
 import { createRoot } from "react-dom/client";
 import { WebApp } from "./page";
-import "../desktop/renderer/app/styles.css";
-import "./styles.css";
+import "../desktop/renderer/app/styles.scss";
+import "./styles.scss";
 import { InstallController } from "./install";
 
 const installation = new InstallController(window);

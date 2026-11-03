@@ -1,0 +1,139 @@
+.web-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--ios-bg);
+}
+
+.ios-sidebar {
+  display: flex;
+  flex-direction: column;
+  width: 236px;
+  flex-shrink: 0;
+  padding: 34px 20px 22px;
+  border-right: 1px solid var(--ios-separator);
+  background: var(--ios-card);
+}
+
+.ios-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--ios-label);
+  text-decoration: none;
+  padding: 0 8px;
+  font-weight: 600;
+  font-size: 17px;
+}
+
+.ios-brand img {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
+.ios-navigation {
+  display: grid;
+  gap: 4px;
+  margin-top: 32px;
+}
+
+.ios-navigation button {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  color: var(--secondary);
+  font-size: 15px;
+  text-align: left;
+}
+
+.ios-navigation button.active {
+  background: var(--ios-soft-blue);
+  color: var(--ios-blue);
+  font-weight: 600;
+}
+
+.ios-sidebar-profile {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  text-align: left;
+  margin-top: auto;
+  border-top: 1px solid var(--ios-separator);
+  padding: 18px 5px 0;
+}
+
+.ios-sidebar-profile > span:nth-child(2) {
+  min-width: 0;
+  flex: 1;
+}
+
+.ios-sidebar-profile strong {
+  display: block;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ios-sidebar-profile small {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  color: var(--ios-secondary);
+  margin-top: 4px;
+}
+
+.ios-sidebar-profile > svg {
+  color: var(--ios-secondary);
+}
+
+.ios-sidebar-avatar {
+  display: grid;
+  place-items: center;
+  width: 35px;
+  height: 35px;
+  border-radius: 6px;
+  background: var(--ios-bg);
+}
+
+.ios-sidebar-avatar img {
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.web-dot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #aaa;
+}
+
+.web-dot.online {
+  background: #07b75b;
+}
+
+.ios-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 86px;
+  padding: 18px 36px;
+  gap: 16px;
+  flex-shrink: 0;
+  border-bottom: 1px solid var(--ios-separator);
+}
+
+.ios-header > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}

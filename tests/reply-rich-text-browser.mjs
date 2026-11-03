@@ -1,4 +1,4 @@
-import { build } from 'esbuild';
+import { build } from '../scripts/renderer-build.mjs';
 import { chromium } from 'playwright';
 import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -15,7 +15,7 @@ try {
     import {SceneStore} from './desktop/renderer/shared/models/scene';
     import {Markdown} from './desktop/renderer/shared/components/markdown';
     import {useModel} from './desktop/renderer/shared/hooks/use-model';
-    import './desktop/renderer/app/styles.css';
+    import './desktop/renderer/app/styles.scss';
     const sent=window.sent=[];
     const town=window.town=new TownModel({sendTown:async input=>{sent.push(input);return {ok:true};}},()=>{},()=>{},new SceneStore(),()=>{},()=>{});
     town.visible=false;
@@ -46,7 +46,7 @@ try {
       const { y, height } = document.querySelector(selector).getBoundingClientRect(); return { y, height };
     }));
     const emptyLayout = await layout();
-    assert.equal(await page.locator('.composer-format').count(), 0);
+    assert.equal(await page.locator('[data-slot="composer-format"]').count(), 0);
     await input.pressSequentially('1312');
     assert.deepEqual(await layout(), emptyLayout, 'Typing the first characters must not shift the reply dialog');
     await input.press('Meta+a'); await input.press('Backspace');
@@ -65,7 +65,7 @@ try {
   }
   await page.evaluate(()=>window.openReply('dm'));
   await paste('{"标题":"聚餐","人数":4}');
-  await page.locator('.composer-highlight .hljs-attr').first().waitFor();
+  await page.locator('[data-slot="composer-highlight"] .hljs-attr').first().waitFor();
   assert.equal(await input.inputValue(),'{"标题":"聚餐","人数":4}');
   await input.press('Control+Enter');
   await page.locator('#reply-result code.lang-json').waitFor();

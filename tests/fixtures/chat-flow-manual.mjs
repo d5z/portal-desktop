@@ -23,7 +23,7 @@ const document = `<!doctype html><meta charset="utf-8"><title>对话流回归测
 <style>body{margin:0;font:14px system-ui;background:#eee}header{padding:8px;display:flex;flex-wrap:wrap;gap:8px}button{padding:6px 10px}iframe{display:block;border:0;width:100%;height:calc(100vh - 130px);margin:auto;background:white}output{display:block;padding:6px 12px;white-space:pre-wrap;font:12px monospace}</style>
 <header>
 <button data-action="character">追加单字</button><button data-action="short">追加短文本</button><button data-action="long">追加长文本</button>
-<button data-action="tool">工具阶段</button><button data-action="finish">结束回复</button>
+<button data-action="markdown">Markdown 分块</button><button data-action="tool">工具阶段</button><button data-action="finish">结束回复</button>
 <button data-action="history">同步历史</button><button data-action="fail-stop">下次停止失败</button>
 <button id="task">后台任务</button><button id="narrow">窄屏切换</button>
 <button id="reset">重置测量</button><button id="reload">刷新对话</button>
@@ -105,6 +105,20 @@ const server = createServer(async (req,res) => {
     if(action==='character'||action==='short'||action==='long'){
       const text=action==='character'?'好':action==='short'?'这是一段流式回复。':Array.from({length:30},(_,i)=>'\n\n'+(i+1)+'. 长回复段落，用于验证打断、滚动锚点和历史同步后的稳定性。').join('');
       if(active&&!active.finished){active.text+=text;event('content_block_delta',{delta:{text}});}
+    }
+    if(action==='markdown'&&active&&!active.finished){
+      const owner=active;
+      const text='\n\n## 流式格式验证\n\n| 项目 | 状态 |\n| --- | --- |\n| 中文 🌱 | 正常 |\n\n```javascript\nconst greeting = "你好🌱";\nconsole.log(greeting);\n```\n\n[引用链接][fixture]\n\n[fixture]: https://example.com\n';
+      for(let i=0;i<text.length;i+=9){
+        if(active!==owner||owner.finished)break;
+        const part=text.slice(i,i+9),data={scene_id:scene,delta:{text:part}};
+        owner.text+=part;
+        owner.events.push({seq:owner.events.length+1,event:'content_block_delta',data});
+        const wire=new TextEncoder().encode('event:content_block_delta\r\ndata:{"scene_id":"'+scene+'",\r\ndata:"delta":'+JSON.stringify(data.delta)+'}\r\n\r\n');
+        // Split bytes as well as fields, including inside Chinese/emoji UTF-8.
+        for(let j=0;j<wire.length;j+=7)owner.response?.write(wire.slice(j,j+7));
+        await new Promise(resolve=>setTimeout(resolve,40));
+      }
     }
     if(action==='finish'&&active&&!active.finished){persist();event('message_stop');active.finished=true;active.response?.end();history.push(...pendingHistory.splice(0));}
     return json({ok:true});

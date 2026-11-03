@@ -1,3 +1,5 @@
+import styles from './context-menu.module.scss';
+import clsx from 'clsx';
 import useEventListener from 'ahooks/es/useEventListener';
 import { useMenuDismiss } from '../hooks/use-menu-dismiss';
 import { LocalFileAction } from './local-file-link';
@@ -11,10 +13,11 @@ type Context = {
   field: TextField | null; container: HTMLElement; portal: HTMLElement; target: Element; restore(): void;
 };
 
-export function EditContextMenu({ edit, onOpenChange, rootSelector = ".chat-root",
+export function EditContextMenu({ edit, onOpenChange, appearance = 'shell', rootSelector = ".chat-root",
   selectionSelector = ".content, .reading-text, .panel pre" }: {
   edit(command: ChatEditCommand): Promise<boolean>;
   onOpenChange?(open: boolean): void;
+  appearance?: 'shell' | 'chat';
   rootSelector?: string;
   selectionSelector?: string;
 }) {
@@ -115,7 +118,7 @@ export function EditContextMenu({ edit, onOpenChange, rootSelector = ".chat-root
   };
 
   return <>
-    {context && createPortal(<div ref={menu} popover="manual" className="chat-context-menu" role="menu" aria-label="编辑菜单" tabIndex={-1}
+    {context && createPortal(<div ref={menu} popover="manual" className={clsx(styles.menu, appearance === 'chat' && styles.chat)} role="menu" aria-label="编辑菜单" tabIndex={-1}
       style={{ left: context.x, top: context.y }}
       onMouseDown={event => event.preventDefault()}
       onKeyDown={event => {
@@ -148,6 +151,6 @@ export function EditContextMenu({ edit, onOpenChange, rootSelector = ".chat-root
         <span>全选</span><kbd>{modifier}A</kbd>
       </button></>}
     </div>, context.portal)}
-    {error && createPortal(<div ref={notice} popover="manual" className="chat-context-notice" role="status">{error.message}</div>, error.portal)}
+    {error && createPortal(<div ref={notice} popover="manual" className={clsx(styles.notice, appearance === 'chat' && styles.chat)} role="status">{error.message}</div>, error.portal)}
   </>;
 }

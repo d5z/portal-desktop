@@ -1,0 +1,688 @@
+@use './tokens';
+
+.dsh-manager-backdrop {
+  position: fixed;
+  inset: 0;
+  background: #0005;
+  z-index: 1000;
+  -webkit-app-region: no-drag;
+}
+
+#third-party-plugins {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  z-index: 1001;
+  width: min(720px, calc(100vw - 48px));
+  height: min(680px, calc(100dvh - 48px));
+  max-height: calc(100dvh - 48px);
+  padding: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 20px;
+  color: var(--text);
+  background: var(--control);
+  -webkit-app-region: no-drag;
+}
+
+#third-party-plugins[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+#third-party-plugins .dsh-manager-heading {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  height: auto;
+  min-height: 88px;
+  padding: 22px 28px;
+  position: static;
+  border-bottom: 1px solid var(--line);
+}
+
+.dsh-manager-heading > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.dsh-manager-heading h2 {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.dsh-manager-heading p {
+  margin: 6px 0 0;
+  color: var(--secondary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.dsh-manager-heading .close {
+  flex: none;
+}
+
+.dsh-back {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 36px;
+  margin-left: -10px;
+  border-radius: 8px;
+}
+
+.dsh-back:hover {
+  background: var(--hover);
+}
+
+.dsh-back svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dsh-manager-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px 28px 28px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  scroll-padding: 24px;
+}
+
+.dsh-plugin-content {
+  width: 100%;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: var(--dsh-content-font-size, 14px);
+}
+
+.dsh-plugin-content > * {
+  margin-inline: auto;
+}
+
+.dsh-plugin-content :is(button, select) {
+  flex-shrink: 0;
+}
+
+.dsh-plugin-content button {
+  white-space: nowrap;
+}
+
+.dsh-plugin-content :is(input, select, textarea) {
+  max-width: 100%;
+}
+
+#third-party-plugins :is(button, input, select, textarea, summary):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+#third-party-plugins input[type='range'] {
+  accent-color: var(--accent);
+}
+
+.dsh-install {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0 0 24px;
+}
+
+#third-party-plugins .dsh-install label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.dsh-install > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dsh-install input {
+  flex: 1 1 280px;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--text);
+  background: var(--control);
+}
+
+.dsh-install button,
+.dsh-actions button,
+.dsh-contributions button {
+  min-height: 36px;
+}
+
+.dsh-actions,
+.dsh-contributions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.dsh-contributions:empty {
+  display: none;
+}
+
+.dsh-contributions {
+  margin-top: 14px;
+}
+
+.dsh-reload {
+  padding: 14px;
+  background: var(--surface);
+  border-radius: 10px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+.dsh-reload button {
+  margin-top: 8px;
+}
+
+#third-party-plugins .plugin-card {
+  display: block;
+  padding: 22px 0;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+
+#third-party-plugins .plugin-card h3 {
+  font-size: 15px;
+  margin: 0 0 8px;
+  overflow-wrap: anywhere;
+}
+
+#third-party-plugins .plugin-card > p {
+  margin: 8px 0 14px;
+  font-size: 13px;
+  line-height: 1.7;
+}
+
+#third-party-plugins .plugin-card .card-meta {
+  font-size: 12px;
+  color: var(--secondary);
+}
+
+.dsh-compatibility {
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+  color: var(--secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.dsh-compatibility summary {
+  cursor: pointer;
+  padding: 8px 0;
+}
+
+.dsh-settings-links {
+  display: flex;
+  flex-direction: column;
+  margin-top: 20px;
+}
+
+#client-settings-dialog #settings-panel-plugins .dsh-settings-links > button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 74px;
+  padding: 16px 4px;
+  text-align: left;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+}
+
+#client-settings-dialog #settings-panel-plugins .dsh-settings-links > button:hover {
+  background: var(--surface);
+}
+
+.dsh-settings-links > button > span {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.dsh-settings-links strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.dsh-settings-links small {
+  font-size: 12px;
+  color: var(--secondary);
+  overflow-wrap: anywhere;
+}
+
+.dsh-settings-links svg {
+  transform: rotate(-90deg);
+  color: var(--secondary);
+}
+
+.dsh-panel-entry {
+  position: fixed;
+  left: 80px;
+  bottom: 24px;
+  z-index: 100;
+}
+
+@media (max-width: 600px) {
+  #third-party-plugins {
+    width: calc(100vw - 24px);
+    height: calc(100dvh - 24px);
+    max-height: calc(100dvh - 24px);
+    border-radius: 16px;
+  }
+
+  #third-party-plugins .dsh-manager-heading {
+    padding: 18px 20px;
+    min-height: 80px;
+  }
+
+  .dsh-manager-body {
+    padding: 20px;
+  }
+
+  .dsh-manager-heading h2 {
+    font-size: 20px;
+  }
+}
+
+/* DSH's semantic aliases are supplied by Town. Plugin overrides flow back into
+   Town through separate variables, avoiding a circular token reference. */
+:root {
+  --dsw-alias-bg-base: #fff;
+  --dsw-alias-bg-layer-1: #f7f7f6;
+  --dsw-alias-bg-layer-2: #f4f4f3;
+  --dsw-alias-bg-layer-3: #fff;
+  --dsw-alias-label-primary: #242424;
+  --dsw-alias-label-secondary: #686868;
+  --dsw-alias-label-tertiary: #737373;
+  --dsw-alias-border-l2: #ddd;
+  --dsw-alias-border-l3: #e9e9e7;
+  --dsw-specific-sidebar-fill: #f7f7f6;
+}
+
+:root[data-theme='dark'] {
+  --dsw-alias-bg-base: #212121;
+  --dsw-alias-bg-layer-1: #292929;
+  --dsw-alias-bg-layer-2: #303030;
+  --dsw-alias-bg-layer-3: #252525;
+  --dsw-alias-label-primary: #ececec;
+  --dsw-alias-label-secondary: #adadad;
+  --dsw-alias-label-tertiary: #858585;
+  --dsw-alias-border-l2: #454545;
+  --dsw-alias-border-l3: #ffffff12;
+  --dsw-specific-sidebar-fill: #1c1c1c;
+}
+
+/* Translate the complete surface palette, rather than mixing plugin text with
+   Town's default controls. Action buttons retain Town's high-contrast treatment. */
+body[data-town-dsh-theme] {
+  --bg: var(--dsw-alias-bg-base);
+  --sidebar: var(--dsw-specific-sidebar-fill);
+  --surface: var(--dsw-alias-bg-layer-1);
+  --control: var(--dsw-alias-bg-overlay);
+  --text: var(--dsw-alias-label-primary);
+  --secondary: var(--dsw-alias-label-secondary);
+  --muted: color-mix(in srgb, var(--text) 78%, var(--control));
+  --line: color-mix(in srgb, var(--text) 20%, var(--control));
+  --accent: var(--text);
+  --button-text: var(--control);
+  --theme-brand: var(--dsw-alias-brand-primary);
+  --hover: color-mix(in srgb, var(--text) 8%, transparent);
+  --pressed: color-mix(in srgb, var(--text) 14%, transparent);
+  --selected: color-mix(in srgb, var(--text) 14%, var(--surface));
+  --selection-face: var(--selected);
+  --selection-edge: color-mix(in srgb, var(--text) 28%, var(--surface));
+  --selection-shadow: 0 1px 4px #0002;
+  --selection-row: var(--selected);
+  --selection-mark: var(--theme-brand);
+  --utility-surface: var(--surface);
+  --message-surface: var(--dsw-alias-bg-layer-2);
+  --code: var(--dsw-alias-bg-layer-2);
+  --green: var(--dsw-alias-state-success-primary);
+
+  background: var(--bg);
+}
+
+body[data-town-dsh] #welcome,
+body[data-town-dsh] .workspace-stage,
+body[data-town-dsh] #chat-view {
+  background: transparent;
+}
+
+body[data-town-dsh-wallpaper] {
+  --bg: transparent;
+
+  background: transparent;
+}
+
+/* Dialogs remain readable when a wallpaper plugin makes the base transparent. */
+body[data-town-dsh-theme] dialog {
+  background: var(--control);
+}
+
+/* Wallpaper plugins can make --bg transparent; settings and switch thumbs
+   must retain their own opaque surface in both themes. */
+body[data-town-dsh] :is(#client-settings-dialog, #third-party-plugins) {
+  --bg: var(--control);
+
+  background: var(--control);
+}
+
+body[data-town-dsh] input[type='checkbox']::before {
+  background: var(--control);
+}
+
+body[data-town-dsh-theme] :is(input[type='checkbox'], .being-wake-track) {
+  background: var(--selected);
+}
+
+body[data-town-dsh-theme] input[type='checkbox']:checked,
+body[data-town-dsh-theme] .being-wake-switch[aria-checked='true'] .being-wake-track {
+  background: var(--accent);
+}
+
+body[data-town-dsh-theme] :is(.settings-tabs, .being-tabs, .model-targets) [aria-selected='true'],
+body[data-town-dsh-theme] :is(.theme-options, .chat-session-scope) [aria-pressed='true'] {
+  color: var(--text);
+  background: var(--selected);
+}
+
+body[data-town-dsh-theme] ::selection {
+  color: var(--text);
+  background: var(--selected);
+}
+
+/* Original plugin controls live in the same scrolling list as Town destinations. */
+.dsh-navigation,
+.dsh-rail-entries {
+  display: contents;
+}
+
+.workspace-rail .dsh-rail-entries :is(button, a[href], [role='button']) {
+  position: relative;
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 44px;
+  min-width: 44px;
+  max-width: 44px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  text-decoration: none;
+  -webkit-app-region: no-drag;
+}
+
+.workspace-rail
+  .dsh-rail-entries
+  :is(button, a[href], [role='button']):is(:hover, [aria-expanded='true'], [aria-current='page']) {
+  background: var(--selected);
+}
+
+.workspace-rail .dsh-rail-entries :is(button, a[href], [role='button']):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.workspace-rail .dsh-rail-entries [aria-hidden='true'] {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.workspace-rail .dsh-rail-entries img {
+  max-width: 24px;
+  max-height: 24px;
+  object-fit: contain;
+}
+
+.workspace-rail .dsh-rail-entries :is(button, a[href], [role='button']):disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Older plugins sometimes supply text alone. Retain the accessible name and
+   show a consistent fallback icon rather than squeezing a label into the rail. */
+.workspace-rail
+  .dsh-rail-entries
+  :is(button, a[href], [role='button']):not(:has(svg, img, [aria-hidden='true'], [role='img'])) {
+  font-size: 0;
+}
+
+.workspace-rail
+  .dsh-rail-entries
+  :is(button, a[href], [role='button']):not(:has(svg, img, [aria-hidden='true'], [role='img']))
+  > * {
+  font-size: 0;
+}
+
+.workspace-rail
+  .dsh-rail-entries
+  :is(button, a[href], [role='button']):not(
+    :has(svg, img, [aria-hidden='true'], [role='img'])
+  )::before {
+  content: '';
+  width: 24px;
+  height: 24px;
+  background: currentcolor;
+  mask: center/contain no-repeat
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath fill='none' stroke='black' stroke-width='1.5' stroke-linejoin='round' d='M8 3h8v5h5v8h-5v5H8v-5H3V8h5V3Z'/%3E%3C/svg%3E");
+}
+
+.dsh-unsaved {
+  padding: 12px 28px;
+  border-bottom: 1px solid var(--line);
+  background: var(--control);
+  flex: none;
+}
+
+.dsh-unsaved p {
+  margin: 0 0 8px;
+  font-size: 13px;
+}
+
+.dsh-unsaved button + button {
+  margin-left: 8px;
+}
+
+.dsh-main-panel {
+  position: fixed;
+  inset: 72px 16px 16px 96px;
+  z-index: 80;
+  overflow: auto;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.dsh-main-panel > header {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 16px;
+}
+
+.dsh-rightbar {
+  position: fixed;
+  right: 0;
+  top: 64px;
+  bottom: 0;
+  width: min(400px, 100vw);
+  z-index: 90;
+  overflow: auto;
+  background: var(--bg);
+  border-left: 1px solid var(--line);
+}
+
+.dsh-rightbar.fullscreen {
+  inset: 64px 0 0;
+  width: auto;
+}
+
+.dsh-shell-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+}
+
+.dsh-shell-overlay > * {
+  pointer-events: auto;
+}
+
+.dsh-config-form fieldset {
+  border: 0;
+  padding: 0;
+  margin: 0 0 20px;
+  min-width: 0;
+}
+
+.dsh-config-form legend {
+  padding: 12px 0;
+  font-weight: 600;
+}
+
+.dsh-config-field {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.dsh-config-field label {
+  display: flex;
+  flex: 1;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.dsh-config-field label > span {
+  flex: 1 1 180px;
+  font-size: 13px;
+}
+
+.dsh-config-field :is(input:not([type='checkbox']), textarea, select) {
+  width: min(100%, 260px);
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--control);
+  color: var(--text);
+}
+
+.dsh-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* Plugin drawers supplement Town navigation; they never replace its rail.
+   Reserve space only when both the plugin and Town retain usable widths. */
+@media (min-width: 1100px) {
+  body.dsh-rightbar-track .workspace-stage {
+    margin-right: 360px;
+  }
+
+  body.dsh-rightbar-track .dsh-rightbar {
+    width: 360px;
+  }
+}
+
+.dsh-main-panel,
+.dsh-rightbar {
+  background: var(--control);
+  -webkit-app-region: no-drag;
+}
+
+.dsh-main-panel > header {
+  position: sticky;
+  top: -20px;
+  z-index: 1;
+  padding: 12px 0;
+  background: var(--control);
+}
+
+.dsh-rightbar {
+  width: min(400px, calc(100vw - 96px));
+  padding: 16px;
+}
+
+.dsh-rightbar.fullscreen {
+  left: 88px;
+}
+
+.dsh-rightbar > button {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--control);
+}
+
+.dsh-manager-heading h2 {
+  overflow-wrap: anywhere;
+}
+
+body[data-town-dsh] {
+  --font-sans: var(
+    --dsh-font-family-text,
+    var(--dsw-font-family, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif)
+  );
+  --mono: var(--dsh-font-family-code, var(--ds-font-family-code, ui-monospace, monospace));
+}
+
+/* VS Code Themes 1.x previews mix light/dark cards, but its favorite control
+   uses the active theme's text. Give that control its own matching surface. */
+.dsh-plugin-content .vst-card .vst-fav-star {
+  color: var(--text);
+  background: var(--control);
+  border-color: var(--secondary);
+}
+
+.dsh-plugin-content .vst-card .vst-fav-star:hover {
+  color: var(--text);
+  border-color: var(--text);
+}
+
+.dsh-plugin-content .vst-card .vst-fav-star.is-fav {
+  color: light-dark(#805900, #f5c518);
+  background: var(--control);
+  border-color: currentcolor;
+}

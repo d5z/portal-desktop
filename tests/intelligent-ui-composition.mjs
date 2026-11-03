@@ -1,4 +1,4 @@
-import { build } from 'esbuild';
+import { build } from '../scripts/renderer-build.mjs';
 import { chromium } from 'playwright';
 import { mkdtemp, writeFile, rm, mkdir } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -8,8 +8,8 @@ import assert from 'node:assert/strict';
 const dir = await mkdtemp(path.join(tmpdir(), 'town-composition-'));
 let browser;
 try {
-  await build({stdin:{contents:`import React from 'react';import {createRoot} from 'react-dom/client';import {IntelligentUI} from './desktop/renderer/shared/intelligent-ui/view';import {gdp} from './desktop/renderer/shared/intelligent-ui/scenarios';const root=createRoot(document.getElementById('root'));window.show=(doc)=>root.render(<IntelligentUI key={doc.title} source={JSON.stringify(doc)}/>);window.show(gdp);`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,platform:'browser',jsx:'automatic',outfile:path.join(dir,'ui.js')});
-  await writeFile(path.join(dir,'index.html'),`<meta charset="utf-8"><link rel="stylesheet" href="${pathToFileURL(path.resolve('desktop/renderer/chat/styles.css'))}"><style>html,body,#root{overflow:visible;height:auto}body{padding:16px}#root{max-width:960px;margin:0 auto}</style><div id="root"></div><script src="ui.js"></script>`);
+  await build({stdin:{contents:`import './desktop/renderer/chat/styles.scss';import React from 'react';import {createRoot} from 'react-dom/client';import {IntelligentUI} from './desktop/renderer/shared/intelligent-ui/view';import {gdp} from './desktop/renderer/shared/intelligent-ui/scenarios';const root=createRoot(document.getElementById('root'));window.show=(doc)=>root.render(<IntelligentUI key={doc.title} source={JSON.stringify(doc)}/>);window.show(gdp);`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,platform:'browser',jsx:'automatic',outfile:path.join(dir,'ui.js')});
+  await writeFile(path.join(dir,'index.html'),`<meta charset="utf-8"><link rel="stylesheet" href="ui.css"><style>html,body,#root{overflow:visible;height:auto}body{padding:16px}#root{max-width:960px;margin:0 auto}</style><div id="root"></div><script src="ui.js"></script>`);
   browser=await chromium.launch({headless:true,channel:process.env.PLAYWRIGHT_CHANNEL||'chrome'});
   const page=await browser.newPage({viewport:{width:1100,height:900}}),errors=[];
   page.on('pageerror',e=>errors.push(e.message));

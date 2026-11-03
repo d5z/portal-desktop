@@ -1,5 +1,6 @@
 // Exercise the actual desktop scheme and response CSP, not a permissive file fixture.
-import { build } from 'esbuild';
+import { build } from '../scripts/renderer-build.mjs';
+import { browserAssets } from './support/browser-assets.mjs';
 import { _electron } from 'playwright';
 import electron from 'electron';
 import { mkdtemp, rm, cp, copyFile, writeFile } from 'node:fs/promises';
@@ -18,11 +19,11 @@ try {
   await cp('desktop/generated',path.join(dir,'assets'),{recursive:true});
   await writeFile(path.join(dir,'preload.js'),'// Isolated regression fixture.');
   await writeFile(path.join(dir,'assets','index.html'), '<!doctype html><link rel="stylesheet" href="shell.css"><div id="root"></div><script src="shell.js"></script>');
-  await build({stdin:{loader:'tsx',resolveDir:process.cwd(),contents:`
+  await build({plugins:[browserAssets()],stdin:{loader:'tsx',resolveDir:process.cwd(),contents:`
     import {createRoot} from 'react-dom/client';
     import {App} from './desktop/renderer/app/page';
     import {AppModel} from './desktop/renderer/app/models/app';
-    import './desktop/renderer/app/styles.css';
+    import './desktop/renderer/app/styles.scss';
     const model = new AppModel({platform:'darwin',appearance:async theme=>theme || 'light',browserBounds:async()=>{},browserState:async()=>({open:false,address:'',tabs:[]}),onBrowser:()=>()=>{},beingModelConfig:async()=>({presets:[]})});
     model.start=()=>()=>{}; model.startup='ready';
     model.town.show=view=>{model.town.view=view;model.town.visible=view!=='chat';model.town.changed();};
@@ -61,7 +62,7 @@ app.whenReady().then(()=>{
   await page.getByRole('button',{name:'添加附件和工具'}).click();
   await page.getByRole('menuitem',{name:/交互示例/}).click();
   await window.getByRole('heading',{name:'智能交互示例',exact:true}).waitFor();
-  assert.equal(await page.locator('.iui-examples-panel').count(),0,'Desktop must not render a second panel inside chat');
+  assert.equal(await page.locator('[data-slot="ui-examples-panel"]').count(),0,'Desktop must not render a second panel inside chat');
   const preview=await (await window.locator('.ui-examples-frame').elementHandle()).contentFrame();
   const placeBounds=await window.locator('#place-panel').boundingBox();
   assert.ok(Math.abs(placeBounds.x-bonfireBounds.x)<2 && Math.abs(placeBounds.width-bonfireBounds.width)<2,'Examples reuse the bonfire place panel layout');

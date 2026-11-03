@@ -1,0 +1,191 @@
+.markdown-input p {
+  margin: 0 0 0.6em;
+}
+.markdown-input > :first-child {
+  margin-top: 0;
+}
+.markdown-input > :last-child {
+  margin-bottom: 0;
+}
+.composer-command-token {
+  display: inline-block;
+  vertical-align: baseline;
+  padding: 0 2px;
+  margin: 0;
+  border-radius: 4px;
+  color: #3979b8;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: inherit;
+  user-select: all;
+  cursor: default;
+  box-decoration-break: clone;
+}
+.composer-command-token .composer-menu-icon {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  margin-right: 3px;
+  vertical-align: -2px;
+  color: inherit;
+}
+.composer-command-token .composer-menu-icon svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+.composer-command-token:hover,
+.composer-command-token.is-selected {
+  background: #3979b812;
+}
+.composer-command-token.is-selected {
+  outline: 1px solid #3979b850;
+}
+.message-command-token {
+  white-space: nowrap;
+  user-select: text;
+}
+:root[data-theme='dark'] .composer-command-token {
+  color: #91c7fa;
+}
+:root[data-theme='dark'] .composer-command-token:hover,
+:root[data-theme='dark'] .composer-command-token.is-selected {
+  background: #91c7fa14;
+}
+:root[data-theme='dark'] .composer-command-token.is-selected {
+  outline-color: #91c7fa60;
+}
+.markdown-input h1,
+.markdown-input h2,
+.markdown-input h3,
+.markdown-input h4,
+.markdown-input h5,
+.markdown-input h6 {
+  margin: 0.7em 0 0.35em;
+  line-height: 1.4;
+  font-weight: 650;
+}
+.markdown-input h1 {
+  font-size: 1.35em;
+}
+.markdown-input h2 {
+  font-size: 1.2em;
+}
+.markdown-input h3,
+.markdown-input h4,
+.markdown-input h5,
+.markdown-input h6 {
+  font-size: 1.05em;
+}
+.markdown-input strong {
+  font-weight: 700;
+}
+.markdown-input em {
+  font-style: italic;
+}
+.markdown-input s {
+  text-decoration: line-through;
+}
+.markdown-input ul,
+.markdown-input ol {
+  margin: 0.5em 0;
+  padding-left: 1.6em;
+}
+.markdown-input ul {
+  list-style: disc;
+}
+.markdown-input ol {
+  list-style: decimal;
+}
+.markdown-input li {
+  display: list-item;
+  margin: 0.2em 0;
+}
+.markdown-input li p {
+  margin: 0;
+}
+.markdown-input blockquote {
+  margin: 0.6em 0;
+  padding-left: 12px;
+  border-left: 3px solid var(--border, var(--line));
+  color: var(--text-dim, var(--muted));
+}
+.markdown-input code {
+  font: 0.9em var(--composer-mono);
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--bg-softer, var(--control));
+}
+.markdown-input pre {
+  padding: 12px;
+  margin: 0.6em 0;
+  white-space: pre-wrap;
+  border-radius: 8px;
+  background: var(--bg-softer, var(--control));
+}
+.markdown-input pre code {
+  padding: 0;
+  background: transparent;
+}
+.markdown-input a {
+  color: var(--accent);
+  text-decoration: underline;
+  cursor: text;
+}
+.markdown-input table {
+  border-collapse: collapse;
+  table-layout: fixed;
+  width: 100%;
+  margin: 0.6em 0;
+}
+.markdown-input td,
+.markdown-input th {
+  min-width: 40px;
+  border: 1px solid var(--border, var(--line));
+  padding: 6px 9px;
+  vertical-align: top;
+}
+.markdown-input th {
+  font-weight: 650;
+  background: var(--bg-softer, var(--control));
+}
+.markdown-input ul[data-type='taskList'] {
+  padding-left: 0;
+  list-style: none;
+}
+.markdown-input li[data-type='taskItem'] {
+  display: flex;
+  gap: 8px;
+}
+.markdown-input li[data-type='taskItem'] > label {
+  flex: 0 0 auto;
+  margin: 0;
+}
+.markdown-input li[data-type='taskItem'] > div {
+  min-width: 0;
+  flex: 1;
+}
+.markdown-input input[type='checkbox'] {
+  width: auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+#town-send-dialog #town-send-content {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  resize: none;
+  min-height: 150px;
+  max-height: 40vh;
+  padding: 9px 0;
+  line-height: 24px;
+}
+#town-send-dialog #town-send-content:focus-visible {
+  outline: none;
+}
+.markdown-input[data-empty='true']::before {
+  content: attr(data-placeholder);
+  position: absolute;
+  pointer-events: none;
+  color: var(--text-muted, var(--muted));
+}

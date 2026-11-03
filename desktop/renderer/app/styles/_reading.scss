@@ -1,0 +1,213 @@
+/* Reading surfaces follow the same wrapping rules as chat bubbles. */
+#place-panel :is(.reading-text, .social-body) {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#place-panel :is(.reading-text, .social-body) pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+#place-panel :is(.reading-text, .social-body) table {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+}
+
+#place-panel :is(.reading-text, .social-body) :is(img, video) {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Available updates stay discoverable while the settings menu is closed. */
+.rail-update {
+  position: fixed;
+  left: 20px;
+  bottom: 72px;
+  z-index: 149;
+  -webkit-app-region: no-drag;
+}
+
+.rail-update:empty {
+  display: none;
+}
+
+body:has(.rail-update:not(:empty)) .rail-settings-placeholder {
+  height: 92px;
+}
+
+@media (max-width: 800px) {
+  .rail-update {
+    left: 14px;
+  }
+}
+
+/* Restrained feed accents: blue actions, warm community identity, readable metadata. */
+body:is([data-view='bonfire'], [data-view='firesides'], [data-view='mail']) {
+  --feed-action: #1767c4;
+  --feed-tint: #eaf3ff;
+  --fire-ink: #9b562b;
+  --fire-tint: #f7ecdf;
+}
+
+:root[data-theme='dark']
+  body:is([data-view='bonfire'], [data-view='firesides'], [data-view='mail']) {
+  --feed-action: #8abbff;
+  --feed-tint: #273b54;
+  --fire-ink: #edba85;
+  --fire-tint: #41352b;
+}
+
+body:is([data-view='bonfire'], [data-view='firesides'], [data-view='mail'])
+  #place-panel
+  .social-avatar {
+  background: var(--surface);
+  color: var(--secondary);
+  border-radius: 50%;
+}
+
+body:is([data-view='bonfire'], [data-view='firesides'], [data-view='mail'])
+  #place-panel
+  .social-message {
+  border-bottom: 0;
+}
+
+body:is([data-view='bonfire'], [data-view='firesides'], [data-view='mail'])
+  .feed-relations
+  button.selected {
+  background: var(--feed-tint);
+  color: var(--feed-action);
+  font-weight: 600;
+}
+
+body:is([data-view='bonfire'], [data-view='firesides'], [data-view='mail'])
+  :is(.social-body a, .social-foot button, .expand-label) {
+  color: var(--feed-action);
+}
+
+body:is([data-view='bonfire'], [data-view='firesides'], [data-view='mail']) .bonfire-announcements {
+  background: var(--control);
+  border-color: var(--line);
+  border-left: 3px solid var(--fire-ink);
+}
+
+body:is([data-view='bonfire'], [data-view='firesides'], [data-view='mail']) .social-author {
+  font-weight: 600;
+}
+
+/* Keep compact windows useful before a catalog detail has been selected. */
+#place-panel .catalog-detail > .detail-placeholder {
+  margin: 0;
+  box-sizing: border-box;
+}
+
+#place-panel .catalog-split:has(> .catalog-list > .empty-inline):not(:has(.catalog-item)) {
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+}
+
+#place-panel
+  .catalog-split:has(> .catalog-list > .empty-inline):not(:has(.catalog-item))
+  > .catalog-detail {
+  display: none;
+}
+
+#place-panel .town-meta-row .town-status-row {
+  flex: 1;
+  min-width: 0;
+}
+
+#place-panel .town-status-row .list-status {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#place-panel .grove-help-button {
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+#town-send-dialog .dialog-footer {
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+#town-send-count,
+.send-shortcut {
+  white-space: nowrap;
+}
+
+#town-send-dialog .town-send-actions {
+  margin-left: auto;
+}
+
+@container stage (max-width:800px) {
+  #place-panel .fireside-body .fireside-rooms {
+    grid-template-columns: minmax(0, 1fr) minmax(120px, 180px);
+    gap: 10px;
+  }
+
+  #place-panel .fireside-rooms input {
+    margin: 0;
+  }
+
+  #place-panel .fireside-rooms h2 {
+    margin: 0;
+  }
+
+  #place-panel .fireside-body .fireside-room-list {
+    max-height: 100px;
+  }
+
+  #place-panel .fireside-room {
+    gap: 4px;
+  }
+}
+
+@container stage (max-width:570px) {
+  #place-panel .catalog-split:has(> .catalog-detail > .detail-placeholder) {
+    grid-template-rows: minmax(0, 1fr);
+  }
+
+  #place-panel .catalog-split > .catalog-detail:has(> .detail-placeholder) {
+    display: none;
+  }
+
+  #place-panel .town-meta-row:has(.grove-help-button) {
+    flex-wrap: wrap;
+    gap: 0 8px;
+    overflow: visible;
+  }
+
+  #place-panel .town-meta-row:has(.grove-help-button) .town-live-row {
+    display: none;
+  }
+
+  #place-panel .seed-search {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    gap: 6px;
+  }
+
+  #place-panel .seed-search > input {
+    min-width: 0;
+    width: 100%;
+  }
+
+  #place-panel .seed-search .seed-filter-menu > summary {
+    padding-inline: 6px;
+  }
+}
+
+@media (max-width: 520px) {
+  #town-send-dialog :is(.dialog-heading, .dialog-body, .dialog-footer) {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  #town-send-dialog .dialog-footer .send-shortcut {
+    display: none;
+  }
+}

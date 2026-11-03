@@ -1,0 +1,275 @@
+/* ═══ TUI Activity Bar ═══ */
+#tui-bar {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-muted);
+  padding: 0 16px;
+  min-height: 0;
+  max-height: 0;
+  overflow: hidden;
+  transition:
+    max-height 0.3s ease,
+    padding 0.3s ease,
+    opacity 0.3s ease;
+  opacity: 0;
+}
+
+#tui-bar.active {
+  min-height: 28px;
+  max-height: 120px;
+  padding: 6px 16px;
+  opacity: 1;
+  border-top: 1px solid var(--border);
+  position: relative;
+}
+
+#tui-bar.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 20%;
+  right: 20%;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    color-mix(in srgb, var(--accent) 15%, transparent),
+    transparent
+  );
+  transition: opacity 0.2s;
+}
+
+#tui-wrapper:hover #tui-bar.active::after {
+  opacity: 0;
+}
+
+#tui-bar .tui-line {
+  animation: tui-fade-in 0.2s ease;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.6;
+}
+
+@keyframes tui-fade-in {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+#tui-bar .tui-prompt {
+  color: var(--text-ghost);
+}
+
+#tui-bar .tui-cmd {
+  color: var(--purple);
+}
+
+#tui-bar .tui-arg {
+  color: var(--text-dim);
+}
+
+#tui-bar .tui-result {
+  color: var(--text-muted);
+}
+
+#tui-bar .tui-ok {
+  color: var(--green);
+}
+
+#tui-bar .tui-thinking {
+  color: var(--purple);
+}
+
+#tui-bar .tui-elapsed {
+  color: var(--text-ghost);
+  font-size: 11px;
+  margin-left: 4px;
+}
+
+#tui-bar .tui-cursor {
+  animation: blink-soft 1.6s ease-in-out infinite;
+  color: var(--purple);
+}
+
+#tui-bar .tui-stop {
+  position: absolute;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: 1px solid var(--red);
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--red);
+  font-size: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.6;
+  transition:
+    opacity 0.2s,
+    background 0.2s;
+}
+
+#tui-bar .tui-stop:hover {
+  opacity: 1;
+  background: rgb(248 81 73 / 10%);
+}
+
+#tui-bar .tui-stop svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* Stall hint (P1-7): 转圈的点不该承担全部沟通责任 */
+#tui-bar .tui-hint {
+  color: var(--yellow);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.85;
+  padding-left: 14px;
+}
+
+/* Two-line TUI (action + thinking preview) */
+#tui-bar .tui-preview {
+  color: var(--text-ghost);
+  font-size: 11px;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  opacity: 0.75;
+  padding-left: 14px;
+}
+
+#tui-bar .tui-key-arg {
+  color: var(--text-dim);
+  margin-left: 4px;
+}
+
+/* ═══ Activity Log (hover panel) ═══ */
+#tui-wrapper {
+  position: relative;
+}
+
+#activity-log {
+  position: absolute;
+  bottom: 100%;
+  left: 0;
+  right: 0;
+  max-height: 0;
+  overflow-y: auto;
+  opacity: 0;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-bottom: none;
+  border-radius: 8px 8px 0 0;
+  transition:
+    max-height 0.25s ease,
+    opacity 0.2s ease,
+    padding 0.2s ease;
+  font-family: var(--mono);
+  font-size: 11px;
+  padding: 0 12px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+  pointer-events: none;
+  z-index: 5;
+}
+
+#activity-log::-webkit-scrollbar {
+  width: 6px;
+}
+
+#activity-log::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+#activity-log::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+#tui-wrapper:hover #activity-log.has-content,
+#activity-log.pinned {
+  max-height: 200px;
+  opacity: 1;
+  padding: 8px 12px;
+  pointer-events: auto;
+}
+
+.act-item {
+  padding: 3px 0;
+  line-height: 1.5;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.act-item.think {
+  color: var(--text-muted);
+}
+
+.act-preview {
+  padding-left: 16px;
+  color: var(--text-ghost);
+  font-size: 10px;
+  line-height: 1.4;
+  max-height: 1.4em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.act-dot {
+  margin-right: 6px;
+  display: inline-block;
+  width: 10px;
+}
+
+.act-dot.done {
+  color: var(--green);
+}
+
+.act-dot.error {
+  color: var(--red);
+}
+
+.act-dot.current {
+  color: var(--purple);
+  animation: pulse-soft 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse-soft {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.act-result {
+  color: var(--text-ghost);
+  margin-left: 4px;
+}
+
+.act-arg {
+  color: var(--text-dim);
+}

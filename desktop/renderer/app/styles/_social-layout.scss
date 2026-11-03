@@ -1,0 +1,449 @@
+/* Social channels use the available workspace, with one sticky header and small edge insets. */
+#place-panel .social-feed {
+  max-width: none;
+  margin-inline: 0;
+}
+
+#place-panel .social-messages {
+  width: 100%;
+  padding-block: 0 20px;
+}
+
+#place-panel .social-messages > .message-time-divider {
+  margin: 18px 0 8px;
+  font-size: 11px;
+}
+
+#place-panel .social-messages > .message-time-divider:first-child {
+  margin-top: 12px;
+}
+
+#place-panel .social-view .feed-controls {
+  gap: 8px;
+  min-height: 44px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+#place-panel .feed-controls .feed-summary {
+  padding: 0;
+  margin-left: auto;
+  line-height: 1.5;
+}
+
+#place-panel .feed-options {
+  margin-left: 0;
+}
+
+#place-panel [data-module='mail'] .feed-summary {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+#place-panel .social-view .town-content {
+  max-width: none;
+  padding-inline: 24px;
+}
+
+body:is([data-view='bonfire'], [data-view='firesides'], [data-view='mail'])
+  #place-panel.central-place
+  .place-sheet-heading {
+  max-width: none;
+  padding-inline: 24px;
+}
+
+#place-panel .social-view .town-toolbar {
+  padding-bottom: 12px;
+}
+
+#place-panel .social-view .town-meta-row {
+  min-height: 28px;
+}
+
+#place-panel .social-view .town-meta-row .list-status {
+  height: 28px;
+  min-height: 28px;
+}
+
+#place-panel .social-view #town-auth-button {
+  max-width: 150px;
+}
+
+#place-panel .social-view #town-pagination:empty {
+  display: none;
+}
+
+#place-panel .social-message {
+  grid-template-columns: 32px minmax(0, 1fr);
+  gap: 12px;
+  padding: 10px 0;
+  border: 0;
+}
+
+#place-panel .social-avatar {
+  width: 32px;
+  height: 32px;
+  font-size: 13px;
+  margin-top: 2px;
+}
+
+#place-panel .social-content {
+  min-width: 0;
+}
+
+#place-panel .social-meta {
+  gap: 8px;
+  min-height: 24px;
+  margin-bottom: 6px;
+  font-size: 11px;
+}
+
+#place-panel .social-author {
+  font-size: 13px;
+  font-weight: 550;
+}
+
+#place-panel .social-meta time {
+  font-size: 11px;
+  color: var(--secondary);
+}
+
+#place-panel .social-bubble {
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  padding: 12px 16px;
+  background: var(--message-surface);
+  border-radius: 6px 20px 20px;
+  overflow-wrap: anywhere;
+}
+
+#place-panel .social-mine .social-bubble {
+  background: var(--feed-tint);
+  border-radius: 20px 6px 20px 20px;
+}
+
+#place-panel .social-bubble .social-body {
+  margin-top: 0;
+  line-height: 1.75;
+}
+
+#place-panel .social-bubble .social-preview {
+  line-height: 1.75;
+}
+
+#place-panel .social-foot {
+  gap: 4px;
+  margin-top: 4px;
+}
+
+#place-panel .social-foot .scene-select {
+  border: 0;
+  background: transparent;
+  min-height: 32px;
+  padding: 6px 10px;
+  color: var(--secondary);
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+#place-panel .social-foot .scene-select:is(:hover, :focus-visible) {
+  background: var(--hover);
+  color: var(--text);
+}
+
+#place-panel .social-message {
+  scroll-margin-top: 112px;
+}
+
+#place-panel .social-meta .message-time-actions {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+#place-panel .social-expansion > .expand-label {
+  min-height: 32px;
+  margin-top: 8px;
+  padding: 6px 10px;
+  border-radius: 8px;
+}
+
+#place-panel .social-expansion {
+  overflow: visible;
+}
+
+.social-expanded-body:not([hidden]) {
+  animation: message-reveal 140ms ease-out;
+}
+
+@keyframes message-reveal {
+  from {
+    opacity: 0.6;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .social-expanded-body:not([hidden]) {
+    animation: none;
+  }
+}
+
+@media (pointer: coarse) {
+  #place-panel :is(.social-foot .scene-select, .social-expansion > .expand-label) {
+    min-height: 44px;
+  }
+}
+
+#place-panel .fireside-layout {
+  grid-template-columns: 212px minmax(0, 1fr);
+  gap: 24px;
+}
+
+#place-panel .fireside-rooms {
+  padding-right: 20px;
+}
+
+#place-panel .fireside-room {
+  padding: 14px 12px;
+  border-radius: 12px;
+}
+
+#place-panel .fireside-room.selected {
+  box-shadow: none;
+  background: var(--utility-surface);
+}
+
+#place-panel .fireside-thread-heading {
+  height: auto;
+  min-height: 60px;
+  padding: 4px 0 8px;
+}
+
+#place-panel .fireside-thread-heading h2 {
+  font-size: 18px;
+  line-height: 1.4;
+  letter-spacing: normal;
+}
+
+#place-panel .bonfire-announcements {
+  border-left: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+#place-panel [data-module='mail'] .social-message {
+  max-width: 760px;
+  margin-right: 32px;
+}
+
+#place-panel [data-module='mail'] .social-message.social-mine {
+  grid-template-columns: minmax(0, 1fr) 32px;
+  width: calc(100% - 32px);
+  margin-left: auto;
+  margin-right: 0;
+}
+
+#place-panel [data-module='mail'] .social-mine .social-avatar {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+#place-panel [data-module='mail'] .social-mine .social-content {
+  grid-column: 1;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+#place-panel [data-module='mail'] .social-mine .social-meta {
+  justify-content: flex-end;
+}
+
+#place-panel [data-module='mail'] .social-mine .social-foot {
+  justify-content: flex-end;
+}
+
+@media (max-width: 600px) {
+  #client-settings-dialog .client-settings-content {
+    grid-template-columns: 1fr;
+    grid-template-rows: 56px auto minmax(0, 1fr);
+  }
+
+  #client-settings-dialog .client-settings-content > .dialog-heading {
+    grid-column: 1;
+    grid-row: 1;
+    padding: 16px 20px;
+    background: var(--bg);
+  }
+
+  #client-settings-dialog .settings-tabs {
+    grid-column: 1;
+    grid-row: 2;
+    flex-direction: row;
+    padding: 4px 12px 12px;
+    background: var(--bg);
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
+  #client-settings-dialog .settings-tabs button {
+    flex: none;
+    justify-content: center;
+    min-width: 88px;
+    padding: 10px 12px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  #client-settings-dialog .settings-tabs svg {
+    display: none;
+  }
+
+  #client-settings-dialog .settings-page {
+    grid-column: 1;
+    grid-row: 3;
+  }
+
+  #client-settings-dialog .settings-page-title {
+    padding: 12px 20px 20px;
+  }
+
+  #client-settings-dialog .dialog-body {
+    padding: 0 20px 24px;
+  }
+
+  .settings-page-title {
+    font-size: 21px;
+    margin-bottom: 20px;
+  }
+
+  #client-settings-dialog
+    :is(.appearance-setting-row, .reading-setting, .reasoning-setting, .general-settings-group) {
+    padding: 16px 0;
+  }
+}
+
+@container stage (max-width:800px) {
+  #place-panel .fireside-layout {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 16px;
+  }
+
+  #place-panel .fireside-rooms {
+    padding-right: 0;
+  }
+
+  #place-panel .fireside-body .fireside-rooms {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(100px, 180px);
+    align-items: center;
+    gap: 8px;
+    border-right: 0;
+  }
+
+  #place-panel .fireside-rooms h2,
+  #place-panel .fireside-rooms input {
+    margin: 0;
+  }
+
+  #place-panel .fireside-body .fireside-room-list {
+    grid-column: 1/-1;
+    display: flex;
+    flex-direction: row;
+    max-height: none;
+    overflow-x: auto;
+    gap: 8px;
+    scrollbar-width: thin;
+  }
+
+  #place-panel .fireside-room {
+    flex: 0 0 160px;
+    padding: 10px 12px;
+  }
+
+  #place-panel .fireside-rooms .empty-inline {
+    grid-column: 1/-1;
+    padding: 8px;
+  }
+
+  #place-panel.central-place .town-content {
+    padding: 8px 18px 20px;
+  }
+
+  #place-panel .social-message {
+    grid-template-columns: 28px minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  #place-panel .social-avatar {
+    width: 28px;
+    height: 28px;
+  }
+
+  #place-panel .social-bubble {
+    padding: 12px 14px;
+  }
+
+  #place-panel [data-module='mail'] .social-message {
+    margin-right: 16px;
+  }
+
+  #place-panel [data-module='mail'] .social-message.social-mine {
+    grid-template-columns: minmax(0, 1fr) 28px;
+    width: calc(100% - 16px);
+  }
+}
+
+@container stage (max-width:570px) {
+  #place-panel .social-view #town-search {
+    flex: 1 1 100px;
+    min-width: 0;
+  }
+
+  #place-panel .social-view .town-header-actions {
+    gap: 4px;
+    justify-content: flex-end;
+  }
+
+  #place-panel .social-view .town-write-button {
+    width: 34px;
+    min-width: 34px;
+    padding: 8px;
+  }
+
+  #place-panel .social-view .town-write-label {
+    display: none;
+  }
+
+  #place-panel .social-view #town-auth-button {
+    max-width: 88px;
+  }
+
+  #place-panel .social-view #town-tabs {
+    flex-basis: 100%;
+    width: max-content;
+    flex-grow: 0;
+  }
+
+  #place-panel .feed-controls .feed-summary {
+    font-size: 10px;
+  }
+
+  #place-panel .feed-options > summary {
+    padding-inline: 6px;
+  }
+
+  #place-panel .feed-reply-preview > summary {
+    gap: 8px;
+    padding-inline: 8px;
+  }
+
+  #place-panel .feed-reply-toggle {
+    font-size: 10px;
+  }
+}

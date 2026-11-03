@@ -1,0 +1,250 @@
+.ios-header h1 {
+  font-size: 24px;
+  letter-spacing: -0.5px;
+  line-height: 1.4;
+  font-weight: 600;
+  margin: 0;
+}
+
+.ios-header-avatar {
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  position: relative;
+  display: grid;
+  place-items: center;
+  background: var(--ios-card);
+  border: 1px solid var(--ios-separator);
+  border-radius: 12px;
+}
+
+.web-chat-refresh {
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.web-chat-refresh[aria-busy='true'] svg {
+  animation: web-refresh-spin 1s linear infinite;
+}
+
+@keyframes web-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .web-chat-refresh[aria-busy='true'] svg {
+    animation: none;
+  }
+}
+
+.ios-header-avatar img {
+  display: block;
+  width: 26px;
+  height: 26px;
+  object-fit: contain;
+}
+
+.ios-header-avatar .web-dot {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 9px;
+  height: 9px;
+  border: 2px solid var(--ios-bg);
+}
+
+.ios-round-button,
+.ios-back {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  color: var(--ios-label);
+  background: transparent;
+}
+
+.ios-back {
+  margin-left: -10px;
+}
+
+.ios-tabbar {
+  display: none;
+}
+
+.ios-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.ios-mobile-chat-menu {
+  display: none;
+}
+
+.ios-action-list {
+  padding: 0 16px 16px;
+}
+
+.ios-action-list button {
+  display: flex;
+  width: 100%;
+  gap: 14px;
+  align-items: center;
+  padding: 18px 8px;
+  border-radius: 4px;
+  text-align: left;
+  font-size: 16px;
+}
+
+.ios-action-list button + button {
+  border-top: 1px solid var(--ios-separator);
+}
+
+.ios-scroll-page {
+  min-height: 0;
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+.ios-content {
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 32px 36px 40px;
+}
+
+.ios-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 24px 0 10px;
+}
+
+.ios-section-heading h2 {
+  font-size: 13px;
+  color: var(--ios-secondary);
+  font-weight: 400;
+}
+
+.ios-group {
+  background: var(--ios-card);
+  border: 1px solid var(--ios-separator);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.ios-list-row {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  width: 100%;
+  padding: 22px;
+  text-align: left;
+  position: relative;
+}
+
+.ios-list-row + .ios-list-row::before {
+  content: '';
+  position: absolute;
+  height: 1px;
+  left: 80px;
+  right: 0;
+  top: 0;
+  background: var(--ios-separator);
+}
+
+.ios-row-copy {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ios-row-copy strong {
+  display: block;
+  font-size: 16px;
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+
+.ios-row-copy small {
+  font-size: 12px;
+  color: var(--ios-secondary);
+  line-height: 1.6;
+}
+
+.ios-list-row > svg:last-child {
+  color: #b5b5b5;
+  flex-shrink: 0;
+}
+
+.ios-row-value {
+  font-size: 12px;
+  color: var(--ios-secondary);
+  white-space: nowrap;
+}
+
+.ios-icon-tile {
+  display: inline-grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 13px;
+  background: var(--ios-bg);
+  flex-shrink: 0;
+  color: var(--ios-blue);
+}
+
+.ios-pair-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--ios-card);
+  width: 100%;
+  padding: 18px 20px;
+  margin-top: 20px;
+  border: 1px solid var(--ios-separator);
+  border-radius: 16px;
+  text-align: left;
+  color: var(--ios-label);
+}
+
+.ios-pair-card > span:nth-child(2) {
+  flex: 1;
+}
+
+.ios-pair-card strong {
+  display: block;
+  font-size: 15px;
+  font-weight: 500;
+  margin-bottom: 5px;
+}
+
+.ios-pair-card small {
+  color: var(--ios-secondary);
+  font-size: 12px;
+}
+
+.ios-pair-icon {
+  color: var(--ios-blue);
+  width: 28px;
+  display: grid;
+  place-items: center;
+}
+
+.ios-directory-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  padding: 24px 10px;
+  color: var(--ios-secondary);
+  font-size: 12px;
+}

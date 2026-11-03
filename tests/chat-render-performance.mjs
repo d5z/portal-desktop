@@ -3,6 +3,8 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFile, mkdir, writeFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
+const paragraphs = Number(process.env.PERF_PARAGRAPHS || 90);
+const interval = Number(process.env.PERF_INTERVAL_MS || 16);
 const assets = new Map(await Promise.all(['loom.html','chat.js','chat.css','highlight.css'].map(async name=>['/'+name,await readFile('desktop/generated/'+name)])));
 const id = n => 'msg_' + n.toString(16).padStart(64,'0');
 const receipt = {type:'being.image-generation',version:1,being_id:'fixture',jobs:[{index:1,title:'row 967',submission:'accepted',generation_id:'gen_perf',client_request_id:'perf',error_code:null}]};
@@ -97,17 +99,23 @@ try {
     new PerformanceObserver(list=>{if(window.measuring)window.longTasks.push(...list.getEntries().map(entry=>entry.duration));}).observe({type:'longtask',buffered:false});
     let last=performance.now();function tick(now){if(!window.measuring)return;window.samples.push(now-last);last=now;requestAnimationFrame(tick);}requestAnimationFrame(tick);
   });
+  const performanceSession = await page.context().newCDPSession(page);
+  await performanceSession.send('Performance.enable');
+  const cpuBefore = (await performanceSession.send('Performance.getMetrics')).metrics.find(metric => metric.name === 'TaskDuration').value;
   answer='';
-  for(let i=0;i<90;i++){const text=`流式段落 ${i}。\n\n`;answer+=text;emit('content_block_delta',{delta:{text}});await new Promise(resolve=>setTimeout(resolve,16));}
+  for(let i=0;i<paragraphs;i++){const text=`流式段落 ${i}。\n\n`;answer+=text;emit('content_block_delta',{delta:{text}});await new Promise(resolve=>setTimeout(resolve,interval));}
   answer+='```javascript\n';emit('content_block_delta',{delta:{text:'```javascript\n'}});
-  for(let i=0;i<40;i++){const text=`const value_${i} = ${i};\n`;answer+=text;emit('content_block_delta',{delta:{text}});await new Promise(resolve=>setTimeout(resolve,16));}
+  for(let i=0;i<40;i++){const text=`const value_${i} = ${i};\n`;answer+=text;emit('content_block_delta',{delta:{text}});await new Promise(resolve=>setTimeout(resolve,interval));}
   await page.waitForFunction(()=>[...document.querySelectorAll('pre code')].at(-1)?.textContent.includes('const value_39'));
   assert.equal(await page.locator('.message.being').last().locator('code .hljs-keyword').count(),0,'Live code avoids highlighting on every delta');
   answer+='```';emit('content_block_delta',{delta:{text:'```'}});
   emit('message_stop',{});stream.end();
-  await page.getByText('流式段落 89。',{exact:true}).waitFor();
+  await page.getByText(`流式段落 ${paragraphs - 1}。`,{exact:true}).waitFor();
   await page.locator('.message.being').last().locator('code .hljs-keyword').first().waitFor();
   const metrics=await page.evaluate(()=>{window.measuring=false;const values=window.samples.slice(2).sort((a,b)=>a-b);return{frames:values.length,messageLayoutReads:window.messageLayoutReads,p95FrameMs:values[Math.floor(values.length*.95)],maxLongTaskMs:Math.max(0,...window.longTasks),mountedMessages:document.querySelectorAll('.message').length};});
+  const cpuAfter = (await performanceSession.send('Performance.getMetrics')).metrics.find(metric => metric.name === 'TaskDuration').value;
+  metrics.mainThreadMs = Math.round((cpuAfter - cpuBefore) * 1000);
+  metrics.paragraphs = paragraphs;
   metrics.idleP95FrameMs=idleP95FrameMs;
   metrics.frameBudgetMs=Math.max(100,idleP95FrameMs+50);
   await mkdir('test-results',{recursive:true});await writeFile('test-results/chat-render-performance.json',JSON.stringify(metrics,null,2));

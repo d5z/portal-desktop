@@ -3,10 +3,11 @@ import { readShellStyles } from './support/shell-styles.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdir, readFile } from 'node:fs/promises';
-import { build } from 'esbuild';
+import { build } from '../scripts/renderer-build.mjs';
+import { browserAssets } from './support/browser-assets.mjs';
 import { chromium } from 'playwright';
 
-const { outputFiles } = await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
+const { outputFiles } = await build({ plugins: [browserAssets()], stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
   import React from 'react';
   import { createRoot } from 'react-dom/client';
   import { AppModel } from './desktop/renderer/app/models/app';

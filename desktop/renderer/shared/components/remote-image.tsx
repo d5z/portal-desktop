@@ -1,3 +1,4 @@
+import styles from './remote-image.module.scss';
 import { createContext, useContext, useCallback, useEffect, useId, useRef, useState, type ReactNode } from 'react';
 import { ImageViewer, type ImageViewerNavigation } from './image-viewer';
 import { type ImageGalleryItem } from '../../../shared/image-gallery';
@@ -54,7 +55,7 @@ export function RemoteImage({ src, name, title, blob, onError }: { src: string; 
     } else setOpen(true);
   }
   return <>
-    <button type="button" className="remote-image-thumbnail" aria-label={`预览 ${label}`} title={title || '点击查看大图'} onClick={event => { event.preventDefault(); event.stopPropagation(); show(); }}>
+    <button type="button" className={styles.thumbnail} data-slot="image-thumbnail" aria-label={`预览 ${label}`} title={title || '点击查看大图'} onClick={event => { event.preventDefault(); event.stopPropagation(); show(); }}>
       <img src={src} alt={name} loading="lazy" draggable={false} referrerPolicy="no-referrer" onError={onError} />
     </button>
     {open && <RemoteImagePreview src={src} name={label} load={blob ? loadLocal : undefined} onClose={() => setOpen(false)} />}

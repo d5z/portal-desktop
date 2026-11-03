@@ -29,6 +29,18 @@ import { refreshSystemTheme, watchSystemTheme } from '../desktop/main/app/system
 
 afterEach(() => { nativeTheme.removeAllListeners(); vi.restoreAllMocks(); });
 
+it('allows reloading the Town shell while blocking other main-window destinations', () => {
+  const { window } = createMainWindow({
+    shellURL: () => 'beings://desktop/', isQuitting: () => false, isSessionEnding: () => false,
+    markSessionEnding: vi.fn(), openExternal: vi.fn(), onBrowser: vi.fn(), onClosed: vi.fn(),
+  });
+  for (const url of ['beings://desktop/', 'https://example.invalid/', 'beings://chat/', 'beings://desktop/other.html']) {
+    const preventDefault = vi.fn();
+    window.webContents.emit('will-navigate', { url, preventDefault });
+    expect(preventDefault.mock.calls.length).toBe(url === 'beings://desktop/' ? 0 : 1);
+  }
+});
+
 it('keeps the caption black while shell theme listeners follow Windows independently', async () => {
   vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
   const { window } = createMainWindow({

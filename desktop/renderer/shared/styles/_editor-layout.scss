@@ -1,0 +1,31 @@
+#input-area #input-row > .btn-icon,
+#input-area #input-row > .btn-icon:not(#send-btn) {
+  grid-row: 2;
+  align-self: center;
+}
+#input-area #input-row > .btn-icon > svg {
+  display: block;
+  flex-shrink: 0;
+}
+#input-area #input-row:has(#input) #send-btn {
+  grid-row: 2;
+}
+/* Keep the draft and its actions in two compact, stable rows. */
+#input-area {
+  padding: 12px 14px 10px;
+  border-radius: 22px;
+  border-color: color-mix(in srgb, var(--text) 12%, transparent);
+  background: var(--bg);
+  box-shadow: 0 4px 20px #00000005;
+  transition:
+    border-color 0.16s ease,
+    box-shadow 0.16s ease;
+}
+#input-area:focus-within {
+  border-color: color-mix(in srgb, var(--text) 24%, transparent);
+  box-shadow: 0 5px 24px #00000008;
+}
+#input-area #input-row {
+  gap: 6px 8px;
+}
+/* A single real document owns its caret, wrapping and scrolling. */

@@ -1,0 +1,137 @@
+/* Navigation lives in the web shell's four tabs, leaving room for typing. */
+#desktop-composer-tools {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  input,
+  textarea,
+  select {
+    font-size: 16px !important;
+  }
+
+  button {
+    touch-action: manipulation;
+  }
+
+  #messages {
+    padding: 20px 16px 12px;
+  }
+
+  #input-area {
+    padding: 6px 8px;
+    margin-bottom: 12px;
+    width: calc(100% - 20px);
+    border-radius: 16px;
+  }
+
+  #chat-index {
+    display: none;
+  }
+
+  .message.being .content {
+    max-width: 95%;
+    padding: 12px 15px;
+  }
+
+  .message.user .content {
+    max-width: 90%;
+  }
+}
+
+:root[data-theme='dark'] .message.user .content {
+  background: #385d35;
+  color: #e5efe1;
+}
+
+#input-area {
+  box-shadow: none;
+}
+
+#send-btn {
+  border-radius: 12px;
+}
+
+#settings-panel {
+  background: var(--bg-soft);
+}
+
+#settings-panel .llm-current {
+  background: var(--bg);
+  border-color: var(--border);
+  border-radius: 16px;
+}
+
+#settings-panel .btn-apply {
+  color: #fff;
+}
+
+@media (max-width: 640px) {
+  #settings-panel {
+    width: 100%;
+  }
+
+  #settings-panel .settings-header,
+  #settings-panel .settings-body {
+    padding: 16px;
+  }
+
+  #settings-panel .model-target-header {
+    padding: 0 16px;
+  }
+
+  #settings-panel .provider-items {
+    grid-template-columns: 1fr;
+  }
+
+  #settings-panel .llm-item {
+    min-height: 54px;
+  }
+
+  #settings-panel .btn-close {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  #settings-panel .model-targets {
+    flex-wrap: wrap;
+  }
+
+  #settings-panel .model-targets button {
+    min-height: 44px;
+  }
+}
+
+.message .content {
+  font-family: var(--font-sans);
+  line-height: 1.8;
+}
+
+.message .meta {
+  color: #919b92;
+}
+
+#input-row > .btn-icon:not(#send-btn) {
+  color: var(--text-dim);
+}
+
+#input-area {
+  background: var(--bg-soft);
+}
+
+#messages {
+  padding-top: 28px;
+}
+
+@media (max-width: 640px) {
+  #messages {
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+
+  #input-area {
+    width: calc(100% - 32px);
+    margin-bottom: 14px;
+    padding: 8px;
+  }
+}

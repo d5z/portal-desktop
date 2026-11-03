@@ -14,7 +14,7 @@ describe('generated image previews', () => {
       content: `![生成的图片](${source.replace('&', '&amp;')})`, chat: true,
     }));
     expect(html).toContain('aria-label="预览 生成的图片"');
-    expect(html).toContain('class="remote-image-thumbnail"');
+    expect(html).toContain('data-slot="image-thumbnail"');
     expect(html).toContain(`src="${source.replace('&', '&amp;')}"`);
   });
 

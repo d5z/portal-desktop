@@ -6,6 +6,8 @@ const CLIENT_NAME = 'Portal Desktop';
 
 export interface MainWindowOptions {
   shellURL: () => string;
+  recoverPlugins?: () => void;
+  pluginRoute?: (url: URL) => boolean;
   isQuitting: () => boolean;
   isSessionEnding: () => boolean;
   markSessionEnding: () => void;
@@ -21,18 +23,24 @@ export function createMainWindow(options: MainWindowOptions) {
     // ICON_SMALL stays black; taskbar-icons updates ICON_BIG independently.
   }
   window.webContents.on('before-input-event', (event, input) => {
+    if (input.type === 'keyDown' && (input.control || input.meta) && input.alt && input.shift && input.key.toLowerCase() === 'p') { event.preventDefault(); options.recoverPlugins?.(); return; }
     if (input.type !== 'keyDown' || input.key !== 'F12' || input.isAutoRepeat) return;
     event.preventDefault();
     if (window.webContents.isDevToolsOpened()) window.webContents.closeDevTools();
     else window.webContents.openDevTools({ mode: 'detach' });
   });
   window.webContents.setWindowOpenHandler(({ url }) => { options.openExternal(url); return { action: 'deny' }; });
-  window.webContents.on('will-navigate', event => event.preventDefault());
+  window.webContents.on('will-navigate', event => {
+    // Renderer-initiated reload is needed to discard third-party global state.
+    // Only the exact bundled shell may replace the main document.
+    if (event.url !== options.shellURL()) event.preventDefault();
+  });
   window.webContents.on('will-frame-navigate', event => {
     const url = event.url;
     const parsed = new URL(url);
     // Generated pages cannot navigate into the shell/chat or out to another application.
     if (event.frame?.url.startsWith('beings://preview/')) { event.preventDefault(); return; }
+    if (!event.isMainFrame && event.frame?.parent?.url === options.shellURL() && options.pluginRoute?.(parsed)) return;
     const localPreview = !event.isMainFrame && parsed.protocol === 'beings:' && parsed.hostname === 'preview'
       && event.frame?.parent?.url === options.shellURL();
     if (localPreview) return;

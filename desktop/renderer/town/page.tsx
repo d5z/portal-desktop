@@ -1,3 +1,4 @@
+import { dshRuntime } from '../plugins/dsh/runtime';
 import { CodeClipboard } from '../shared/components/markdown';
 import { ToolsLibrary } from './components/tools-library';
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -111,6 +112,7 @@ export function Town({ model }: { model: TownModel }) {
           {town.view === 'kits' && !town.directId && <>
             <label className="tools-local-filter"><input type="checkbox" checked={town.localOnly} onChange={e => { town.localOnly = e.target.checked; town.offset = 0; town.toolSelection = ""; town.localKit = undefined; town.changed(); }} />仅本机存在</label>
             {town.groveKind === 'plugin' && town.plugins?.api && <button className="primary" disabled={town.plugins.busy} onClick={() => void town.plugins!.act(() => town.plugins!.api!.importLocal())}>导入插件目录</button>}
+            {town.groveKind === 'plugin' && <button className="secondary" onClick={() => dshRuntime.openManager()}>第三方插件</button>}
             {town.groveKind === 'plugin' && town.plugins && <button className="secondary" title="Ctrl / ⌘ + Shift + P" onClick={() => town.plugins!.showCommands(true)}>快捷操作</button>}
             {town.groveKind === 'kit' && town.supportsLocalKits && <button className="primary" onClick={() => void town.importKit()}>导入 Kit</button>}
           </>}

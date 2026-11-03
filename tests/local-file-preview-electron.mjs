@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { build } from 'esbuild';
+import { build } from '../scripts/renderer-build.mjs';
 import { mkdtemp, mkdir, writeFile, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -24,18 +24,19 @@ try {
   await writeFile(path.join(dir, 'shell.css'), await readShellStyles());
   const shellHTML = (await readFile('desktop/renderer/index.html', 'utf8')).replace('<link rel="icon" type="image/png" href="../../resources/branding/app.png">', '<link rel="stylesheet" href="shell.css">').replace('<script type="module" src="/main.tsx"></script>', '<script src="shell.js"></script>');
   await writeFile(path.join(dir, 'index.html'), shellHTML);
-  await writeFile(path.join(dir, 'chat.css'), await readFile('desktop/renderer/chat/styles.css', 'utf8'));
   await writeFile(path.join(dir, 'loom.html'), '<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="chat.css"><div id="root"></div><script src="chat.js"></script>');
   await bundle('preload.js', process.env.LOCAL_PREVIEW_LEGACY==='1'
     ? (await readFile('desktop/preload/preload.ts','utf8')).replace(/^  checkLocalFiles:.*\n/m,'')
     : `import './desktop/preload/preload';`, 'node');
   await bundle('shell.js', `
+    import './desktop/renderer/app/styles.scss';
     import {createRoot} from 'react-dom/client'; import {useRef} from 'react';
     import {AttachmentFileViewer} from './desktop/renderer/app/components/attachment-file-viewer';
     function Shell(){const frame=useRef(null);return <div className="workspace-body" style={{height:'100vh'}}><div className="workspace-stage"><iframe ref={frame} title="当前对话" src="beings://chat/?revision=test" style={{width:'100%',height:'100%',border:0}}/></div><AttachmentFileViewer frame={frame}/></div>;}
     createRoot(document.getElementById('root')).render(<Shell/>);
   `);
   await bundle('chat.js', `
+    import './desktop/renderer/chat/document.scss';
     import {createRoot} from 'react-dom/client'; import {Markdown} from './desktop/renderer/shared/components/markdown';
     import {LocalFileAction, requestLocalFilePreview} from './desktop/renderer/shared/components/local-file-link';
     import {EditContextMenu} from './desktop/renderer/shared/components/context-menu';
@@ -44,7 +45,7 @@ try {
     const entries = [newToolActivity([], {call_id:'file-write',name:'portal_file_write'}, 'entry', Date.now())];
     completeToolActivity(entries, {call_id:'file-write',path:${JSON.stringify(file)},is_error:false,summary:'文件已保存'});
     const toolRun = {kind:'run',id:'run',entries,start:Date.now(),end:Date.now(),label:'已完成',hint:'',arg:'',outcome:'done'};
-    createRoot(document.getElementById('root')).render(<LocalFileAction.Provider value={requestLocalFilePreview}><div className="chat-root" style={{padding:24}}><div className="message being"><div className="content">{${process.env.LOCAL_PREVIEW_TOOL_ACTIVITY === '1'} ? <ChatActivity run={toolRun}/> : <Markdown chat content={${JSON.stringify(`页面已生成，点击下面的文件即可在当前对话中预览。\n\n[预览页面](<${file}>)\n\n你可以继续告诉我需要修改的地方。`)}}/>}</div></div><Markdown chat content={${JSON.stringify(`[不存在](<${path.join(workspace, 'missing.html')}>)\n\n` + '`' + path.join(workspace, 'Example.app') + '` ' + '`' + path.join(workspace, '.portal-connection.url') + '`')}}/><textarea aria-label="继续修改" defaultValue="把标题改成蓝色"/><EditContextMenu edit={async()=>true}/></div></LocalFileAction.Provider>);
+    createRoot(document.getElementById('root')).render(<LocalFileAction.Provider value={requestLocalFilePreview}><div className="chat-root" style={{padding:24}}><div className="message being"><div className="content">{${process.env.LOCAL_PREVIEW_TOOL_ACTIVITY === '1'} ? <ChatActivity run={toolRun}/> : <Markdown chat content={${JSON.stringify(`页面已生成，点击下面的文件即可在当前对话中预览。\n\n[预览页面](<${file}>)\n\n你可以继续告诉我需要修改的地方。`)}}/>}</div></div><Markdown chat content={${JSON.stringify(`[不存在](<${path.join(workspace, 'missing.html')}>)\n\n` + '`' + path.join(workspace, 'Example.app') + '` ' + '`' + path.join(workspace, '.portal-connection.url') + '`')}}/><textarea aria-label="继续修改" defaultValue="把标题改成蓝色"/><EditContextMenu appearance="chat" edit={async()=>true}/></div></LocalFileAction.Provider>);
   `);
   await bundle('main.cjs', `
     import {app,protocol,ipcMain} from 'electron';

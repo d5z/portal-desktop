@@ -1,0 +1,274 @@
+/* Session editor uses one aligned column and clear primary actions. */
+#chat-session-editor {
+  box-sizing: border-box;
+  padding: 24px;
+}
+
+#chat-session-editor .dialog-heading {
+  padding: 0;
+  margin: 0 0 20px;
+}
+
+#chat-session-editor .utility-subtitle {
+  line-height: 1.7;
+  margin: 16px 0 20px;
+}
+
+#chat-session-editor .chat-session-field {
+  margin: 16px 0;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--secondary);
+}
+
+#chat-session-editor .chat-session-field input {
+  height: 40px;
+  color: var(--text);
+}
+
+.chat-session-hint {
+  margin: 12px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+#chat-session-editor .files-footer {
+  justify-content: flex-end;
+  margin: 24px 0 0;
+  gap: 8px;
+}
+
+#chat-session-editor .files-footer button {
+  min-height: 36px;
+  padding: 7px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: transparent;
+  font-size: 12px;
+}
+
+#chat-session-editor .files-footer button[type='submit'] {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+
+#chat-session-editor button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.switch-list .subagent-switch-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  padding: 11px 0;
+}
+
+.switch-list .subagent-switch-row > label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  flex: 1;
+  min-width: 0;
+  gap: 4px;
+  padding: 0;
+}
+
+.subagent-switch-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-shrink: 0;
+}
+
+.subagent-switch-actions button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.subagent-switch-row > .subagent-skip {
+  flex-basis: 100%;
+  text-align: left;
+}
+
+.chat-session-context-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px 0;
+  border-top: 1px solid var(--line);
+  color: var(--secondary);
+  cursor: pointer;
+}
+
+.chat-session-context-toggle input {
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.plugin-page {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.plugin-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 22px;
+  border-bottom: 1px solid var(--line);
+  flex-wrap: wrap;
+}
+
+.plugin-toolbar h2 {
+  margin: 0 auto 0 0;
+  font-size: 17px;
+}
+
+.plugin-library {
+  overflow: auto;
+  padding: 18px 22px;
+}
+
+.plugin-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 18px;
+  margin: 16px 0;
+  flex-wrap: wrap;
+}
+
+.plugin-card h3 {
+  margin: 0;
+}
+
+.plugin-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.plugin-frame {
+  flex: 1;
+  width: 100%;
+  min-height: 320px;
+  border: 0;
+  background: var(--bg);
+}
+
+.plugin-page > p {
+  margin: 12px 22px;
+}
+
+.plugin-command-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 16px 0;
+  max-height: 50vh;
+  overflow: auto;
+}
+
+#plugin-commands {
+  width: min(560px, 90vw);
+  padding: 24px;
+}
+
+#plugin-commands input {
+  width: 100%;
+}
+
+.plugin-slot-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 22px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+
+.plugin-place-layout {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.plugin-place-main {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.plugin-sidebar {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 340px;
+  width: 340px;
+  max-width: 50%;
+  min-height: 0;
+  overflow: hidden;
+  border-left: 1px solid var(--line);
+  background: var(--bg);
+}
+
+.plugin-sidebar > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px;
+  gap: 8px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.plugin-sidebar .plugin-frame {
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+}
+
+.plugin-resource-menu {
+  position: relative;
+  font-size: 12px;
+}
+
+.plugin-resource-menu summary {
+  cursor: pointer;
+}
+
+.plugin-resource-menu > div {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  min-width: 240px;
+  max-width: 340px;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px #0002;
+}
+
+.plugin-resource-menu p {
+  margin: 0;
+  color: var(--secondary);
+  overflow-wrap: anywhere;
+}

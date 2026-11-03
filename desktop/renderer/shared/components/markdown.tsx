@@ -1,3 +1,4 @@
+import { StreamingMarkdown } from './streaming-markdown';
 import { LocalFileAction, LocalFileLink } from './local-file-link';
 import { RemoteImage } from './remote-image';
 import { MarkdownReferences } from './markdown-references';
@@ -146,16 +147,24 @@ export const Markdown = memo(function Markdown({
 }) {
   const previewLocalFile = useContext(LocalFileAction);
   const references = useContext(MarkdownReferences);
-  const tokens = useMemo(
-    () => {
-      const language = richCode && detectStructuredText(content);
-      if (language) return [{ type: 'code', raw: content, text: content, lang: language } as Tokens.Code];
-      const lexer = new marked.Lexer({gfm:true,breaks:chat});
-      lexer.tokens.links = {...references};
-      return lexer.lex(content);
-    },
-    [content, chat, richCode, references],
-  );
+  const parser = useMemo(() => new StreamingMarkdown((source) => {
+    const lexer = new marked.Lexer({ gfm: true, breaks: chat });
+    lexer.tokens.links = { ...references };
+    return lexer.lex(source);
+  }), [chat, references, streaming]);
+  const tokens = useMemo(() => {
+    const language = richCode && detectStructuredText(content);
+    if (language) return [{ type: 'code', raw: content, text: content, lang: language } as Tokens.Code];
+    if (streaming) return parser.update(content);
+    const lexer = new marked.Lexer({ gfm: true, breaks: chat });
+    lexer.tokens.links = { ...references };
+    return lexer.lex(content);
+  }, [content, chat, richCode, references, streaming, parser]);
+  // Frozen token identities retain their React elements. Include the rendering
+  // vocabulary and streaming state so final code highlighting and action changes
+  // always invalidate the cache. Weak keys release superseded tail tokens.
+  const blockCache = useMemo(() => new WeakMap<Token, { before: string; after: PlaceView[]; node: ReactNode }>(),
+    [onPlace, renderText, leadingContent, chat, richCode, previewMarkdownCode, intelligentUI, streaming, previewLocalFile]);
   const linked = new Set<PlaceView>();
   const firstContentToken = tokens.find(token => token.type !== 'space');
   // Explicit links take precedence over automatic word links throughout the message.
@@ -232,8 +241,14 @@ export const Markdown = memo(function Markdown({
       value
     );
   }
-  function render(list: Token[], decorate = true): ReactNode {
+  function render(list: Token[], decorate = true, topLevel = false): ReactNode {
     return list.map((token, index) => {
+      const before = topLevel ? [...linked].sort().join(',') : '';
+      const cached = topLevel ? blockCache.get(token) : undefined;
+      if (cached && cached.before === before) {
+        cached.after.forEach(view => linked.add(view));
+        return <Fragment key={index}>{cached.node}</Fragment>;
+      }
       const inner = ["link", "code", "codespan", "html", "image"].includes(
         token.type,
       )
@@ -419,10 +434,11 @@ export const Markdown = memo(function Markdown({
         default:
           node = token.raw;
       }
+      if (topLevel) blockCache.set(token, { before, after: [...linked], node });
       return <Fragment key={index}>{node}</Fragment>;
     });
   }
-  return <div className={className}>{leadingContent && firstContentToken?.type !== 'paragraph' && <p>{leadingContent}</p>}{render(tokens)}</div>;
+  return <div className={className}>{leadingContent && firstContentToken?.type !== 'paragraph' && <p>{leadingContent}</p>}{render(tokens, true, true)}</div>;
 });
 
 function MarkdownCodeBlock({ text, language, streaming }: { text: string; language: string; streaming: boolean }) {

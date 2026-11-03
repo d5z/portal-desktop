@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { chromium } from 'playwright';
+import { compileAsync } from 'sass';
 const assets = new Map(await Promise.all(['loom.html', 'chat.js', 'chat.css', 'highlight.css', 'iui-runtime.html'].map(async f => ['/' + f, await readFile('desktop/generated/' + f)])));
 const policy = (await readFile('desktop/main/app/protocol.ts', 'utf8')).match(/const CHAT_CONTENT_SECURITY_POLICY = "([^"]+)"/)[1];
 const source = JSON.stringify({ version: 1, title: '实时预算', state: { count: 8 }, body: [
@@ -51,9 +52,9 @@ try {
   assert.equal(await examples.locator('..').getByRole('menuitem', {name:/智能 UI.*\/ui/}).count(), 1, 'One example button shares the UI command row');
   await examples.click();
   await page.getByRole('complementary', {name:'智能 UI 交互示例'}).waitFor();
-  const chatBounds = await page.locator('#app').boundingBox(), panelBounds = await page.locator('.iui-examples-panel').boundingBox();
+  const chatBounds = await page.locator('#app').boundingBox(), panelBounds = await page.locator('[data-slot="ui-examples-panel"]').boundingBox();
   assert.ok(panelBounds.x >= chatBounds.x + chatBounds.width - 1, 'Examples occupy a separate panel to the right');
-  assert.equal(await page.locator('#input-area .iui-examples-panel, #input-area .iui-playground').count(), 0);
+  assert.equal(await page.locator('#input-area [data-slot="ui-examples-panel"], #input-area .iui-playground').count(), 0);
   assert.equal(await input.textContent(), '保留我的草稿');
   assert.equal(sends.length, 0);
 
@@ -65,7 +66,7 @@ try {
   await page.getByRole('button', {name:'重新启动',exact:true}).click();
   await page.locator('.iui-app svg').waitFor();
 
-  await page.locator('.iui-examples-header').getByRole('button', { name: '关闭交互示例' }).click();
+  await page.getByRole('button', { name: '关闭交互示例' }).click();
   await input.fill('/ui');
   const picker = page.getByRole('listbox', {name:'斜杠功能'});
   assert.equal(await picker.getByRole('option', {name:'交互示例',exact:true}).count(), 1);
@@ -79,20 +80,21 @@ try {
   await page.setViewportSize({width:375,height:800});
   await page.getByRole('dialog', {name:'智能 UI 交互示例'}).waitFor();
   assert.equal(await page.locator('#app').evaluate(el=>el.inert), true);
-  const narrowPanel = await page.locator('.iui-examples-panel').boundingBox();
+  const narrowPanel = await page.locator('[data-slot="ui-examples-panel"]').boundingBox();
   assert.equal(narrowPanel.x, 0); assert.equal(narrowPanel.width, 375);
   await page.getByRole('button', {name:'关闭交互示例'}).focus();
   await page.keyboard.press('Shift+Tab');
-  assert.ok(await page.locator('.iui-examples-panel').evaluate(el=>el.contains(document.activeElement)), 'Focus stays inside the mobile preview');
+  assert.ok(await page.locator('[data-slot="ui-examples-panel"]').evaluate(el=>el.contains(document.activeElement)), 'Focus stays inside the mobile preview');
   await page.screenshot({path:'test-results/intelligent-ui-examples-mobile.png'});
   await page.keyboard.press('Escape');
-  assert.equal(await page.locator('.iui-examples-panel').count(), 0);
+  assert.equal(await page.locator('[data-slot="ui-examples-panel"]').count(), 0);
   assert.equal(await page.locator('#app').evaluate(el=>el.inert), false);
   await input.waitFor();
   assert.equal(await input.textContent(), '/ui');
   // Filled drafts used to activate an older :has() rule that moved send onto the textarea.
+  const webCSS = (await compileAsync('web/chat.scss')).css;
   for (const web of [false, true]) {
-    const webStyle = web ? await page.addStyleTag({ content: await readFile('web/chat.css', 'utf8') }) : null;
+    const webStyle = web ? await page.addStyleTag({ content: webCSS }) : null;
     for (const width of [1280, 375, 320]) {
       await page.setViewportSize({ width, height: 800 });
       for (const draft of ['', '给我一个实时预算', '第一行\n第二行\n较长的多行输入内容']) {

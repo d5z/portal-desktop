@@ -1,0 +1,133 @@
+.ios-profile {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 26px 22px;
+  border: 1px solid var(--ios-separator);
+  border-radius: 16px;
+  background: var(--ios-card);
+  margin-bottom: 24px;
+}
+
+.ios-profile > div:last-child {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.ios-profile-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 18px;
+  background: var(--ios-bg);
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+}
+
+.ios-profile-avatar img {
+  width: 40px;
+  height: 40px;
+  object-fit: contain;
+}
+
+.ios-profile h2 {
+  font-size: 20px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.ios-profile p {
+  font-size: 12px;
+  color: var(--ios-secondary);
+  margin-bottom: 0;
+}
+
+.ios-preference-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 20px;
+}
+
+.ios-preference-row strong,
+.ios-preference-row label {
+  font-size: 15px;
+  font-weight: 400;
+}
+
+.ios-preference-row + .ios-preference-row {
+  border-top: 1px solid var(--ios-separator);
+}
+
+.ios-segment {
+  display: flex;
+  background: var(--surface);
+  padding: 3px;
+  border-radius: 9px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.ios-segment button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  border-radius: 7px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--secondary);
+}
+
+.ios-segment button[aria-pressed='true'] {
+  background: var(--ios-card);
+  color: var(--ios-label);
+  box-shadow: 0 1px 3px #0001;
+}
+
+.ios-preference-row select {
+  margin-left: auto;
+  width: auto;
+  min-width: 72px;
+  border: 0;
+  background: transparent;
+  color: var(--secondary);
+  padding: 8px;
+  font: inherit;
+}
+
+.ios-reading-preview {
+  margin: 0 20px 20px;
+  padding: 16px;
+  background: var(--ios-bg);
+  color: var(--secondary);
+  text-align: center;
+  line-height: 1.8;
+}
+
+.ios-about {
+  padding-top: 32px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 7px;
+  color: var(--ios-secondary);
+}
+
+.ios-about img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  opacity: 0.4;
+  margin-bottom: 5px;
+}
+
+.ios-about strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.ios-about span,
+.ios-about small {
+  font-size: 11px;
+}

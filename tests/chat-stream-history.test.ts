@@ -31,11 +31,32 @@ describe("stream progress and persisted replies", () => {
     }));
     const state = new ChatState(), runtime = createChatRuntime(state);
     return { state, runtime, history,
+      raw: (text: string) => stream.enqueue(new TextEncoder().encode(text)),
       event: (event: string, data: object) => stream.enqueue(new TextEncoder().encode(`event: ${event}\ndata: ${JSON.stringify({ scene_id: "desktop-test", ...data })}\n\n`)),
       close: () => stream.close(),
       replies: () => state.items.filter((item): item is Message => item.kind === "message" && item.role === "being"),
     };
   }
+
+  it('renders framed multiline SSE, ignores untyped data and discards incomplete acknowledgements', async () => {
+    const f = fixture();
+    try {
+      await f.runtime.start();
+      await f.runtime.send('分块协议测试');
+      await vi.advanceTimersByTimeAsync(0);
+      f.raw('event:content_block_delta\r\ndata:{"delta":\r\ndata:{"text":"你好🌱"}}\r');
+      await vi.advanceTimersByTimeAsync(20);
+      expect(f.replies()).toHaveLength(0);
+      f.raw('\n\r\ndata:{"delta":{"text":"不应显示"}}\n\nevent:message_stop\ndata:{}\n\n');
+      f.raw('event:meta\ndata:{"persisted":{"from":"final","kind":"self","seq":99}}\n');
+      f.close();
+      await vi.advanceTimersByTimeAsync(20);
+      expect(f.replies()).toHaveLength(1);
+      expect(f.replies()[0]).toMatchObject({text:'你好🌱', streaming:false});
+      expect(f.replies()[0].historySeq).toBeUndefined();
+      expect(f.state.streaming).toBe(false);
+    } finally { f.runtime.dispose(); }
+  });
 
   it.each(['finished', 'gone', 'streaming'])('rechecks a startup replay snapshot after history hydration (%s)', async latest => {
     let probes = 0;
@@ -145,6 +166,43 @@ describe("stream progress and persisted replies", () => {
       f.history.push({ ...row, seq: 13318 });
       await f.runtime.refreshHistory();
       expect(f.replies()).toHaveLength(2);
+    } finally { f.runtime.dispose(); }
+  });
+
+  it.each(['before-meta', 'after-stop', 'tail-only', 'independent-prefix', 'after-tool'])('reconciles final speech across tools without repeating the prefix (%s)', async order => {
+    const f = fixture();
+    try {
+      await f.runtime.start();
+      await f.runtime.send('检查');
+      await vi.advanceTimersByTimeAsync(0);
+      f.event('content_block_delta', {delta:{text:'先检查。'}});
+      f.event('tool_use', {name:'read',input:{}});
+      if (order === 'independent-prefix') {
+        f.event('meta', {persisted:{from:'act_talk',kind:'self',seq:10,stream_id:'final-stream'}});
+      }
+      f.event('content_block_delta', {delta:{text:'检查完成。'}});
+      if (order === 'after-tool') f.event('tool_use', {name:'read',input:{}});
+      await vi.advanceTimersByTimeAsync(20);
+      const first = f.replies()[0];
+      const combined = !['tail-only','independent-prefix'].includes(order);
+      const row = {seq:11,role:'assistant',scene_id:'desktop-test',content:combined?'先检查。检查完成。':'检查完成。'};
+      if (order === 'before-meta') { f.history.push(row); await f.runtime.refreshHistory(); }
+      f.event('meta', {persisted:{from:'final',kind:'self',seq:11,stream_id:'final-stream'}});
+      f.event('message_stop', {});
+      f.close();
+      await vi.advanceTimersByTimeAsync(20);
+      if (order !== 'before-meta') f.history.push(row);
+      await f.runtime.refreshHistory();
+      const bubbles = replyBubbles(f.state.items).filter((item): item is Message => item.kind === 'message' && item.role === 'being');
+      expect(bubbles).toHaveLength(1);
+      expect(bubbles[0].text).toBe(combined ? row.content : '先检查。\n\n检查完成。');
+      if (combined) {
+        expect(f.replies()).toHaveLength(1);
+        expect(f.replies()[0]).toBe(first);
+        expect(first).toMatchObject({historySeq:11,interim:false,streaming:false});
+      } else expect(f.replies()).toHaveLength(2);
+      await f.runtime.refreshHistory();
+      expect(replyBubbles(f.state.items).filter(item => item.kind === 'message' && item.role === 'being')).toHaveLength(1);
     } finally { f.runtime.dispose(); }
   });
 

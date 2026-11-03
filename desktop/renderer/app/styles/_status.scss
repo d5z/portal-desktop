@@ -1,0 +1,229 @@
+.split-chat-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.6;
+}
+
+.place-sheet-title-main:has(.split-chat-toggle) {
+  gap: 12px;
+  flex-wrap: nowrap;
+}
+
+.chat-session-panel-heading {
+  gap: 8px;
+  padding: 0;
+  flex-shrink: 0;
+}
+
+.chat-session-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  flex: 1;
+  min-width: 0;
+  padding: 10px 13px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--bg);
+}
+
+.chat-session-search:focus-within {
+  border-color: #2684ff;
+  box-shadow: 0 0 0 1px #2684ff;
+}
+
+.chat-session-search svg {
+  width: 20px;
+  height: 20px;
+  color: var(--secondary);
+}
+
+.chat-session-search input {
+  min-width: 0;
+  width: 100%;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 14px;
+  padding: 0;
+}
+
+.chat-session-options {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.chat-session-options summary {
+  list-style: none;
+  cursor: pointer;
+  font-size: 22px;
+  color: var(--secondary);
+  padding: 4px 6px;
+  border-radius: 8px;
+}
+
+.chat-session-options summary::-webkit-details-marker {
+  display: none;
+}
+
+.chat-session-options-popover {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  top: 36px;
+  width: 166px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px #0002;
+  background: var(--bg);
+}
+
+.chat-session-options-popover button {
+  display: block;
+  width: 100%;
+  padding: 10px;
+  text-align: left;
+  font-size: 13px;
+  border-radius: 7px;
+}
+
+.chat-session-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  padding: 8px 12px;
+  color: var(--secondary);
+  font-size: 13px;
+}
+
+.chat-session-group button {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  font-size: 22px;
+  color: var(--secondary);
+}
+
+.chat-session-list > button {
+  height: 44px;
+  min-height: 44px;
+  padding: 10px 14px;
+  font-size: 14px;
+  border-radius: 14px;
+  color: var(--text);
+}
+
+.chat-session-list > button[aria-current='true'] {
+  font-weight: 400;
+  background: var(--surface);
+}
+
+.chat-session-context-toggle {
+  flex-shrink: 0;
+  font-size: 11px;
+  border: 0;
+  color: var(--muted);
+}
+
+.rail-settings-placeholder {
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.portal-status {
+  --portal-tone: var(--secondary);
+
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  flex-shrink: 0;
+  color: var(--portal-tone);
+  font-size: 11px;
+  font-weight: 550;
+  line-height: 1.4;
+  white-space: nowrap;
+}
+
+.portal-status[data-tone='healthy'] {
+  --portal-tone: #247545;
+}
+
+.portal-status[data-tone='pending'] {
+  --portal-tone: #906000;
+}
+
+.portal-status[data-tone='error'] {
+  --portal-tone: #ba3c34;
+}
+
+:root[data-theme='dark'] .portal-status[data-tone='healthy'] {
+  --portal-tone: #8bd5a3;
+}
+
+:root[data-theme='dark'] .portal-status[data-tone='pending'] {
+  --portal-tone: #e8bd69;
+}
+
+:root[data-theme='dark'] .portal-status[data-tone='error'] {
+  --portal-tone: #ffaaa1;
+}
+
+.portal-status-dot {
+  width: 6px;
+  height: 6px;
+  flex: none;
+  border-radius: 50%;
+  background: currentcolor;
+}
+
+#conversation-options.rail-settings-menu {
+  position: fixed;
+  z-index: 150;
+  left: 16px;
+  bottom: 16px;
+  -webkit-app-region: no-drag;
+}
+
+.rail-settings-menu #options-trigger {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: transparent;
+  color: var(--text);
+}
+
+.rail-settings-menu #options-trigger:hover {
+  background: var(--surface);
+}
+
+@media (max-width: 800px) {
+  #conversation-options.rail-settings-menu {
+    left: 10px;
+  }
+}
+
+#conversation-options.rail-settings-menu .options-menu {
+  position: absolute;
+  inset: auto auto 56px 0;
+  max-height: calc(100vh - 100px);
+  overflow: auto;
+  transform-origin: bottom left;
+}
+
+.chat-session-options-popover {
+  width: 228px;
+}
+
+.chat-session-options-popover button {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}

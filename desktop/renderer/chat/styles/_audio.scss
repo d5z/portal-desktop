@@ -1,0 +1,497 @@
+/* Audio is a standalone playback pill; file operations live in its menu. */
+.attachment-audio-card {
+  width: 310px;
+}
+
+.attachment-audio-card .attachment-audio {
+  border: 0;
+  border-radius: 30px;
+  background: #171717;
+  color: #fff;
+}
+
+.attachment-audio-card .attachment-audio > button {
+  width: 34px;
+  height: 34px;
+  background: #383838;
+  color: #fff;
+  flex-shrink: 0;
+}
+
+.attachment-audio-card .attachment-audio > input {
+  accent-color: #eee;
+}
+
+.attachment-audio-card .attachment-audio > span {
+  color: #c9c9c9;
+}
+
+.attachment-audio-card .attachment-download {
+  gap: 0;
+}
+
+.audio-menu > summary {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: #383838;
+}
+
+:is(.audio-menu > div, .audio-floating-menu) {
+  top: auto;
+  bottom: calc(100% + 12px);
+  color: var(--text);
+  width: 220px;
+  padding: 10px;
+}
+
+.audio-settings {
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 6px;
+  padding: 0 4px 8px;
+}
+
+.audio-settings label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 0;
+  font-size: 13px;
+}
+
+.audio-settings input {
+  width: 130px;
+  flex: none;
+  accent-color: var(--accent);
+}
+
+.audio-settings select {
+  width: 90px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px;
+  color: var(--text);
+  background: var(--bg);
+}
+
+.attachment-audio-card .attachment-download:has(> small),
+.attachment-audio-card .attachment-download:has(> progress) {
+  flex-wrap: wrap;
+}
+
+:is(.audio-menu > div, .audio-floating-menu) > button {
+  height: auto;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+}
+
+:is(.audio-menu > div, .audio-floating-menu) > button:hover {
+  background: var(--hover-overlay);
+}
+
+/* Match Muse's waveform transport and icon-led popover. */
+.attachment-audio-card {
+  width: 320px;
+  max-width: 100%;
+  box-sizing: border-box;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--bg-soft);
+}
+
+.attachment-audio-card .attachment-audio {
+  background: #050505;
+  padding: 10px 12px;
+  gap: 10px;
+  flex-wrap: nowrap;
+}
+
+.attachment-audio-card .attachment-audio > span {
+  font-size: 12px;
+  font-weight: 600;
+  min-width: 30px;
+  text-align: right;
+  color: #999;
+}
+
+.audio-waveform {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  height: 28px;
+}
+
+.audio-waveform-bars {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 2px;
+  height: 100%;
+  overflow: hidden;
+}
+
+.audio-waveform-bars i {
+  display: block;
+  flex: 1;
+  min-width: 0;
+  max-width: 3px;
+  border-radius: 3px;
+}
+
+.audio-waveform > input {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.audio-waveform:focus-within {
+  outline: 2px solid #aaa;
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.audio-menu > summary {
+  width: 26px;
+  height: 26px;
+  background: #454545;
+  font-size: 16px;
+}
+
+:is(.audio-menu > div, .audio-floating-menu) {
+  width: 225px;
+  padding: 12px 14px;
+  bottom: calc(100% + 8px);
+  right: -2px;
+  border: 0;
+  border-radius: 22px;
+  box-shadow: 0 8px 30px #0003;
+}
+
+.audio-settings {
+  padding: 0 0 7px;
+  margin: 0 0 6px;
+}
+
+.audio-settings svg,
+:is(.audio-menu > div, .audio-floating-menu) > button svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.audio-settings .audio-volume {
+  gap: 12px;
+  padding: 5px 7px 12px;
+  color: var(--text-dim);
+}
+
+.audio-volume input[type='range'] {
+  appearance: none;
+  width: 100%;
+  flex: 1;
+  min-width: 0;
+  height: 8px;
+  border-radius: 8px;
+  border: 0;
+  background: linear-gradient(to right, #0869d6 var(--volume), #ddd var(--volume));
+}
+
+.audio-volume input::-webkit-slider-thumb {
+  appearance: none;
+  width: 24px;
+  height: 17px;
+  border-radius: 12px;
+  background: white;
+  border: 1px solid #e4e4e4;
+  box-shadow: 0 1px 3px #0002;
+}
+
+.audio-settings .audio-speed-toggle,
+:is(.audio-menu > div, .audio-floating-menu) > button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: auto;
+  min-height: 38px;
+  padding: 8px 7px;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font-size: 14px;
+  text-align: left;
+}
+
+.audio-speed-toggle > span:first-of-type {
+  flex: 1;
+}
+
+.audio-speed-chevron {
+  margin-left: auto;
+  color: var(--text-dim);
+  font-size: 22px;
+  line-height: 18px;
+}
+
+.audio-speed-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 4px;
+  padding: 4px 0 8px;
+}
+
+.audio-settings .audio-speed-options button {
+  width: auto;
+  height: 30px;
+  border-radius: 6px;
+  font-size: 12px;
+  color: var(--text);
+  background: var(--bg-soft);
+}
+
+.audio-speed-options button[aria-pressed='true'] {
+  font-weight: 600;
+  outline: 1px solid var(--border);
+}
+
+.audio-settings .audio-speed-toggle {
+  flex-wrap: nowrap;
+  white-space: nowrap;
+}
+
+.audio-settings .audio-speed-toggle > small {
+  flex: 0 0 auto;
+  margin: 0;
+  font-size: 12px;
+}
+
+.audio-settings .audio-speed-toggle > span:first-of-type {
+  flex: 1 1 auto;
+}
+
+:is(.audio-menu > div, .audio-floating-menu) > button {
+  white-space: nowrap;
+}
+
+/* The scroll controller owns anchoring; native focus/resize anchoring must not fight it. */
+#messages {
+  overflow-anchor: none;
+}
+
+.attachment-message-copy {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 16px;
+  max-width: 100%;
+  padding: 12px 16px;
+  background: var(--chat-sent);
+  border-radius: 22px 5px 22px 22px;
+}
+
+.attachment-message-copy:empty {
+  display: none;
+}
+
+.attachment-message .attachment-message-copy .attachment-original-text {
+  padding: 0;
+  background: none;
+  border-radius: 0;
+}
+
+.attachment-transcript p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.attachment-transcript button,
+.attachment-transcript-error button {
+  border: 0;
+  padding: 4px 0;
+  background: none;
+  color: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.attachment-transcript-error {
+  font-size: 12px;
+}
+
+/* Legacy inline speed selection; floating menus size to their actual actions. */
+:is(.audio-menu > div, .audio-floating-menu) {
+  height: auto;
+  box-sizing: border-box;
+}
+
+.audio-settings .audio-speed-options {
+  position: absolute;
+  inset: 12px 14px;
+  z-index: 2;
+  background: var(--bg);
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: 38px 38px 38px;
+  align-content: start;
+  gap: 8px;
+  padding: 0;
+  border-radius: 10px;
+}
+
+.audio-settings .audio-speed-options button {
+  height: 38px;
+}
+
+.audio-settings .audio-speed-options .audio-speed-back {
+  grid-column: 1/-1;
+  text-align: left;
+  justify-content: start;
+  background: transparent;
+  font-size: 14px;
+}
+
+.attachment-message .attachment-processing-status {
+  align-self: flex-end;
+  padding: 4px 2px;
+  min-height: 20px;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.attachment-message .attachment-processing-status small {
+  font-size: 11px;
+}
+
+.audio-floating-menu[popover] {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  height: auto;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 0;
+  border-radius: 22px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 8px 30px #0003;
+  overflow: visible;
+  font-size: 14px;
+}
+
+.audio-floating-menu::backdrop {
+  background: transparent;
+}
+
+.attachment-audio .audio-menu-trigger {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  color: #fff;
+  background: #454545;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.audio-floating-menu .audio-settings .audio-speed-options {
+  inset: var(--submenu-top) auto auto var(--submenu-left);
+  width: 220px;
+  padding: 10px;
+  height: auto;
+  display: grid;
+  grid-template-columns: 1fr;
+  grid-template-rows: none;
+  gap: 0;
+  background: var(--bg);
+  border-radius: 18px;
+  box-shadow: 0 8px 30px #0003;
+}
+
+.audio-floating-menu .audio-settings .audio-speed-options .audio-speed-back {
+  display: none;
+}
+
+.audio-floating-menu .audio-settings .audio-speed-options button {
+  height: 36px;
+  padding: 8px 12px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  outline: 0;
+  font-size: 14px;
+}
+
+.audio-floating-menu .audio-speed-options button[aria-pressed='true'] {
+  color: #0879ed;
+}
+
+.audio-floating-menu:has(.audio-speed-options) > button {
+  visibility: visible;
+}
+
+.audio-floating-menu button:hover {
+  background: var(--bg-soft);
+}
+
+.audio-floating-menu > button,
+.audio-floating-menu .audio-speed-toggle {
+  border: 0;
+  cursor: pointer;
+}
+
+.audio-floating-menu .audio-settings .audio-speed-options {
+  width: var(--submenu-width, 220px);
+}
+
+.audio-floating-menu .audio-settings .audio-speed-options::before {
+  content: '';
+  position: absolute;
+  inset: 0 -10px;
+  z-index: -1;
+}
+
+.audio-floating-menu .audio-settings .audio-speed-toggle:hover,
+.audio-floating-menu .audio-settings .audio-speed-toggle[aria-expanded='true'],
+.audio-floating-menu .audio-settings .audio-speed-options button:hover,
+.audio-floating-menu > button:hover {
+  background: var(--bg-soft);
+}
+
+.audio-floating-menu .audio-settings .audio-speed-options button:focus-visible,
+.audio-floating-menu .audio-settings .audio-speed-toggle:focus-visible,
+.audio-floating-menu > button:focus-visible {
+  background: var(--bg-soft);
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.audio-floating-menu .audio-settings .audio-speed-options button {
+  transition:
+    background 0.12s,
+    color 0.12s;
+  cursor: pointer;
+}
+
+.audio-floating-menu .audio-settings .audio-speed-options button[aria-pressed='true'] {
+  color: #0879ed;
+  font-weight: 500;
+}

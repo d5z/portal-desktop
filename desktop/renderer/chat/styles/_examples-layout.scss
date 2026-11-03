@@ -1,0 +1,16 @@
+.chat-root.has-ui-examples {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) clamp(360px, 42vw, 580px);
+}
+
+.chat-root.has-ui-examples > #app {
+  grid-column: 1;
+  grid-row: 1;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .chat-root.has-ui-examples {
+    display: block;
+  }
+}

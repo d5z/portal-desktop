@@ -2,7 +2,7 @@ import { readShellStyles } from './support/shell-styles.mjs';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdir } from 'node:fs/promises';
-import { build } from 'esbuild';
+import { build } from '../scripts/renderer-build.mjs';
 import { chromium } from 'playwright';
 const bundle = await build({ stdin: { contents: `
 import {createRoot} from 'react-dom/client';
@@ -23,10 +23,10 @@ window.saves=[];window.heartPatches=[];window.app=app;
 window.openSettings=(staged,target='subagent')=>{app.modelSettingsTarget=target;app.subagentFromConnection=staged;app.subagentSettingsOpen=true;app.changed()};
 function Fixture(){useSyncExternalStore(app.subscribe,app.getVersion);return <div className="workspace-body" style={{height:"100vh"}}><main className="workspace-stage">对话保留在这里</main>{app.subagentSettingsOpen&&<SubagentModelSettings app={app}/>}</div>}
 createRoot(document.getElementById('root')).render(<StrictMode><Fixture/></StrictMode>);
-`, loader: 'tsx', resolveDir: process.cwd() }, bundle: true, write: false, format: 'iife', jsx: 'automatic', platform: 'browser' });
-const css = await readShellStyles();
+`, loader: 'tsx', resolveDir: process.cwd() }, bundle: true, write: false, outdir: 'fixture', format: 'iife', jsx: 'automatic', platform: 'browser' });
+const css = await readShellStyles() + '\n' + bundle.outputFiles.filter(file => file.path.endsWith('.css')).map(file => file.text).join('\n');
 const server = createServer((req,res)=>{
-  if(req.url==='/app.js'){res.setHeader('Content-Type','text/javascript');res.end(bundle.outputFiles[0].contents)}
+  if(req.url==='/app.js'){res.setHeader('Content-Type','text/javascript');res.end(bundle.outputFiles.find(file => file.path.endsWith('.js')).contents)}
   else if(req.url==='/style.css'){res.setHeader('Content-Type','text/css');res.end(css)}
   else{res.setHeader('Content-Type','text/html;charset=utf-8');res.end('<!doctype html><link rel="stylesheet" href="/style.css"><div id="root"></div><script src="/app.js"></script>')}
 });

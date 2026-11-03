@@ -1,4 +1,4 @@
-import { build } from 'esbuild';
+import { build } from '../scripts/renderer-build.mjs';
 import { chromium } from 'playwright';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -32,7 +32,7 @@ try {
     function App(){useModel(town);return <ToolsLibrary town={town}/>;}
     createRoot(document.getElementById('root')).render(<App/>);
   `, resolveDir: process.cwd(), loader: 'tsx' }, bundle: true, platform: 'browser', format: 'iife', jsx: 'automatic', outfile: path.join(dir, 'ui.js') });
-  await writeFile(path.join(dir, 'index.html'), '<meta charset="utf-8"><div id="root"></div><script src="ui.js"></script>');
+  await writeFile(path.join(dir, 'index.html'), '<meta charset="utf-8"><link rel="stylesheet" href="ui.css"><div id="root"></div><script src="ui.js"></script>');
   browser = await chromium.launch({ headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || 'chrome' });
   const page = await browser.newPage(); page.setDefaultTimeout(10000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));

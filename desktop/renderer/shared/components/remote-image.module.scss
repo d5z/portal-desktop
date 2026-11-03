@@ -1,0 +1,21 @@
+@use '../styles/mixins';
+
+.thumbnail {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  vertical-align: middle;
+  cursor: zoom-in;
+
+  img {
+    display: block;
+    max-width: 100%;
+    height: auto;
+  }
+
+  &:focus-visible {
+    @include mixins.focus-ring(currentColor, 4px);
+  }
+}

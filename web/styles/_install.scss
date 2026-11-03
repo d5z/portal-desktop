@@ -1,0 +1,121 @@
+.web-page-intro {
+  margin: 0 2px 20px;
+}
+
+.web-page-intro h2 {
+  font-size: 15px;
+  font-weight: 500;
+  margin: 0 0 7px;
+  color: var(--secondary);
+}
+
+.web-page-intro p {
+  font-size: 12px;
+  color: var(--ios-secondary);
+  margin: 0;
+  line-height: 1.7;
+}
+
+.ios-list-row {
+  transition: background-color 140ms ease;
+}
+
+.ios-list-row:hover {
+  background: var(--ios-bg);
+}
+
+.ios-pair-card > svg:last-child {
+  color: var(--ios-secondary);
+}
+
+@media (max-width: 360px) {
+  .ios-content {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .ios-icon-tile {
+    width: 34px;
+    height: 38px;
+  }
+
+  .ios-preference-row {
+    gap: 9px;
+    padding: 14px 12px;
+  }
+
+  .ios-preference-row strong,
+  .ios-preference-row label {
+    font-size: 14px;
+  }
+}
+
+@media (max-width: 760px), (hover: none) and (pointer: coarse) {
+  .web-app[data-chat-panel='model'] .ios-header,
+  .web-app[data-chat-panel='model'] .web-scene-toolbar,
+  .web-app[data-chat-panel='model'] .web-chat-tools,
+  .web-app[data-chat-panel='model'] .ios-tabbar {
+    display: none;
+  }
+}
+
+#web-install {
+  width: min(480px, calc(100vw - 24px));
+}
+
+.web-install-preview {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.web-install-preview img {
+  width: 64px;
+  height: 64px;
+  border: 1px solid var(--ios-separator);
+  border-radius: 16px;
+}
+
+.web-install-preview strong {
+  font-size: 17px;
+  font-weight: 600;
+}
+
+.web-install-preview p {
+  font-size: 12px;
+  color: var(--ios-secondary);
+  margin: 7px 0 0;
+}
+
+.web-install-steps {
+  padding-left: 24px;
+  margin: 0 0 24px;
+  font-size: 14px;
+  line-height: 1.9;
+}
+
+.web-install-steps li {
+  padding-left: 4px;
+  margin-bottom: 14px;
+}
+
+.web-install-steps li::marker {
+  color: var(--ios-blue);
+  font-weight: 600;
+}
+
+.web-install-notice {
+  color: var(--secondary);
+  font-size: 12px;
+  line-height: 1.7;
+  padding: 0 4px;
+  margin: 12px 0;
+}
+
+@media (max-width: 760px) {
+  #web-install {
+    margin-top: auto;
+    margin-bottom: max(12px, env(safe-area-inset-bottom));
+  }
+}

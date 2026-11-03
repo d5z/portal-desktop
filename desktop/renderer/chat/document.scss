@@ -1,0 +1,7 @@
+/* Document-wide styles, in their established cascade order. Component modules
+   are imported by their React owners and emitted in the same CSS bundle. */
+@use '../shared/styles/typography';
+@use './styles';
+@use '../shared/styles/composer';
+@use './styles/examples-layout';
+@use '../shared/styles/model-settings';

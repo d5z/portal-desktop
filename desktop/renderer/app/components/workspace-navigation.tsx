@@ -1,3 +1,4 @@
+import { dshRuntime } from "../../plugins/dsh/runtime";
 import { PluginIcon } from "../../plugins/icon";
 import { RecentHistory } from './recent-history';
 import { useNavigationSort } from "./use-navigation-sort";
@@ -125,6 +126,7 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
 
           plugin={entry.plugin} unread={entry.unread} onClick={entry.open}>{entry.plugin ? <PluginIcon icon={entry.icon} /> : <Icon path={entry.path} />}</RailButton>;
       })}
+      <div id="dsh-navigation" className="dsh-navigation" ref={dshRuntime.setNavigationHost} />
       <RailButton id="rail-more-trigger" label={moreOpen ? "收起更多功能" : "更多功能"} expanded={moreOpen}
         active={entries.some(entry => !pins.includes(entry.key) && entry.active)}
         unread={entries.some(entry => !pins.includes(entry.key) && entry.unread)} onClick={() => setMoreOpen(open => !open)}>

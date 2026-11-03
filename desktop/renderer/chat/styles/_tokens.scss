@@ -1,0 +1,84 @@
+:root {
+  --bg: #fcfcfc;
+  --bg-soft: #f2f2f3;
+  --bg-softer: #ebebed;
+  --border: #e9e9eb;
+  --text: #242424;
+  --text-dim: #62666b;
+  --text-muted: #666b72;
+  --text-ghost: #a1a19e;
+  --accent: #3f78ae;
+  --green: #4c8967;
+  --yellow: #a78342;
+  --red: #bd6455;
+  --purple: #827492;
+  --accent-rgb: 63, 120, 174;
+  --yellow-rgb: 167, 131, 66;
+  --hover-overlay: #416f5018;
+  --overlay-backdrop: #0004;
+  --surface-tint: #00000002;
+  --accent-tint: #00000004;
+  --accent-border: #a9ccee;
+  --mono: 'SF Mono', 'Cascadia Code', 'Fira Code', 'JetBrains Mono', monospace;
+  --font-2xs: 10px;
+  --font-xs: 12px;
+  --font-sm: 13px;
+  --font-md: 15px;
+  --font-lg: 18px;
+  --font-xl: 24px;
+  --lh-body: 1.6;
+  --lh-reading: 1.7;
+  --space-xs: 4px;
+  --space-sm: 8px;
+  --space-md: 12px;
+  --space-lg: 16px;
+  --space-xl: 24px;
+  --space-2xl: 32px;
+  --radius-xs: 4px;
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+  --shadow-panel: -24px 0 60px rgb(0 0 0 / 25%);
+  --shadow-modal: 0 24px 80px rgb(0 0 0 / 35%);
+  --transition-fast: color 0.2s, background 0.2s;
+  --transition-full: color 0.2s, background 0.2s, border-color 0.2s, opacity 0.2s;
+  --transition-slide: 0.25s ease;
+  --duration-breathe: 3s;
+  --duration-pulse: 1.2s;
+  --duration-blink: 0.8s;
+  --header-height: 56px;
+  --touch-target: 44px;
+  --content-max-width: 800px;
+  --panel-width: 380px;
+
+  color-scheme: light;
+
+  --pressed-overlay: #416f5029;
+  --chat-reply: #ebebed;
+  --chat-sent: #cce5ff;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #202124;
+  --bg-soft: #292b30;
+  --bg-softer: #34363b;
+  --border: #ffffff14;
+  --text: #eceef1;
+  --text-dim: #b0b3b9;
+  --text-muted: #a0a5ae;
+  --text-ghost: #767676;
+  --accent: #a5cef6;
+  --accent-rgb: 165, 206, 246;
+  --green: #8bb79a;
+  --hover-overlay: #b2cfb31f;
+  --pressed-overlay: #b2cfb333;
+  --surface-tint: #ffffff02;
+  --accent-tint: #ffffff08;
+  --accent-border: #597b9e;
+  --overlay-backdrop: #0008;
+  --chat-reply: #303237;
+  --chat-sent: #304b68;
+}

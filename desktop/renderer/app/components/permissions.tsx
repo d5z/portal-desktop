@@ -1,3 +1,4 @@
+import styles from './permissions.module.scss';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Dialog } from '../../shared/components/dialog';
 import { PermissionIcon, choicesFor } from '../../shared/components/permission-picker';
@@ -37,7 +38,7 @@ export function PermissionSettings({ app }: { app: AppModel }) {
     catch (e) { setError(e instanceof Error ? e.message : '无法应用权限设置'); }
     finally { setBusy(false); }
   };
-  return <div ref={menu} popover="auto" role="menu" aria-label="工作权限" aria-busy={busy} className="permission-menu"
+  return <div ref={menu} popover="auto" role="menu" aria-label="工作权限" aria-busy={busy} className={styles.menu}
     onToggle={event => { if (event.newState === 'closed' && app.permissionSettingsOpen) app.closePermissionSettings(); }}
     onKeyDown={event => {
       if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
@@ -48,14 +49,14 @@ export function PermissionSettings({ app }: { app: AppModel }) {
       const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
       items[next].focus();
     }}>
-    <div className="permission-menu-heading">Portal 调用权限</div>
+    <div className={styles.heading}>Portal 调用权限</div>
     {choicesFor(mode).map(choice => <button key={choice.value} type="button" role="menuitemradio" aria-checked={choice.value === mode}
       tabIndex={choice.value === mode ? 0 : -1} data-mode={choice.value} disabled={busy || !app.snapshot?.settings.hasToken} onClick={() => void apply(choice.value)}>
-      <PermissionIcon kind={choice.icon}/><span className="permission-menu-copy"><strong>{choice.title}</strong><small>{choice.detail}</small></span>
-      <span className="permission-menu-check" aria-hidden="true">{choice.value === mode ? '✓' : ''}</span>
+      <PermissionIcon kind={choice.icon}/><span className={styles.copy}><strong>{choice.title}</strong><small>{choice.detail}</small></span>
+      <span className={styles.check} aria-hidden="true">{choice.value === mode ? '✓' : ''}</span>
     </button>)}
-    <div className="permission-menu-note" role="status">{busy ? '正在切换…' : '切换会重启运行时，中断当前本机任务'}</div>
-    {error && <p role="alert" className="permission-menu-error">{error}</p>}
+    <div className={styles.menuNote} role="status">{busy ? '正在切换…' : '切换会重启运行时，中断当前本机任务'}</div>
+    {error && <p role="alert" className={styles.menuError}>{error}</p>}
   </div>;
 }
 
@@ -78,11 +79,11 @@ export function ToolApprovalDialog({ app }: { app: AppModel }) {
     catch (e) { setError(e instanceof Error ? e.message : '审批失败'); return false; }
     finally { setBusy(false); }
   }
-  return <Dialog open={Boolean(request)} busy={busy} onClose={() => void answer(false)} className="permissions-dialog tool-approval-dialog" aria-labelledby="tool-approval-title">
-    <header className="permission-dialog-header"><span className="permission-header-icon"><PermissionIcon/></span><div><h2 id="tool-approval-title">此操作需要你的允许</h2><p>{request?.rememberScope ? '允许后记住授权，范围内的重复操作不再询问' : '仅对当前这一次调用生效'}</p></div></header>
-    <div className="permission-dialog-body"><strong className="approval-action">{request?.message}</strong><pre className="approval-request">{request?.detail}</pre>
-      {request?.rememberScope && <p className="permission-note">{request.rememberScope}</p>}
-      <p className="permission-note">关闭即拒绝 · 2 分钟后自动过期{request?.rememberScope ? ' · 切换为“请求批准”可恢复逐次询问' : ' · 不会记住此授权'}</p>{error && <p role="alert" className="form-error">{error}</p>}</div>
-    <footer className="permission-dialog-footer"><button type="button" className="permission-manage" disabled={busy} onClick={() => { void answer(false).then(answered => { if (answered) app.openPermissionSettings(); }); }}>调整权限…</button><button type="button" ref={denyButton} onClick={() => void answer(false)} disabled={busy}>拒绝</button><button type="button" className="primary" onClick={() => void answer(true)} disabled={busy}>{request?.rememberScope ? '允许并记住' : '允许这一次'}</button></footer>
+  return <Dialog open={Boolean(request)} busy={busy} onClose={() => void answer(false)} className={styles.dialog} aria-labelledby="tool-approval-title">
+    <header className={styles.header}><span className={styles.headerIcon}><PermissionIcon/></span><div><h2 id="tool-approval-title">此操作需要你的允许</h2><p>{request?.rememberScope ? '允许后记住授权，范围内的重复操作不再询问' : '仅对当前这一次调用生效'}</p></div></header>
+    <div className={styles.body}><strong className={styles.action}>{request?.message}</strong><pre className={styles.request}>{request?.detail}</pre>
+      {request?.rememberScope && <p className={styles.note}>{request.rememberScope}</p>}
+      <p className={styles.note}>关闭即拒绝 · 2 分钟后自动过期{request?.rememberScope ? ' · 切换为“请求批准”可恢复逐次询问' : ' · 不会记住此授权'}</p>{error && <p role="alert" className="form-error">{error}</p>}</div>
+    <footer className={styles.footer}><button type="button" className={styles.manage} disabled={busy} onClick={() => { void answer(false).then(answered => { if (answered) app.openPermissionSettings(); }); }}>调整权限…</button><button type="button" ref={denyButton} onClick={() => void answer(false)} disabled={busy}>拒绝</button><button type="button" className="primary" onClick={() => void answer(true)} disabled={busy}>{request?.rememberScope ? '允许并记住' : '允许这一次'}</button></footer>
   </Dialog>;
 }

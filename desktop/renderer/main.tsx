@@ -3,7 +3,8 @@ import { createRoot } from "react-dom/client";
 import { App } from "./app/page";
 import { AppModel } from "./app/models/app";
 import { PluginWindow } from './plugins/window';
-import "./app/styles.css";
+import "./app/styles.scss";
+import { dshRuntime } from './plugins/dsh/runtime';
 
 class ErrorBoundary extends Component<
   { children: ReactNode },
@@ -30,11 +31,17 @@ class ErrorBoundary extends Component<
 }
 const model = window.beingsPluginWindow ? undefined : new AppModel(window.beings);
 const root = createRoot(document.getElementById("root")!);
-root.render(
+function render() {
+  root.render(
   <StrictMode>
     <ErrorBoundary>
       {window.beingsPluginWindow ? <PluginWindow api={window.beingsPluginWindow} /> : <App model={model!} />}
     </ErrorBoundary>
   </StrictMode>,
 );
+  // Town must remain usable while third-party resources or lifecycle hooks wait.
+  // The compatibility runtime still orders each plugin's styles before scripts.
+  if (!window.beingsPluginWindow) void dshRuntime.start();
+}
+void render();
 if (import.meta.hot) import.meta.hot.dispose(() => root.unmount());

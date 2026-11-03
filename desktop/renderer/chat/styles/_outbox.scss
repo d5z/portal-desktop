@@ -1,0 +1,123 @@
+/* Queue and composer share an edge and read as one fused control. */
+.composer-queue-wrap {
+  position: relative;
+  z-index: 1;
+  width: calc(100% - 40px);
+  max-width: 880px;
+  margin: 0 auto -1px;
+}
+
+.composer-queue-wrap .composer-queue {
+  border-radius: 22px 22px 0 0;
+  background: var(--bg-soft);
+  box-shadow: 0 5px 22px #0000000b;
+}
+
+#input-area.has-queue {
+  position: relative;
+  z-index: 0;
+  border-top-color: transparent;
+  border-radius: 0 0 30px 30px;
+}
+
+@media (max-width: 680px) {
+  .composer-queue-wrap {
+    width: calc(100% - 28px);
+  }
+}
+
+.chat-local-file-link {
+  display: inline;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--accent);
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+.chat-local-file-link:hover {
+  opacity: 0.8;
+}
+
+.chat-local-file-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 3px;
+}
+
+.chat-local-file-card {
+  display: inline-flex;
+  vertical-align: middle;
+  align-items: center;
+  gap: 12px;
+  width: 320px;
+  max-width: 100%;
+  min-width: 0;
+  margin: 6px 0;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.chat-local-file-card:hover {
+  border-color: var(--accent-border);
+  background: var(--bg-soft);
+}
+
+.chat-local-file-card:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.chat-local-file-icon {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 46px;
+  border-radius: 10px;
+  background: var(--accent-tint);
+  color: var(--accent);
+  font: 500 17px var(--mono);
+}
+
+.chat-local-file-details {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.chat-local-file-name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.chat-local-file-description {
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.chat-local-file-chevron {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 22px;
+  line-height: 1;
+}

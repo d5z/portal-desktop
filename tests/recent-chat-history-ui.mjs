@@ -1,11 +1,12 @@
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { mkdir } from 'node:fs/promises';
-import { build } from 'esbuild';
+import { build } from '../scripts/renderer-build.mjs';
 import { chromium } from 'playwright';
 import { readShellStyles } from './support/shell-styles.mjs';
+import { browserAssets } from './support/browser-assets.mjs';
 
-const { outputFiles } = await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
+const { outputFiles } = await build({ plugins: [browserAssets()], stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { AppModel } from './desktop/renderer/app/models/app';
@@ -76,7 +77,7 @@ try {
   assert.equal(await page.locator('.pair-human,.pair-link').count(),0);
   assert.equal(await page.locator('#conversation-name').textContent(),'fixture');
   assert.equal(await page.locator('#conversation-name').isVisible(),true);
-  const dot=page.locator('.topbar .sbs-control-trigger .sbs-control-dot');
+  const dot=page.locator('.topbar [aria-label="SBS 状态与显示设置"] > span');
   assert.equal(await dot.isVisible(),true);
   assert.equal(await dot.getAttribute('data-enabled'),'true');
   await page.getByRole('button',{name:'SBS 状态与显示设置'}).click();

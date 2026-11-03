@@ -1,0 +1,173 @@
+#portal-view {
+  overflow: auto;
+}
+
+.portal-content {
+  max-width: 920px;
+  margin: auto;
+  padding: 46px 44px;
+}
+
+.section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 34px;
+}
+
+.section-heading h1 {
+  margin-bottom: 8px;
+}
+
+.section-heading p {
+  font-size: 13px;
+  color: var(--secondary);
+  margin: 0;
+}
+
+.portal-card {
+  padding: 24px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.portal-card-top {
+  display: flex;
+  align-items: center;
+  gap: 15px;
+}
+
+.portal-symbol {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 24px;
+  color: var(--secondary);
+}
+
+.portal-card-top > div {
+  flex: 1;
+}
+
+.portal-card-top div > span {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--secondary);
+}
+
+.portal-details {
+  display: flex;
+  gap: 36px;
+  padding: 24px 0;
+}
+
+.portal-details > div {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.portal-details small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.portal-details span {
+  font:
+    12px/1.6 ui-monospace,
+    monospace;
+  overflow-wrap: anywhere;
+  color: var(--secondary);
+}
+
+.portal-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.capabilities {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 25px;
+  padding: 26px 0 34px;
+}
+
+.capabilities > div {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  gap: 5px 8px;
+}
+
+.capabilities > div > span {
+  grid-row: span 2;
+  font-size: 18px;
+  color: var(--muted);
+}
+
+.capabilities strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.capabilities small {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.log-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.log-heading h2 {
+  font-size: 13px;
+}
+
+.log-heading span {
+  font-size: 11px;
+  color: var(--muted);
+}
+
+#portal-logs {
+  background: var(--code);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 18px;
+  color: var(--secondary);
+  font:
+    11px/1.9 ui-monospace,
+    SFMono-Regular,
+    Consolas,
+    monospace;
+  height: 230px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.portal-foot {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 14px;
+}
+
+.portal-recovery {
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.portal-recovery p {
+  margin: 6px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--muted);
+}

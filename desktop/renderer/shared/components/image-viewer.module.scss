@@ -1,0 +1,271 @@
+@use '../styles/mixins';
+
+.viewer {
+  position: fixed;
+  inset: 0;
+  margin: 0;
+  box-sizing: border-box;
+  width: 100vw;
+  height: 100vh;
+  max-width: none;
+  max-height: none;
+  padding: 80px 24px 100px;
+  border: 0;
+  background: transparent;
+  color: white;
+  overflow: hidden;
+}
+
+.viewer[open] {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.viewer::backdrop {
+  background: rgb(25 28 32 / 80%);
+  backdrop-filter: blur(12px);
+}
+
+.toolbar {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  right: 24px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  -webkit-app-region: no-drag;
+}
+
+.viewer button,
+.viewer a {
+  color: white;
+  font: inherit;
+}
+
+.viewer button {
+  padding: 8px 16px;
+  border: 0;
+  border-radius: 20px;
+  background: #ffffff25;
+  cursor: pointer;
+}
+
+.viewer button:hover {
+  background: #ffffff45;
+}
+
+.viewer button:focus-visible {
+  @include mixins.focus-ring(white);
+}
+
+.viewer button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.toolbar > button {
+  padding: 0;
+  width: 36px;
+  height: 36px;
+  flex: none;
+  font-size: 26px;
+  line-height: 1;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.actions [role='alert'] {
+  flex-basis: 100%;
+  text-align: right;
+  font-size: 13px;
+}
+
+/* AttachmentDownload is a legacy consumer supplied through the actions slot. */
+/* stylelint-disable-next-line selector-class-pattern */
+.actions :global(.attachment-download) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  max-width: 280px;
+  justify-content: flex-end;
+}
+
+/* stylelint-disable-next-line selector-class-pattern */
+.actions :global(.attachment-download) :is(small, progress) {
+  width: 100%;
+  font-size: 12px;
+}
+
+.name {
+  min-width: 0;
+  flex: 1;
+  align-self: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  opacity: 0.85;
+}
+
+.position {
+  align-self: center;
+  flex: none;
+  padding: 6px 12px;
+  border: 1px solid #ffffff26;
+  border-radius: 20px;
+  background: #2228;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.navigation button {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0 0 4px;
+  border: 1px solid #ffffff30;
+  border-radius: 50%;
+  background: #222b;
+  backdrop-filter: blur(12px);
+  font-size: 36px;
+  line-height: 1;
+}
+
+.navigation .previous {
+  left: 24px;
+}
+
+.navigation .next {
+  right: 24px;
+}
+
+.navigation button:disabled {
+  opacity: 0.25;
+}
+
+@media (max-width: 600px) {
+  .toolbar {
+    gap: 8px;
+    left: 12px;
+    right: 12px;
+  }
+
+  .position {
+    padding: 6px 8px;
+  }
+
+  .navigation .previous {
+    left: 12px;
+  }
+
+  .navigation .next {
+    right: 12px;
+  }
+}
+
+.stage {
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  overscroll-behavior: contain;
+  touch-action: none;
+  scrollbar-width: thin;
+}
+
+.canvas {
+  display: grid;
+  place-items: center;
+}
+
+.canvas img {
+  display: block;
+  max-width: none;
+  max-height: none;
+  object-fit: contain;
+  user-select: none;
+}
+
+.stage.canPan {
+  cursor: grab;
+}
+
+.stage.isDragging {
+  cursor: grabbing;
+}
+
+.notice {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+}
+
+.controls {
+  position: absolute;
+  bottom: 42px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid #ffffff26;
+  border-radius: 30px;
+  background: #222b;
+  backdrop-filter: blur(16px);
+  white-space: nowrap;
+}
+
+.controls button {
+  background: transparent;
+  min-width: 36px;
+  padding: 8px 12px;
+}
+
+.controls output {
+  min-width: 56px;
+  text-align: center;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.controlDivider {
+  height: 18px;
+  width: 1px;
+  background: #ffffff40;
+  margin: 0 6px;
+}
+
+.hint {
+  position: absolute;
+  bottom: 16px;
+  left: 0;
+  right: 0;
+  text-align: center;
+  color: #fffb;
+  font-size: 11px;
+  pointer-events: none;
+}
+
+html[data-platform='darwin'] .toolbar {
+  top: 60px;
+}
+
+html[data-platform='darwin'] .viewer {
+  padding-top: 112px;
+}

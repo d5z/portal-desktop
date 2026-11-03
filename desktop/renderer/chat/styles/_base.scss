@@ -1,0 +1,19 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+/* Keep a visible keyboard focus fallback for every control. */
+
+html,
+body {
+  height: 100%;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 15px;
+  line-height: var(--lh-body);
+  overflow: hidden;
+  -webkit-text-size-adjust: 100%;
+}

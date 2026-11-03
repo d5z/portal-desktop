@@ -2,6 +2,7 @@ import { writeRuntimeBundle } from './runtime-bundle.mjs';
 import { mkdir, copyFile, access, chmod } from 'node:fs/promises';
 import path from 'node:path';
 import './build-chat.mjs';
+import './build-dsh-host.mjs';
 import { portalSource } from './portal-source.mjs';
 import { checkPortalCapabilities } from './portal-capabilities.mjs';
 

@@ -1,0 +1,31 @@
+.web-chat {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.web-chat iframe {
+  display: block;
+  border: 0;
+  width: 100%;
+  flex: 1;
+  min-height: 0;
+}
+
+.web-chat-tools {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0 24px 6px;
+  gap: 8px;
+}
+
+.web-chat-tools button {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  font-size: 12px;
+  border-radius: 4px;
+  color: var(--secondary);
+}

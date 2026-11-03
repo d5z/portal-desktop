@@ -1,0 +1,118 @@
+/* ═══ Button Base Classes ═══ */
+
+/* Icon button — 用于 header, input area 的图标按钮 */
+.btn-icon {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-dim);
+  min-width: var(--touch-target);
+  min-height: var(--touch-target);
+  padding: 8px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: var(--transition-fast);
+  text-decoration: none;
+  font-size: 16px;
+}
+
+.btn-icon:hover {
+  color: var(--text);
+  background: var(--hover-overlay);
+}
+
+/* Ghost button — 有边框的轻量按钮 */
+.btn-ghost {
+  background: none;
+  cursor: pointer;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  color: var(--text-muted);
+  font-size: var(--font-sm);
+  transition: var(--transition-fast);
+}
+
+.btn-ghost:hover {
+  color: var(--text);
+  background: var(--hover-overlay);
+}
+
+/* Primary button — accent 色实心按钮 */
+.btn-primary {
+  background: var(--accent);
+  color: var(--text);
+  border: none;
+  cursor: pointer;
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  font-size: var(--font-sm);
+  font-weight: 600;
+  transition: var(--transition-fast);
+}
+
+.btn-primary:hover {
+  opacity: 0.88;
+}
+
+.btn-primary:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+/* Close button — 统一的关闭按钮 */
+.btn-close {
+  cursor: pointer;
+  color: var(--text-muted);
+  width: var(--touch-target);
+  height: var(--touch-target);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-lg);
+  transition: var(--transition-fast);
+  font-size: var(--font-lg);
+  background: none;
+  border: none;
+}
+
+.btn-close:hover {
+  color: var(--text);
+  background: var(--hover-overlay);
+}
+
+/* ═══ Side Panel Base Classes ═══ */
+.side-panel {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: var(--panel-width);
+  max-width: 100%;
+  background: var(--bg-soft);
+  border-left: 1px solid var(--border);
+  z-index: 100;
+  transform: translateX(100%);
+  transition: transform var(--transition-slide);
+  box-shadow: var(--shadow-panel);
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+}
+
+.side-panel.active {
+  transform: translateX(0);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: var(--header-height);
+  padding: 0 16px;
+  border-bottom: 1px solid var(--border);
+  font-weight: 600;
+  flex-shrink: 0;
+}

@@ -94,7 +94,7 @@ try{
   assert.equal(await page.locator('.image-generation-images img').count(),1);
   await page.waitForFunction(()=>document.querySelector('.image-generation-images img')?.naturalWidth>0);
   const frames=await page.locator('.image-generation-card').evaluateAll(cards=>cards.map(card=>{
-    const frame=card.querySelector('.remote-image-thumbnail, .image-generation-placeholder').getBoundingClientRect();
+    const frame=card.querySelector('[data-slot="image-thumbnail"], .image-generation-placeholder').getBoundingClientRect();
     const caption=card.querySelector('.image-generation-caption').getBoundingClientRect();
     return {width:frame.width,height:frame.height,left:frame.left,top:frame.top,bottom:frame.bottom,captionTop:caption.top};
   }));
@@ -152,9 +152,9 @@ try{
   await page.getByRole('button',{name:'放大图片',exact:true}).click();
   await page.keyboard.press('ArrowRight');
   await page.getByRole('dialog',{name:'图片预览：暹罗猫 · 沙发暖阳',exact:true}).waitFor();
-  await page.waitForFunction(()=>document.querySelector('.remote-image-canvas img')?.naturalWidth>0);
+  await page.waitForFunction(()=>document.querySelector('dialog[aria-label^="图片预览："] img')?.naturalWidth>0);
   assert.equal(await page.getByLabel('缩放比例',{exact:true}).textContent(),'100%','switching resets zoom');
-  assert.ok((await page.locator('.remote-image-canvas img').getAttribute('src')).includes('/image/2?'));
+  assert.ok((await page.locator('dialog[aria-label^="图片预览："] img').getAttribute('src')).includes('/image/2?'));
   const secondDownload=page.waitForEvent('download');
   await page.getByRole('button',{name:'下载原图',exact:true}).click();
   assert.equal((await secondDownload).suggestedFilename(),'暹罗猫 · 沙发暖阳.png');
@@ -166,7 +166,7 @@ try{
   await page.keyboard.press('ArrowLeft');
   await page.keyboard.press('ArrowLeft');
   assert.equal(await page.getByLabel('图片位置',{exact:true}).textContent(),'1 / 3');
-  await page.waitForFunction(()=>document.querySelector('.remote-image-canvas img')?.naturalWidth>0);
+  await page.waitForFunction(()=>document.querySelector('dialog[aria-label^="图片预览："] img')?.naturalWidth>0);
   await page.screenshot({path:'test-results/image-generations/gallery-preview.png'});
   await page.keyboard.press('Escape');
   await page.getByRole('button',{name:'预览 暹罗猫 · 木地板',exact:true}).click();

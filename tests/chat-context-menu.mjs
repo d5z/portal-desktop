@@ -1,7 +1,7 @@
 import { readShellStyles } from './support/shell-styles.mjs';
 // Exercise the styled menu through the real chat iframe, shell bridge and Electron clipboard.
 import assert from 'node:assert/strict';
-import { build } from 'esbuild';
+import { build } from '../scripts/renderer-build.mjs';
 import { mkdir, mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -13,13 +13,14 @@ const dir = await mkdtemp(path.join(tmpdir(), 'town-chat-menu-'));
 await writeFile(path.join(dir, 'shell.css'), await readShellStyles());
 async function bundle(name, contents, platform = 'node') {
   const result = await build({ stdin: { contents, resolveDir: process.cwd(), loader: 'tsx' },
-    bundle: true, write: false, platform, format: platform === 'node' ? 'cjs' : 'iife',
+    bundle: true, write: false, outfile: path.join(dir, name), platform, format: platform === 'node' ? 'cjs' : 'iife',
     external: platform === 'node' ? ['electron'] : [], jsx: 'automatic',
     define: { 'process.env.NODE_ENV': '"production"' } });
-  await writeFile(path.join(dir, name), result.outputFiles[0].contents);
+  for (const file of result.outputFiles) await writeFile(file.path, file.contents);
 }
 await bundle('preload.cjs', "import './desktop/preload/preload';");
 await bundle('shell.js', `
+  import './desktop/renderer/app/styles.scss';
   import { createRoot } from 'react-dom/client';
   import { useRef, useState } from 'react';
   import { useChatBridge } from './desktop/renderer/app/hooks/use-chat-bridge';
@@ -257,8 +258,8 @@ try {
   if (app) {
     const page = await app.firstWindow();
     console.error(await page.frames().find(frame => frame.url().startsWith('beings://chat/'))?.evaluate(() => ({
-      viewport: [innerWidth, innerHeight], menu: document.querySelector('.chat-context-menu')?.outerHTML,
-      bounds: document.querySelector('.chat-context-menu')?.getBoundingClientRect().toJSON(),
+      viewport: [innerWidth, innerHeight], menu: document.querySelector('[role="menu"][aria-label="编辑菜单"]')?.outerHTML,
+      bounds: document.querySelector('[role="menu"][aria-label="编辑菜单"]')?.getBoundingClientRect().toJSON(),
       draft: document.querySelector('#input')?.outerHTML,
       markdown: document.querySelector('#input')?.editor?.getMarkdown(),
     })));

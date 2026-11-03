@@ -1,0 +1,263 @@
+.topbar {
+  height: 54px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  gap: 20px;
+  -webkit-app-region: drag;
+}
+
+.topbar-left,
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+}
+
+.topbar strong {
+  font-size: 13px;
+  font-weight: 550;
+  white-space: nowrap;
+}
+
+#conversation-name {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body:not([data-view='chat']) #conversation-name {
+  display: none;
+}
+
+#client-version {
+  font-size: 11px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.icon-button,
+.close {
+  display: inline-grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  padding: 0;
+  font-size: 19px;
+  line-height: 1;
+  -webkit-app-region: no-drag;
+}
+
+/* Draw the close mark independently of the platform font and its baseline. */
+.close {
+  color: var(--secondary);
+}
+
+.close::before,
+.close::after {
+  content: '';
+  grid-area: 1/1;
+  width: 14px;
+  height: 1.5px;
+  border-radius: 1px;
+  background: currentcolor;
+  transform: rotate(45deg);
+  pointer-events: none;
+}
+
+.close::after {
+  transform: rotate(-45deg);
+}
+
+.close:hover:not(:disabled) {
+  color: var(--text);
+}
+
+.icon-button svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#refresh-chat[aria-busy='true'] svg {
+  animation: chat-refresh-spin 0.8s linear infinite;
+}
+
+@keyframes chat-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #refresh-chat[aria-busy='true'] svg {
+    animation: none;
+  }
+}
+
+.view {
+  min-height: 0;
+  flex: 1;
+  position: relative;
+}
+
+#chat-frame {
+  border: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: var(--bg);
+}
+
+#welcome {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 36px 100px;
+}
+
+.welcome-intro {
+  text-align: center;
+}
+
+.welcome-logo {
+  display: inline-block;
+  width: 88px;
+  height: 88px;
+  object-fit: contain;
+  margin-bottom: 22px;
+  vertical-align: middle;
+}
+
+.welcome-intro h1 {
+  font-size: 29px;
+  font-weight: 500;
+  letter-spacing: -1px;
+  margin-bottom: 10px;
+}
+
+.welcome-intro p {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 32px;
+}
+
+.welcome-connect {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: min(100%, 590px);
+  min-height: 90px;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  padding: 24px;
+  color: var(--secondary);
+  font-size: 14px;
+  box-shadow: 0 3px 12px #00000004;
+  background: var(--control);
+}
+
+.welcome-connect-arrow {
+  display: grid;
+  place-items: center;
+  background: var(--accent);
+  color: var(--button-text);
+  width: 32px;
+  height: 32px;
+  font-size: 18px;
+}
+
+.welcome-shortcuts {
+  display: flex;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.welcome-shortcuts button {
+  font-size: 12px;
+  color: var(--secondary);
+  padding: 8px 12px;
+  border-radius: 8px;
+}
+
+.welcome-shortcuts span {
+  color: var(--muted);
+  margin-left: 15px;
+}
+
+.primary {
+  background: var(--accent);
+  color: var(--button-text);
+  padding: 9px 15px;
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.primary:hover:not(:disabled) {
+  background: var(--accent);
+  opacity: 0.88;
+}
+
+.primary:active:not(:disabled) {
+  background: var(--accent);
+  opacity: 0.75;
+}
+
+.secondary {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 7px 13px;
+  font-size: 12px;
+  background: var(--control);
+}
+
+.text-button {
+  font-size: 12px;
+  color: var(--secondary);
+  margin-left: auto;
+  padding: 8px;
+  border-radius: 6px;
+}
+
+.dot {
+  display: inline-block;
+  flex-shrink: 0;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.dot.green {
+  background: var(--green);
+}
+
+.dot.amber {
+  background: #b39051;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--secondary);
+  white-space: nowrap;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: var(--surface);
+}

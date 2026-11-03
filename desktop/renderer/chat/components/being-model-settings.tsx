@@ -443,7 +443,7 @@ export function BeingModelSettings({
             <div className="settings-title-line">
               <h2 id={id("settings-title")}>模型设置</h2>
               {!mobilePage && (
-                <NavigationControls back={disabled ? undefined : back} />
+                <NavigationControls appearance="chat" back={disabled ? undefined : back} />
               )}
             </div>
             <p>选择当前 Being 使用的模型</p>

@@ -1,0 +1,1061 @@
+/* Local declarative interfaces use the chat theme and never inject model CSS. */
+.intelligent-ui {
+  margin: 12px 0;
+  border: 1px solid var(--border, #38404a);
+  border-radius: 14px;
+  overflow: hidden;
+  text-align: left;
+  min-width: 0;
+  color: inherit;
+}
+
+.iui-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 16px;
+  font-size: 12px;
+  flex-wrap: wrap;
+}
+
+.iui-toolbar {
+  border-bottom: 1px solid var(--border, #38404a);
+}
+
+.iui-toolbar small,
+.iui-metric > span {
+  opacity: 0.65;
+}
+
+.intelligent-ui button {
+  color: inherit;
+  background: transparent;
+  border: 1px solid var(--border, #38404a);
+  border-radius: 7px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.iui-body {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+}
+
+.iui-body h3,
+.iui-body p,
+.iui-body figure {
+  margin: 0;
+}
+
+.iui-body h3 {
+  font-size: 18px;
+}
+
+.iui-text {
+  line-height: 1.6;
+}
+
+.iui-stack {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.iui-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.iui-row > * {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+
+.iui-field {
+  display: grid;
+  gap: 8px;
+}
+
+.iui-field label {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.iui-field input:not([type='range']),
+.iui-field select {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 9px 12px;
+  font: inherit;
+  color: inherit;
+  background: var(--bg, #15191f);
+  border: 1px solid var(--border, #38404a);
+  border-radius: 8px;
+}
+
+.iui-field input[type='range'] {
+  width: 100%;
+  accent-color: var(--accent, #7cbfa6);
+}
+
+.iui-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.iui-toggle input {
+  accent-color: var(--accent, #7cbfa6);
+}
+
+.iui-metric {
+  display: grid;
+  gap: 4px;
+  padding: 18px;
+  background: rgb(128 160 150 / 8%);
+  border-radius: 10px;
+}
+
+.iui-metric output {
+  font-size: 32px;
+  line-height: 1.2;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.iui-reset {
+  justify-self: start;
+}
+
+.iui-chart {
+  display: grid;
+  gap: 10px;
+}
+
+.iui-bar-row {
+  display: grid;
+  grid-template-columns: minmax(50px, 1fr) minmax(40px, 3fr) minmax(35px, auto);
+  gap: 12px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.iui-bar-row span {
+  overflow-wrap: anywhere;
+}
+
+.iui-bar-track {
+  background: rgb(128 160 150 / 12%);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.iui-bar {
+  height: 12px;
+  background: var(--accent, #7cbfa6);
+  border-radius: 4px;
+}
+
+.iui-table {
+  overflow: auto;
+}
+
+.iui-table table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.iui-table td,
+.iui-table th {
+  padding: 8px;
+  border-bottom: 1px solid var(--border, #38404a);
+  text-align: left;
+}
+
+.iui-source {
+  margin: 0;
+  padding: 16px;
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 12px;
+}
+
+.iui-notice {
+  padding: 10px 16px;
+  opacity: 0.75;
+  font-size: 12px;
+}
+
+.intelligent-ui :focus-visible {
+  outline: 2px solid var(--accent, #7cbfa6);
+  outline-offset: 3px;
+}
+
+.iui-beta-description {
+  padding: 0 16px 12px;
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+
+#input-row .btn-icon[data-enabled='true'] {
+  color: var(--accent);
+  background: var(--accent-tint);
+  box-shadow: inset 0 0 0 1px var(--accent-border);
+}
+
+#input-area #input-row {
+  grid-template-columns: 32px 32px minmax(0, 1fr) 36px;
+}
+
+#input-area #input-row > .btn-icon[data-enabled] {
+  grid-column: 1;
+}
+
+#input-area #input-row > .btn-icon[aria-label='添加附件'] {
+  grid-column: 2;
+}
+
+#input-area #input {
+  grid-column: 3;
+  min-width: 0;
+}
+
+#input-area #input-row #send-btn {
+  grid-column: 4;
+}
+
+/* Artifact surfaces are independent of prose typography and message bubbles. */
+.message.being .intelligent-answer {
+  width: 100%;
+  min-width: 0;
+  white-space: normal;
+}
+
+.intelligent-ui {
+  position: relative;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 12px 0 20px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  overflow: visible;
+  box-shadow: 0 4px 18px #00000004;
+  font: 14px/1.5 var(--font-sans);
+  white-space: normal;
+}
+
+.intelligent-ui *,
+.intelligent-ui *::before,
+.intelligent-ui *::after {
+  box-sizing: border-box;
+}
+
+.intelligent-ui :is(p, h3, h4, figure) {
+  margin: 0;
+}
+
+.intelligent-ui h3 {
+  font-size: 22px;
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.4px;
+}
+
+.intelligent-ui h4 {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.intelligent-ui p {
+  line-height: 1.65;
+}
+
+.intelligent-ui button {
+  min-height: 32px;
+  padding: 5px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+  background: var(--bg);
+}
+
+.intelligent-ui button:hover:not(:disabled) {
+  background: var(--bg-soft);
+  border-color: var(--accent-border);
+}
+
+.intelligent-ui button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.iui-toolbar {
+  padding: 10px 20px 0;
+  border: 0;
+  color: var(--text-muted);
+  min-height: 42px;
+}
+
+.iui-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 11px;
+}
+
+.iui-status-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+.iui-status-dot.generating {
+  background: var(--accent);
+}
+
+.iui-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.iui-toolbar-actions > button,
+.iui-menu > summary {
+  border: 0;
+  background: transparent;
+  color: var(--text-muted);
+}
+
+.iui-menu {
+  position: relative;
+}
+
+.iui-menu summary {
+  cursor: pointer;
+  list-style: none;
+  padding: 4px 8px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.iui-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.iui-menu > button {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  top: 30px;
+  min-width: 80px;
+  box-shadow: 0 4px 12px #0001;
+}
+
+.iui-body {
+  gap: 18px;
+  padding: 14px 24px 24px;
+}
+
+.iui-text {
+  color: var(--text-dim);
+}
+
+.iui-field {
+  gap: 7px;
+  min-width: 0;
+}
+
+.iui-field label,
+.iui-toggle {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.iui-field output {
+  font-variant-numeric: tabular-nums;
+  color: var(--accent);
+}
+
+.iui-field input:not([type='range']),
+.iui-field select {
+  min-height: 40px;
+  background: var(--bg-soft);
+  border-color: transparent;
+}
+
+.iui-field input[type='range'] {
+  min-height: 24px;
+  margin: 0;
+  cursor: pointer;
+}
+
+.iui-metric {
+  padding: 18px 20px;
+  border: 1px solid var(--border);
+  background: var(--accent-tint);
+  border-radius: 12px;
+}
+
+.iui-metric > span {
+  font-size: 12px;
+  opacity: 1;
+  color: var(--text-dim);
+}
+
+.iui-metric output {
+  font-size: 30px;
+  letter-spacing: -1px;
+  font-variant-numeric: tabular-nums;
+}
+
+.iui-chart {
+  margin: 0;
+}
+
+.iui-chart figcaption {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.iui-chart svg {
+  width: 100%;
+  max-height: 300px;
+}
+
+.iui-bar-track {
+  position: relative;
+}
+
+.iui-zero {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: var(--border);
+}
+
+.iui-table {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow-x: auto;
+}
+
+.iui-table caption {
+  text-align: left;
+  font-weight: 600;
+  padding: 12px;
+}
+
+.iui-table :is(th, td) {
+  font-size: 13px;
+  padding: 10px 12px;
+  white-space: normal;
+}
+
+.iui-table th {
+  background: var(--bg-soft);
+  color: var(--text-dim);
+}
+
+.iui-table th button {
+  text-align: left;
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+}
+
+.iui-table tbody tr:last-child td {
+  border: 0;
+}
+
+.iui-pagination,
+.iui-app-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 10px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.iui-pagination > span,
+.iui-app-actions > span {
+  margin-right: auto;
+}
+
+.iui-app-actions {
+  padding: 0 0 10px;
+}
+
+.iui-app .iui-body {
+  padding: 0;
+}
+
+.iui-segments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.iui-segments button {
+  border-color: transparent;
+  color: var(--text-dim);
+  background: var(--bg-soft);
+}
+
+.iui-segments button[aria-pressed='true'] {
+  background: var(--accent-tint);
+  border-color: var(--accent-border);
+  color: var(--accent);
+}
+
+.iui-diagram {
+  display: grid;
+  gap: 16px;
+}
+
+.iui-diagram-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(150px, 1fr);
+  gap: 20px;
+  align-items: center;
+}
+
+.iui-diagram-stage {
+  min-width: 0;
+  background: var(--bg-soft);
+  border-radius: 12px;
+  padding: 12px;
+}
+
+.iui-diagram-stage svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 3/2;
+  overflow: hidden;
+}
+
+.iui-diagram-part {
+  cursor: pointer;
+  transition: opacity 120ms;
+}
+
+.iui-diagram-part:focus-visible {
+  outline: none;
+  filter: drop-shadow(0 0 3px var(--accent));
+}
+
+.iui-part-description {
+  display: grid;
+  gap: 8px;
+}
+
+.iui-part-description p {
+  color: var(--text-dim);
+  font-size: 13px;
+}
+
+.iui-eyebrow {
+  color: var(--text-muted);
+  font-size: 11px;
+}
+
+.iui-zoom {
+  display: flex;
+  gap: 3px;
+  justify-content: center;
+}
+
+.iui-zoom button {
+  min-width: 32px;
+  border: 0;
+  background: transparent;
+}
+
+.iui-timeline ol {
+  display: grid;
+  gap: 16px;
+  margin: 14px 0 0;
+  padding-left: 20px;
+}
+
+.iui-timeline li::marker {
+  color: var(--accent);
+}
+
+.iui-timeline label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.iui-timeline p {
+  color: var(--text-dim);
+  font-size: 13px;
+  margin-top: 4px;
+}
+
+.iui-source {
+  font-family: var(--mono);
+  background: var(--bg-soft);
+  border-radius: 0 0 18px 18px;
+}
+
+.iui-expanded {
+  position: fixed;
+  inset: 20px;
+  width: auto;
+  margin: 0;
+  z-index: 10000;
+  overflow-y: auto;
+  box-shadow: 0 0 0 100vmax #0006;
+}
+
+.iui-expanded .iui-toolbar {
+  position: sticky;
+  top: 0;
+  background: var(--bg);
+  z-index: 3;
+  padding-bottom: 10px;
+}
+
+.iui-expanded .iui-body {
+  max-width: 1040px;
+  margin: auto;
+}
+
+@media (max-width: 600px) {
+  .iui-body {
+    padding: 12px 16px 18px;
+    gap: 16px;
+  }
+
+  .iui-toolbar {
+    padding: 8px 12px 0;
+  }
+
+  .intelligent-ui h3 {
+    font-size: 19px;
+  }
+
+  .iui-diagram-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .iui-expanded {
+    inset: 8px;
+  }
+
+  .intelligent-ui button {
+    min-height: 40px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .iui-diagram-part {
+    transition: none;
+  }
+}
+
+/* Task content has its own hierarchy; diagram geometry stays in a single SVG coordinate system. */
+.intelligent-ui .iui-body {
+  gap: 24px;
+}
+
+.intelligent-ui .iui-body > h3 {
+  font-size: clamp(22px, 2.3vw, 30px);
+  font-weight: 600;
+  letter-spacing: -0.6px;
+  line-height: 1.25;
+}
+
+.intelligent-ui .iui-text {
+  line-height: 1.8;
+}
+
+.iui-card {
+  display: grid;
+  gap: 18px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: 24px;
+  min-width: 0;
+}
+
+.intelligent-ui .iui-card > h4 {
+  font-size: 20px;
+  line-height: 1.35;
+  margin: 0;
+  font-weight: 600;
+}
+
+.iui-card > p {
+  margin: 0;
+  color: var(--text-dim);
+  line-height: 1.7;
+}
+
+.iui-card .iui-text strong {
+  display: block;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 5px;
+  letter-spacing: 0.06em;
+}
+
+.iui-card .iui-metric {
+  border: 0;
+  background: var(--bg-soft);
+  padding: 16px;
+}
+
+.iui-card .iui-row {
+  align-items: stretch;
+}
+
+.iui-diagram {
+  gap: 22px;
+}
+
+.iui-diagram-stage {
+  padding: 0;
+  border-radius: 20px;
+}
+
+.iui-diagram-stage svg {
+  aspect-ratio: auto;
+}
+
+.iui-explode {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--text-muted);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.iui-explode input {
+  flex: 1;
+  min-width: 0;
+  cursor: pointer;
+  accent-color: var(--text);
+}
+
+.iui-diagram .iui-segments {
+  gap: 8px;
+}
+
+.iui-diagram .iui-segments button {
+  padding: 7px 15px;
+  border-radius: 24px;
+}
+
+.iui-diagram .iui-segments button[aria-pressed='true'] {
+  background: var(--text);
+  color: var(--bg);
+  border-color: transparent;
+}
+
+.iui-part-description {
+  min-height: 90px;
+  align-content: start;
+}
+
+.intelligent-ui .iui-part-description h4 {
+  margin: 0;
+  font-size: 19px;
+}
+
+.iui-part-description p {
+  line-height: 1.8;
+  font-size: 14px;
+}
+
+@media (max-width: 600px) {
+  .iui-card {
+    padding: 18px;
+    gap: 16px;
+  }
+
+  .iui-card .iui-row {
+    flex-wrap: wrap;
+  }
+
+  .iui-diagram .iui-segments {
+    gap: 5px;
+  }
+
+  .iui-diagram .iui-segments button {
+    padding: 5px 11px;
+  }
+}
+
+.iui-image {
+  margin: 0;
+  min-width: 0;
+}
+
+.intelligent-ui .iui-image [data-slot='image-thumbnail'] {
+  display: block;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+  cursor: zoom-in;
+}
+
+.iui-image img {
+  display: block;
+  width: 100%;
+  max-height: 440px;
+  object-fit: cover;
+  border-radius: 16px;
+}
+
+.iui-image figcaption {
+  color: var(--text-muted);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+#input-area #input-row > .iui-trigger {
+  position: relative;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 9px;
+  box-shadow: none;
+  background: transparent;
+  color: var(--text-dim);
+}
+
+#input-area #input-row > .iui-trigger:hover,
+#input-area #input-row > .iui-trigger[aria-expanded='true'] {
+  background: var(--bg-softer);
+  color: var(--text);
+}
+
+#input-area #input-row > .iui-trigger[data-enabled='true'] {
+  color: var(--text);
+  background: var(--bg-soft);
+  box-shadow: none;
+}
+
+.iui-trigger-dot {
+  display: none;
+  position: absolute;
+  right: 3px;
+  top: 3px;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 2px var(--bg);
+}
+
+.iui-trigger[data-enabled='true'] .iui-trigger-dot {
+  display: block;
+}
+
+.iui-beta-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  min-height: 40px;
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.iui-beta-toggle input {
+  appearance: auto;
+  -webkit-appearance: checkbox;
+  width: 14px;
+  height: 14px;
+  flex: 0 0 14px;
+  margin: 0;
+  padding: 0;
+  accent-color: var(--green);
+  cursor: pointer;
+}
+
+.iui-beta-toggle input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.iui-beta-description {
+  padding: 0 12px 16px;
+  font-size: 12px;
+  line-height: 1.75;
+  max-width: 440px;
+}
+
+/* A shared range treatment for generated controls, examples, and diagram disassembly. */
+.intelligent-ui input[type='range'] {
+  appearance: none;
+  -webkit-appearance: none;
+  display: block;
+  width: 100%;
+  height: 40px;
+  min-height: 40px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.intelligent-ui input[type='range']::-webkit-slider-runnable-track {
+  height: 28px;
+  background: var(--bg-soft);
+  border: 0;
+  border-radius: 999px;
+}
+
+.intelligent-ui input[type='range']::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 24px;
+  height: 24px;
+  margin-top: 2px;
+  background: #fff;
+  border: 1px solid #00000012;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px #0000001c;
+}
+
+.intelligent-ui input[type='range']::-moz-range-track {
+  height: 28px;
+  background: var(--bg-soft);
+  border: 0;
+  border-radius: 999px;
+}
+
+.intelligent-ui input[type='range']::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  background: #fff;
+  border: 1px solid #00000012;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px #0000001c;
+}
+
+.intelligent-ui input[type='range']:focus-visible {
+  outline: 2px solid var(--accent-border);
+  outline-offset: 3px;
+  border-radius: 999px;
+}
+
+.intelligent-ui input[type='range']:active::-webkit-slider-thumb {
+  box-shadow: 0 1px 5px #0003;
+}
+
+.intelligent-ui .iui-range-field {
+  gap: 6px;
+  padding: 6px 0;
+}
+
+.intelligent-ui .iui-range-field label {
+  align-items: baseline;
+  color: var(--text-dim);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
+.intelligent-ui .iui-range-field output {
+  color: var(--text);
+  font-size: 19px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.iui-range-scale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.5;
+  font-variant-numeric: tabular-nums;
+}
+
+.iui-range-scale span {
+  flex: 1;
+}
+
+.iui-range-scale span:nth-child(2) {
+  text-align: center;
+}
+
+.iui-range-scale span:last-child {
+  text-align: right;
+}
+
+.intelligent-ui .iui-field {
+  align-content: start;
+}
+
+.iui-message-option {
+  display: flex;
+  justify-content: flex-start;
+  padding: 0 14px 8px;
+}
+
+.iui-message-option button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  background: var(--bg);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.iui-message-option button small {
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.iui-message-option button[aria-pressed='true'] {
+  background: var(--accent-tint);
+  border-color: var(--accent-border);
+  color: var(--text);
+}
+
+.iui-message-option button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.iui-message-option button:hover {
+  border-color: var(--text-muted);
+}
+
+.intelligent-ui .iui-repair {
+  margin: 0 24px 12px;
+}

@@ -133,9 +133,9 @@ async function openOptions(page) {
 async function toolWithApproval(page, name, args, allow) {
   const [result] = await Promise.all([
     rpc('tools/call', { name, arguments: args }),
-    page.locator('.tool-approval-dialog').getByRole('button', { name: allow ? '允许这一次' : '拒绝', exact: true }).click(),
+    page.getByRole('dialog', { name: '此操作需要你的允许' }).getByRole('button', { name: allow ? '允许这一次' : '拒绝', exact: true }).click(),
   ]);
-  await page.locator('.tool-approval-dialog').waitFor({ state: 'hidden' });
+  await page.getByRole('dialog', { name: '此操作需要你的允许' }).waitFor({ state: 'hidden' });
   return result;
 }
 async function openClientSettings(page) {

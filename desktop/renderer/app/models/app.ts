@@ -10,6 +10,7 @@ import type {
   UpdateState,
 } from "../../../shared/types";
 import { Store, errorText } from "../../shared/models/store";
+import { renderedColorScheme, selectColorScheme, type ColorScheme } from '../../shared/color-scheme';
 import { PluginsModel } from '../../plugins/model';
 import { hostPluginContext } from '../../plugins/context';
 import { WorkspaceModel } from "./workspace";
@@ -387,7 +388,7 @@ export class AppModel extends Store {
       if (!sameChat) this.chatHistoryScope = next.chatScene ? "current" : "all";
       this.chatHistoryScopeKnown = false;
       this.connection = "connecting";
-      this.chatSource = `beings://chat/?name=${encodeURIComponent(next.settings.being)}&history_scope=${encodeURIComponent(next.settings.endpoint)}&history_limit=${this.chatHistoryLimit}&scene_scope=${this.chatHistoryScope}&scene_strict=1&theme=${this.theme}&revision=${crypto.randomUUID()}`;
+      this.chatSource = `beings://chat/?name=${encodeURIComponent(next.settings.being)}&history_scope=${encodeURIComponent(next.settings.endpoint)}&history_limit=${this.chatHistoryLimit}&scene_scope=${this.chatHistoryScope}&scene_strict=1&theme=${this.colorScheme}&revision=${crypto.randomUUID()}`;
       if (next.chatScene) {
         this.chatSource += `&scene_id=${encodeURIComponent(next.chatScene.scene_id)}&scene_label=${encodeURIComponent(next.chatScene.scene_meta.scene_label)}`;
       }
@@ -482,8 +483,9 @@ export class AppModel extends Store {
     this.sbsKnown = typeof enabled === "boolean";
     this.changed();
   }
+  get colorScheme() { return renderedColorScheme(this.theme); }
   postAppearance() {
-    this.post({ type: "beings:appearance", theme: this.theme });
+    this.post({ type: "beings:appearance", theme: this.colorScheme });
     this.post({ type: "beings:reading", size: this.readingSize });
     this.post({ type: "beings:reasoning-display", show: this.showReasoning });
     if (this.chatSource) this.post({ type: 'beings:history-limit', limit: this.chatHistoryLimit, revision: new URL(this.chatSource).searchParams.get('revision') });
@@ -497,11 +499,11 @@ export class AppModel extends Store {
     this.changed();
     this.toast('历史消息条数已保存，将用于后续加载。');
   }
-  async toggleTheme() {
+  toggleTheme() { return this.setTheme(this.colorScheme === 'light' ? 'dark' : 'light'); }
+  async setTheme(theme: ColorScheme) {
     await this.run(async () => {
-      this.theme = await this.api.appearance(
-        this.theme === "light" ? "dark" : "light",
-      );
+      this.theme = await this.api.appearance(theme);
+      selectColorScheme(this.theme);
       this.postAppearance();
       this.changed();
     });

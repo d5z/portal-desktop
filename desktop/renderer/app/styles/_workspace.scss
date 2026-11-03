@@ -1,0 +1,639 @@
+/* Three-column workspace: destinations, active page, dismissible Being details. */
+.workspace-rail {
+  width: 76px;
+  flex: 0 0 76px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 56px 10px 16px;
+  border-right: 0;
+  background: var(--sidebar);
+  -webkit-app-region: drag;
+}
+
+.rail-links {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  justify-content: center;
+  gap: 10px;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: none;
+  padding: 8px 0;
+}
+
+.workspace-rail button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  color: var(--text);
+  -webkit-app-region: no-drag;
+  transition: background 0.18s;
+}
+
+.workspace-rail button[aria-current='page'] {
+  background: var(--selected);
+}
+
+.workspace-rail svg {
+  width: 24px;
+  height: 24px;
+}
+
+.rail-settings {
+  margin-top: 12px;
+}
+
+.workspace-stage .topbar,
+html[data-platform='darwin'] .workspace-stage .topbar {
+  padding: 0 24px;
+  grid-template-columns: minmax(110px, 1fr) auto minmax(100px, 1fr);
+}
+
+.chat-scene-indicator {
+  min-height: 38px;
+  padding: 7px 14px;
+  border-radius: 22px;
+  background: var(--control);
+  border: 1px solid var(--line);
+  color: var(--text);
+  box-shadow: 0 3px 12px #00000006;
+}
+
+.chat-session-panel .chat-session-list {
+  flex: 1;
+  max-height: none;
+}
+
+#place-panel.central-place {
+  position: relative;
+  inset: auto;
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  max-width: none;
+  min-height: 0;
+  height: auto;
+  border: 0;
+  box-shadow: none;
+  z-index: 1;
+  animation: page-arrive 0.2s ease-out;
+}
+
+:is(#place-panel) #view-title {
+  font: 550 23px/1.4 var(--font-sans);
+}
+
+.being-info {
+  position: relative;
+  flex: 0 0 320px;
+  width: 320px;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-left: 1px solid var(--line);
+  padding: 48px 24px 0;
+  background: var(--bg);
+}
+
+.being-info-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+}
+
+.being-profile {
+  text-align: center;
+  padding: 12px 0 38px;
+}
+
+.being-avatar {
+  display: grid;
+  place-items: center;
+  width: 100px;
+  height: 100px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font:
+    40px Georgia,
+    serif;
+  color: var(--secondary);
+}
+
+.being-profile h2 {
+  font-size: 26px;
+  letter-spacing: -0.5px;
+  overflow-wrap: anywhere;
+}
+
+.being-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin: 6px 0 0;
+  color: var(--secondary);
+  font-size: 13px;
+}
+
+.being-status > span {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--muted);
+}
+
+.being-status[data-online='true'] > span {
+  background: var(--green);
+}
+
+.being-tabs {
+  display: flex;
+  padding: 4px;
+  background: var(--surface);
+  border-radius: 24px;
+  margin: 0 0 28px;
+}
+
+.being-tabs button {
+  flex: 1;
+  padding: 8px;
+  border-radius: 20px;
+  color: var(--secondary);
+  font-size: 12px;
+}
+
+.being-tabs button[aria-selected='true'] {
+  background: var(--control);
+  color: var(--text);
+  box-shadow: 0 3px 10px #0000000b;
+}
+
+.being-info h3 {
+  font-size: 14px;
+  font-weight: 550;
+  margin-bottom: 18px;
+}
+
+.being-details {
+  margin: 0;
+}
+
+.being-details > div {
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.being-details dt {
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 5px;
+}
+
+.being-details dd {
+  margin: 0;
+  font-size: 13px;
+  overflow-wrap: anywhere;
+}
+
+.being-connect {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  padding: 12px 14px;
+  margin-top: 24px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  font-size: 12px;
+}
+
+.being-activities {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.being-activities li {
+  display: flex;
+  gap: 12px;
+  padding: 16px 0;
+}
+
+.being-activities strong {
+  font-size: 13px;
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+
+.being-activities p,
+.being-empty {
+  margin: 6px 0;
+  font-size: 12px;
+  color: var(--secondary);
+  line-height: 1.7;
+}
+
+.being-activity-dot {
+  flex: 0 0 8px;
+  height: 8px;
+  margin-top: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
+@keyframes being-arrive {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes page-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@container stage (max-width:620px) {
+  .workspace-stage .topbar,
+  html[data-platform='darwin'] .workspace-stage .topbar {
+    grid-template-columns: minmax(90px, 1fr) auto;
+    gap: 10px;
+    padding: 0 18px;
+  }
+
+  .pair-name {
+    display: none;
+  }
+
+  .topbar-actions {
+    grid-column: 2;
+  }
+}
+
+@media (max-width: 1100px) {
+  .being-info {
+    flex-basis: 280px;
+    width: 280px;
+    padding-inline: 20px;
+  }
+}
+
+@media (max-width: 800px) {
+  .workspace-rail {
+    width: 64px;
+    flex-basis: 64px;
+  }
+
+  .being-info {
+    position: absolute;
+    z-index: 80;
+    inset: 0 0 0 auto;
+    box-shadow: -16px 0 48px #00000014;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .being-info,
+  #place-panel.central-place {
+    animation: none;
+  }
+
+  .workspace-rail button {
+    transition: none;
+  }
+}
+
+.workspace-content {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.workspace-content > #chat-view {
+  min-width: 0;
+  flex: 1;
+}
+
+.workspace-content.split-chat > #chat-view {
+  order: 0;
+  flex: 0 1 var(--chat-pane-width, 640px);
+  min-width: 300px;
+  border-right: 1px solid var(--line);
+  animation: being-arrive 0.2s ease-out;
+}
+
+.workspace-content.split-chat > .central-place {
+  order: 1;
+  min-width: 320px;
+}
+
+.split-chat-heading {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 18px;
+  font-size: 12px;
+  color: var(--secondary);
+}
+
+.split-chat-toggle {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  padding: 8px;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--secondary);
+  -webkit-app-region: no-drag;
+}
+
+.split-chat-toggle:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+
+@container stage (max-width:700px) {
+  .workspace-content.split-chat {
+    flex-direction: column;
+  }
+
+  .workspace-content.split-chat > .central-place {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .workspace-content.split-chat > #chat-view {
+    flex: 1;
+    min-width: 0;
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-content.split-chat > #chat-view {
+    animation: none;
+  }
+}
+
+.workspace-content > #chat-view {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.workspace-content #chat-frame {
+  flex: 1;
+  min-height: 0;
+  height: 0;
+}
+
+/* One navigation rail and one shared resize affordance across auxiliary panels. */
+.workspace-rail {
+  position: relative;
+  padding-top: 54px;
+  gap: 10px;
+  z-index: 6;
+}
+
+.workspace-rail::after {
+  content: '';
+  position: absolute;
+  right: 0;
+  top: 44px;
+  bottom: 0;
+  width: 1px;
+  background: var(--line);
+  pointer-events: none;
+}
+
+.workspace-rail .rail-links {
+  justify-content: flex-start;
+  gap: 6px;
+  padding: 10px 0;
+  min-height: 0;
+}
+
+.workspace-rail .rail-being {
+  flex: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  font:
+    22px Georgia,
+    serif;
+  color: var(--secondary);
+  margin-bottom: 10px;
+}
+
+.rail-button {
+  position: relative;
+}
+
+.rail-button[data-navigation-key] {
+  touch-action: none;
+  user-select: none;
+  transition:
+    transform 160ms cubic-bezier(0.2, 0.8, 0.2, 1),
+    background 120ms;
+}
+
+.rail-links {
+  position: relative;
+}
+
+.rail-links[data-sorting]::before {
+  content: '';
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  top: var(--sort-line);
+  height: 2px;
+  border-radius: 2px;
+  background: var(--secondary);
+  opacity: 0.25;
+  pointer-events: none;
+  z-index: 3;
+  transition: top 160ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.rail-links[data-sorting] .rail-button {
+  cursor: grabbing;
+}
+
+.rail-links[data-sorting] .rail-button:not(.rail-sorting-item) {
+  opacity: 0.65;
+}
+
+.rail-links[data-sorting] .rail-sorting-item {
+  z-index: 2;
+  transition: none;
+  background: var(--control);
+  box-shadow: 0 3px 10px #00000012;
+}
+
+body:has(.rail-links[data-sorting]) .rail-tooltip {
+  display: none;
+}
+
+.rail-links[data-sorting] .rail-icon-line {
+  animation: none !important;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-button[data-navigation-key],
+  .rail-links[data-sorting]::before {
+    transition: none;
+  }
+}
+
+/* Animate the stroke itself; keep the SVG at its native size and position. */
+.rail-button:not(:disabled):is(:hover, :focus-visible) .rail-icon-line {
+  animation: rail-icon-draw 0.45s ease-out;
+}
+
+.rail-unread {
+  position: absolute;
+  right: 6px;
+  top: 7px;
+  width: 6px;
+  height: 6px;
+  background: var(--green);
+  border-radius: 50%;
+  border: 1px solid var(--bg);
+}
+
+.rail-tooltip {
+  position: fixed;
+  z-index: 10020;
+  transform: translateY(-50%);
+  padding: 7px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--control);
+  color: var(--text);
+  box-shadow: 0 4px 16px #00000012;
+  font-size: 12px;
+  line-height: 18px;
+  max-width: 240px;
+  pointer-events: none;
+  animation: tooltip-in 0.12s ease-out;
+  -webkit-app-region: no-drag;
+}
+
+@keyframes rail-icon-draw {
+  from {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+  }
+
+  to {
+    stroke-dasharray: 100;
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes tooltip-in {
+  from {
+    opacity: 0;
+    margin-left: -4px;
+  }
+
+  to {
+    opacity: 1;
+    margin-left: 0;
+  }
+}
+
+/* Highlight the panel's existing border instead of drawing a second line inside it. */
+:is(
+  #chat-view,
+  .being-info,
+  .plugin-sidebar,
+  .chat-session-panel,
+  #companion-panel,
+  #subagent-model-panel,
+  .client-file-viewer
+):has(> [data-slot='panel-resize-handle']:is(:hover, :focus-visible, [data-resizing='true'])) {
+  border-color: var(--secondary);
+}
+
+.workspace-content > #chat-view,
+.plugin-sidebar {
+  position: relative;
+}
+
+.being-info {
+  flex-shrink: 1;
+  max-width: calc(100% - 396px);
+}
+
+.chat-session-panel {
+  max-width: calc(100% - 48px);
+}
+
+.chat-session-panel[data-pinned='true'] {
+  max-width: 40cqw;
+  box-shadow: none;
+}
+
+.workspace-stage:has(.chat-session-panel[data-pinned='true']) > .workspace-content {
+  margin-left: min(var(--scene-panel-width, 320px), 40cqw);
+}
+
+.plugin-sidebar {
+  max-width: 60%;
+  min-width: 0;
+}
+
+#companion-panel {
+  min-width: 0;
+}
+
+@media (max-width: 800px) {
+  .being-info {
+    max-width: calc(100% - 64px);
+    width: min(320px, calc(100% - 64px));
+  }
+
+  .being-info > [data-slot='panel-resize-handle'] {
+    display: none;
+  }
+}
+
+@container stage (max-width:700px) {
+  .split-chat > #chat-view > [data-slot='panel-resize-handle'] {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-button:not(:disabled):is(:hover, :focus-visible) .rail-icon-line,
+  .rail-tooltip {
+    animation: none;
+  }
+}

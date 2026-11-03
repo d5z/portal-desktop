@@ -1,0 +1,549 @@
+/* Every settings destination shares one modal, heading and scroll/action layout. */
+.settings-surface {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.settings-surface > .dialog-heading,
+.settings-surface > form > .dialog-heading {
+  display: none;
+}
+
+#client-settings-dialog .dialog-footer {
+  flex-shrink: 0;
+  padding: 16px 32px;
+  margin: 0;
+  border-top: 1px solid var(--line);
+  gap: 12px;
+  background: var(--bg);
+  flex-wrap: wrap;
+}
+
+#client-settings-dialog .dialog-footer > span {
+  flex: 1;
+  min-width: 140px;
+  font-size: 12px;
+  color: var(--secondary);
+}
+
+#client-settings-dialog .dialog-footer button {
+  min-height: 38px;
+}
+
+#client-settings-dialog :is(.field-help, .permission-note, .connection-description) {
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--secondary);
+}
+
+#client-settings-dialog .switch-list {
+  margin-top: 24px;
+  padding: 0 16px;
+  background: var(--utility-surface);
+  border-radius: var(--utility-radius);
+}
+
+#client-settings-dialog .switch-list > label {
+  padding: 16px 0;
+  margin: 0;
+}
+
+#client-settings-dialog .switch-list :is(strong, .permission-section-heading) {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+#client-settings-dialog .switch-list small {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--secondary);
+}
+
+#client-settings-dialog .subagent-switch-row {
+  padding: 16px 0;
+}
+
+#client-settings-dialog .notification-switches {
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  background: none;
+}
+
+#client-settings-dialog #diagnostics-dialog {
+  padding: 0 32px 24px;
+  width: auto;
+  max-height: none;
+  overflow: auto;
+}
+
+#client-settings-dialog #diagnostics-dialog .files-footer {
+  position: sticky;
+  bottom: -24px;
+  flex-shrink: 0;
+  background: var(--bg);
+  padding-block: 16px;
+}
+
+#client-settings-dialog #subagent-model-panel.embedded-model-settings {
+  position: relative;
+  inset: auto;
+  width: 100%;
+  max-width: none;
+  flex: 1;
+  height: auto;
+  border: 0;
+  box-shadow: none;
+}
+
+#client-settings-dialog #settings-panel .settings-header[hidden] {
+  display: none;
+}
+
+#client-settings-dialog #settings-panel {
+  --text-dim: var(--secondary);
+  --bg-soft: var(--utility-surface);
+}
+
+#client-settings-dialog #settings-panel .model-target-header {
+  padding: 0 32px 20px;
+}
+
+#client-settings-dialog #settings-panel .settings-body {
+  padding: 0 32px 28px;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+#client-settings-dialog #settings-panel .llm-current {
+  background: var(--utility-surface);
+  border: 0;
+  padding: 18px 20px;
+  border-radius: var(--utility-radius);
+}
+
+#client-settings-dialog #settings-panel .llm-list {
+  max-height: none;
+  overflow: visible;
+}
+
+#client-settings-dialog #settings-panel .model-name {
+  font-size: 20px;
+}
+
+#client-settings-dialog #settings-panel .btn-apply {
+  min-height: 38px;
+  width: auto;
+  padding: 10px 18px;
+  display: block;
+  margin-left: auto;
+  color: var(--button-text);
+}
+
+#client-settings-dialog #settings-panel .toggle-group button.active {
+  color: var(--text);
+}
+
+.embedded-portal-settings {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+#client-settings-dialog .portal-content {
+  padding: 0 32px 28px;
+  max-width: none;
+}
+
+#client-settings-dialog .portal-content .section-heading {
+  margin: 0 0 20px;
+}
+
+#client-settings-dialog .portal-card {
+  padding: 20px;
+  background: var(--utility-surface);
+  border: 0;
+  border-radius: var(--utility-radius);
+}
+
+.portal-symbol {
+  padding: 9px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#client-settings-dialog .portal-card-top {
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+#client-settings-dialog .portal-card-top h2 {
+  font-size: 16px;
+  overflow-wrap: anywhere;
+  margin: 0;
+}
+
+.portal-card-top > .portal-status {
+  font-size: 16px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.portal-card-top > .portal-status .portal-status-dot {
+  width: 8px;
+  height: 8px;
+}
+
+#client-settings-dialog .portal-symbol {
+  border: 0;
+  background: var(--bg);
+}
+
+#client-settings-dialog .portal-details {
+  padding: 20px 0;
+  gap: 20px;
+  flex-direction: column;
+}
+
+#client-settings-dialog .portal-details small {
+  font-size: 12px;
+  color: var(--secondary);
+}
+
+#client-settings-dialog .portal-details span {
+  font: 13px/1.6 var(--font-sans);
+}
+
+#client-settings-dialog .portal-actions {
+  flex-wrap: wrap;
+}
+
+#client-settings-dialog .portal-actions button {
+  font-size: 12px;
+  min-height: 36px;
+  padding: 8px 12px;
+}
+
+#client-settings-dialog .capabilities {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 16px 0 24px;
+}
+
+#client-settings-dialog .capabilities > div {
+  grid-template-columns: 24px minmax(0, 1fr);
+  align-items: center;
+  gap: 4px 12px;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.capabilities > div > svg {
+  grid-row: span 2;
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  color: var(--secondary);
+}
+
+#client-settings-dialog .capabilities strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+#client-settings-dialog .capabilities small,
+#client-settings-dialog .portal-foot {
+  font-size: 12px;
+  color: var(--secondary);
+  line-height: 1.7;
+}
+
+#client-settings-dialog .log-heading {
+  align-items: flex-start;
+  gap: 12px;
+  flex-direction: column;
+}
+
+#client-settings-dialog .portal-content summary {
+  font-size: 12px;
+  line-height: 1.7;
+  cursor: pointer;
+  color: var(--secondary);
+}
+
+#client-settings-dialog :is(button, summary) {
+  touch-action: manipulation;
+}
+
+#client-settings-dialog [hidden] {
+  display: none !important;
+}
+
+@media (max-width: 600px) {
+  #client-settings-dialog .dialog-footer {
+    padding: 12px 20px;
+  }
+
+  #client-settings-dialog #settings-panel .model-target-header {
+    padding: 0 20px 16px;
+  }
+
+  #client-settings-dialog #settings-panel .settings-body,
+  #client-settings-dialog .portal-content,
+  #client-settings-dialog #diagnostics-dialog {
+    padding: 0 20px 24px;
+  }
+
+  #client-settings-dialog .portal-card {
+    padding: 16px;
+  }
+
+  #client-settings-dialog .portal-actions button {
+    min-height: 40px;
+  }
+}
+
+.settings-fields {
+  border: 0;
+  margin: 0;
+  min-width: 0;
+}
+
+#client-settings-dialog {
+  border: 0;
+
+  --muted: var(--secondary);
+}
+
+#client-settings-dialog summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+/* Keep unsaved-work decisions inside the settings frame. */
+#client-settings-dialog .settings-unsaved {
+  flex: none;
+  margin: 0 24px 16px;
+  padding: 14px 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+#client-settings-dialog .settings-unsaved > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+#client-settings-dialog .settings-unsaved button {
+  min-height: 36px;
+}
+
+/* One scroll surface per category; disclosures expand without replacing it. */
+#client-settings-dialog .settings-inline-body {
+  overflow: auto;
+  scrollbar-gutter: stable;
+}
+
+#client-settings-dialog .settings-inline-form,
+#client-settings-dialog .settings-inline-form > form,
+#client-settings-dialog .settings-inline-form .dialog-body {
+  display: block;
+  flex: none;
+  height: auto;
+  overflow: visible;
+  min-height: 0;
+}
+
+#client-settings-dialog .settings-inline-form {
+  margin-bottom: 24px;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+}
+
+#client-settings-dialog .settings-inline-form .dialog-body {
+  padding: 0;
+}
+
+#client-settings-dialog .settings-inline-form .dialog-footer {
+  padding: 16px 0 0;
+  margin-top: 16px;
+  background: transparent;
+}
+
+#client-settings-dialog .settings-inline-form .switch-list {
+  margin-top: 0;
+  padding: 0;
+  background: transparent;
+}
+
+#client-settings-dialog
+  .settings-inline-form
+  :is(input:not([type='checkbox'], [type='range']), select, textarea) {
+  border-radius: 10px;
+}
+
+#client-settings-dialog .settings-inline-body :is(button:not(.close), .toggle-group) {
+  border-radius: 10px;
+}
+
+#client-settings-dialog .settings-disclosure {
+  padding: 0;
+  margin: 0 0 20px;
+  background: var(--utility-surface);
+  border-radius: 16px;
+}
+
+#client-settings-dialog .settings-disclosure > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px;
+  list-style: none;
+  color: var(--text);
+  cursor: pointer;
+  border-radius: 16px;
+}
+
+#client-settings-dialog .settings-disclosure > summary::-webkit-details-marker {
+  display: none;
+}
+
+#client-settings-dialog .settings-disclosure > summary > span {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+#client-settings-dialog .settings-disclosure strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+#client-settings-dialog .settings-disclosure small {
+  font-size: 12px;
+  color: var(--secondary);
+  line-height: 1.6;
+}
+
+.settings-disclosure-icon {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 140ms ease;
+}
+
+.settings-disclosure[open] > .settings-disclosure-icon,
+.settings-disclosure[open] > summary > .settings-disclosure-icon {
+  transform: rotate(180deg);
+}
+
+#client-settings-dialog .settings-disclosure > .settings-inline-form {
+  margin: 0;
+  padding: 0 20px 20px;
+}
+
+#client-settings-dialog .settings-inline-body .embedded-portal-settings {
+  overflow: visible;
+  flex: none;
+}
+
+#client-settings-dialog .settings-inline-body .portal-content {
+  padding: 0;
+}
+
+#client-settings-dialog .settings-inline-body #diagnostics-dialog {
+  padding: 0 20px 20px;
+  overflow: visible;
+}
+
+#client-settings-dialog .settings-inline-body #diagnostics-dialog .files-footer {
+  position: static;
+  background: transparent;
+  padding-bottom: 0;
+}
+
+#client-settings-dialog .settings-inline-body #subagent-model-panel,
+#client-settings-dialog .settings-inline-body #settings-panel,
+#client-settings-dialog .settings-inline-body .model-target-content,
+#client-settings-dialog .settings-inline-body .settings-body {
+  height: auto;
+  min-height: 0;
+  flex: none;
+  overflow: visible;
+}
+
+#client-settings-dialog .settings-inline-body #settings-panel .model-target-header {
+  padding: 0 0 20px;
+}
+
+#client-settings-dialog .settings-inline-body #settings-panel .settings-body {
+  padding: 0 0 20px;
+}
+
+#client-settings-dialog .settings-inline-body :is([id$='llm-step2'], [id$='llm-picker']) {
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-disclosure-icon {
+    transition: none;
+  }
+}
+
+@media (max-width: 600px) {
+  #client-settings-dialog .settings-inline-form {
+    padding: 0;
+  }
+
+  #client-settings-dialog .settings-disclosure > summary {
+    padding: 16px;
+  }
+}
+
+#client-settings-dialog .settings-inline-form .switch-list {
+  border: 0;
+}
+
+#client-settings-dialog .settings-inline-form .form-error:empty {
+  display: none;
+}
+
+#client-settings-dialog .settings-inline-body .portal-card {
+  margin-bottom: 20px;
+}
+
+/* Follow the rendered color scheme, including themes applied by plugins. */
+html:not([data-theme='dark']) .town-logo-dark,
+html[data-theme='dark'] .town-logo-light {
+  display: none;
+}

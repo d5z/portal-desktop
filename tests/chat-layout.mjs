@@ -49,7 +49,7 @@ try{
       }
       const row = frame.locator(`.message.${role}`).first();
       const bubble = row.locator('.content');
-      const copy = row.locator('.message-copy');
+      const copy = row.getByRole('button', { name: '复制正文', exact: true });
       await bubble.hover();
       const before = await bubble.boundingBox();
       const button = await copy.boundingBox();
@@ -70,5 +70,18 @@ try{
   await page.screenshot({path:'test-results/chat-layout-dark.png'});
   // Wrapping must never rewrite the copyable source.
   assert.equal(await frame.locator('.message.being .code-block code').textContent(),'const result = "'+long+'";');
+  const keyboardCopy = frame.locator('.message.being').first().getByRole('button', {name:'复制正文',exact:true});
+  await page.mouse.move(0, 0);
+  await keyboardCopy.focus();
+  assert.equal(await keyboardCopy.evaluate(el => getComputedStyle(el).opacity), '1', 'Keyboard focus reveals Copy without hovering');
+  assert.equal(await keyboardCopy.evaluate(el => getComputedStyle(el).outlineStyle), 'solid');
+  const touchPage = await browser.newPage({hasTouch:true,viewport:{width:380,height:800},reducedMotion:'reduce'});
+  await touchPage.goto(origin);
+  const touchCopy = touchPage.frameLocator('iframe').getByRole('button', {name:'复制正文',exact:true}).first();
+  await touchCopy.waitFor();
+  assert.equal(await touchCopy.evaluate(el => getComputedStyle(el).opacity), '1', 'Touch users can discover Copy without hovering');
+  assert.equal(await touchCopy.evaluate(el => getComputedStyle(el).pointerEvents), 'auto');
+  assert.equal((await touchCopy.boundingBox()).width, 32);
+  await touchPage.close();
   console.log('PASS: chat Markdown, attachments and composer fit 1100/640/380/300px, with intact code and vertical reading.');
 }finally{await browser?.close();await new Promise(r=>server.close(r));}

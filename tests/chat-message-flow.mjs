@@ -117,11 +117,11 @@ try{
  await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
  await bubble.click({button:'right'});await menu.waitFor();
  const rect=await menu.boundingBox();assert.ok(rect.x>=0&&rect.y>=0&&rect.x+rect.width<=435&&rect.y+rect.height<=746);
- await page.waitForFunction(()=>{const n=document.querySelector('.message-context-menu');return n?.matches(':popover-open')&&n.getAnimations().length===0;});
+ await page.waitForFunction(()=>{const n=document.querySelector('[role="menu"][aria-label="消息操作"]');return n?.matches(':popover-open')&&n.getAnimations().length===0;});
  await page.screenshot({path:'test-results/message-menu-narrow.png'});
  await page.keyboard.press('Escape');assert.equal(await bubble.evaluate(n=>n===document.activeElement),true);
  await page.evaluate(()=>document.documentElement.dataset.theme='dark');await bubble.click({button:'right'});
- await page.waitForFunction(()=>{const n=document.querySelector('.message-context-menu');return n?.matches(':popover-open')&&n.getAnimations().length===0;});
+ await page.waitForFunction(()=>{const n=document.querySelector('[role="menu"][aria-label="消息操作"]');return n?.matches(':popover-open')&&n.getAnimations().length===0;});
  await page.screenshot({path:'test-results/message-menu-dark.png'});
  await page.locator('#input').dispatchEvent('scroll');assert.equal(await menu.isVisible(),true);
  await page.locator('#messages').evaluate(node=>{node.scrollTop+=60;});

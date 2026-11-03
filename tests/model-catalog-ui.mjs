@@ -1,8 +1,9 @@
 // Real settings panel with an isolated catalog adapter; never accesses a live Being.
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
-import { readFile, mkdir } from "node:fs/promises";
-import { build } from "esbuild";
+import { mkdir } from "node:fs/promises";
+import { build } from "../scripts/renderer-build.mjs";
+import { readShellStyles } from "./support/shell-styles.mjs";
 import { chromium } from "playwright";
 const bundle = await build({
   stdin: {
@@ -44,15 +45,12 @@ createRoot(document.getElementById('root')).render(<StrictMode><div className="w
   },
   bundle: true,
   write: false,
+  outdir: "fixture",
   format: "iife",
   jsx: "automatic",
   platform: "browser",
 });
-const css =
-  (await readFile("desktop/renderer/app/styles.css", "utf8")).replace(
-    '@import "../shared/model-settings.css";',
-    "",
-  ) + (await readFile("desktop/renderer/shared/model-settings.css", "utf8"));
+const css = await readShellStyles() + '\n' + bundle.outputFiles.filter(file => file.path.endsWith('.css')).map(file => file.text).join('\n');
 const server = createServer((req, res) => {
   res.setHeader(
     "Content-Type",
@@ -64,7 +62,7 @@ const server = createServer((req, res) => {
   );
   res.end(
     req.url === "/app.js"
-      ? bundle.outputFiles[0].contents
+      ? bundle.outputFiles.find(file => file.path.endsWith('.js')).contents
       : req.url === "/style.css"
         ? css
         : '<!doctype html><link rel="stylesheet" href="/style.css"><div id="root"></div><script src="/app.js"></script>',

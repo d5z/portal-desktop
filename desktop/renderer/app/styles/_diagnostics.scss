@@ -1,0 +1,56 @@
+.utility-dialog {
+  width: min(900px, 90vw);
+  max-height: 88vh;
+  padding: 26px;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  overflow: auto;
+}
+
+.utility-dialog h2 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+}
+
+.utility-subtitle {
+  font-size: 12px;
+  color: var(--secondary);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.files-footer {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin: 14px 0;
+}
+
+#diagnostics-dialog {
+  width: min(650px, 90vw);
+}
+
+.diagnostic-row {
+  display: grid;
+  grid-template-columns: 110px 1fr;
+  gap: 10px;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+}
+
+.diagnostic-row strong {
+  color: var(--accent);
+  font-weight: 500;
+}
+
+.diagnostic-row span {
+  color: var(--secondary);
+}
+
+.diagnostic-row[data-status='error'] strong {
+  color: #b34b47;
+}

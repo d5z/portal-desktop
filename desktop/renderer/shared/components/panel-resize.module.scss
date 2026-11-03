@@ -1,0 +1,26 @@
+.handle {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  z-index: 90;
+  cursor: col-resize;
+  touch-action: none;
+  outline: none;
+  -webkit-app-region: no-drag;
+}
+
+.handle.left {
+  left: 0;
+}
+
+.handle.right {
+  right: 0;
+}
+
+.handle[data-resizing='true']::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  cursor: col-resize;
+}

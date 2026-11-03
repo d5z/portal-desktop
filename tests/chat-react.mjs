@@ -91,8 +91,8 @@ const server = createServer(async (request, response) => {
       return;
     }
     event(response, 'thinking', { text: '检查 React 状态与协议' });
-    event(response, 'content_block_delta', { delta: { text: '开始回复。' } });
     if (input.message === 'hold') { heldResponse = response; return; }
+    event(response, 'content_block_delta', { delta: { text: '开始回复。' } });
     const continuation = input.message === 'continuation';
     if (continuation) {
       event(response, 'message_stop', {});
@@ -153,7 +153,7 @@ try {
   assert.ok(Math.abs(actionBounds[0].y + actionBounds[0].height / 2 - actionBounds[1].y - actionBounds[1].height / 2) < 2);
   // Edit rendered Markdown directly; JSON/source mode retains native text editing.
   const jsonDraft = '{"标题":"聚餐","人数":4,"id":9007199254740993123}';
-  const editor = frame.locator('.rich-composer');
+  const editor = frame.locator('[data-slot="rich-composer"]');
   const input = frame.locator('#input');
   const pasteDraft = async text => {
     await input.press('ControlOrMeta+a');
@@ -163,9 +163,9 @@ try {
       el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData }));
     }, text);
   };
-  const paint = editor.locator('.composer-highlight');
+  const paint = editor.locator('[data-slot="composer-highlight"]');
   await pasteDraft(jsonDraft);
-  assert.equal(await editor.locator('.composer-format').count(), 0);
+  assert.equal(await editor.locator('[data-slot="composer-format"]').count(), 0);
   assert.equal(await paint.locator('.hljs-attr').count(), 3);
   assert.equal(await paint.textContent(), jsonDraft + '\n');
   assert.equal(await frame.locator('.draft-preview').count(), 0);
@@ -183,7 +183,7 @@ try {
   assert.equal(await input.locator('ol li').count(), 2);
   assert.equal(await input.locator('table').count(), 1);
   assert.ok(!(await input.textContent()).includes('**'));
-  assert.equal(await editor.locator('.composer-format').count(), 0, 'Typing Markdown must not reveal a toolbar');
+  assert.equal(await editor.locator('[data-slot="composer-format"]').count(), 0, 'Typing Markdown must not reveal a toolbar');
   await input.locator('strong').first().waitFor();
   await frame.locator('#input-area').screenshot({ path: 'test-results/chat-markdown-editor.png' });
   await input.press('Control+End');
@@ -210,7 +210,7 @@ try {
   });
   assert.deepEqual(metrics.input, metrics.paint);
   assert.equal(await frame.locator('#input-row').evaluate(el => {
-    const editor = el.querySelector('.rich-composer').getBoundingClientRect();
+    const editor = el.querySelector('[data-slot="rich-composer"]').getBoundingClientRect();
     const send = el.querySelector('#send-btn').getBoundingClientRect();
     return send.top >= editor.bottom;
   }), true, 'Send button stays below the editor without obscuring text');
@@ -261,7 +261,7 @@ try {
   assert.equal(await frame.locator('.message .meta time').count(),0,'Bubble metadata no longer repeats timestamps');
   assert.ok(await frame.locator('.message-time-divider').count()>=2,'Calendar gaps retain timeline labels');
   await messageFor('历史问题 1').locator('.message-bubble-body').click({button:'right'});
-  assert.match(await frame.locator('.message-menu-info time').getAttribute('title'),/2024/,'Full time stays available in the message menu');
+  assert.match(await frame.locator('[role="menu"][aria-label="消息操作"] time').getAttribute('title'),/2024/,'Full time stays available in the message menu');
   await page.keyboard.press('Escape');
   assert.equal(await frame.locator('#messages img').count(), 0);
   assert.equal(await frame.locator('#messages a[href^="javascript:"]').count(), 0);
@@ -439,6 +439,11 @@ try {
   await post({type:'beings:reasoning-display',show:true});
   await frame.locator('.run-activity.running').waitFor();
 
+  // Release the first token only after inspecting the waiting state. Sending it
+  // with `thinking` made the screenshot race an intentionally removed indicator.
+  event(heldResponse, 'content_block_delta', {delta:{text:'开始回复。'}});
+  await frame.locator('.thinking-bubble').waitFor({state:'detached'});
+
   assert.equal(await frame.locator('.run-stop').count(), 0, 'Stop belongs in the composer');
   await pasteDraft('   ');
   assert.equal(await frame.locator('#send-btn').getAttribute('aria-label'), '停止处理');
@@ -459,7 +464,7 @@ try {
   assert.equal(activeDuringHold.finished, false);
   assert.ok(activeDuringHold.events.some(item => item.event === 'content_block_delta'));
   await frame.locator('#send-btn.stop').click();
-  await frame.getByText(/停止未确认，任务可能仍在执行/).waitFor();
+  await frame.getByText(/停止尚未确认，仍在接收回复/).waitFor();
   await frame.getByRole('button', {name:'再次停止',exact:true}).waitFor();
   // Recheck the live task after the attention debounce, as a slow CI run does.
   await page.waitForTimeout(1600);

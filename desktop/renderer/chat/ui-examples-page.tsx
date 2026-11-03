@@ -1,3 +1,4 @@
+import styles from './components/intelligent-ui-examples.module.scss';
 import { useEffect, useState } from 'react';
 import { IntelligentUIExamples, type UIExampleId } from './components/intelligent-ui-examples';
 
@@ -15,6 +16,6 @@ export function UIExamplesPage() {
     window.addEventListener('message', receive);
     return () => window.removeEventListener('message', receive);
   }, [revision]);
-  return <div className="iui-examples-page"><IntelligentUIExamples embedded example={example} overlay={false} onSelect={setExample}
+  return <div className={styles.page}><IntelligentUIExamples embedded example={example} overlay={false} onSelect={setExample}
     onClose={() => send('beings:ui-examples-close')} onContinue={text => send('beings:ui-examples-continue', text)} /></div>;
 }

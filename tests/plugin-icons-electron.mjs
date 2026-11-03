@@ -67,8 +67,8 @@ try {
   await dialog.getByRole('alert').filter({ hasText: '图片无法读取' }).waitFor();
   assert.equal(await dialog.getByLabel('Emoji 或短文字').inputValue(), '🚀');
   await dialog.getByLabel('上传图标图片').setInputFiles(path.join(source, 'icon.svg'));
-  await dialog.locator('.plugin-icon-preview img').waitFor();
-  assert(await dialog.locator('.plugin-icon-preview img').evaluate(img => img.complete && img.naturalWidth > 0));
+  await dialog.locator('[data-slot="plugin-icon-preview"] img').waitFor();
+  assert(await dialog.locator('[data-slot="plugin-icon-preview"] img').evaluate(img => img.complete && img.naturalWidth > 0));
   await mkdir(path.join(root, 'output/playwright/plugins'), { recursive: true });
   await page.screenshot({ path: path.join(root, 'output/playwright/plugins/icon-editor.png') });
   await dialog.getByRole('button', { name: '保存', exact: true }).click();

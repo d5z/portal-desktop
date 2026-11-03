@@ -5,8 +5,8 @@ import type { AppModel } from '../models/app';
 export function UIExamplesPlace({ app }: { app: AppModel }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const [revision] = useState(() => crypto.randomUUID());
-  const syncTheme = () => frame.current?.contentWindow?.postMessage({ type: 'beings:ui-examples-theme', theme: app.theme, revision }, 'beings://chat');
-  useEffect(syncTheme, [app.theme, revision]);
+  const syncTheme = () => frame.current?.contentWindow?.postMessage({ type: 'beings:ui-examples-theme', theme: app.colorScheme, revision }, 'beings://chat');
+  useEffect(syncTheme, [app.colorScheme, revision]);
   useEffect(() => {
     const receive = (event: MessageEvent) => {
       if (event.origin !== 'beings://chat' || event.source !== frame.current?.contentWindow || event.data?.revision !== revision) return;

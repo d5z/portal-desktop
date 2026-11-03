@@ -1,3 +1,4 @@
+import { ChatEventDecoder } from './sse';
 import { withComposerCommandContext, usesIntelligentUICommand } from './composer-command-context';
 import { newToolActivity, completeToolActivity } from '../models/tool-activity';
 import { stripLocalFileContext, stripClientMessageContext } from './local-file-context';
@@ -1659,8 +1660,7 @@ function createStreamRuntime(state: any, options: any): any {
 
     try {
       const reader = res.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = "";
+      const decoder = new ChatEventDecoder();
       const myEpoch = ++writerEpoch; // F2: 我是当前唯一合法写者
       readerEpoch = myEpoch;
       streamMessage = null;
@@ -1668,7 +1668,6 @@ function createStreamRuntime(state: any, options: any): any {
       streamReplyPrefix = "";
       progressBubbles = [];
       toolCount = 0;
-      let eventType = "";
       resetLiveProgress();
 
       const stall = makeStallTracker();
@@ -1701,18 +1700,11 @@ function createStreamRuntime(state: any, options: any): any {
         // 服务端 15s 一次的 keepalive（`:\n\n`）也会让它 resolve。
         // 进展只由下面解析出来的真 SSE 事件（markProgress）来标记。
 
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (line.startsWith("event: ")) {
-            eventType = line.slice(7).trim();
-            continue;
-          }
-          if (!line.startsWith("data: ")) continue;
+        for (const { event: eventType, data: rawData } of decoder.push(value)) {
+          // Untyped data/keepalives are not entries in Heart's replay log.
+          if (eventType === 'message') continue;
           try {
-            const data = JSON.parse(line.slice(6));
+            const data = JSON.parse(rawData);
 
             // Initial transport meta has no replay sequence. Continuation and
             // persistence acknowledgements belong to the replay event log.
@@ -1811,7 +1803,6 @@ function createStreamRuntime(state: any, options: any): any {
             }
           } catch (parseErr: any) {
             // data 行以 { 或 [ 开头说明是真的 JSON 格式错误，值得记录
-            const rawData = line.slice(6).trim();
             if (rawData.startsWith("{") || rawData.startsWith("[")) {
               console.error(
                 "SSE JSON parse error:",
@@ -1821,8 +1812,6 @@ function createStreamRuntime(state: any, options: any): any {
               );
             }
             // 其他情况（空行、keepalive 等）静默忽略
-          } finally {
-            eventType = ""; // 每次 data 行处理完后重置
           }
         }
       }
@@ -2639,7 +2628,7 @@ function createStreamRuntime(state: any, options: any): any {
     // A yielded partial can contain every speech fragment since the preceding
     // stop, even when the last tool/reasoning event already released the bubble.
     // Keep the exact raw fragments until history verifies this seq's coverage.
-    if (p.from === "partial" && fragments.length > 1) {
+    if ((p.from === "partial" || (p.from === "final" && !current)) && fragments.length > 1) {
       registerPersistedGroup(fragments, p);
       rememberPersisted(p.seq);
       return;
@@ -2651,6 +2640,10 @@ function createStreamRuntime(state: any, options: any): any {
     message.persistedStreamId = p.stream_id;
     if (p.from !== "final") message.interim = true;
     bindPersisted(message, p.seq);
+    // Some final rows cover all speech around tools; others contain only the
+    // last fragment. Keep the tail binding, but let the exact durable row verify
+    // whole-reply coverage before removing any earlier, unpersisted fragments.
+    if (p.from === "final" && fragments.length > 1) registerPersistedGroup(fragments, p);
     rememberPersisted(p.seq);
   }
   function rememberPersisted(seq: number) {
@@ -2708,7 +2701,7 @@ function createStreamRuntime(state: any, options: any): any {
       message.historySeq = persisted.seq;
       message.persistedStreamId = persisted.stream_id;
       message.persistedFrom = persisted.from;
-      message.interim = true;
+      message.interim = persisted.from !== 'final';
       message.streaming = false;
     }
     state.items = state.items.filter((item: any) => item === first ||

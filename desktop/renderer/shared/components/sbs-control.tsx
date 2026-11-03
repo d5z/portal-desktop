@@ -1,4 +1,4 @@
-import './sbs-control.css';
+import styles from './sbs-control.module.scss';
 import {createPortal} from 'react-dom';
 import {useEffect, useId, useLayoutEffect, useRef, useState} from 'react';
 
@@ -38,26 +38,26 @@ export function SbsControl({known, enabled, origin, phase, showContent, allScene
     window.addEventListener('blur',blur);
     return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape);document.removeEventListener('focusin',outside);window.removeEventListener('blur',blur);};
   },[open]);
-  return <div className="sbs-control">
-    <button ref={trigger} type="button" className="sbs-control-trigger" aria-label="SBS 状态与显示设置"
+  return <div className={styles.root}>
+    <button ref={trigger} type="button" className={styles.trigger} aria-label="SBS 状态与显示设置"
       aria-controls={open?id:undefined} aria-expanded={open} aria-haspopup="dialog" title={status} onClick={()=>setOpen(value=>!value)}>
-      <span className="sbs-control-dot" data-enabled={known && enabled} data-active={!!origin} aria-hidden="true" />
+      <span className={styles.dot} data-enabled={known && enabled} data-active={!!origin} aria-hidden="true" />
     </button>
-    {origin && <span className="sbs-control-active" role="status" aria-live="polite"><span>{origin==='callback' ? 'SBS 回调' : 'SBS 活动'}</span>{status}</span>}
-    {open && createPortal(<div ref={panel} id={id} className="sbs-control-panel" role="dialog" aria-labelledby={id+'-title'} tabIndex={-1} style={position}
+    {origin && <span className={styles.active} role="status" aria-live="polite"><span>{origin==='callback' ? 'SBS 回调' : 'SBS 活动'}</span>{status}</span>}
+    {open && createPortal(<div ref={panel} id={id} className={styles.panel} role="dialog" aria-labelledby={id+'-title'} tabIndex={-1} style={position}
       onBlur={event=>{
         if(!event.currentTarget.contains(event.relatedTarget) && !trigger.current?.contains(event.relatedTarget))setOpen(false);
       }}>
-      <div className="sbs-control-heading"><strong id={id+'-title'}>SBS 自主活动</strong><button type="button" aria-label="关闭 SBS 设置" onClick={close}>×</button></div>
-      <div className="sbs-control-status" data-active={!!origin}>
-        <span className="sbs-control-dot" data-enabled={known && enabled} data-active={!!origin} aria-hidden="true" />
+      <div className={styles.heading}><strong id={id+'-title'}>SBS 自主活动</strong><button type="button" aria-label="关闭 SBS 设置" onClick={close}>×</button></div>
+      <div className={styles.status} data-active={!!origin}>
+        <span className={styles.dot} data-enabled={known && enabled} data-active={!!origin} aria-hidden="true" />
         <div><strong role="status">{status}</strong><small>{origin ? origin==='callback' ? '正在处理自主回调' : '正在处理自主活动' : '运行状态始终显示在对话顶部'}</small></div>
       </div>
-      <label className="sbs-control-option"><span>显示 SBS 消息正文<small>仅影响当前场景，思考状态统一在顶部显示</small></span>
+      <label className={styles.option}><span>显示 SBS 消息正文<small>仅影响当前场景，思考状态统一在顶部显示</small></span>
         <input type="checkbox" role="switch" checked={allScenes || showContent} disabled={!visibilityReady || allScenes}
           onChange={event=>onVisibility(event.target.checked)} /></label>
-      {allScenes && <p className="sbs-control-note">全部场景包含 SBS 正文；切回当前场景后恢复此场景的显示设置。</p>}
-      <label className="sbs-control-option"><span>自主醒来<small>控制 SBS 是否主动开始任务</small></span>
+      {allScenes && <p className={styles.note}>全部场景包含 SBS 正文；切回当前场景后恢复此场景的显示设置。</p>}
+      <label className={styles.option}><span>自主醒来<small>控制 SBS 是否主动开始任务</small></span>
         <input type="checkbox" role="switch" checked={enabled} disabled={!known} onChange={onToggle} /></label>
     </div>,document.body)}
   </div>;

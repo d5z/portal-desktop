@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { build } from 'esbuild';
+import { build } from '../scripts/renderer-build.mjs';
 import { mkdtemp, mkdir, copyFile, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -19,7 +19,7 @@ try {
     import {ChatSceneIndicator} from './desktop/renderer/app/components/chat-scene';
     import {SbsControl} from './desktop/renderer/shared/components/sbs-control';
     import {useChatBridge} from './desktop/renderer/app/hooks/use-chat-bridge';
-    import './desktop/renderer/app/styles.css';
+    import './desktop/renderer/app/styles.scss';
     const app = new AppModel(window.beings); app.showReasoning = true; (window as any).fixtureApp = app;
     function Shell() {
       useSyncExternalStore(app.subscribe, app.getVersion);
@@ -152,7 +152,7 @@ try {
   await page.getByRole('button',{name:'展开场景列表',exact:true}).click();
   await page.getByLabel('场景列表选项',{exact:true}).click();
   await page.getByRole('button',{name:'保持显示聊天面板',exact:true}).click();
-  const sbsVisibility = page.locator('.sbs-control-panel input').first();
+  const sbsVisibility = page.locator('[role="dialog"][aria-labelledby] input').first();
   const visibilityState = async (method) => {
     if (!await sbsVisibility.isVisible()) await page.getByLabel('SBS 状态与显示设置',{exact:true}).click();
     const result = await sbsVisibility[method]();

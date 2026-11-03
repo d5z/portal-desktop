@@ -4,6 +4,7 @@ import type { ChatEditCommand } from "../../../shared/types";
 import { validChatHistoryLimit } from '../../../shared/chat-history';
 import { HistoryCache } from './history-cache';
 import { localActivityHistory } from './activity-history';
+import { applyPluginAppearance } from '../../shared/plugin-appearance';
 
 /** Source-checked desktop transport. It never reads or mutates rendered UI. */
 export function createChatBridge(state: ChatState) {
@@ -232,6 +233,12 @@ export function createChatBridge(state: ChatState) {
         case "beings:sbs-request":
           void refreshSbs();
           return;
+        case 'beings:dsh-appearance': {
+          if (!data.colors || typeof data.colors !== 'object') return;
+          applyPluginAppearance(data);
+          if (data.theme === 'light' || data.theme === 'dark') ui.theme(data.theme);
+          return;
+        }
         case "beings:appearance":
           if (data.theme === "light" || data.theme === "dark")
             ui.theme(data.theme);

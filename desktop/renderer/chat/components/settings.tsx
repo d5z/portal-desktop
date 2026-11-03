@@ -246,7 +246,7 @@ function LegacyChatSettings({
         <div className="settings-heading-copy">
           <div className="settings-title-line">
             <h2 id={fieldId("settings-title")} >模型设置</h2>
-            {!mobilePage && <NavigationControls back={disabled ? undefined : back} />}
+            {!mobilePage && <NavigationControls appearance="chat" back={disabled ? undefined : back} />}
           </div>
           <p>{subagent ? (staged ? "选择 subagent 模型，随连接一起安装与配置" : "配置本机 subagent 使用的模型") : "选择当前 Being 使用的模型"}</p>
         </div>

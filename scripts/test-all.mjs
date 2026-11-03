@@ -57,6 +57,10 @@ try {
   await persist();
   await requirePortalSource();
   await npm('typecheck', ['run', 'typecheck']);
+  await npm('styles-lint', ['run', 'lint:styles']);
+  await npm('style-architecture', ['run', 'check:styles']);
+  await npm('style-format', ['run', 'format:styles:check']);
+  await npm('web-styles-ui', ['run', 'test:web-styles']);
   await npm('chat-hooks-lint', ['run', 'lint:chat-hooks']);
   await npm('chat-hooks', ['run', 'test:chat-hooks']);
   // Native Windows unit tests exercise the bundled Portal from resources/.

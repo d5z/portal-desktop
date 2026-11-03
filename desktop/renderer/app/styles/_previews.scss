@@ -1,0 +1,479 @@
+/* File preview shares the workspace with chat, without a modal backdrop. */
+.workspace-body:has(> .client-file-viewer) > .workspace-stage {
+  flex: 1 1 0;
+  min-width: 280px;
+}
+
+.workspace-body:has(> .client-file-viewer) > .client-file-viewer ~ * {
+  display: none;
+}
+
+.client-file-viewer {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  width: min(var(--file-preview-width, 640px), max(0px, calc(100% - 280px)));
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--text);
+  box-sizing: border-box;
+}
+
+.workspace-body:has(> .client-file-viewer.maximized) > .workspace-stage {
+  display: none;
+}
+
+.client-file-viewer.maximized {
+  flex: 1 1 100%;
+  width: 100%;
+  border-left: 0;
+}
+
+.client-file-viewer header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+}
+
+.client-file-viewer header strong {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.client-file-viewer button {
+  border: 0;
+  border-radius: 8px;
+  padding: 7px 10px;
+  background: var(--surface);
+  color: inherit;
+  cursor: pointer;
+  font: inherit;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.client-file-viewer button:hover {
+  background: var(--hover);
+}
+
+.client-file-viewer .file-preview-layout-toggle {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  flex: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--secondary);
+}
+
+.client-file-viewer .file-preview-layout-toggle:hover,
+.client-file-viewer .file-preview-layout-toggle[aria-pressed='true'] {
+  background: var(--surface);
+}
+
+.client-file-viewer .file-preview-layout-toggle svg {
+  display: block;
+}
+
+.client-file-actions {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 20px;
+  font-size: 12px;
+  color: var(--secondary);
+  flex: none;
+}
+
+.local-file-actions {
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.local-file-actions > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.client-file-actions .attachment-download {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.client-file-actions .attachment-download progress {
+  width: 100%;
+}
+
+.client-file-viewer > iframe {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0;
+  background: white;
+}
+
+.client-file-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 24px;
+  user-select: text;
+}
+
+.client-file-body pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font:
+    13px/1.7 ui-monospace,
+    monospace;
+}
+
+.client-file-body table {
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.client-file-body td,
+.client-file-body th {
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  text-align: left;
+  white-space: pre-wrap;
+}
+
+.client-file-body section {
+  padding: 4px 0;
+}
+
+.client-file-body section h3 {
+  font-size: 12px;
+  color: var(--secondary);
+}
+
+.file-json {
+  font:
+    13px/1.8 ui-monospace,
+    monospace;
+  overflow-wrap: anywhere;
+}
+
+.file-json summary {
+  cursor: pointer;
+}
+
+.file-json-children {
+  margin-left: 20px;
+}
+
+.file-json span {
+  color: var(--accent);
+}
+
+.pdf-pages {
+  overflow: auto;
+  flex: 1;
+  min-height: 0;
+  background: var(--surface);
+  padding: 16px;
+  text-align: center;
+  scrollbar-gutter: stable;
+}
+
+.pdf-page {
+  width: 100%;
+  position: relative;
+  margin: 0 auto 16px;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px #0002;
+}
+
+.pdf-page canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+.xlsx-preview {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.xlsx-grid {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.xlsx-grid table {
+  border-collapse: separate;
+  border-spacing: 0;
+  table-layout: fixed;
+  width: max-content;
+  font-size: 14px;
+}
+
+.xlsx-grid th,
+.xlsx-grid td {
+  padding: 0;
+  height: 32px;
+  border-right: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+
+.xlsx-grid th {
+  background: var(--surface);
+  color: var(--secondary);
+  font-size: 12px;
+  font-weight: 400;
+  text-align: center;
+}
+
+.xlsx-grid thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+.xlsx-grid tbody th {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+}
+
+.xlsx-grid thead th:first-child {
+  left: 0;
+  z-index: 3;
+}
+
+.client-file-viewer .xlsx-grid td button {
+  display: block;
+  width: 100%;
+  height: 32px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: left;
+  border-radius: 0;
+  padding: 5px 8px;
+  background: transparent;
+}
+
+.client-file-viewer .xlsx-grid td button:hover {
+  background: var(--hover);
+}
+
+.xlsx-tabs {
+  display: flex;
+  flex: none;
+  overflow-x: auto;
+  border-top: 1px solid var(--line);
+}
+
+.client-file-viewer .xlsx-tabs button {
+  flex: none;
+  border-radius: 0;
+  background: transparent;
+  padding: 12px 18px;
+  border-top: 2px solid transparent;
+  color: var(--secondary);
+}
+
+.client-file-viewer .xlsx-tabs button[aria-selected='true'] {
+  border-color: #1672df;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.xlsx-cell-value {
+  display: flex;
+  gap: 16px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+  font-size: 12px;
+  max-height: 80px;
+  overflow: auto;
+  user-select: text;
+}
+
+.xlsx-cell-value span {
+  overflow-wrap: anywhere;
+}
+
+.xlsx-limit {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--secondary);
+}
+
+@container stage (max-width:620px) {
+  .workspace-stage .pair-name {
+    display: flex;
+    grid-column: 1;
+    justify-content: flex-start;
+  }
+
+  .workspace-stage .pair-name > span {
+    display: none;
+  }
+}
+
+.being-recent-history {
+  margin: 0;
+}
+
+.being-history-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.being-history-heading h3 {
+  margin: 0;
+}
+
+.being-history-heading button,
+.being-recent-history .being-empty button {
+  border: 0;
+  background: transparent;
+  color: var(--secondary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+  padding: 5px 8px;
+  border-radius: 6px;
+}
+
+.being-history-heading button:hover,
+.being-recent-history .being-empty button:hover {
+  background: var(--hover);
+}
+
+.being-history-heading button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.being-history-list {
+  margin-top: 20px;
+}
+
+.being-history-list ol {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.being-history-list section + section {
+  margin-top: 24px;
+}
+
+.being-info-content .being-history-date {
+  margin: 0 0 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.being-history-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  padding: 10px 4px;
+  font: inherit;
+}
+
+button.being-history-row {
+  cursor: pointer;
+}
+
+button.being-history-row:hover {
+  background: var(--hover);
+}
+
+.being-history-row:focus-visible,
+.being-history-heading button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.being-history-icon {
+  display: grid;
+  place-items: center;
+  flex: 0 0 36px;
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--hover);
+  color: var(--secondary);
+}
+
+.being-history-icon svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.being-history-text {
+  display: block;
+  flex: 1;
+  min-width: 0;
+}
+
+.being-history-preview {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.6;
+}
+
+.being-history-time {
+  display: block;
+  margin-top: 3px;
+  color: var(--secondary);
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.ui-examples-frame {
+  display: block;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+  border: 0;
+  background: var(--bg);
+}

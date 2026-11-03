@@ -154,3 +154,24 @@ it('requests shell preferences after the chat listener is ready', () => {
   expect(f.parent.postMessage.mock.calls.map(call => call[0])).toContainEqual({type:'beings:appearance-request',revision:'fixture'});
   f.bridge.dispose();
 });
+
+it('replaces and clears plugin appearance without retaining colors from the previous theme', () => {
+  const values = new Map<string,string>(), attributes = new Set<string>();
+  vi.stubGlobal('document', {documentElement: {
+    style: {setProperty: (key:string,value:string)=>values.set(key,value), removeProperty: (key:string)=>values.delete(key)},
+    toggleAttribute: (key:string,on:boolean)=>on ? attributes.add(key) : attributes.delete(key),
+  }});
+  vi.stubGlobal('CSS', {supports: (_property:string,value:string)=>value !== 'invalid'});
+  const f=fixture();
+  const first={type:'beings:dsh-appearance',theme:'dark',colors:{'--bg':'#282a36','--text':'#f8f8f2','--chat-sent':'#44475a','--unexpected':'red'},fonts:{'--font-sans':'Arial'}};
+  f.send(first,'https://untrusted.example');expect(values.size).toBe(0);
+  f.send(first);
+  expect(values.get('--chat-sent')).toBe('#44475a');expect(values.has('--unexpected')).toBe(false);
+  expect(attributes.has('data-plugin-theme')).toBe(true);
+  f.send({type:'beings:dsh-appearance',theme:'light',colors:{'--bg':'white','--text':'invalid'},fonts:{}});
+  expect(values.get('--bg')).toBe('white');expect(values.has('--text')).toBe(false);
+  expect(values.has('--chat-sent')).toBe(false);expect(values.has('--font-sans')).toBe(false);
+  f.send({type:'beings:dsh-appearance',theme:'light',colors:{}});
+  expect(values.size).toBe(0);expect(attributes.has('data-plugin-theme')).toBe(false);
+  f.bridge.dispose();
+});

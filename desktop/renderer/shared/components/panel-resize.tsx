@@ -1,3 +1,5 @@
+import clsx from 'clsx';
+import styles from './panel-resize.module.scss';
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react";
 
 /** Shared sizing for supplementary panels; never remounts their content. */
@@ -46,7 +48,7 @@ export function PanelResizeHandle({ panel, label, width, onResize, initial, min 
     return () => { window.removeEventListener("blur", stop); stop(); };
   }, []);
   useEffect(() => { if (disabled) stop(); }, [disabled]);
-  return <div ref={handle} className={`panel-resize-handle edge-${edge}`} role="separator" tabIndex={0} hidden={disabled}
+  return <div ref={handle} className={clsx(styles.handle, styles[edge])} data-slot="panel-resize-handle" role="separator" tabIndex={0} hidden={disabled}
     aria-label={label} aria-orientation="vertical" aria-valuemin={lower} aria-valuemax={limit}
     aria-valuenow={Math.max(lower, Math.min(limit, width))} aria-valuetext={`${Math.max(lower, Math.min(limit, width))} 像素`}
     onPointerDown={event => {

@@ -1,3 +1,5 @@
+import { DshPluginManager } from './plugins/dsh/manager';
+import { registerDshIpc } from './plugins/dsh/ipc';
 import { LocalFilePreviews } from './app/local-file-preview';
 import { withScenePortal } from './chat/scene-portal';
 import {AttachmentDownloads} from './chat/downloads';
@@ -119,7 +121,9 @@ const exclusive = <T>(operation: () => Promise<T>): Promise<T> => {
   mutation = next.then(() => {}, () => {});
   return next;
 };
+let dshPlugins: DshPluginManager | undefined;
 async function cleanupForQuit() {
+  await dshPlugins?.shutdown();
   await kitInstaller?.dispose();
   await portal.stop();
   browser?.close();
@@ -156,6 +160,13 @@ function createWindow() {
   if (!windowReady || quitting || (window && !window.isDestroyed())) return;
   const created = createMainWindow({
     shellURL,
+    recoverPlugins: () => { void dshPlugins?.disableAll().then(() => window?.webContents.reload()); },
+    pluginRoute: url => {
+      const own = new URL(shellURL());
+      // URL.origin is "null" for custom schemes; compare scheme/host explicitly.
+      const sameOrigin = url.protocol === own.protocol && url.host === own.host;
+      return (sameOrigin || (url.protocol === 'beings:' && url.host === 'desktop')) && !!dshPlugins?.matches(url.pathname);
+    },
     isQuitting: () => quitting,
     isSessionEnding: () => sessionEnding,
     markSessionEnding: () => { sessionEnding = true; },
@@ -334,8 +345,21 @@ async function ready() {
     return result.canceled ? undefined : result.filePaths[0];
   },file=>shell.openPath(file),file=>shell.showItemInFolder(file));
   const localFiles = new LocalFilePreviews(() => store.settings.workspace);
-  registerLocalProtocol(assets, proxy, plugins, attachmentDownloads, localFiles);
-  configureLocalSession();
+  dshPlugins = new DshPluginManager(path.join(directory, 'third-party-plugins'), path.join(assets, 'dsh-plugin-host.cjs'), app.isPackaged ? path.join(process.resourcesPath, 'npm/bin/npm-cli.js') : path.resolve('node_modules/npm/bin/npm-cli.js'), new URL(shellURL()).origin);
+  // Plugin host startup must not delay the native window or Town's own IPC.
+  // Its state endpoint waits for initialization, and mutations share its queue.
+  void dshPlugins.initialize();
+  if (MAIN_WINDOW_VITE_DEV_SERVER_URL) {
+    // Keep plugin URLs same-origin in development, just as in the packaged app.
+    // A redirect to beings: breaks fetch/CSS and iframe-relative resources.
+    protocol.handle(new URL(shellURL()).protocol.slice(0, -1), request => {
+      const url = new URL(request.url);
+      if (url.origin === new URL(shellURL()).origin && dshPlugins?.matches(url.pathname)) return dshPlugins.resource(request);
+      return net.fetch(request, { bypassCustomProtocolHandlers: true });
+    });
+  }
+  registerLocalProtocol(assets, proxy, plugins, attachmentDownloads, localFiles, dshPlugins);
+  configureLocalSession(shellURL, () => notifications.state.supported && notifications.state.preferences.enabled);
   const clientContext = new ClientContextReader(shellURL());
   const approvalDialogs = new ApprovalDialogs(request => {
     if (window && !window.isDestroyed()) window.webContents.send('beings:tool-approval', request);
@@ -693,6 +717,7 @@ async function ready() {
   });
   registerKitsIpc({ handle, exclusive, window: () => window, store, kitInstaller });
   registerPluginsIpc({ handle, exclusive, window: () => window, registry: plugins, closeWindows: id => pluginWindows?.close(id), fetcher: downloadFetch });
+  registerDshIpc(handle, dshPlugins!, () => window);
   handle('beings:plugins-context', context => pluginWorkspace.update(context));
   handle('beings:model-catalog', async (input: { kind: string; route?: string; api_key?: string }) => {
     if (!input || !['routes', 'models', 'keys'].includes(input.kind) ||

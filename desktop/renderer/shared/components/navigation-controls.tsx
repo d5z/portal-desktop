@@ -1,4 +1,6 @@
 import { useEffect, useRef } from "react";
+import clsx from "clsx";
+import styles from "./navigation-controls.module.scss";
 
 const gestureThreshold = 72;
 const gestureReleaseDelay = 240;
@@ -27,9 +29,11 @@ function canScrollHorizontally(
 export function NavigationControls({
   back,
   forward,
+  appearance = "shell",
 }: {
   back?: () => void;
   forward?: () => void;
+  appearance?: "shell" | "chat";
 }) {
   const controls = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -91,7 +95,8 @@ export function NavigationControls({
   return (
     <div
       ref={controls}
-      className="navigation-controls"
+      className={clsx(styles.controls, appearance === "chat" && styles.chat)}
+      data-slot="navigation-controls"
       role="group"
       aria-label="页面历史"
     >
