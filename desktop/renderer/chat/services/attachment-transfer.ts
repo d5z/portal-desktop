@@ -41,6 +41,3 @@ export async function uploadAttachment(request: AttachmentRequest, path: string,
     throw Object.assign(new Error(message), {status:(error as {status?:number} | null)?.status});
   }
 }
-export function transferBytes(bytes: number) {
-  return bytes < 1024 ? `${bytes} B` : bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KiB` : `${(bytes / 1024 / 1024).toFixed(1)} MiB`;
-}

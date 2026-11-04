@@ -41,7 +41,10 @@ function render() {
 );
   // Town must remain usable while third-party resources or lifecycle hooks wait.
   // The compatibility runtime still orders each plugin's styles before scripts.
-  if (!window.beingsPluginWindow) void dshRuntime.start();
+  if (model) void dshRuntime.start().then(() => {
+    const notice = dshRuntime.startupNotice;
+    if (notice) model.toast(notice);
+  });
 }
 void render();
 if (import.meta.hot) import.meta.hot.dispose(() => root.unmount());

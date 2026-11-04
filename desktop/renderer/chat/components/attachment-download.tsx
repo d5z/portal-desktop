@@ -1,7 +1,8 @@
+import { Icon } from '../../shared/icons/icon';
 import {AttachmentFileMenu} from './attachment-file-menu';
 import {AttachmentAudioMenu} from './attachment-audio-menu';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import {transferBytes} from '../services/attachment-transfer';
+import {formatBytes} from '../../shared/lib/format-bytes';
 export function AttachmentDownload({endpoint, id, artifact, name, children, file, details, compact=false, apiBase='', request=fetch, onPreview, onDownloaded}: {
   onDownloaded?:()=>void; onPreview?:()=>void; request?:typeof fetch; apiBase?:string; endpoint: string; id: string; artifact?: string; name: string; children: string; file?:{size:number;mime:string}; details?:ReactNode; compact?:boolean;
 }) {
@@ -58,12 +59,12 @@ export function AttachmentDownload({endpoint, id, artifact, name, children, file
   return <div className="attachment-download">
     {compact ? <AttachmentAudioMenu name={name}>
       {details}
-      <button type="button" disabled={busy || checking} onClick={()=>void action(downloaded ? 'open' : 'download')}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7"><path d={downloaded ? 'M14 3h7v7m0-7L10 14M10 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5' : 'M12 3v12m-5-5 5 5 5-5M5 8H3v12h18V8h-2'}/></svg><span>{primary}</span></button>
-      {downloaded && <button type="button" disabled={busy} onClick={()=>void action('reveal')}><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.7"><path d="M3 6h7l2 3h9v11H3z"/></svg><span>打开所在位置</span></button>}
+      <button type="button" disabled={busy || checking} onClick={()=>void action(downloaded ? 'open' : 'download')}><Icon name={downloaded ? 'external-link' : 'download-tray'} fill="none" stroke="currentColor" strokeWidth="1.7" /><span>{primary}</span></button>
+      {downloaded && <button type="button" disabled={busy} onClick={()=>void action('reveal')}><Icon name="folder" fill="none" stroke="currentColor" strokeWidth="1.7" /><span>打开所在位置</span></button>}
     </AttachmentAudioMenu> : file ? <div className="attachment-file-row">
       <button className="attachment-file-main" type="button" disabled={busy || checking} title={cardAction} aria-label={`${canPreview ? '预览' : primary} ${name}`} onClick={()=>canPreview ? onPreview!() : void action(downloaded ? 'open' : 'download')}>
-        <span className="attachment-file-icon" aria-hidden="true">{codeFile ? <span className="attachment-code-icon">&lt;/&gt;</span> : <svg width="20" height="24" viewBox="0 0 24 28" fill="none"><rect x="4" y="2" width="16" height="24" rx="4" stroke="currentColor" strokeWidth="1.6"/><path d="M8 9h8M8 14h6M8 19h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></svg>}</span>
-        <span className="attachment-file-label"><strong>{name}</strong><small>{fileType} · {transferBytes(file.size)}</small></span>
+        <span className="attachment-file-icon" aria-hidden="true">{codeFile ? <span className="attachment-code-icon">&lt;/&gt;</span> : <Icon name="file-text-tall" width="20" height="24" fill="none" />}</span>
+        <span className="attachment-file-label"><strong>{name}</strong><small>{fileType} · {formatBytes(file.size)}</small></span>
         <span className="attachment-file-action" aria-hidden="true">{checking ? '…' : downloaded ? '↗' : '↓'}</span>
       </button>
       <AttachmentFileMenu name={name}>
@@ -73,7 +74,7 @@ export function AttachmentDownload({endpoint, id, artifact, name, children, file
       </AttachmentFileMenu>
     </div> : <button type="button" disabled={busy || checking} onClick={()=>void action(downloaded ? 'open' : 'download')}>{checking ? '正在检查…' : downloaded ? '打开' : downloading ? '正在下载…' : children}</button>}
     {downloading && <button type="button" onClick={()=>controller.current?.abort()}>取消下载</button>}
-    {status && <small role="status">{status}{downloading && progress.total ? ` · ${Math.min(99,Math.floor(progress.loaded / progress.total * 100))}% · ${transferBytes(progress.loaded)} / ${transferBytes(progress.total)}` : ''}</small>}
+    {status && <small role="status">{status}{downloading && progress.total ? ` · ${Math.min(99,Math.floor(progress.loaded / progress.total * 100))}% · ${formatBytes(progress.loaded)} / ${formatBytes(progress.total)}` : ''}</small>}
     {downloading && <progress aria-label={`${name} 下载进度`} max={progress.total || undefined} value={progress.total ? progress.loaded : undefined} />}
     {error && <p role="alert">{error}</p>}
   </div>;

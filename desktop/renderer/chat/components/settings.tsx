@@ -1,3 +1,4 @@
+import { Icon } from '../../shared/icons/icon';
 import { BeingModelSettings } from "./being-model-settings";
 import { useEffect, useRef, useState } from "react";
 import type { ChatRuntime, ChatState, Preset } from "../models/chat";
@@ -258,7 +259,7 @@ function LegacyChatSettings({
           onClick={close}
           disabled={disabled}
         >
-          {mobilePage ? <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8"><path d="m15 5-7 7 7 7" /></svg> : '✕'}
+          {mobilePage ? <Icon name="back-wide" width="22" height="22" fill="none" stroke="currentColor" strokeWidth="1.8" /> : '✕'}
         </button>
       </div>
       }
@@ -325,18 +326,11 @@ function LegacyChatSettings({
               </button>
             </div>
             <div className="model-search">
-              <svg
-                width="16"
+              <Icon name="search" width="16"
                 height="16"
-                viewBox="0 0 24 24"
                 fill="none"
                 stroke="currentColor"
-                strokeWidth="1.7"
-                aria-hidden="true"
-              >
-                <circle cx="10.5" cy="10.5" r="6.5" />
-                <path d="m16 16 4.5 4.5" />
-              </svg>
+                strokeWidth="1.7" />
               <input
                 type="search"
                 aria-label="搜索模型"
@@ -396,17 +390,11 @@ function LegacyChatSettings({
                 {thinkingOptions.find(
                   ([value]) => value === (state.config.thinking || "medium"),
                 )?.[1] || state.config.thinking}
-                <svg
-                  width="14"
+                <Icon name="chevron-down" width="14"
                   height="14"
-                  viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
-                  strokeWidth="1.8"
-                  aria-hidden="true"
-                >
-                  <path d="m7 10 5 5 5-5" />
-                </svg>
+                  strokeWidth="1.8" />
               </span>
             </summary>
             <div className="model-parameter">

@@ -4,6 +4,8 @@ import { createServer } from 'node:http';
 import { readFile, mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
 const assets = new Map(await Promise.all(['loom.html', 'chat.js', 'chat.css', 'highlight.css'].map(async file => ['/' + file, await readFile('desktop/generated/' + file)])));
+const topInset = process.argv.includes('--floating-header') ? 68 : 0;
+const expectedReplyTop = 20 + topInset;
 let seq = 1, heldResponse = null;
 const history = [];
 for (let i = 0; i < 12; i++) {
@@ -53,6 +55,8 @@ try {
   const child = () => page.frames().find(frame => frame.url().includes('/loom.html'));
   const post = data => page.evaluate(data => document.querySelector('iframe').contentWindow.postMessage(data, location.origin), data);
   await frame.locator('.message.user').nth(11).waitFor();
+  await post({type:'beings:chat-top-inset',value:topInset});
+  await child().waitForFunction(value => document.querySelector('.chat-root').style.getPropertyValue('--chat-top-inset') === `${value}px`, topInset);
   const jump=frame.locator('#chat-jump-latest');
   await jump.waitFor({state:'hidden'});
   await frame.locator('#messages').evaluate(el=>{
@@ -101,12 +105,12 @@ try {
     clientHeight: el.clientHeight,
     bottomGap: el.scrollHeight - el.scrollTop - el.clientHeight,
   }), anchoredOffset);
-  assert.ok(Math.abs(anchoredOffset - 20) < 5, `Long reply anchors its start near the viewport top (${JSON.stringify(anchorMetrics)})`);
+  assert.ok(Math.abs(anchoredOffset - expectedReplyTop) < 5, `Long reply anchors its start near the viewport top (${JSON.stringify(anchorMetrics)})`);
   // Small trackpad micro-movements must NOT release the anchor (accumulated threshold).
   await messages.hover();
   await page.mouse.wheel(0, -5);
   await new Promise(r => setTimeout(r, 100));
-  assert.ok(Math.abs(await replyOffset() - 20) < 5, 'Tiny wheel delta does not release anchor');
+  assert.ok(Math.abs(await replyOffset() - expectedReplyTop) < 5, 'Tiny wheel delta does not release anchor');
   // Larger intentional scroll releases the anchor.
   await page.mouse.wheel(0, -40);
   await new Promise(r => setTimeout(r, 100));
@@ -139,7 +143,7 @@ try {
     event(heldResponse, 'content_block_delta', { delta: { text: `\n\n第二条锚定段落 ${i}，验证同一轮回复经过工具阶段后仍会重新锚定。` } });
   }
   await frame.getByText('第二条锚定段落 29').waitFor();
-  assert.ok(Math.abs(await replyOffset() - 20) < 5, 'A later reply in the same turn anchors independently');
+  assert.ok(Math.abs(await replyOffset() - expectedReplyTop) < 5, 'A later reply in the same turn anchors independently');
   event(heldResponse, 'message_stop', {});
   await browser.contexts()[0].grantPermissions(['clipboard-read', 'clipboard-write']);
   const copyTarget = frame.locator('.message.being:not(.thinking-indicator):not(.consecutive)').last();

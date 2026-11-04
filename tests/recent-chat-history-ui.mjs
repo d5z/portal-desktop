@@ -26,6 +26,7 @@ const app = new AppModel({
   changeChatSession:async(op,id,endpoint)=>{window.selections.push({op,id,endpoint});return {...app.snapshot,chatScene:scenes.find(scene=>scene.scene_id===id)};}
 });
 app.applySnapshot(snapshot); app.chatLoading=false; app.sbsKnown=true; app.sbsEnabled=true; app.beingInfoOpen=true;
+  app.startup = 'ready';
 window.app=app;
 const frame=document.createElement('iframe');frame.hidden=true;document.body.append(frame);
 const loadLocal=()=>{app.chatLoading=true;const params=new URL(app.chatSource).searchParams;frame.src='/local.html?'+params;};

@@ -22,6 +22,7 @@ export class HomeClient {
   constructor(private directory: string, private storage: SecretStorage,
     private openExternal: (url: string) => Promise<void>, private fetcher: typeof fetch = fetch) {}
   get authenticated() { return !!this.saved; }
+  get sessionVersion() { return this.generation; }
   get pending() { return this.saved?.pending; }
   get authenticating() { return !!this.cancelAuth; }
   private get file() { return path.join(this.directory, 'home-session.json'); }
@@ -51,16 +52,25 @@ export class HomeClient {
     if (!this.saved) throw new HomeError(401, '');
     this.saved = { ...this.saved, pending }; await this.persist();
   }
-  async raw<T>(pathname: string, init: RequestInit = {}): Promise<T> {
-    let response: Response;
-    try { response = await this.fetcher(homeURL(pathname), { ...init, redirect: 'error', signal: init.signal ? AbortSignal.any([init.signal, AbortSignal.timeout(20_000)]) : AbortSignal.timeout(20_000) }); }
-    catch { throw new HomeError(0, 'network'); }
-    if (!response.ok) {
-      const error = await response.json().catch(() => ({}));
-      throw new HomeError(response.status, typeof error.error === 'string' ? error.error : '');
-    }
-    if (response.status === 204) return undefined as T;
-    try { return await response.json() as T; } catch { throw new HomeError(502, 'invalid_response'); }
+  async raw<T>(pathname: string, init: RequestInit = {}, read?: (response: Response, progress: () => void) => Promise<T>): Promise<T> {
+    const timeout = new AbortController();
+    const timer = setTimeout(() => timeout.abort(new Error('Being Home 请求超时，请重试。')), 20_000);
+    const signal = init.signal ? AbortSignal.any([init.signal, timeout.signal]) : timeout.signal;
+    try {
+      let response: Response;
+      try { response = await this.fetcher(homeURL(pathname), { ...init, redirect: 'error', signal }); }
+      catch { throw new HomeError(0, 'network'); }
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new HomeError(response.status, typeof error.error === 'string' ? error.error : '');
+      }
+      if (response.status === 204) return undefined as T;
+      if (read) {
+        timer.refresh(); // File transfers time out on inactivity, not total duration.
+        return await read(response, () => timer.refresh());
+      }
+      try { return await response.json() as T; } catch { throw new HomeError(502, 'invalid_response'); }
+    } finally { clearTimeout(timer); }
   }
   private tokenRequest(body: Record<string, string>) {
     return this.raw<OAuthTokens>('/native/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -94,24 +104,26 @@ export class HomeClient {
     this.refreshFlight = flight;
     try { await flight; } finally { if (this.refreshFlight === flight) this.refreshFlight = undefined; }
   }
-  async request<T>(pathname: string, init: RequestInit = {}): Promise<T> {
+  async request<T>(pathname: string, init: RequestInit = {}, read?: (response: Response, progress: () => void) => Promise<T>): Promise<T> {
     const generation = this.generation, requestGeneration = this.requestGeneration;
     if (!this.saved) throw new HomeError(401, '');
     if (this.saved.tokens.expires <= Date.now() + 60_000) await this.refreshToken();
     const access = this.saved?.tokens.access;
     if (!access || generation !== this.generation || requestGeneration !== this.requestGeneration) throw new HomeError(401, '');
     const request = new AbortController(); this.requests.add(request);
-    const send = (token: string) => this.raw<T>(pathname, { ...init, signal: request.signal, headers: { ...init.headers, Authorization: `Bearer ${token}` } });
+    const current = () => { if (generation !== this.generation || requestGeneration !== this.requestGeneration) throw new Error('请求已取消，请重试。'); };
+    const send = (token: string) => { current(); return this.raw<T>(pathname, { ...init, signal: request.signal, headers: { ...init.headers, Authorization: `Bearer ${token}` } }, read); };
     try {
       const result = await send(access);
-      if (generation !== this.generation) throw new HomeError(401, '');
+      current();
       return result;
     } catch (error) {
-      if (!(error instanceof HomeError) || error.status !== 401 || generation !== this.generation) throw error;
+      if (!(error instanceof HomeError) || error.status !== 401 || generation !== this.generation || requestGeneration !== this.requestGeneration) throw error;
       await this.refreshToken(access);
+      current();
       // A rejected authentication is safe to retry; ambiguous transport failures never replay writes.
       const result = await send(this.saved!.tokens.access);
-      if (generation !== this.generation) throw new HomeError(401, '');
+      current();
       return result;
     } finally { this.requests.delete(request); }
   }

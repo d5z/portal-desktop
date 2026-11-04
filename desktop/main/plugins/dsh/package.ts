@@ -20,8 +20,8 @@ export async function readDshPackage(root: string, requireDeclaration = true, al
   packageName(data.name);
   if ((requireDeclaration && !data.dsh) || typeof data.version !== 'string') throw new Error('此包没有 DSH 插件声明。');
   data.dsh ??= {};
-  if (data.dsh.client?.platform && !['web', 'all'].includes(data.dsh.client.platform)) throw new Error(`不支持此客户端平台：${data.dsh.client.platform}`);
-  if (data.engines?.dsh && (!validRange(data.engines.dsh) || !satisfies('0.2.1-rc.5', data.engines.dsh, { includePrerelease: true }))) throw new Error(`插件要求 DSH ${data.engines.dsh}；当前适配目标为 0.2.1-rc.5。`);
+  if (data.dsh.client?.platform && !['web', 'all'].includes(data.dsh.client.platform)) throw new Error(`插件与当前 Town 不适配：不支持此客户端平台：${data.dsh.client.platform}`);
+  if (data.engines?.dsh && (!validRange(data.engines.dsh) || !satisfies('0.2.1-rc.5', data.engines.dsh, { includePrerelease: true }))) throw new Error(`插件与当前 Town 不适配：需要 DSH ${data.engines.dsh}；当前适配目标为 0.2.1-rc.5。`);
   if (data.dsh.client?.inject && (!Array.isArray(data.dsh.client.inject) || data.dsh.client.inject.some((name: unknown) => typeof name !== 'string'))) throw new Error('客户端 inject 必须是模块名列表。');
   const patchFile = data.dsh.bundle?.patch;
   let rows: EntryOptions[] = [];

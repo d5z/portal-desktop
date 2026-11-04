@@ -19,9 +19,10 @@ export function usePanelWidth(key: string, initial: number) {
   return [width, resize] as const;
 }
 
-export function PanelResizeHandle({ panel, label, width, onResize, initial, min = 240, max = 640, reserve = 320, edge = "left", disabled = false }: {
+export function PanelResizeHandle({ panel, label, width, onResize, initial, min = 240, max = 640, reserve = 320, edge = "left", disabled = false, onDraggingChange }: {
   panel: RefObject<HTMLElement | null>; label: string; width: number; onResize: (width: number) => void;
   initial: number; min?: number; max?: number; reserve?: number; edge?: "left" | "right"; disabled?: boolean;
+  onDraggingChange?: (dragging: boolean) => void;
 }) {
   const handle = useRef<HTMLDivElement>(null);
   const drag = useRef<{ id: number; x: number; width: number } | null>(null);
@@ -29,7 +30,10 @@ export function PanelResizeHandle({ panel, label, width, onResize, initial, min 
   useLayoutEffect(() => {
     const parent = panel.current?.parentElement;
     if (!parent || disabled) return;
-    const update = () => setLimit(Math.max(0, Math.min(max, parent.clientWidth - reserve)));
+    const update = () => {
+      const rail = parent.querySelector(':scope > .workspace-rail')?.getBoundingClientRect().width || 0;
+      setLimit(Math.max(0, Math.min(max, parent.clientWidth - reserve - rail)));
+    };
     update();
     const observer = new ResizeObserver(update);
     observer.observe(parent);
@@ -42,6 +46,7 @@ export function PanelResizeHandle({ panel, label, width, onResize, initial, min 
     drag.current = null;
     if (active && handle.current?.hasPointerCapture(active.id)) handle.current.releasePointerCapture(active.id);
     handle.current?.removeAttribute("data-resizing");
+    if (active) onDraggingChange?.(false);
   };
   useEffect(() => {
     window.addEventListener("blur", stop);
@@ -56,6 +61,7 @@ export function PanelResizeHandle({ panel, label, width, onResize, initial, min 
       event.preventDefault(); event.currentTarget.focus();
       drag.current = { id: event.pointerId, x: event.clientX, width: panel.current.getBoundingClientRect().width };
       event.currentTarget.setPointerCapture(event.pointerId); event.currentTarget.dataset.resizing = "true";
+      onDraggingChange?.(true);
     }}
     onPointerMove={event => {
       const active = drag.current;

@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { Markdown } from '../desktop/renderer/shared/components/markdown';
-import { detectStructuredText, formatJSON } from '../desktop/renderer/shared/components/structured-text';
+import { detectStructuredText, formatJSON } from '../desktop/renderer/shared/lib/structured-text';
 
 describe('structured chat content', () => {
   it('recognizes complete JSON and JSONL without interpreting ordinary text', () => {

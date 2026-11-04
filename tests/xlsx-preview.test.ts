@@ -1,7 +1,7 @@
 import {describe,it,expect} from 'vitest';
 import {unzipSync,zipSync,strFromU8,strToU8} from 'fflate';
 import ExcelJS from 'exceljs';
-import {readWorkbook} from '../desktop/renderer/app/components/xlsx-data';
+import {readWorkbook} from '../desktop/renderer/app/lib/xlsx-data';
 describe('spreadsheet original-file preview',()=>{
   it('keeps sheets, positions, zero, false, formulas and rich text',async()=>{
     const book=new ExcelJS.Workbook(),first=book.addWorksheet('First');

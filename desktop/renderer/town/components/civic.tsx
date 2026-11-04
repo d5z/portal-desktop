@@ -1,3 +1,4 @@
+import { Icon } from '../../shared/icons/icon';
 import { catalogPage } from '../models/pagination';
 import { useEffect, useRef, useState } from "react";
 import { TownModel, date, list, str, type Data } from "../models/town";
@@ -73,9 +74,7 @@ export function BonfireAnnouncements({ town }: { town: TownModel }) {
       {current && <button className="announcement-compact-title announcement-compact-regular" onClick={() => town.openAnnouncements(str(current.id))}>{str(current.title)}</button>}
       {!entries.length && <span className="announcement-compact-status">{town.announcementsError ? '暂时未能加载' : town.announcementsLoading ? '正在读取…' : '暂无公告'}</span>}
       <button ref={toggle} type="button" className="announcement-toggle" aria-label={expanded ? '收起公告' : '展开公告'} aria-expanded={expanded} aria-controls="bonfire-announcement-panel" onClick={() => setExpanded(!expanded)}>
-        <svg viewBox="0 0 20 20" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" focusable="false">
-          <path d={expanded ? 'm5 12 5-5 5 5' : 'm5 8 5 5 5-5'} />
-        </svg>
+        <Icon name={expanded ? 'disclosure-up' : 'disclosure-down'} width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" focusable="false" />
       </button>
     </div>
     {expanded && <div id="bonfire-announcement-panel" className="bonfire-announcement-panel">

@@ -588,7 +588,8 @@ body:has(.rail-links[data-sorting]) .rail-tooltip {
   .chat-session-panel,
   #companion-panel,
   #subagent-model-panel,
-  .client-file-viewer
+  .client-file-viewer,
+  #browser-panel
 ):has(> [data-slot='panel-resize-handle']:is(:hover, :focus-visible, [data-resizing='true'])) {
   border-color: var(--secondary);
 }

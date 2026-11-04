@@ -1,13 +1,15 @@
-import { StreamingMarkdown } from './streaming-markdown';
+import { homeFileReference, beingFileBlocks } from '../../../shared/being-files';
+import { BeingFilesMessage, HomeFileLink } from './being-files';
+import { StreamingMarkdown } from '../lib/streaming-markdown';
 import { LocalFileAction, LocalFileLink } from './local-file-link';
 import { RemoteImage } from './remote-image';
-import { MarkdownReferences } from './markdown-references';
+import { MarkdownReferences, MarkdownReferenceScope } from './markdown-references';
 import { localFileReference } from '../../../shared/local-file';
 import { IntelligentUI } from "../intelligent-ui/view";
 import hljs from "highlight.js/lib/common";
 import type { Emitter } from "highlight.js";
 import { Fragment, memo, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { detectStructuredText, formatJSON } from './structured-text';
+import { detectStructuredText, formatJSON } from '../lib/structured-text';
 import { marked, type Token, type Tokens } from "marked";
 import {
   placeFromURL,
@@ -121,19 +123,7 @@ export function markdownText(content: string, transformText: (text: string) => s
     .trim();
 }
 
-/** Markdown tokens become React elements. Raw HTML has no execution/rendering path. */
-export const Markdown = memo(function Markdown({
-  content,
-  className = "reading-text",
-  onPlace,
-  chat = false,
-  richCode = chat,
-  renderText,
-  leadingContent,
-  previewMarkdownCode = true,
-  intelligentUI = false,
-  streaming = false,
-}: {
+interface MarkdownProps {
   content: string;
   className?: string;
   onPlace?: (target: PlaceTarget) => void;
@@ -144,7 +134,32 @@ export const Markdown = memo(function Markdown({
   previewMarkdownCode?: boolean;
   intelligentUI?: boolean;
   streaming?: boolean;
-}) {
+}
+
+/** File receipts replace their complete JSON range while surrounding prose stays Markdown. */
+export const Markdown = memo(function Markdown(props: MarkdownProps) {
+  const blocks = useMemo(() => beingFileBlocks(props.content), [props.content]);
+  if (!blocks.length) return <MarkdownText {...props} />;
+  return <MarkdownReferenceScope text={props.content}><div className={props.className ?? 'reading-text'}>
+    {blocks.map((block, index) => block.kind === 'files'
+      ? <BeingFilesMessage key={block.start} receipt={block.receipt} streaming={props.streaming ?? false} source={block.text} />
+      : <MarkdownText {...props} key={block.start} content={block.text} className="" leadingContent={index === 0 ? props.leadingContent : undefined} />)}
+  </div></MarkdownReferenceScope>;
+});
+
+/** Markdown tokens become React elements. Raw HTML has no execution/rendering path. */
+const MarkdownText = memo(function MarkdownText({
+  content,
+  className = "reading-text",
+  onPlace,
+  chat = false,
+  richCode = chat,
+  renderText,
+  leadingContent,
+  previewMarkdownCode = true,
+  intelligentUI = false,
+  streaming = false,
+}: MarkdownProps) {
   const previewLocalFile = useContext(LocalFileAction);
   const references = useContext(MarkdownReferences);
   const parser = useMemo(() => new StreamingMarkdown((source) => {
@@ -325,7 +340,8 @@ export const Markdown = memo(function Markdown({
             href = safeLink(unescapeText(link.href)),
             target = onPlace ? placeFromURL(link.href) : null;
           const local = previewLocalFile ? localFileReference(unescapeText(link.href), true) : undefined;
-          node = local ? <LocalFileLink path={local} card={/\.html?$/i.test(local)}>{render(link.tokens, false)}</LocalFileLink> : (
+          const homeFile = homeFileReference(unescapeText(link.href));
+          node = homeFile ? <HomeFileLink path={homeFile.path}>{render(link.tokens, false)}</HomeFileLink> : local ? <LocalFileLink path={local} card={/\.html?$/i.test(local)}>{render(link.tokens, false)}</LocalFileLink> : (
             <a
               href={href}
               title={

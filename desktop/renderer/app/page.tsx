@@ -1,3 +1,6 @@
+import { HomeFileViewer } from './components/home-file-viewer';
+import { IconButton } from '../shared/components/icon-button';
+import { Icon } from '../shared/icons/icon';
 import { DshPluginSurfaces } from '../plugins/dsh/page';
 import {AttachmentFileViewer} from './components/attachment-file-viewer';
 import {AttachmentImageViewer} from './components/attachment-image-viewer';
@@ -52,6 +55,7 @@ export function App({ model }: { model: AppModel }) {
   }, [app.view, app.readingSize, app.api]);
   useEffect(() => {
     const keyboard = (event: KeyboardEvent) => {
+      if (app.startup !== "ready") return;
       const dialog = document.querySelector("dialog[open]");
       if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === 'p' && !dialog) {
         event.preventDefault(); app.plugins.showCommands(true); return;
@@ -80,7 +84,7 @@ export function App({ model }: { model: AppModel }) {
     return () => document.removeEventListener("keydown", keyboard, true);
   }, [app]);
   return (
-    <>
+    <HomeFileViewer api={app.api.home} frame={frame} scope={app.chatSource}>
       <DshPluginSurfaces />
       <AttachmentImageViewer key={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}`} frame={frame}/>
       <section
@@ -198,7 +202,7 @@ export function App({ model }: { model: AppModel }) {
       <Toast message={app.toastMessage} />
       <EditContextMenu edit={app.api.editSelection} rootSelector="#client-main, dialog[open]"
         selectionSelector=".reading-text, .dialog-body pre" />
-    </>
+    </HomeFileViewer>
   );
 }
 
@@ -215,9 +219,9 @@ function PlaceContent({ app }: { app: AppModel }) {
         title={app.view === 'ui-examples' ? '智能交互示例' : app.view === 'plugins' ? selectedPlugin?.manifest.name : undefined}
         actions={app.view !== 'ui-examples' && <>
           <PluginSlots model={app.plugins} />
-          {app.view === 'plugins' && <button className="plugin-manage-button" aria-label="管理插件" title="管理插件" onClick={() => plugins.manage()}>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></svg>
-          </button>}
+          {app.view === 'plugins' && <IconButton className="plugin-manage-button" label="管理插件" onClick={() => plugins.manage()}>
+            <Icon name="more-filled" />
+          </IconButton>}
         </>}
         chatExpanded={app.chatSplitOpen}
         onToggleChat={app.toggleChatSplit}

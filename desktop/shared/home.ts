@@ -20,6 +20,7 @@ export interface HomeState {
 }
 export interface HomeBounds { x: number; y: number; width: number; height: number; visible: boolean; presentation?: 'preview' | 'browser'; dark?: boolean }
 export interface HomeAPI {
+  files?: HomeFilesAPI;
   state(): Promise<HomeState>;
   refresh(): Promise<HomeState>;
   action(action: HomeAction): Promise<HomeState>;
@@ -27,4 +28,15 @@ export interface HomeAPI {
   bounds(bounds: HomeBounds): Promise<void>;
   onExpand?(callback: () => void): () => void;
   subscribe(callback: (state: HomeState) => void): () => void;
+}
+
+export const MAX_HOME_PREVIEW = 8 * 1024 * 1024;
+export const HOME_PREVIEW_TOO_LARGE = '此文件较大，请下载后查看。在线预览最多支持 8 MiB。';
+export interface HomeFileEntry { name: string; path: string; type: 'file' | 'directory'; size: number }
+export interface HomeFileList { entries: HomeFileEntry[] }
+export interface HomeFilePreview { name: string; path: string; bytes: Uint8Array }
+export interface HomeFilesAPI {
+  list(path: string): Promise<HomeFileList>;
+  preview(path: string): Promise<HomeFilePreview>;
+  download(path: string): Promise<boolean>;
 }

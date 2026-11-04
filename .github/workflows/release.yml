@@ -96,9 +96,14 @@ jobs:
           PORTAL_DESKTOP_NATIVE_UPGRADE_TESTS: '1'
         run: npx vitest run tests/runtime-update-native.test.ts
       - run: npm run make
+      - name: Verify interrupted upgrade recovery and installer retry
+        run: node tests/update-recovery-electron.mjs
       - name: Verify signed macOS DMG installation and Release ZIP upgrade preflight
         if: runner.os == 'macOS'
         run: npm run test:macos-package
+      - name: Verify signed macOS client replacement and relaunch
+        if: runner.os == 'macOS'
+        run: npm run test:macos-upgrade
       - name: Clean up Apple signing material
         if: runner.os == 'macOS' && always()
         run: |

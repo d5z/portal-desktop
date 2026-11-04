@@ -1,7 +1,7 @@
 import { useId, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { RichComposer, type RichComposerProps } from '../../shared/components/rich-composer';
 import { useModel } from '../../shared/hooks/use-model';
-import { ComposerMenuIcon } from './composer-menu-icon';
+import { ComposerMenuIcon } from '../../shared/icons/composer-menu';
 import { ComposerExamples } from './composer-examples';
 import { composerEditorExtensions } from './composer-command-extension';
 import type { ChatState } from '../models/chat';

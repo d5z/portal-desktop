@@ -2,7 +2,7 @@ import { Fragment, type ComponentProps } from 'react';
 import { Markdown } from '../../shared/components/markdown';
 import { composerCommands, parseComposerCommands } from '../models/composer-commands';
 import { stripClientMessageContext } from '../services/local-file-context';
-import { ComposerMenuIcon } from './composer-menu-icon';
+import { ComposerMenuIcon } from '../../shared/icons/composer-menu';
 
 function commandContent(text: string) {
   const clean = stripClientMessageContext(text);

@@ -7,12 +7,13 @@ export interface DshPlugin {
   enabled: boolean;
   installedAt: string;
   error?: string;
+  missingServices?: string[];
   config?: Record<string, unknown>;
   status: 'disabled' | 'active' | 'blocked' | 'error';
 }
 export interface DshClientModule { id: string; owner: string; url: string; inject: string[]; immediately?: boolean }
 /** Host-normalized document contributions consumed by the renderer. */
-export type DshDocumentInjection = { placement: 'head' | 'body' } & (
+export type DshDocumentInjection = { placement: 'head' | 'body'; owner?: string } & (
   | { kind: 'html'; html: string }
   | { kind: 'script-src'; src: string; type?: string }
 );
@@ -23,7 +24,9 @@ export interface DshPluginState {
   routes: { kind: 'exact' | 'prefix'; path: string }[];
   error?: string;
 }
+export interface DshActivationFailure { id: string; installedAt: string; error: string }
 export interface DshPluginAPI {
+  reportFailures(failures: DshActivationFailure[]): Promise<void>;
   state(): Promise<DshPluginState>;
   install(source?: string): Promise<boolean>;
   enable(id: string, enabled: boolean): Promise<void>;

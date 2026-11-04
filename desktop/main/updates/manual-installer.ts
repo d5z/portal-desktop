@@ -57,19 +57,72 @@ export function macInstallerScript(parentPid: number, current: string, candidate
   const launch = `/usr/bin/open${profile ? ` --env ${quote(`PORTAL_DESKTOP_USER_DATA=${profile}`)}` : ''} -n ${quote(current)}`;
   return `#!/bin/sh
 set -eu
+ready_file=\${1:-}
+cancel_file=\${2:-}
+status_file=\${3:-}
+state() {
+  printf '%s\\n' "$1"
+  [ -z "$status_file" ] || printf '{"stage":"%s"}\\n' "$1" > "$status_file"
+}
+active() {
+  if [ -n "$cancel_file" ] && [ -e "$cancel_file" ]; then state cancelled; exit 1; fi
+}
+active
+state waiting-for-client
+[ -z "$ready_file" ] || printf '%s\\n' "$$" > "$ready_file"
 count=0
 while kill -0 ${parentPid} 2>/dev/null; do
-  count=$((count + 1)); [ "$count" -lt 120 ] || exit 1; sleep 1
+  active
+  count=$((count + 1))
+  if [ "$count" -ge 120 ]; then state shutdown-timeout; exit 1; fi
+  sleep 1
 done
+active
+state replacing-client
 if /bin/mv ${quote(current)} ${quote(backup)}; then
-  if /bin/mv ${quote(candidate)} ${quote(current)} && ${launch}; then exit 0; fi
+  if /bin/mv ${quote(candidate)} ${quote(current)} && ${launch}; then state completed; exit 0; fi
   # Keep a failed candidate for diagnosis; restore the old app on launch failure.
   [ ! -e ${quote(current)} ] || /bin/mv ${quote(current)} ${quote(candidate + '.failed')}
   /bin/mv ${quote(backup)} ${quote(current)}
 fi
+state restoring-client
 ${launch}
+state failed
 exit 1
 `;
+}
+
+// The shell must acknowledge its wait loop before this client quits. A failed
+// or timed-out attempt is cancelled so it cannot replace the app on a later exit.
+export async function launchMacInstaller(root: string, scriptFile: string, timeoutMs = 20_000) {
+  const attempt = path.join(root, `install-${randomUUID()}`);
+  const ready = attempt + '.ready', cancel = attempt + '.cancel';
+  const log = await open(path.join(root, 'install.log'), 'a', 0o600);
+  const child = spawn('/bin/sh', [scriptFile, ready, cancel, attempt + '.json'], {
+    detached: true, stdio: ['ignore', log.fd, log.fd],
+  });
+  let failure: Error | undefined;
+  child.once('error', error => { failure = error; });
+  child.once('exit', (code, signal) => { failure = new Error(`安装助手在交接前退出（${signal || code}），请查看 install.log。`); });
+  try {
+    const deadline = Date.now() + timeoutMs;
+    while (true) {
+      if (failure) throw failure;
+      const acknowledgement = await readFile(ready, 'utf8').catch((error: NodeJS.ErrnoException) => {
+        if (error.code === 'ENOENT') return '';
+        throw error;
+      });
+      if (failure) throw failure;
+      if (acknowledgement.trim() === String(child.pid)) break;
+      if (Date.now() >= deadline) throw new Error('启动客户端安装助手超时，请查看 install.log。');
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    child.unref();
+  } catch (error) {
+    try { await writeFile(cancel, 'cancelled'); }
+    finally { child.kill(); }
+    throw error;
+  } finally { await log.close(); }
 }
 export function windowsInstallerScript(parentPid: number, setup: string, oldExecutable: string) {
   return `param([string]$ReadyFile, [string]$CancelFile, [string]$StatusFile)
@@ -227,10 +280,7 @@ try {
         } finally { clearTimeout(timer); await log.close(); }
         return;
       }
-      const log = await open(path.join(root, 'install.log'), 'a', 0o600);
-      const child = spawn('/bin/sh', [scriptFile], { detached: true, windowsHide: true, stdio: ['ignore', log.fd, log.fd] });
-      try { await new Promise<void>((resolve, reject) => { child.once('spawn', resolve); child.once('error', reject); }); child.unref(); }
-      finally { await log.close(); }
+      await launchMacInstaller(root, scriptFile);
     };
     return Object.assign(handoff, { discard });
   } catch (error) {

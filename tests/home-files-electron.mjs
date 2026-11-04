@@ -1,0 +1,62 @@
+import assert from 'node:assert/strict';
+import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import path from 'node:path';
+import os from 'node:os';
+import { build } from 'esbuild';
+import electronPath from 'electron';
+import { launchDesktop } from './support/electron-lifecycle.mjs';
+const directory = await mkdtemp(path.join(os.tmpdir(), 'home-files-ipc-'));
+let app;
+try {
+  const preload = path.join(directory, 'preload.cjs'), main = path.join(directory, 'main.cjs');
+  await build({ entryPoints: ['desktop/preload/preload.ts'], bundle: true, platform: 'node', format: 'cjs', external: ['electron'], outfile: preload });
+  await build({ stdin: { resolveDir: process.cwd(), loader: 'ts', contents: `
+    import { app, BrowserWindow, ipcMain } from 'electron';
+    import { writeFile } from 'node:fs/promises';
+    import path from 'node:path';
+    import { HomeClient } from './desktop/main/home/client';
+    import { HomeService } from './desktop/main/home/service';
+    import { HomeFiles } from './desktop/main/home/files';
+    import { registerHomeIpc } from './desktop/main/home/ipc';
+    import { parseConnection } from './desktop/main/chat/connection';
+    const directory=${JSON.stringify(directory)};
+    app.setPath('userData',directory);
+    app.whenReady().then(async()=>{
+      await writeFile(path.join(directory,'home-session.json'),JSON.stringify({credential:Buffer.from(JSON.stringify({version:1,tokens:{access:'private-access',refresh:'private-refresh',expires:Date.now()+3600000,subject:'one'}})).toString('base64')}));
+      const requests=[];
+      const json=data=>new Response(JSON.stringify(data),{headers:{'Content-Type':'application/json'}});
+      const client=new HomeClient(directory,{isEncryptionAvailable:()=>true,encryptString:value=>Buffer.from(value),decryptString:value=>value.toString()},async()=>{},async(url,init)=>{
+        const target=new URL(String(url));requests.push({path:target.pathname,query:target.searchParams.get('path'),method:init?.method||'GET'});
+        if(target.pathname==='/v1/me')return json({username:'fixture',being:{id:'p'},storage:{status:'ready'},storage_enabled:true,files_enabled:true,computer_enabled:false});
+        if(target.pathname==='/v1/me/heart')return json({configured:true,heart_being_id:'willow',origin:'https://heart.example'});
+        if(target.pathname==='/v1/me/files')return json({entries:[{name:'sample.bin',path:'sample.bin',type:'file',size:4}]});
+        return new Response(new Uint8Array([0,1,255,42]),{headers:{'Content-Type':'application/octet-stream'}});
+      });
+      await client.load();
+      const window=new BrowserWindow({width:800,height:600,show:false,webPreferences:{preload:${JSON.stringify(preload)},sandbox:true,contextIsolation:true,nodeIntegration:false}});
+      const viewer={close(){},open(){},preview:async()=>null,setBounds(){}};
+      const home=new HomeService(client,viewer,()=>parseConnection('https://heart.example/willow/?token=fixture'),state=>window.webContents.send('beings:home-state',state));
+      const files=new HomeFiles(client,home,{chooseDownload:async()=>path.join(directory,'download.bin')});
+      registerHomeIpc((channel,callback)=>ipcMain.handle(channel,(event,...args)=>{if(event.sender!==window.webContents||event.senderFrame!==window.webContents.mainFrame)throw Error('Untrusted sender');return callback(...args);}),home,viewer,files);
+      globalThis.fixture={requests};
+      await window.loadURL('data:text/html,<title>Cloud workspace IPC fixture</title><p>Isolated native file test</p><iframe srcdoc="child"></iframe>');
+    });
+    app.on('window-all-closed',()=>app.quit());
+  ` }, bundle: true, platform: 'node', format: 'cjs', external: ['electron'], outfile: main });
+  app = await launchDesktop({ executablePath: electronPath, args: [main], env: { ...process.env, PORTAL_DESKTOP_USER_DATA: directory, PORTAL_DESKTOP_TEST_MOCK_KEYCHAIN: '1' } });
+  const page = await app.firstWindow();
+  assert.deepEqual(await page.evaluate(() => Object.keys(window.beings.home.files).sort()), ['download', 'list', 'preview']);
+  assert.equal(await page.evaluate(() => typeof require), 'undefined');
+  assert.equal(await page.frames()[1].evaluate(() => typeof window.beings), 'undefined');
+  assert.deepEqual(await page.evaluate(() => window.beings.home.files.list('')), { entries: [{ name: 'sample.bin', path: 'sample.bin', type: 'file', size: 4 }] });
+  const preview = await page.evaluate(async () => { const file = await window.beings.home.files.preview('sample.bin'); return { ...file, bytes: [...file.bytes] }; });
+  assert.deepEqual(preview, { path: 'sample.bin', name: 'sample.bin', bytes: [0, 1, 255, 42] });
+  assert(!JSON.stringify(preview).includes('private-access'));
+  assert.equal(await page.evaluate(() => window.beings.home.files.download('sample.bin')), true);
+  assert.deepEqual(await readFile(path.join(directory, 'download.bin')), Buffer.from([0, 1, 255, 42]));
+  await assert.rejects(page.evaluate(() => window.beings.home.files.preview('../private')), /相对路径/);
+  const requests = await app.evaluate(() => globalThis.fixture.requests);
+  assert.equal(requests.some(r => r.path.includes('/computer')), false);
+  assert(requests.every(r => r.method === 'GET'));
+  console.log('Home file Electron IPC passed: actual preload/handlers, binary round-trip, native-selected files, no renderer tokens, no child-frame bridge, traversal rejection, no computer requests. File dialogs and credentials use isolated fixtures.');
+} finally { if (app) await app.close(); await rm(directory, { recursive: true, force: true }); }

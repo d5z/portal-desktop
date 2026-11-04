@@ -1,6 +1,6 @@
 import { useState, useSyncExternalStore } from "react";
 import { Dialog } from "../desktop/renderer/shared/components/dialog";
-import { Icon } from "./icons";
+import { Icon } from "../desktop/renderer/shared/icons/web";
 import type { InstallController } from "./install";
 
 export function InstallApp({ controller }: { controller: InstallController }) {

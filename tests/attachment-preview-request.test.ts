@@ -1,5 +1,5 @@
 import {afterEach,beforeEach,describe,expect,it,vi} from 'vitest';
-import {attachmentPreviewRequest} from '../desktop/renderer/app/components/attachment-preview-request';
+import {attachmentPreviewRequest} from '../desktop/renderer/app/services/attachment-preview-request';
 let channel:any;
 beforeEach(()=>{vi.useFakeTimers();vi.stubGlobal('MessageChannel',class {
  port1={postMessage:vi.fn(),close:vi.fn(),onmessage:null as any,onmessageerror:null as any};

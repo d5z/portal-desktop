@@ -1,6 +1,7 @@
+import { Icon } from '../../shared/icons/icon';
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { canUseComposerCommand, composerCommands, insertComposerCommand } from '../models/composer-commands';
-import { ComposerMenuIcon } from './composer-menu-icon';
+import { ComposerMenuIcon } from '../../shared/icons/composer-menu';
 import { ComposerExamples } from './composer-examples';
 import type { ChatState } from '../models/chat';
 
@@ -37,7 +38,7 @@ export function ComposerAddMenu({ state, onUpload, onExamples, onSelect, onConfi
   return <div className="composer-add">
     <button ref={trigger} type="button" className="btn-icon composer-add-trigger" aria-label="添加附件和工具" title={state.intelligentUIForMessage ? '添加附件和工具 · 本条已开启智能 UI' : '添加附件和工具'}
       popoverTarget={id} onClick={event => { event.preventDefault(); toggle(); }} aria-haspopup="menu" aria-expanded={open} data-active={state.intelligentUIForMessage}>
-      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+      <Icon name="plus" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       {state.intelligentUIForMessage && <span className="composer-add-dot" aria-hidden="true"/>}
     </button>
     <div id={id} ref={menu} popover="auto" role="menu" aria-label="添加附件和工具" className="composer-add-menu" onToggle={event => setOpen(event.newState === 'open')}

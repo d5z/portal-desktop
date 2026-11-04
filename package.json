@@ -48,6 +48,7 @@
     "test:seed-garden": "node tests/seed-garden.mjs",
     "test:sbs-refresh": "npm run prepare:desktop && node tests/sbs-refresh.mjs",
     "test:recent-history": "node tests/recent-chat-history-ui.mjs",
+    "test:home-files": "vitest run tests/home-files.test.ts && node tests/home-library-ui.mjs && node tests/home-files-electron.mjs && node tests/html-preview-electron.mjs && node tests/preview-browser-split.mjs",
     "test:browser": "node tests/browser-e2e.mjs",
     "build:chat": "node scripts/build-chat.mjs",
     "test:model-catalog": "node tests/model-catalog-ui.mjs",

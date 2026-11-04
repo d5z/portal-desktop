@@ -393,7 +393,7 @@ try {
   }
   await page.setViewportSize({width:1440,height:960});
   await info.getByRole('tab',{name:'资料库',exact:true}).click();
-  await info.getByText('云电脑创建的 HTML 页面和文件会显示在这里。',{exact:true}).waitFor();
+  await info.getByText('当前客户端不支持云端资料库，请更新桌面客户端。',{exact:true}).waitFor();
   assert.equal(await info.locator('#being-library-panel button').count(), 0);
   await page.locator('#conversation-name').click();
   assert.equal(await info.isVisible(), false);

@@ -305,6 +305,63 @@ describe("React desktop state lifecycle", () => {
     expect(app.chatHistoryScope).toBe('current');
     expect(new URL(app.chatSource).searchParams.get('scene_scope')).toBe('current');
   });
+  it('restores both history views after restart and keeps preferences separate by Being and scene', async () => {
+    vi.useFakeTimers();
+    const saved = new Map<string, string>();
+    vi.stubGlobal('localStorage', { getItem: (key: string) => saved.get(key) ?? null, setItem: (key: string, value: string) => saved.set(key, value) });
+    const first = { ...state(), chatScene: { scene_id: 'desktop-first', scene_meta: { client: 'portal-desktop', scene_label: 'First' } } };
+    const second = { ...first, chatScene: { ...first.chatScene, scene_id: 'desktop-second' } };
+    const changeChatSession = vi.fn().mockResolvedValue(second);
+    const create = (snapshot = first) => {
+      const app = new AppModel(api({ changeChatSession }).value);
+      app.post = vi.fn();
+      app.applySnapshot(snapshot);
+      app.frameLoaded();
+      app.setChatHistoryScope(app.chatHistoryScope);
+      return app;
+    };
+    try {
+      const app = create();
+      expect(app.chatHistoryScope).toBe('current');
+      app.changeChatHistoryScope('all');
+      const restored = create();
+      expect(restored.chatHistoryScope).toBe('all');
+      expect(new URL(restored.chatSource).searchParams.get('scene_scope')).toBe('all');
+      expect(restored.post).toHaveBeenCalledWith(expect.objectContaining({ type: 'beings:session-select', scope: 'all' }));
+      expect(create({ ...first, settings: state('river').settings }).chatHistoryScope).toBe('current');
+      await restored.changeChatSession('select', second.chatScene.scene_id);
+      expect(restored.chatHistoryScope).toBe('current');
+      changeChatSession.mockResolvedValue(first);
+      await restored.changeChatSession('select', first.chatScene.scene_id);
+      expect(restored.chatHistoryScope).toBe('all');
+      expect(restored.post).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'beings:session-select', scope: 'all' }));
+      await restored.changeChatSession('select', first.chatScene.scene_id, undefined, 42);
+      expect(restored.chatHistoryScope).toBe('current');
+      expect(create().chatHistoryScope).toBe('all');
+      restored.changeChatHistoryScope('current');
+      expect(create().chatHistoryScope).toBe('current');
+    } finally { vi.unstubAllGlobals(); }
+  });
+  it('uses default history views for invalid or unavailable local preferences', () => {
+    const snapshot = { ...state(), chatScene: { scene_id: 'desktop-fixed', scene_meta: { client: 'portal-desktop', scene_label: 'Desktop' } } };
+    const getItem = vi.fn(() => 'invalid');
+    vi.stubGlobal('localStorage', { getItem, setItem: () => { throw new Error('Storage unavailable'); } });
+    try {
+      for (const unavailable of [false, true]) {
+        if (unavailable) getItem.mockImplementation(() => { throw new Error('Storage unavailable'); });
+        const app = new AppModel(api().value);
+        app.applySnapshot(snapshot);
+        expect(app.chatHistoryScope).toBe('current');
+        app.frameLoaded();
+        app.setChatHistoryScope('current');
+        app.changeChatHistoryScope('all');
+        expect(app.chatHistoryScope).toBe('all');
+        const global = new AppModel(api().value);
+        global.applySnapshot(state());
+        expect(global.chatHistoryScope).toBe('all');
+      }
+    } finally { vi.unstubAllGlobals(); }
+  });
   it("announces the scene context only when a session change enters another scene", async () => {
     vi.useFakeTimers();
     const original = { scene_id: "desktop-original", scene_meta: { client: "portal-desktop", scene_label: "日常对话" } };
@@ -813,6 +870,20 @@ describe("Town request and identity isolation", () => {
       "inbox",
       "sent",
     ]);
+  });
+  it.each([['inbox', '收件箱'], ['sent', '已发送']])('shows which mailbox failed when %s cannot load', async (failed, label) => {
+    let offline = true;
+    const { model } = town({ town: async query => query.kind === failed && offline
+      ? { ok: false, code: 'network', message: '连接中断' }
+      : result({ messages: [{ id: query.kind }] }) });
+    model.live = live(); model.live.versions.mail = 1; model.show('mail'); await settle();
+    expect(model.unread('mail')).toBe(failed === 'inbox');
+    expect(model.data?.messages).toHaveLength(1);
+    expect(model.refreshError).toBe(label + '加载失败：连接中断');
+    offline = false; await model.load(true);
+    expect(model.data?.messages).toHaveLength(2);
+    expect(model.unread('mail')).toBe(false);
+    expect(model.refreshError).toBe('');
   });
   it("keeps the private-message tab selected after sending", async () => {
     const townApi = vi.fn(async (_query: import("../desktop/shared/types").TownQuery) =>

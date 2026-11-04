@@ -10,8 +10,10 @@ const bundle = await build({
   stdin: {
     contents: `import { createRoot } from 'react-dom/client';
       import { Topbar } from './desktop/renderer/app/components/topbar';
+      const listeners = new Set(); let version = 0;
       const model = {
-        subscribe: () => () => {}, getVersion: () => 0,
+        startup: 'loading',
+        subscribe: callback => { listeners.add(callback); return () => listeners.delete(callback); }, getVersion: () => version,
         snapshot: { settings: { hasToken: true, being: 'fixture', portalName: '工作室 Mac Portal' }, portal: { phase: 'connected', message: 'ready', logs: [] } },
         town: { subscribe: () => () => {}, getVersion: () => 0, live: { display: 'Fixture Town' }, displayName: 'Fixture Town' },
         api: { platform: 'darwin' }, connection: 'online',
@@ -20,6 +22,7 @@ const bundle = await build({
         openClientSettings() { window.settingsOpened = (window.settingsOpened || 0) + 1; },
         collectLogs() { window.logsCollected = (window.logsCollected || 0) + 1; },
       };
+      window.setStartup = value => { model.startup = value; version++; listeners.forEach(callback => callback()); };
       createRoot(document.getElementById('root')).render(<Topbar model={model} />);`,
     resolveDir: process.cwd(), loader: 'tsx',
   },
@@ -40,6 +43,21 @@ try {
   page = await browser.newPage(); page.setDefaultTimeout(15000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto('http://127.0.0.1:' + server.address().port);
+  await page.waitForFunction(() => typeof window.setStartup === 'function');
+  for (const startup of ['loading', 'error', 'loading']) {
+    await page.evaluate(value => window.setStartup(value), startup);
+    await page.waitForFunction(() => !document.querySelector('#options-trigger'));
+    assert.equal(await page.locator('.rail-settings-menu,.rail-update').count(), 0, 'Startup must not expose body portals');
+  }
+  await page.evaluate(() => window.setStartup('ready'));
+  await page.locator('#options-trigger').waitFor({ state: 'visible' });
+  // Re-entering startup also clears an open settings menu and its animations.
+  await page.locator('#options-trigger').click();
+  await page.evaluate(() => window.setStartup('error'));
+  await page.locator('#options-trigger').waitFor({ state: 'detached' });
+  await page.evaluate(() => window.setStartup('ready'));
+  await page.locator('#options-trigger').waitFor({ state: 'visible' });
+  assert.equal(await page.locator('#options-trigger').getAttribute('aria-expanded'), 'false');
   assert.equal(await page.locator('#open-browser,.options-sbs,.rail-portal-status').count(),0);
   await page.locator('#local-portal-status').waitFor({state:'hidden'});
   await page.locator('#options-trigger').click();

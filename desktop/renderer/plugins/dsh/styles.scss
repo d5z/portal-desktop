@@ -221,6 +221,56 @@
   color: var(--secondary);
 }
 
+.dsh-plugin-issue,
+.dsh-operation-issue {
+  padding: 12px 14px;
+  color: var(--text);
+  background: var(--surface);
+  font-size: 13px;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.dsh-plugin-issue {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 0 0 14px;
+  border-radius: 10px;
+}
+
+.dsh-plugin-issue svg {
+  flex: none;
+  width: 18px;
+  margin-top: 1px;
+  fill: none;
+  stroke: var(--warning, #a86b08);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+}
+
+.dsh-plugin-issue p,
+.dsh-operation-issue span {
+  margin: 3px 0 0;
+  color: var(--secondary);
+}
+
+.dsh-plugin-issue details {
+  margin-top: 6px;
+  font-size: 12px;
+}
+
+.dsh-plugin-issue summary {
+  width: fit-content;
+  cursor: pointer;
+}
+
+.dsh-operation-issue {
+  display: grid;
+  padding-inline: 28px;
+  border-bottom: 1px solid var(--line);
+}
+
 .dsh-compatibility {
   margin-top: 16px;
   padding-top: 12px;

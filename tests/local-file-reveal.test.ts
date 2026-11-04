@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { revealLocalFile } from '../desktop/renderer/app/components/local-file-reveal';
+import { revealLocalFile } from '../desktop/renderer/app/services/local-file-reveal';
 
 const path = '/Users/d5/portal-desktop Workspace/qimen-study/奇门遁甲.html';
 describe('reveal local file errors', () => {

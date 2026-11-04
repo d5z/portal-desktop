@@ -7,6 +7,7 @@ import path from 'node:path';
 import type { ChatProxy } from '../chat/proxy';
 import type { PluginRegistry } from '../plugins/registry';
 import { remoteImage } from '../chat/remote-image';
+import { HTML_PREVIEW_RUNTIME, htmlPreviewPolicy } from './html-preview';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -28,6 +29,9 @@ export function registerLocalProtocol(assets: string, proxy: ChatProxy, plugins?
     const url = new URL(request.url);
     if (url.hostname === 'desktop' && dshPlugins?.matches(url.pathname)) return dshPlugins.resource(request);
     if (url.hostname === 'chat' && url.pathname === '/api/remote-image') return remoteImage(request);
+    if (url.hostname === 'preview' && url.pathname === '/runtime.html' && request.method === 'GET') return new Response(HTML_PREVIEW_RUNTIME, { headers: {
+      'Content-Type': 'text/html; charset=utf-8', 'Content-Security-Policy': htmlPreviewPolicy(), 'Cache-Control': 'no-store', 'Referrer-Policy': 'no-referrer',
+    } });
     if (url.hostname === 'preview' && localFiles) return localFiles.resource(request);
     if (url.hostname === 'chat' && url.pathname === '/api/local-downloads') return downloads.handle(request,proxy);
     if (url.hostname === 'plugins' && request.method === 'GET' && plugins) return plugins.document(url);

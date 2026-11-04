@@ -1,5 +1,5 @@
 import {describe,it,expect} from 'vitest';
-import {csvRows,validFilePreview} from '../desktop/renderer/app/components/file-preview-data';
+import {csvRows,validFilePreview} from '../desktop/renderer/app/lib/file-preview-data';
 describe('file previews',()=>{
   it('keeps CSV commas, newlines, escaped quotes and zero/false cells',()=>{
     expect(csvRows('name,note,value\r\n"a,b","line 1\nline ""2""",0\r\nx,false,')).toEqual([['name','note','value'],['a,b','line 1\nline "2"','0'],['x','false','']]);

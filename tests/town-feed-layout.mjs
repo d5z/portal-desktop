@@ -50,6 +50,7 @@ try {
       overflow: [...document.querySelectorAll('#town-body,.social-bubble,.fireside-thread')].some(node => node.scrollWidth > node.clientWidth + 1),
       outerOverflow: document.documentElement.scrollWidth > innerWidth };
   });
+  let sharedMessageStyles;
   for (const [name, slug] of [['篝火','bonfire'],['围炉','firesides'],['私信','mail']]) {
     await navigate(name);
     const first = page.locator('.social-message').first();
@@ -57,6 +58,15 @@ try {
     const m = await metrics(); console.log(name, m);
     await page.screenshot({path:`test-results/town-${slug}-${baseline?'before':'after'}-1440.png`});
     if (baseline) continue;
+    const styles = await page.evaluate(() => Object.fromEntries([
+      '.social-message', '.social-avatar', '.social-meta', '.social-bubble', '.social-mine .social-bubble', '.social-foot',
+    ].map(selector => {
+      const style = getComputedStyle(document.querySelector(selector));
+      return [selector, Object.fromEntries(['display', 'padding', 'borderRadius', 'backgroundColor', 'fontSize', 'lineHeight'].map(property => [property, style[property]]))];
+    })));
+    if (sharedMessageStyles) assert.deepEqual(styles, sharedMessageStyles, 'All Town channels share the same message presentation');
+    else sharedMessageStyles = styles;
+    assert.equal(await page.locator('.town-meta-row').isVisible(), false, 'Healthy Town feeds have no connection or refresh metadata row');
     assert.ok(!m.overflow && !m.outerOverflow, 'Message widths stay inside the reading column');
     assert.ok(m.quoteHeight < 100, 'Collapsed quote must not become a wall of raw Markdown');
     assert.ok(m.firstTop - m.controlsBottom < 60, 'First message follows controls without an empty metadata row');
@@ -74,10 +84,15 @@ try {
     const menu = page.getByRole('menu',{name:'消息操作'});
     await menu.getByRole('menuitem',{name:'复制',exact:true}).click();
     assert.match(await page.evaluate(()=>window.fixtureCopied), /这段讨论/);
-    if (slug==='mail') {
+    {
       const outgoing = page.locator('.social-message.social-mine').first();
       const a = await outgoing.locator('.social-avatar').boundingBox(), b = await outgoing.locator('.social-bubble').boundingBox();
-      assert.ok(a.x >= b.x + b.width, 'Outgoing private message avatar belongs on the right');
+      assert.ok(Math.abs(a.x - b.x) < 1 && a.y + a.height <= b.y, 'Message avatar stays in the heading, above the flush-left body');
+      const incoming = page.locator('.social-message:not(.social-mine)').first();
+      const received = await incoming.locator('.social-bubble').boundingBox();
+      assert.ok(Math.abs(b.x - received.x) < 1, 'Incoming and outgoing messages share one reading edge');
+      assert.equal(await page.locator('.social-messages > .message-time-divider').count(), 0, 'Message timestamps belong in each row');
+      assert.equal(await outgoing.locator('.social-meta time').count(), 1);
     }
     await page.locator('.feed-options > summary').click();
     await page.getByLabel('排序',{exact:true}).selectOption('oldest');
@@ -94,6 +109,13 @@ try {
       const layout = await page.evaluate(() => { const panel=document.querySelector('#place-panel').getBoundingClientRect(), content=document.querySelector('.town-content').getBoundingClientRect(); return {left:content.left-panel.left,right:panel.right-content.right}; });
       assert.ok(layout.left <= 32 && layout.right <= 32, 'Wide workspaces must not center Town in a narrow column');
       assert.ok(!compact.overflow && !compact.outerOverflow, `${name} must fit ${viewport.width}px`);
+      {
+        const edges = await page.locator('.social-message').evaluateAll(rows => rows.slice(0, 4).map(row => {
+          const left = row.closest('.social-messages').getBoundingClientRect().left;
+          return ['.social-meta', '.social-bubble', '.social-foot'].map(selector => Math.abs(row.querySelector(selector).getBoundingClientRect().left - left));
+        }));
+        assert.ok(edges.flat().every(offset => offset < 1), 'Message headings, bodies and actions align with the list edge at every width');
+      }
       const toolbar = await page.locator('.town-toolbar').boundingBox(), search = await page.locator('#town-search').boundingBox();
       assert.ok(search.x >= toolbar.x && search.x+search.width <= toolbar.x+toolbar.width+1);
       if (slug==='firesides') {
@@ -111,6 +133,30 @@ try {
     await page.evaluate(()=>{const app=window.fixtureApp;app.theme='light';app.changed();});
     await page.setViewportSize({width:1440,height:960});
   }
+  await page.evaluate(() => {
+    const town = window.fixtureApp.town;
+    town.live = { ...town.live, versions: { ...town.live.versions, mail: town.live.versions.mail + 1 } };
+    town.changed();
+  });
+  await page.locator('#town-refresh[data-unread]').waitFor();
+  assert.equal(await page.locator('.town-meta-row').isVisible(), false, 'Unread content uses the existing refresh control without adding a row');
+  await page.getByRole('button', { name: '刷新内容', exact: true }).click();
+  await page.waitForFunction(() => !document.querySelector('#town-refresh').hasAttribute('data-unread'));
+  await page.evaluate(() => {
+    const town = window.fixtureApp.town;
+    town.live = { ...town.live, phase: 'reconnecting', message: '连接中断，正在重连' };
+    town.changed();
+  });
+  await page.getByText('连接中断，正在重连', { exact: true }).waitFor();
+  assert.equal(await page.getByRole('button', { name: '重新连接', exact: true }).isVisible(), true);
+  await page.evaluate(() => {
+    const town = window.fixtureApp.town;
+    town.live = { ...town.live, phase: 'connected' };
+    town.refreshError = '刷新失败，仍显示上次内容：网络不可用';
+    town.changed();
+  });
+  await page.getByText('刷新失败，仍显示上次内容：网络不可用', { exact: true }).waitFor();
+  assert.equal(await page.locator('.town-live-row').isVisible(), false);
   assert.deepEqual(errors, []);
-  console.log(baseline ? 'Baseline screenshots captured.' : 'PASS: three Town feeds, quote/expansion/copy/filter, outgoing alignment, responsive widths and sticky headers.');
+  console.log(baseline ? 'Baseline screenshots captured.' : 'PASS: three Town feeds, quote/expansion/copy/filter, shared bubble alignment and header states, responsive widths and sticky headers.');
 } finally { await browser?.close(); fixture?.kill(); }

@@ -37,9 +37,8 @@ export function validateSubagentSetup(input: SubagentSetup) {
   }
 }
 
-/** Use Portal's installer/config writer; secrets travel only through stdin. */
+/** Accept input validated by portal/ipc. Secrets travel only through stdin. */
 export async function setupSubagent(directory: string, settings: Settings, input: SubagentSetup): Promise<string> {
-  validateSubagentSetup(input);
   await mkdir(directory, { recursive: true, mode: 0o700 });
   const config = settings.portalConfigPath || path.join(directory, 'subagent-portal.toml');
   if (!settings.portalConfigPath) {

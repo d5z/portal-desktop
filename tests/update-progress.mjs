@@ -33,6 +33,7 @@ const bundle = await build({ stdin: { contents: `
     },
     installUpdate: async () => { window.installations = (window.installations || 0) + 1; },
   });
+  app.startup = 'ready';
   app.update = { phase: 'idle', currentVersion: '0.1.0', message: '尚未检查更新', releaseUrl: '' };
   // Exercise the real update subscription/bootstrap while isolating unrelated services.
   app.plugins.refresh = async () => {};

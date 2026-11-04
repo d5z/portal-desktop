@@ -2,6 +2,11 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { DesktopAPI, PortalState, TownLiveState } from '../shared/types';
 const api: DesktopAPI = {
   home: {
+    files: {
+      list: path => ipcRenderer.invoke('beings:home-files-list', path),
+      preview: path => ipcRenderer.invoke('beings:home-files-preview', path),
+      download: path => ipcRenderer.invoke('beings:home-files-download', path),
+    },
     state: () => ipcRenderer.invoke('beings:home-state'),
     refresh: () => ipcRenderer.invoke('beings:home-refresh'),
     action: action => ipcRenderer.invoke('beings:home-action', action),
@@ -19,6 +24,7 @@ const api: DesktopAPI = {
     },
   },
   dshPlugins: {
+    reportFailures: failures => ipcRenderer.invoke('beings:dsh-activation-failures', failures),
     state: () => ipcRenderer.invoke('beings:dsh-state'),
     install: source => ipcRenderer.invoke('beings:dsh-install', source),
     enable: (id, enabled) => ipcRenderer.invoke('beings:dsh-enable', id, enabled),

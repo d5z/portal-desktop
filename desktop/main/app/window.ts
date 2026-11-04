@@ -38,8 +38,12 @@ export function createMainWindow(options: MainWindowOptions) {
   window.webContents.on('will-frame-navigate', event => {
     const url = event.url;
     const parsed = new URL(url);
-    // Generated pages cannot navigate into the shell/chat or out to another application.
-    if (event.frame?.url.startsWith('beings://preview/')) { event.preventDefault(); return; }
+    // Open web destinations without replacing the preview or exposing host pages.
+    if (event.frame?.url.startsWith('beings://preview/')) {
+      event.preventDefault();
+      if (['http:', 'https:', 'mailto:'].includes(parsed.protocol)) options.openExternal(url);
+      return;
+    }
     if (!event.isMainFrame && event.frame?.parent?.url === options.shellURL() && options.pluginRoute?.(parsed)) return;
     const localPreview = !event.isMainFrame && parsed.protocol === 'beings:' && parsed.hostname === 'preview'
       && event.frame?.parent?.url === options.shellURL();

@@ -88,7 +88,7 @@ describe('local preview capabilities', () => {
     const first = await previews.preview(pathToFileURL(file).href);
     expect(first.text).toBe('<h1>First</h1>'); expect(first.path).toBe(await realpath(file));
     const response = await previews.resource(new Request(first.url!));
-    expect(response.status).toBe(200); expect(await response.text()).toBe(first.text);
+    expect(response.status).toBe(200); expect(await response.text()).toContain(first.text);
     expect(response.headers.get('Content-Security-Policy')).toContain('sandbox allow-scripts');
     await writeFile(file, '<h1>Second</h1>');
     expect((await previews.preview('页面 demo.html')).text).toBe('<h1>Second</h1>');

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { localFileReference } from '../../../shared/local-file';
-import { checkLocalFile } from './local-file-availability';
+import { checkLocalFile } from '../services/local-file-availability';
 
 export const LocalFileAction = createContext<((path: string) => void) | undefined>(undefined);
 

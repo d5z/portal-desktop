@@ -3,7 +3,7 @@ import { createContext, useContext, useCallback, useEffect, useId, useRef, useSt
 import { ImageViewer, type ImageViewerNavigation } from './image-viewer';
 import { type ImageGalleryItem } from '../../../shared/image-gallery';
 import { MAX_REMOTE_IMAGE_BYTES, REMOTE_IMAGE_MIME, inlineImageBlob, remoteImageName } from '../../../shared/remote-image';
-import { registerRemoteImageBridge } from './remote-image-bridge';
+import { registerRemoteImageBridge } from '../services/remote-image-bridge';
 
 const GalleryContext = createContext<((src: string) => void) | null>(null);
 const shellPreview = () => location.protocol === 'beings:' && parent !== window;

@@ -119,6 +119,7 @@ export class AppModel extends Store {
   searchLoading = false;
   searchError = "";
   readingSize = 16;
+  chatTopInset = 0;
   showReasoning = false;
   chatHistoryLimit = DEFAULT_CHAT_HISTORY_LIMIT;
   update?: UpdateState;
@@ -385,7 +386,7 @@ export class AppModel extends Store {
       this.readSceneReplies.clear();
       this.sbsKnown = false;
       this.chatLoading = true;
-      if (!sameChat) this.chatHistoryScope = next.chatScene ? "current" : "all";
+      if (!sameChat) this.chatHistoryScope = this.savedChatHistoryScope();
       this.chatHistoryScopeKnown = false;
       this.connection = "connecting";
       this.chatSource = `beings://chat/?name=${encodeURIComponent(next.settings.being)}&history_scope=${encodeURIComponent(next.settings.endpoint)}&history_limit=${this.chatHistoryLimit}&scene_scope=${this.chatHistoryScope}&scene_strict=1&theme=${this.colorScheme}&revision=${crypto.randomUUID()}`;
@@ -446,7 +447,7 @@ export class AppModel extends Store {
     this.historyTarget = operation === 'select' && next.chatScene && Number.isSafeInteger(historySeq) && historySeq! > 0
       ? { endpoint, sceneId: next.chatScene.scene_id, seq: historySeq! } : undefined;
     if (this.historyTarget) this.beingInfoOpen = false;
-    this.chatHistoryScope = "current";
+    this.chatHistoryScope = this.historyTarget ? "current" : this.savedChatHistoryScope();
     if (!this.chatSplitOpen) this.navigate("chat");
     this.postCurrentSession();
     if (next.chatScene && next.chatScene.scene_id !== previousSceneId)
@@ -460,9 +461,21 @@ export class AppModel extends Store {
       revision: new URL(this.chatSource).searchParams.get("revision"),
     });
   }
+  private get chatHistoryScopeKey() {
+    return `beings:scene-history-scope:${JSON.stringify([this.snapshot?.settings.endpoint, this.snapshot?.chatScene?.scene_id])}`;
+  }
+  private savedChatHistoryScope(): HistoryScope {
+    if (!this.snapshot?.chatScene) return "all";
+    try {
+      if (localStorage.getItem(this.chatHistoryScopeKey) === "all") return "all";
+    } catch { /* Optional preference. */ }
+    return "current";
+  }
   changeChatHistoryScope(scope: HistoryScope) {
     if (!this.chatSource || this.chatLoading || !this.chatHistoryScopeKnown || (scope === "current" && !this.snapshot?.chatScene)) return;
     this.chatHistoryScope = scope;
+    try { localStorage.setItem(this.chatHistoryScopeKey, scope); }
+    catch { /* Keep the view usable when local storage is unavailable. */ }
     if (!this.chatSplitOpen) this.navigate("chat");
     this.post({ type: "beings:history-scope", scope, revision: new URL(this.chatSource).searchParams.get("revision") });
   }
@@ -485,6 +498,7 @@ export class AppModel extends Store {
   }
   get colorScheme() { return renderedColorScheme(this.theme); }
   postAppearance() {
+    this.post({ type: 'beings:chat-top-inset', value: this.chatTopInset });
     this.post({ type: "beings:appearance", theme: this.colorScheme });
     this.post({ type: "beings:reading", size: this.readingSize });
     this.post({ type: "beings:reasoning-display", show: this.showReasoning });

@@ -1,3 +1,5 @@
+import { IconButton } from '../../shared/components/icon-button';
+import { Icon } from '../../shared/icons/icon';
 import { SbsControl } from "../../shared/components/sbs-control";
 import { createPortal } from "react-dom";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -6,19 +8,14 @@ import { useModel } from "../../shared/hooks/use-model";
 import { ChatSceneIndicator } from "./chat-scene";
 import { UpdateProgress } from "./update-progress";
 import { PortalStatus, portalStatus } from '../../portal/status';
-const menuIcons = {
-  settings: "M4 7h16M4 17h16M8 4v6m8 4v6",
-  help: "M9 8a3 3 0 0 1 6 0c0 2-3 2-3 5m0 3h.01M22 12a10 10 0 1 1-20 0 10 10 0 0 1 20 0Z",
-  update: "M19 7a8 8 0 1 0 1 8M19 3v5h-5",
-  logs: "M6 3h9l4 4v14H6V3Zm9 0v5h4M9 12h7m-7 4h5",
-  exit: "M10 4H4v16h6m4-12 4 4-4 4m-6-4h12",
-} as const;
-function MenuIcon({ name }: { name: keyof typeof menuIcons }) {
-  return <svg className="options-icon" viewBox="0 0 24 24" aria-hidden="true"><path d={menuIcons[name]} /></svg>;
-}
+import styles from './topbar.module.scss';
 export function Topbar({ model }: { model: AppModel }) {
   const app = useModel(model);
-  const town = useModel(model.town);
+  // Body portals escape the hidden startup shell; mount them only when it is ready.
+  return app.startup === 'ready' ? <ReadyTopbar model={app} /> : null;
+}
+function ReadyTopbar({ model: app }: { model: AppModel }) {
+  const town = useModel(app.town);
   const [expanded, setExpanded] = useState(false),
     [visible, setVisible] = useState(false),
     [help, setHelp] = useState(false);
@@ -143,7 +140,7 @@ export function Topbar({ model }: { model: AppModel }) {
     void app.downloadClientUpdate();
   };
   return (
-    <header className="topbar" hidden={app.view !== "chat" && !app.chatSplitOpen}>
+    <header className={`topbar ${styles.bar}`} data-floating={app.view === 'chat' && !app.snapshot?.notice} hidden={app.view !== "chat" && !app.chatSplitOpen}>
       <ChatSceneIndicator
         createRequest={app.chatSessionCreateRequest}
         visible={app.view === "chat" || app.chatSplitOpen}
@@ -163,10 +160,10 @@ export function Topbar({ model }: { model: AppModel }) {
           app.toast("场景 ID 已复制");
         })}
       />
-      <div className="pair-name">
+      <div className="pair-name" hidden={app.view !== "chat" || app.subagentSettingsOpen}>
         <button id="toggle-being-info" type="button" className="conversation-identity"
           hidden={app.view !== "chat" || app.subagentSettingsOpen} aria-label="Being 信息"
-          title="查看 Being 信息" aria-describedby="conversation-name" aria-controls="being-info" aria-expanded={app.beingInfoOpen}
+          title={`${town.displayName || app.snapshot?.settings.being || 'Being'} · 查看资料`} aria-describedby="conversation-name" aria-controls="being-info" aria-expanded={app.beingInfoOpen}
           onClick={app.toggleBeingInfo}>
           <span className="conversation-avatar" aria-hidden="true">{(town.displayName || app.snapshot?.settings.being || "Being").slice(0, 1).toUpperCase()}</span>
           <span id="conversation-name">{town.displayName || app.snapshot?.settings.being || "Being"}</span>
@@ -177,21 +174,18 @@ export function Topbar({ model }: { model: AppModel }) {
           onVisibility={show=>app.changeChatSbsVisibility(show)} onToggle={()=>app.toggleSbs()} />
       </div>
       <div className="topbar-actions">
-        <button
+        <IconButton
           id="refresh-chat"
           className="topbar-icon-button"
-          aria-label="刷新 Being 对话"
-          title="刷新 Being 对话"
+          label="刷新 Being 对话"
           disabled={!hasToken || app.chatLoading}
           aria-busy={app.chatLoading}
           onClick={() => {
             if (app.snapshot) app.applySnapshot(app.snapshot, true);
           }}
         >
-          <svg viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M20 11a8 8 0 0 0-14.9-3.9L3 9m0 0V4m0 5h5M4 13a8 8 0 0 0 14.9 3.9L21 15m0 0v5m0-5h-5" />
-          </svg>
-        </button>
+          <Icon name="sync" />
+        </IconButton>
         {createPortal(<div className="rail-update">
         <UpdateProgress
           state={app.update}
@@ -258,9 +252,7 @@ export function Topbar({ model }: { model: AppModel }) {
               toggle(!expanded);
             }}
           >
-            <svg viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M4 8h16M4 16h16M8 5v6m8 2v6" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
+            <Icon name="sliders" />
           </summary>
           <div className="options-menu" ref={menu} inert={!expanded}>
             <div id="options-home" hidden={help}>
@@ -272,13 +264,13 @@ export function Topbar({ model }: { model: AppModel }) {
                   <strong>{app.snapshot?.settings.portalName || '本机 Portal'}</strong>
                   <span className="options-portal-meta"><span>本机 Portal</span><PortalStatus state={portal} /></span>
                 </span>
-                <svg className="options-portal-chevron" viewBox="0 0 20 20" aria-hidden="true"><path d="m8 5 5 5-5 5" /></svg>
+                <Icon name="chevron-right-20" className="options-portal-chevron" />
               </button>
               <button
                 id="client-settings-button"
                 onClick={() => void app.openClientSettings()}
               >
-                <MenuIcon name="settings" /><span>设置</span><small>⌘ ,</small>
+                <Icon name="menu-settings" className="options-icon" /><span>设置</span><small>⌘ ,</small>
               </button>
               <button
                 id="options-help"
@@ -287,7 +279,7 @@ export function Topbar({ model }: { model: AppModel }) {
                 aria-expanded={help}
                 onClick={() => showHelp(true)}
               >
-                <MenuIcon name="help" /><span>对话与帮助</span><span className="options-trailing" aria-hidden="true">›</span>
+                <Icon name="menu-help" className="options-icon" /><span>对话与帮助</span><span className="options-trailing" aria-hidden="true">›</span>
               </button>
               <button
                 id="check-updates"
@@ -301,7 +293,7 @@ export function Topbar({ model }: { model: AppModel }) {
                   } else void app.checkClientUpdates();
                 }}
               >
-                <MenuIcon name="update" /><span>{updateActivity?.phase === "ready" ? "安装更新"
+                <Icon name="menu-update" className="options-icon" /><span>{updateActivity?.phase === "ready" ? "安装更新"
                   : updateActivity ? updateActivity.phase === "installing" ? "正在安装…" : "正在下载更新…"
                   : checkingUpdate ? "正在检查更新…"
                   : app.update?.phase === "available" ? "下载更新" : "手动检查更新"}</span>
@@ -312,13 +304,13 @@ export function Topbar({ model }: { model: AppModel }) {
                 disabled={app.collectingLogs}
                 onClick={() => void app.collectLogs()}
               >
-                <MenuIcon name="logs" /><span>{app.collectingLogs ? '正在收集日志…' : '收集日志'}</span>
+                <Icon name="menu-logs" className="options-icon" /><span>{app.collectingLogs ? '正在收集日志…' : '收集日志'}</span>
               </button>
               <button
                 id="quit-client"
                 onClick={() => void app.run(() => app.api.quit())}
               >
-                <MenuIcon name="exit" /><span>退出客户端</span>
+                <Icon name="menu-exit" className="options-icon" /><span>退出客户端</span>
               </button>
               <span id="client-version" aria-label="当前客户端版本">
                 {app.update?.currentVersion ? `v${app.update.currentVersion}` : "正在读取版本…"}

@@ -512,7 +512,9 @@
 
   &:is(:hover, :focus-within) {
     &::after,
-    .being-computer-open { opacity: 1; }
+    .being-computer-open {
+      opacity: 1;
+    }
   }
 }
 
@@ -589,16 +591,24 @@
     color: var(--secondary);
     background: transparent;
     box-shadow: none;
-    transition: background-color 120ms ease, color 120ms ease;
+    transition:
+      background-color 120ms ease,
+      color 120ms ease;
 
     &:hover:not(:disabled) {
       background: var(--surface);
       color: var(--text);
     }
-    &:active:not(:disabled) { background: var(--hover); }
+    &:active:not(:disabled) {
+      background: var(--hover);
+    }
 
-    &[aria-expanded='true'] { background: var(--surface); }
-    &:focus:not(:focus-visible) { outline: none; }
+    &[aria-expanded='true'] {
+      background: var(--surface);
+    }
+    &:focus:not(:focus-visible) {
+      outline: none;
+    }
     &:focus-visible {
       outline: 1px solid var(--accent);
       outline-offset: 2px;
@@ -728,7 +738,8 @@
 }
 
 @keyframes computer-breathe {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 0.55;
     transform: scale(0.96);
   }
@@ -740,10 +751,16 @@
 
 .being-computer-open,
 .being-computer-primary {
-  transition: opacity 140ms ease, transform 140ms ease;
+  transition:
+    opacity 140ms ease,
+    transform 140ms ease;
 
-  &:hover:not(:disabled) { opacity: 0.85; }
-  &:active:not(:disabled) { transform: scale(0.97); }
+  &:hover:not(:disabled) {
+    opacity: 0.85;
+  }
+  &:active:not(:disabled) {
+    transform: scale(0.97);
+  }
   &:disabled {
     opacity: 0.5;
     cursor: wait;
@@ -756,12 +773,113 @@
 
 @media (hover: none) {
   .being-computer-preview::after,
-  .being-computer-open { opacity: 1; }
+  .being-computer-open {
+    opacity: 1;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .being-computer-presence[data-loading='true'] { animation: none; }
+  .being-computer-presence[data-loading='true'] {
+    animation: none;
+  }
   .being-computer-preview::after,
   .being-computer-open,
-  .being-computer-primary { transition: none; }
+  .being-computer-primary {
+    transition: none;
+  }
+}
+
+/* The rail slides over the settled chat layout instead of resizing it every frame. */
+.being-info-body {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  width: 100%;
+  min-height: 0;
+}
+
+.being-info[data-animating='true'] {
+  overflow: clip;
+  will-change: transform;
+}
+
+.being-info[data-closing='true'] {
+  position: absolute;
+  inset: 0 0 0 auto;
+  z-index: 80;
+  transform: translateX(100%);
+}
+
+.being-info-content > [role='tabpanel']:not([hidden]),
+.being-privacy-panel {
+  animation: being-content-enter 180ms ease-out both;
+}
+
+@keyframes being-content-enter {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.being-tabs button,
+.being-info-close {
+  transition:
+    background-color 150ms ease,
+    color 150ms ease,
+    transform 150ms ease;
+
+  &:active:not(:disabled) {
+    transform: scale(0.96);
+  }
+}
+
+.being-computer-menu {
+  box-shadow:
+    0 2px 5px #00000006,
+    0 10px 28px #00000012;
+  transform-origin: bottom right;
+  animation: being-content-enter 160ms ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .being-info-content > [role='tabpanel']:not([hidden]),
+  .being-privacy-panel,
+  .being-computer-menu {
+    animation: none;
+  }
+  .being-tabs button,
+  .being-info-close {
+    transition: none;
+  }
+}
+
+.chat-session-panel {
+  transform-origin: left top;
+  transition:
+    opacity 160ms ease,
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+
+  &[data-open='false'] {
+    opacity: 0;
+    transform: translateX(-12px);
+    pointer-events: none;
+  }
+
+  @starting-style {
+    opacity: 0;
+    transform: translateX(-12px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-session-panel {
+    transition: none;
+    transform: none;
+  }
 }

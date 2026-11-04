@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { registerRemoteImageBridge, requestRemoteImage } from '../desktop/renderer/shared/components/remote-image-bridge';
+import { registerRemoteImageBridge, requestRemoteImage } from '../desktop/renderer/shared/services/remote-image-bridge';
 
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 const src = 'https://images.example/image?token=original';

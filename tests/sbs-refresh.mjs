@@ -17,6 +17,7 @@ const { outputFiles } = await build({ plugins: [browserAssets()], stdin: { resol
   import { ClientSettings } from './desktop/renderer/app/components/settings';
   const app = new AppModel({ copyText: async text => { window.copiedScene = text; }, appearance: async theme => theme,
     beingModelConfig: async () => ({ model: 'fixture' }), changeChatSession: async () => snapshot });
+  app.startup = 'ready';
   window.sbsApp = app;
   window.sbsStates = [];
   window.scopeStates = [];

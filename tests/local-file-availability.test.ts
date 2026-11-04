@@ -12,7 +12,7 @@ describe('local file check transport',()=>{
     }));
     vi.stubGlobal('window',Object.assign(host,{parent}));
     vi.stubGlobal('location',new URL('beings://chat/?revision=fixture'));
-    const {checkLocalFile}=await import('../desktop/renderer/shared/components/local-file-availability');
+    const {checkLocalFile}=await import('../desktop/renderer/shared/services/local-file-availability');
     const known=checkLocalFile('/tmp/exists.html');
     const unknown=checkLocalFile('/tmp/later.html');
     const settled=vi.fn();void unknown.then(settled);
@@ -42,7 +42,7 @@ describe('local file check transport',()=>{
     })};
     vi.stubGlobal('window',Object.assign(host,{parent}));
     vi.stubGlobal('location',new URL('beings://chat/?revision=fixture'));
-    const {checkLocalFile}=await import('../desktop/renderer/shared/components/local-file-availability');
+    const {checkLocalFile}=await import('../desktop/renderer/shared/services/local-file-availability');
     const result=checkLocalFile('/tmp/页面.html');
     await vi.advanceTimersByTimeAsync(mode==='dropped'?5250:250);
     expect(await result).toBe(true);

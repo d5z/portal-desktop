@@ -7,6 +7,7 @@ import postcss from 'postcss';
 export const styleEntries = [
   'desktop/renderer/app/styles.scss',
   'desktop/renderer/chat/document.scss',
+  'desktop/renderer/home/home-viewer.scss',
   'desktop/renderer/plugins/dsh/styles.scss',
   'web/styles.scss',
   'web/chat.scss',

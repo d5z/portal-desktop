@@ -2,7 +2,7 @@ import { Node } from '@tiptap/core';
 import { NodeViewWrapper, ReactNodeViewRenderer, type NodeViewProps } from '@tiptap/react';
 import { AllSelection, Plugin, Selection, type EditorState } from '@tiptap/pm/state';
 import { composerCommands } from '../models/composer-commands';
-import { ComposerMenuIcon } from './composer-menu-icon';
+import { ComposerMenuIcon } from '../../shared/icons/composer-menu';
 
 const nodeName = 'composerCommand';
 const commandFor = (token: string) => composerCommands.find(command =>

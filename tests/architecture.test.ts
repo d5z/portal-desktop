@@ -116,3 +116,23 @@ test("feature models and services remain independent of React components and hoo
     ),
   ).toEqual([]);
 });
+
+test("main features cannot import the process entry or composition root", () => {
+  expect(
+    edges.filter(
+      (edge) =>
+        edge.layer === "main" &&
+        (edge.target === "main/main" ||
+          (edge.target === "main/app/bootstrap" && edge.source !== "main/main.ts")),
+    ),
+  ).toEqual([]);
+});
+
+
+test("renderer pure utilities and icon assets do not import UI or feature state", () => {
+  expect(edges.filter(edge =>
+    /renderer\/shared\/(?:lib|icons)\//.test(edge.source) &&
+    (/\/(?:components|hooks|models|services)\//.test(edge.target) ||
+      /\.(?:s?css)$/.test(edge.specifier))
+  )).toEqual([]);
+});

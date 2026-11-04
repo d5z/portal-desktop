@@ -85,3 +85,10 @@
 :focus:not(:focus-visible) {
   outline: none;
 }
+
+/* Client buttons do not show focus rings, including native dialog autofocus. */
+button:focus,
+[role='button']:focus,
+summary:focus {
+  outline: none !important;
+}

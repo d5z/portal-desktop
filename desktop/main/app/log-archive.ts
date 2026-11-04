@@ -10,7 +10,7 @@ const isLog = (name: string) => /\.log(?:\.previous|\.\d+(?:[-.]\d+)*)?$/i.test(
 
 /** Export complete existing text logs, including rotations, without reading configuration files. */
 export async function createLogArchive(options: {
-  logsDirectory: string; runtimeDirectories: string[]; destination: string; secrets: string[];
+  logsDirectory: string; runtimeDirectories: string[]; installerDirectory?: string; destination: string; secrets: string[];
 }) {
   const entries: { file: string; status: string; bytes?: number; sourceBytes?: number }[] = [];
   const clean = (text: string) => redact(text, options.secrets)
@@ -68,7 +68,7 @@ export async function createLogArchive(options: {
       await drain();
     }
   };
-  const scan = async (directory: string, prefix: string, recursive: boolean) => {
+  const scan = async (directory: string, prefix: string, recursive: boolean, installer = false) => {
     let children;
     try { children = await readdir(directory, { withFileTypes: true }); }
     catch (error) {
@@ -77,12 +77,13 @@ export async function createLogArchive(options: {
     }
     for (const child of children.sort((a, b) => a.name.localeCompare(b.name))) {
       if (child.isSymbolicLink()) continue;
-      if (recursive && child.isDirectory()) await scan(path.join(directory, child.name), prefix + child.name + '/', true);
-      else if (isLog(child.name)) await collect(path.join(directory, child.name), prefix + child.name);
+      if (recursive && child.isDirectory()) await scan(path.join(directory, child.name), prefix + child.name + '/', true, installer);
+      else if (isLog(child.name) || (installer && /^install-[a-f0-9-]+\.json$/.test(child.name))) await collect(path.join(directory, child.name), prefix + child.name);
     }
   };
   try {
     await scan(options.logsDirectory, 'client/', true);
+    if (options.installerDirectory) await scan(options.installerDirectory, 'installer/', true, true);
     for (const name of ['portal-runtime.log', 'portal-status.json'])
       await collect(path.join(options.logsDirectory, name), 'portal/' + name);
     const directories = [...new Set(options.runtimeDirectories.filter(Boolean).map(directory => path.resolve(directory)))];

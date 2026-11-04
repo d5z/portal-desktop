@@ -1,7 +1,7 @@
 # React 界面结构
 
 桌面和完整聊天页均由 React 19 渲染。一级目录按业务大模块划分，模块内再按
-`components / models / hooks` 分类；只有实际存在对应代码时才创建目录。
+`components / models / hooks / services / lib` 分类；只有实际存在对应代码时才创建目录。
 
 ```text
 renderer/
@@ -12,6 +12,8 @@ renderer/
 │  ├─ components/           顶栏、设置、搜索、场景面板、诊断
 │  ├─ models/               应用状态、跨页面工作场景
 │  ├─ hooks/                桌面与聊天的通信
+│  ├─ services/             文件能力与附件预览通信
+│  ├─ lib/                  CSV/XLSX 解析与预览数据规则
 │  ├─ styles.scss           桌面文档样式入口
 │  └─ styles/               按领域拆分的全局 SCSS
 ├─ chat/                    独立聊天页
@@ -32,11 +34,13 @@ renderer/
 ├─ portal/page.tsx          本机 Portal 页面
 ├─ browser/                内置浏览器页面及 hooks/ 分栏交互
 └─ shared/                 跨功能复用
-   ├─ components/          弹窗、Markdown 与代码高亮
+   ├─ icons/               统一 SVG 目录与图标预设
+   ├─ components/          图标按钮、弹窗、Markdown 与代码高亮
+   ├─ services/            本地文件可用性与远程图片通信
    ├─ models/              状态订阅基类、共享场景数据
    ├─ hooks/               React 状态订阅
    ├─ intelligent-ui/      智能 UI 协议、组件、状态与隔离运行时
-   └─ lib/                 导航解析等纯函数
+   └─ lib/                 导航、消息时间、文件大小、权限选项与文本解析
 ```
 
 ## 依赖与文件约定
@@ -53,6 +57,9 @@ renderer/
   或旧路径兼容层。
 - 文档入口保留全局样式和既有级联顺序；新增或迁移组件使用就近的
   `*.module.scss`，由组件直接导入。主题变量、作用域及构建约定见[样式规范](STYLING.md)。
+
+图标、公共组件、纯函数和通信模块的具体用法见 [公共模块说明](shared/README.md)。
+新图标使用 `shared/icons/`；单次使用的逻辑就近保留，外部输入只在边界校验。
 
 ## React 与聊天协议
 

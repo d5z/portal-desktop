@@ -3,6 +3,7 @@ import { constants } from 'node:fs';
 import path from 'node:path';
 import os from 'node:os';
 import { randomUUID } from 'node:crypto';
+import { htmlPreviewPolicy, previewLinkScript } from './html-preview';
 import { localFileReference, type LocalFilePreview, type LocalFileRevealResult } from '../../shared/local-file';
 
 const textTypes = new Set(['html', 'htm', 'txt', 'md', 'markdown', 'csv', 'json', 'js', 'jsx', 'ts', 'tsx', 'css', 'py', 'yaml', 'yml', 'xml', 'log', 'sh', 'sql']);
@@ -112,9 +113,10 @@ export class LocalFilePreviews {
       const type = resourceTypes[path.extname(file).slice(1).toLowerCase()];
       if (!type) return new Response('Unsupported resource', { status: 403 });
       const scope = `beings://preview/${id}/`;
-      return new Response(new Uint8Array(await readBounded(file, 20 * 1024 * 1024)), { headers: {
+      const bytes = await readBounded(file, 20 * 1024 * 1024);
+      return new Response(type === 'text/html' ? '<!doctype html><meta charset="utf-8">' + previewLinkScript + bytes.toString('utf8') : new Uint8Array(bytes), { headers: {
         'Content-Type': type, 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'no-referrer',
-        'Content-Security-Policy': `default-src 'none'; script-src ${scope} 'unsafe-inline'; style-src ${scope} 'unsafe-inline'; img-src ${scope} data: blob:; font-src ${scope} data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; sandbox allow-scripts`,
+        'Content-Security-Policy': htmlPreviewPolicy(scope),
       } });
     } catch { return new Response('File unavailable', { status: 404 }); }
   }

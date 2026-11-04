@@ -1,10 +1,15 @@
+import { HomeFileAction } from '../shared/components/being-files';
+import { requestHomeFilePreview } from '../shared/services/home-file-preview';
+import { formatBytes } from '../shared/lib/format-bytes';
+import { Icon } from '../shared/icons/icon';
 import useMemoizedFn from 'ahooks/es/useMemoizedFn';
 import { useFileDrop } from './hooks/use-file-drop';
 import { useChatViewport } from './hooks/use-chat-viewport';
 import { useMessageSelection } from './hooks/use-message-selection';
 import { useChatShortcuts } from './hooks/use-chat-shortcuts';
 import { LocalFileAction, requestLocalFilePreview } from '../shared/components/local-file-link';
-import { PermissionIcon, choicesFor } from '../shared/components/permission-picker';
+import { PermissionIcon } from '../shared/icons/permission';
+import { choicesFor } from '../shared/lib/permissions';
 import { SbsControl } from "../shared/components/sbs-control";
 import {useHistoryWindow} from './hooks/use-history-window';
 import { AttachmentMessageContent, hasAttachmentMessage, originalMessageText } from "./components/message-content";
@@ -44,7 +49,7 @@ import { ChatComposer } from "./components/composer";
 import { ComposerAddMenu } from './components/composer-add-menu';
 import { canUseComposerCommand, parseComposerCommands } from './models/composer-commands';
 import {useMessageMenu} from '../shared/components/message-menu';
-import {startsTimeGroup,messageTimeLabel} from '../shared/models/message-time';
+import {startsTimeGroup,messageTimeLabel} from '../shared/lib/message-time';
 import { CopyMessage } from '../shared/components/copy-message';
 import { TemperatureGlow, ChatActivity } from "./components/messages";
 import { SceneLoading } from './components/scene-loading';
@@ -115,12 +120,12 @@ function QueueRow({ item, index, allowInterrupt, onEdit, onReorder }: { item: Me
     activeQueueTargetId = item.id;
     onReorder(sourceId, item.id);
   }} onDrop={event => { event.preventDefault(); clearDrag(); }} onDragEnd={clearDrag}>
-    <span className="composer-queue-drag-handle" title="拖动排序" aria-label="拖动排序"><svg className="composer-queue-icon" width="16" height="20" viewBox="0 0 16 20" fill="currentColor" aria-hidden="true"><circle cx="4" cy="4" r="1.3"/><circle cx="10" cy="4" r="1.3"/><circle cx="4" cy="10" r="1.3"/><circle cx="10" cy="10" r="1.3"/><circle cx="4" cy="16" r="1.3"/><circle cx="10" cy="16" r="1.3"/></svg></span>
+    <span className="composer-queue-drag-handle" title="拖动排序" aria-label="拖动排序"><Icon name="grip" className="composer-queue-icon" width="16" height="20" fill="currentColor" /></span>
     <span className="composer-queue-content" title={item.text}>{item.text}</span>
     {item.queueNotice && <span className="composer-queue-notice" role="status" title={item.queueNotice} aria-label={item.queueNotice}>!</span>}
     <button className="composer-queue-text-action" type="button" aria-label={`编辑排队消息：${item.text}`} title="在输入框编辑" onClick={() => onEdit(item)} disabled={!item.editQueued}>编辑</button>
     {item.retry && <button type="button" onClick={() => void item.retry?.()}>{item.retryLabel}</button>}
-    <button className="composer-queue-steer" type="button" aria-label="调整方向" disabled={!allowInterrupt || !item.canInterruptQueued} title="调整方向：立即打断并发送这条消息" onClick={() => void item.interruptQueued?.()}><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 5v5a3 3 0 0 0 3 3h13m-5-5 5 5-5 5" /></svg><span>调整方向</span></button>
+    <button className="composer-queue-steer" type="button" aria-label="调整方向" disabled={!allowInterrupt || !item.canInterruptQueued} title="调整方向：立即打断并发送这条消息" onClick={() => void item.interruptQueued?.()}><Icon name="turn-right" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /><span>调整方向</span></button>
     <button type="button" title="删除排队消息" aria-label={`取消排队：${item.text}`} onClick={() => item.cancelQueued?.()}>×</button>
   </div>;
 }
@@ -211,6 +216,7 @@ function ChatView({
     [panel, setPanel] = useState<ChatPanel>(null),
     [panelReturnsToSettings, setPanelReturnsToSettings] = useState(false);
   const [readingSize, setReadingSize] = useState(16);
+  const [topInset, setTopInset] = useState(0);
   const [showReasoning, setShowReasoning] = useState(() => {
     try { return localStorage.getItem("beings:show-reasoning") === "true"; } catch { return false; }
   });
@@ -245,6 +251,7 @@ function ChatView({
       },
       theme: setTheme,
       reading: setReadingSize,
+      topInset: setTopInset,
       reasoning: show => {
         setShowReasoning(show);
         try { localStorage.setItem("beings:show-reasoning", String(show)); } catch { /* In-memory preference remains usable. */ }
@@ -340,21 +347,17 @@ function ChatView({
     setPanelReturnsToSettings(false);
     composer.current?.focus();
   };
-  const formatSize = (bytes: number) =>
-    bytes < 1024
-      ? `${bytes}B`
-      : bytes < 1048576
-        ? `${(bytes / 1024).toFixed(1)}KB`
-        : `${(bytes / 1048576).toFixed(1)}MB`;
   return (
     <SurfaceContext.Provider value={surfaceContext}>
     <CodeClipboard.Provider value={bridge.copyText}>
+    <HomeFileAction.Provider value={location.protocol === "beings:" && parent !== window ? requestHomeFilePreview : undefined}>
     <LocalFileAction.Provider value={location.protocol === "beings:" && parent !== window ? requestLocalFilePreview : undefined}>
     <div
       className={`chat-root${parent === window ? " standalone-chat" : ""}${showIntelligentUI ? " has-ui-examples" : ""}`}
       style={
         {
           "--reading-size": `${readingSize}px`,
+          "--chat-top-inset": `${topInset}px`,
           "--app-height": `${viewport.height}px`,
           "--app-offset": `${viewport.offset}px`,
       } as CSSProperties
@@ -573,7 +576,7 @@ function ChatView({
                 )}
                 <span>
                   <strong>{file.name}</strong>
-                  <small>{formatSize(file.size)} · {file.loading ? '正在读取…' : '待发送'}</small>
+                  <small>{formatBytes(file.size)} · {file.loading ? '正在读取…' : '待发送'}</small>
                 </span>{" "}
                 <button
                   className="remove"
@@ -591,7 +594,7 @@ function ChatView({
             {parent !== window && location.protocol === 'beings:' && <button type="button" className="btn-icon permission-quick-trigger" data-mode={state.permissionMode} title={`工作权限 · ${choicesFor(state.permissionMode ?? 'auto-review').find(choice => choice.value === state.permissionMode)?.title ?? '加载中'}`} aria-label="快捷设置工作权限" aria-haspopup="menu" aria-expanded={state.permissionMenuOpen} onClick={event => {
               const rect = event.currentTarget.getBoundingClientRect();
               bridge.send({ type: 'beings:permission-settings', anchor: { left: rect.left, top: rect.top, bottom: rect.bottom } });
-            }}><PermissionIcon kind={choicesFor(state.permissionMode ?? 'auto-review').find(choice => choice.value === state.permissionMode)?.icon}/><span>{choicesFor(state.permissionMode ?? 'auto-review').find(choice => choice.value === state.permissionMode)?.title ?? '权限'}</span><svg className="permission-chevron" width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5" aria-hidden="true"><path d="m4 6 4 4 4-4"/></svg></button>}
+            }}><PermissionIcon mode={state.permissionMode}/><span>{choicesFor(state.permissionMode ?? 'auto-review').find(choice => choice.value === state.permissionMode)?.title ?? '权限'}</span><Icon name="chevron-down-16" className="permission-chevron" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" /></button>}
             <ChatComposer
               state={state}
               onExamples={openExamples}
@@ -646,9 +649,7 @@ function ChatView({
                 composer.current?.focus();
               }}
             >
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                {showStop ? <rect x="7" y="7" width="10" height="10" rx="2"/> : <path d="M12 20V4m-7 7 7-7 7 7"/>}
-              </svg>
+              <Icon name={showStop ? 'stop' : 'send'}  />
             </button>
           </div>
           <input
@@ -692,6 +693,7 @@ function ChatView({
       </button>
     </div>
     </LocalFileAction.Provider>
+    </HomeFileAction.Provider>
     </CodeClipboard.Provider>
     </SurfaceContext.Provider>
   );

@@ -5,7 +5,7 @@ import {
   type ChatSceneActivity,
 } from "../desktop/shared/types";
 import type { SceneOperation, WebScenes } from "./scenes";
-import { Icon } from "./icons";
+import { Icon } from "../desktop/renderer/shared/icons/web";
 
 export function ScenePicker({
   open,

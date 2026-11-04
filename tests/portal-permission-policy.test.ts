@@ -1,10 +1,11 @@
+import { permissionChoices } from '../desktop/renderer/shared/lib/permissions';
 import { describe, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { reviewPortalOperation } from '../desktop/main/chat/approval-review';
 import { ToolApproval } from '../desktop/main/chat/tool-approval';
 import { permissionMode, type PermissionMode } from '../desktop/shared/security';
-import { PermissionPicker, permissionChoices } from '../desktop/renderer/shared/components/permission-picker';
+import { PermissionPicker } from '../desktop/renderer/shared/components/permission-picker';
 
 const request = (value: object) => ({endpoint:'https://fixture.test/being', verb:'security-approve', sceneId:'scene-a', args:JSON.stringify(value)});
 const web = (url: string) => ({tool:'portal_web_fetch', isolation:'public-web-read', workspace:'D:\\work', arguments:{url}});

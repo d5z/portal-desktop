@@ -1,3 +1,4 @@
+import { ActivityIcon as Icon } from '../../shared/icons/activity';
 import { SceneScheduling } from './scheduling';
 import { LocalFileLink } from '../../shared/components/local-file-link';
 import { useEffect, useMemo, useState } from "react";
@@ -7,35 +8,7 @@ const duration = (seconds: number) =>
   seconds < 60
     ? `${seconds} 秒`
     : `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
-const icons = {
-  check: <path d="m3.5 8 3 3 6-6" />,
-  think: <path d="M6 11h4M6.5 13h3M5.5 9.5a4.5 4.5 0 1 1 5 0L10 11H6Z" />,
-  tool: <path d="m3.5 5 3 3-3 3M9 11h3.5" />,
-  error: (
-    <>
-      <circle cx="8" cy="8" r="5.5" />
-      <path d="M8 4.5v4M8 11h.01" />
-    </>
-  ),
-  stop: <path d="M4 8h8" />,
-  wait: <><circle cx="8" cy="8" r="5.5" /><path d="M8 4.5V8l2 1.5" /></>,
-  chevron: <path d="m6 4 4 4-4 4" />,
-};
-function Icon({ name }: { name: keyof typeof icons }) {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      {icons[name]}
-    </svg>
-  );
-}
+
 function ToolDetails({ entry, expanded }: { entry: ActivityEntry; expanded: boolean }) {
   const [open, setOpen] = useState(false);
   const hasDetails = !!(entry.inputDetail || entry.resultDetail || entry.exitCode !== undefined || entry.durationMs !== undefined || entry.totalOutputBytes !== undefined);

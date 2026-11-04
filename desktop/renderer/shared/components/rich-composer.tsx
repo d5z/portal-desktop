@@ -1,8 +1,8 @@
 import styles from './rich-composer.module.scss';
-import { appendChatText } from '../models/message-time';
+import { appendChatText } from '../lib/message-time';
 import { useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type RefObject, type TextareaHTMLAttributes, type KeyboardEventHandler, type CompositionEventHandler } from 'react';
 import { HighlightedCode } from './markdown';
-import { detectStructuredText } from './structured-text';
+import { detectStructuredText } from '../lib/structured-text';
 import { MarkdownEditor, type ComposerHandle } from './markdown-editor';
 import type { Extensions } from '@tiptap/core';
 export type { ComposerHandle } from './markdown-editor';

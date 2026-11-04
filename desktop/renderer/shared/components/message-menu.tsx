@@ -1,13 +1,11 @@
+import { Icon } from '../icons/icon';
 import styles from './message-menu.module.scss';
 import { useMenuDismiss } from '../hooks/use-menu-dismiss';
 import {useCallback,useEffect,useLayoutEffect,useRef,useState,type KeyboardEvent,type MouseEvent} from 'react';
 import {createPortal} from 'react-dom';
-import {messageTimeLabel} from '../models/message-time';
+import {messageTimeLabel,fullMessageTime} from '../lib/message-time';
 
 export type MessageInfo = {text:string; time?:number; fallbackTime?:string};
-export function fullMessageTime(time?:number, fallback='') {
-  return time !== undefined && Number.isFinite(new Date(time).getTime()) ? new Date(time).toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}) : fallback;
-}
 export function useMessageMenu(copy:(text:string)=>Promise<void>,scope:string) {
   const [context,setContext]=useState<(MessageInfo & {x:number;y:number;portal:HTMLElement;opener:HTMLElement;anchorLeft:number;anchorTop:number;selected:string})|null>(null);
   const [error,setError]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState<{text:string;portal:HTMLElement}|null>(null);
@@ -55,11 +53,8 @@ export function useMessageMenu(copy:(text:string)=>Promise<void>,scope:string) {
       items[next]?.focus();
     }}>
     {timestamp&&<div className={styles.info}><time title={timestamp} dateTime={context.time!==undefined&&Number.isFinite(new Date(context.time).getTime())?new Date(context.time).toISOString():undefined}>{shortTime}</time></div>}
-    <button role="menuitem" type="button" disabled={busy||!(context.selected||context.text)} onClick={()=>void copyValue(context.selected||context.text)}><CopyIcon/>复制</button>
+    <button role="menuitem" type="button" disabled={busy||!(context.selected||context.text)} onClick={()=>void copyValue(context.selected||context.text)}><Icon name="copy"/>复制</button>
     {error&&<p className={styles.error} role="alert">{error}</p>}
   </div>,context.portal);
   return {openMenu,closeMenu:close,isOpen:!!context,menu:<>{content}{notice&&createPortal(<div className={styles.notice} role="status">{notice.text}</div>,notice.portal)}</>};
-}
-function CopyIcon() {
-  return <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="8" width="12" height="13" rx="3"/><path d="M9 8V6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-2"/></svg>;
 }

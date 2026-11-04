@@ -70,8 +70,14 @@ try {
   await npm('menu-keyboard', ['run', 'test:menu-keyboard']);
   await npm('taskbar-icons', ['run', 'test:taskbar-icons']);
   await npm('update-progress', ['run', 'test:update-progress']);
+  await step('update-recovery-electron', process.execPath, ['tests/update-recovery-electron.mjs']);
   await npm('town-names', ['run', 'test:town-names']);
   await npm('seed-garden', ['run', 'test:seed-garden']);
+  await step('home-library-ui', process.execPath, ['tests/home-library-ui.mjs']);
+  await step('being-files-ui', process.execPath, ['tests/being-files-ui.mjs']);
+  await step('home-files-electron', process.execPath, ['tests/home-files-electron.mjs']);
+  await step('html-preview-electron', process.execPath, ['tests/html-preview-electron.mjs']);
+  await step('preview-browser-split', process.execPath, ['tests/preview-browser-split.mjs']);
   await npm('sbs-refresh', ['run', 'test:sbs-refresh']);
   await npm('recent-history', ['run', 'test:recent-history']);
   await npm('chat-history-recovery', ['run', 'test:chat-history-recovery']);
@@ -79,6 +85,9 @@ try {
   await npm('chat-scene-loading', ['run', 'test:chat-scene-loading']);
   await npm('chat-render-performance', ['run', 'test:chat-render-performance']);
   await npm('settings-navigation', ['run', 'test:settings-navigation']);
+  await step('workspace-motion', process.execPath, ['tests/workspace-motion.mjs']);
+  await step('panel-layout-performance', process.execPath, ['tests/panel-layout-performance.mjs']);
+  await step('being-panel-retention', process.execPath, ['tests/being-panel-retention.mjs']);
   // Some engine tests share process-level environment variables; serialize Rust tests.
   // The sub-agent fixture suite uses Unix-only `/bin/sh` paths and assumes a
   // real `pi` binary. Keep those fixtures out of the Windows hosted job; the
@@ -113,6 +122,7 @@ try {
   await npm('town-feed-layout', ['run', 'test:town-feed-layout']);
   await npm('attachments-ui', ['run', 'test:attachments-ui']);
   await npm('chat-scroll', ['run', 'test:chat-scroll']);
+  await step('chat-scroll-floating-header', process.execPath, ['tests/chat-scroll.mjs', '--floating-header']);
   await npm('chat-context-menu', ['run', 'test:chat-context-menu']);
   await npm('chat-history', ['run', 'test:chat-history']);
   await npm('intelligent-ui-surfaces', ['run', 'test:intelligent-ui-surfaces']);

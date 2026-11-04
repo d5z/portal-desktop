@@ -1,6 +1,6 @@
 import {describe,it,expect} from 'vitest';
-import {startsTimeGroup,appendChatText} from '../desktop/renderer/shared/models/message-time';
-import {fullMessageTime} from '../desktop/renderer/shared/components/message-menu';
+import {startsTimeGroup,appendChatText} from '../desktop/renderer/shared/lib/message-time';
+import {fullMessageTime} from '../desktop/renderer/shared/lib/message-time';
 describe('message timeline and plain-text draft',()=>{
  const base=new Date(2026,9,29,15,0).getTime();
  it('groups nearby speech, separating five-minute gaps and calendar days',()=>{

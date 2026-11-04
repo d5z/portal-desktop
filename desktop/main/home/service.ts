@@ -7,6 +7,7 @@ export interface HomeMe {
   user: { id: string }; username: string | null;
   being: { id: string; being_id: string; display_name: string; provisioning_status: string } | null;
   computer_enabled: boolean; storage: { status: string } | null;
+  storage_enabled?: boolean; files_enabled?: boolean;
 }
 interface Heart { configured: boolean; conflicted?: boolean; origin?: string; heart_being_id?: string }
 interface Viewer { open(url: string, id: string): void; close(): void }
@@ -35,6 +36,28 @@ export class HomeService {
   private current(generation: number) {
     this.contextChanged();
     if (generation !== this.generation) throw new Error('连接已切换，请重新打开电脑栏。');
+  }
+  /** Files remain available while the computer is stopped, disabled or unavailable. */
+  async fileAccess() {
+    this.contextChanged();
+    const generation = this.generation;
+    const session = this.client.sessionVersion;
+    const check = () => {
+      this.current(generation);
+      if (this.client.authenticating) throw new Error('请先完成 Being Home 登录，再刷新资料库。');
+      if (!this.client.authenticated) throw new Error('请先在电脑栏连接 Being Home。');
+      if (session !== this.client.sessionVersion) throw new Error('Home 账号已切换，请刷新资料库。');
+    };
+    check();
+    const me = await this.client.request<HomeMe>('/v1/me'); check();
+    if (!me.being) throw new Error('请先在电脑栏初始化 Being Home。');
+    const heart = await this.client.request<Heart>('/v1/me/heart'); check();
+    const connection = this.connection();
+    if (!connection || !heart.configured || heart.conflicted || heart.heart_being_id !== connection.being || heart.origin !== new URL(connection.endpoint).origin)
+      throw new Error('请在电脑栏连接并关联当前 Being 的 Home 账号。');
+    if (!me.storage_enabled || !me.files_enabled) throw new Error('当前 Home 尚未启用工作区文件服务。');
+    if (me.storage?.status !== 'ready') throw new Error('云端存储正在准备，请稍后刷新。');
+    return check;
   }
   async refresh(): Promise<HomeState> {
     this.contextChanged();

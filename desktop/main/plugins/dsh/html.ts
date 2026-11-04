@@ -8,6 +8,10 @@ import { parse, serialize, type DefaultTreeAdapterMap } from 'parse5';
  */
 export function externalizePluginScripts(html: string, scripts: Map<string, string>, documentURL = 'beings://desktop/') {
   const document = parse(html);
+  externalizeDocumentScripts(document, scripts, documentURL);
+  return serialize(document);
+}
+export function externalizeDocumentScripts(document: DefaultTreeAdapterMap['document'], scripts: Map<string, string>, documentURL: string) {
   initSync();
   let baseURL = documentURL;
   const findBase = (node: DefaultTreeAdapterMap['node']) => {
@@ -39,5 +43,4 @@ export function externalizePluginScripts(html: string, scripts: Map<string, stri
     if ('childNodes' in node) for (const child of node.childNodes) walk(child);
   };
   walk(document);
-  return serialize(document);
 }

@@ -1,3 +1,4 @@
+import { Icon } from '../../shared/icons/icon';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { type GenerationSnapshot, type ImageGenerationJob, type ImageGenerationReceipt } from '../../../shared/image-generation';
 import { imageGenerationBlocks } from '../../../shared/image-generation-blocks';
@@ -10,14 +11,14 @@ import { useNearViewport } from '../../shared/hooks/use-near-viewport';
 
 const labels: Record<GenerationSnapshot['status'],string> = {queued:'排队中', running:'生成中', uncertain:'结果待核对', succeeded:'生成成功', failed:'生成失败', cancelled:'已取消'};
 function PictureIcon() {
-  return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="17" rx="4"/><circle cx="9" cy="9" r="1.5"/><path d="m4 17 5-5 4 4 3-3 4 4"/></svg>;
+  return <Icon name="image-rounded" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />;
 }
 function GenerationSkeleton({label, phase}: {label:string;phase:'running'|'queued'}) {
   return <>
     <div className="image-generation-skeleton" aria-hidden="true">
       <div className="generation-aurora"/><div className="generation-aurora generation-aurora-secondary"/>
       <div className="generation-skeleton-frame"><span className="generation-skeleton-tag"/><span className="generation-skeleton-corner"/>
-        <div className="generation-skeleton-glyph"><svg width="34" height="34" viewBox="0 0 32 32" fill="none" aria-hidden="true"><path d="M16 5c1.6 7 4 9.4 11 11-7 1.6-9.4 4-11 11C14.4 20 12 17.6 5 16c7-1.6 9.4-4 11-11Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/><path d="M26 3v6M23 6h6" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg></div>
+        <div className="generation-skeleton-glyph"><Icon name="sparkles" width="34" height="34" fill="none" /></div>
         <div className="generation-skeleton-lines"><i/><i/></div>
       </div>
       <div className="generation-shimmer"/>

@@ -11,6 +11,13 @@ import type { Extensions } from '@tiptap/core';
 
 export interface ComposerHandle { focus: () => void; appendText: (text: string) => void }
 
+// Empty list items/headings still carry user-entered Markdown structure.
+// Only the initial, empty paragraph should display the input placeholder.
+function isBlankParagraph(editor: Editor): boolean {
+  const doc = editor.state.doc;
+  return doc.childCount === 1 && doc.firstChild?.type.name === 'paragraph' && doc.firstChild.content.size === 0;
+}
+
 export function MarkdownEditor({ value, onChange, inputRef, id, label, placeholder, disabled, suggestions, extensions = [] }: {
   value: string; onChange: (value: string) => void; inputRef: RefObject<ComposerHandle | null>;
   id?: string; label?: string; placeholder?: string; disabled?: boolean;
@@ -41,10 +48,10 @@ export function MarkdownEditor({ value, onChange, inputRef, id, label, placehold
         if (!text || !editor) return false;
         event.preventDefault();
         // Keep pasted source intact until the user edits it; JSON switches to the code editor.
-        if (editor.isEmpty) {
+        if (isBlankParagraph(editor)) {
           lastValue.current = text;
           editor.commands.setContent(text, { contentType: 'markdown', emitUpdate: false });
-          editor.view.dom.dataset.empty = String(editor.isEmpty);
+          editor.view.dom.dataset.empty = String(isBlankParagraph(editor));
           latest.current(text);
         } else {
           const parsed = editor.markdown!.parse(text);
@@ -63,10 +70,10 @@ export function MarkdownEditor({ value, onChange, inputRef, id, label, placehold
         return false;
       },
     },
-    onCreate: ({ editor }) => { editor.view.dom.dataset.empty = String(editor.isEmpty); },
+    onCreate: ({ editor }) => { editor.view.dom.dataset.empty = String(isBlankParagraph(editor)); },
     onUpdate: ({ editor }) => {
-      editor.view.dom.dataset.empty = String(editor.isEmpty);
-      const source = editor.isEmpty ? '' : editor.getMarkdown();
+      editor.view.dom.dataset.empty = String(isBlankParagraph(editor));
+      const source = editor.getMarkdown();
       lastValue.current = source;
       latest.current(source);
     },
@@ -97,7 +104,7 @@ export function MarkdownEditor({ value, onChange, inputRef, id, label, placehold
     if (!editor || value === lastValue.current) return;
     lastValue.current = value;
     editor.commands.setContent(value, { contentType: 'markdown', emitUpdate: false });
-    editor.view.dom.dataset.empty = String(editor.isEmpty);
+    editor.view.dom.dataset.empty = String(isBlankParagraph(editor));
     // External draft replacement (including send/scene changes) starts fresh undo history.
     editor.view.updateState(EditorState.create({ schema: editor.schema, doc: editor.state.doc, plugins: editor.state.plugins }));
   }, [editor, value]);

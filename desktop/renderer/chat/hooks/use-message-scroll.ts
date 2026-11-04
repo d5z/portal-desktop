@@ -74,7 +74,8 @@ export function useMessageScroll(items: ChatItem[], container: RefObject<HTMLDiv
       if (node) {
         const offset = node.getBoundingClientRect().top - el.getBoundingClientRect().top;
         const bottom = Math.max(0, el.scrollHeight - el.clientHeight);
-        if (offset + el.scrollTop - bottom < 20) { anchor.current = reply.id; scrollLock.current = false; el.scrollTop += offset - 20; remember(); publish(); return; }
+        const readingTop = parseFloat(getComputedStyle(el).scrollPaddingTop) || 20;
+        if (offset + el.scrollTop - bottom < readingTop) { anchor.current = reply.id; scrollLock.current = false; el.scrollTop += offset - readingTop; remember(); publish(); return; }
       }
     }
     if (scrollLock.current) el.scrollTop = el.scrollHeight;

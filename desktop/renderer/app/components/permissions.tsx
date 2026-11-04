@@ -1,7 +1,8 @@
 import styles from './permissions.module.scss';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Dialog } from '../../shared/components/dialog';
-import { PermissionIcon, choicesFor } from '../../shared/components/permission-picker';
+import { PermissionIcon } from '../../shared/icons/permission';
+import { choicesFor } from '../../shared/lib/permissions';
 import type { AppModel } from '../models/app';
 import type { PermissionMode, ToolApprovalView } from '../../../shared/security';
 
@@ -52,7 +53,7 @@ export function PermissionSettings({ app }: { app: AppModel }) {
     <div className={styles.heading}>Portal 调用权限</div>
     {choicesFor(mode).map(choice => <button key={choice.value} type="button" role="menuitemradio" aria-checked={choice.value === mode}
       tabIndex={choice.value === mode ? 0 : -1} data-mode={choice.value} disabled={busy || !app.snapshot?.settings.hasToken} onClick={() => void apply(choice.value)}>
-      <PermissionIcon kind={choice.icon}/><span className={styles.copy}><strong>{choice.title}</strong><small>{choice.detail}</small></span>
+      <PermissionIcon mode={choice.value}/><span className={styles.copy}><strong>{choice.title}</strong><small>{choice.detail}</small></span>
       <span className={styles.check} aria-hidden="true">{choice.value === mode ? '✓' : ''}</span>
     </button>)}
     <div className={styles.menuNote} role="status">{busy ? '正在切换…' : '切换会重启运行时，中断当前本机任务'}</div>

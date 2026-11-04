@@ -153,7 +153,7 @@ try {
       const meta = el.querySelector('.social-meta').getBoundingClientRect();
       return icon.left >= author.right && icon.right <= meta.right + 1;
     }), true, 'Copy stays within the metadata row without overlapping the author');
-    assert.ok(await page.locator('.message-time-divider').count() > 0, 'Timestamps appear as message group dividers');
+    assert.equal(await card.locator('.social-meta time').count(), 1, 'Each shared message heading includes its timestamp');
     await copy.click();
     await card.getByRole('button', { name: '已复制', exact: true }).waitFor();
     assert.equal(await page.evaluate(() => window.fixtureCopied), await page.evaluate(() => window.fixtureMessages[0].content));

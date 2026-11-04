@@ -1,3 +1,4 @@
+import { Icon } from '../shared/icons/icon';
 import { dshRuntime } from '../plugins/dsh/runtime';
 import { CodeClipboard } from '../shared/components/markdown';
 import { ToolsLibrary } from './components/tools-library';
@@ -14,7 +15,7 @@ import {
   type Data,
 } from "./models/town";
 import { useModel } from "../shared/hooks/use-model";
-import { navigateTabs } from "../shared/components/tab-navigation";
+import { navigateTabs } from "../shared/lib/tab-navigation";
 import {
   TownHome,
   Catalog,
@@ -31,6 +32,9 @@ export function Town({ model }: { model: TownModel }) {
     definition = definitions[town.view],
     channel = town.channel(),
     social = Boolean(channel),
+    connectionIssue = !["seeds", "announcements", "contacts"].includes(town.view) &&
+      Boolean(town.live && ["reconnecting", "auth-error"].includes(town.live.phase)),
+    hasUpdates = Boolean(channel && town.unread(channel)),
     paginated =
       !town.directId &&
       (["embers", "scrolls", "seeds", "announcements"].includes(town.view) ||
@@ -148,6 +152,7 @@ export function Town({ model }: { model: TownModel }) {
           />
           {town.view === "seeds" && !town.directId && <SeedSearch town={town} />}
           <div className="town-header-actions">
+            {town.view === "kits" && town.tab === "grove" && <button className="secondary grove-help-button" onClick={() => void town.run(() => town.api.openTownLink("/grove"))}>Grove Help ↗</button>}
             <button
               id="town-write"
               className="town-write-button"
@@ -160,9 +165,7 @@ export function Town({ model }: { model: TownModel }) {
               }
               onClick={() => town.compose()}
             >
-              <svg viewBox="0 0 20 20" aria-hidden="true">
-                <path d="m12.5 3.5 4 4M4 12l9-9a1.4 1.4 0 0 1 2 0l2 2a1.4 1.4 0 0 1 0 2l-9 9-5 1 1-5Z" />
-              </svg>
+              <Icon name="edit-20" />
               <span className="town-write-label">{town.view === "mail" ? "写私信" : "写一句"}</span>
             </button>
             <button
@@ -176,49 +179,38 @@ export function Town({ model }: { model: TownModel }) {
             <button
               id="town-refresh"
               className="icon-button"
-              title="刷新内容"
+              title={hasUpdates ? "有新内容，点击刷新" : "刷新内容"}
               aria-label="刷新内容"
+              data-unread={hasUpdates || undefined}
               onClick={() => void town.load(true)}
             >
-              <svg viewBox="0 0 20 20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M16 6a7 7 0 1 0 1 7M16 2v5h-5" /></svg>
+              <Icon name="refresh-20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </button>
           </div>
         </div>
-        <div className="town-meta-row">
-        <div className="town-live-row">
+        <div className="town-meta-row" hidden={!connectionIssue && !town.refreshError}>
+        <div className="town-live-row" hidden={!connectionIssue}>
           <span
             id="town-live-status"
             role="status"
             data-phase={town.live?.phase || "connecting"}
           >
-            {town.view === "seeds" ? "Seed Garden · 公开经验" : town.view === "announcements" ? "公开公告" : town.view === "contacts" ? "通讯录 · 自愿公开" : town.live?.message || "正在读取 Town 连接状态"}
+            {connectionIssue ? town.live?.message : ""}
           </span>
           <button
             id="town-live-retry"
             className="text-button"
-            hidden={
-              ["seeds", "announcements", "contacts"].includes(town.view) || !town.live ||
-              !["reconnecting", "auth-error"].includes(town.live.phase)
-            }
+            hidden={!connectionIssue}
             onClick={() => void town.run(() => town.api.reconnectTown())}
           >
             重新连接
           </button>
-          <button
-            id="town-updates"
-            className="text-button"
-            hidden={!channel || !town.unread(channel)}
-            onClick={() => void town.load(true)}
-          >
-            有新内容 · 更新
-          </button>
         </div>
-        <div className="town-status-row">
+        <div className="town-status-row" hidden={!town.refreshError}>
           <div id="town-status" className="list-status" role="status" aria-live="polite">
-            {town.refreshError || town.status}
+            {town.refreshError}
           </div>
         </div>
-        {town.view === "kits" && town.tab === "grove" && <button className="secondary grove-help-button" onClick={() => void town.run(() => town.api.openTownLink("/grove"))}>Grove Help ↗</button>}
         </div>
         {town.view === "bonfire" && <BonfireAnnouncements town={town} />}
         <div
@@ -502,16 +494,10 @@ function FiresideMembers({
         title={names.join("、")}
         onClick={() => setOpen((value) => !value)}
       >
-        <svg viewBox="0 0 20 20" aria-hidden="true">
-          <circle cx="7" cy="7" r="2.5" />
-          <circle cx="13.5" cy="8" r="2" />
-          <path d="M2.8 15c.5-2.6 2-3.9 4.3-3.9s3.9 1.3 4.4 3.9M11.4 12c.7-.7 1.5-1 2.5-1 1.8 0 2.9 1 3.3 3" />
-        </svg>
+        <Icon name="people-20" />
         <span>{count > 0 ? `${count} 位成员` : "成员"}</span>
         {loading && <span className="fireside-members-loading" aria-label="正在读取" />}
-        <svg className="fireside-members-chevron" viewBox="0 0 12 12" aria-hidden="true">
-          <path d="m3 4.5 3 3 3-3" />
-        </svg>
+        <Icon name="chevron-down-12" className="fireside-members-chevron" />
       </button>
       {open && (
         <div

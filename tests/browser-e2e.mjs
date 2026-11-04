@@ -30,23 +30,23 @@ try {
   await page.waitForFunction(() => document.querySelector('#browser-title').textContent === '浏览器测试');
   await page.waitForFunction(async () => !(await window.beings.browserState()).loading);
   assert.equal(await visible(), true);
-  const divider = page.locator('#browser-divider');
+  const divider = page.getByRole('separator', { name: '调整浏览器宽度' });
   const originalWidth = await page.locator('#browser-panel').evaluate(el => el.getBoundingClientRect().width);
   const stageWidth = await page.locator('.workspace-stage').evaluate(el => el.getBoundingClientRect().width);
-  const expectedWidth = originalWidth + Math.min(20, Math.max(0, stageWidth - 300));
-  const originalPercent = Number(await divider.getAttribute('aria-valuenow'));
+  const expectedWidth = originalWidth + Math.min(24, Math.max(0, stageWidth - 280));
+  const originalSize = Number(await divider.getAttribute('aria-valuenow'));
   // Native page navigation can take keyboard focus after its title arrives.
   // Focus the shell separator after navigation has fully settled.
   await divider.click();
-  await page.waitForFunction(() => document.activeElement?.id === 'browser-divider');
+  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '调整浏览器宽度');
   await divider.press('ArrowLeft');
   await page.waitForFunction(width => Math.abs(document.querySelector('#browser-panel').getBoundingClientRect().width - width) < 1, expectedWidth).catch(async error => {
     console.error('Browser resize', await page.evaluate(before => ({before,width:document.querySelector('#browser-panel').getBoundingClientRect().width,
       stage:document.querySelector('.workspace-stage').getBoundingClientRect().width,viewport:innerWidth,
-      divider:document.querySelector('#browser-divider').outerHTML,focus:document.activeElement?.id}), originalWidth));
+      divider:document.querySelector('#browser-panel [role=separator]').outerHTML,focus:document.activeElement?.id}), originalWidth));
     throw error;
   });
-  assert(Number(await divider.getAttribute('aria-valuenow')) >= originalPercent);
+  assert(Number(await divider.getAttribute('aria-valuenow')) >= originalSize);
   await divider.dblclick();
   await page.waitForFunction(width => Math.abs(document.querySelector('#browser-panel').getBoundingClientRect().width - width) < 2, originalWidth);
   assert.equal((await page.evaluate(() => window.beings.browserState())).address, base + '/one');

@@ -1,3 +1,4 @@
+import { Icon } from '../../shared/icons/icon';
 import { memo, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
 import { PermissionPicker } from '../../shared/components/permission-picker';
 import type { AppModel } from "../models/app";
@@ -8,20 +9,17 @@ import { TownAuth } from "../../town/components/auth";
 import { Portal } from "../../portal/page";
 import { Diagnostics } from "./diagnostics";
 import { NavigationControls } from "../../shared/components/navigation-controls";
-import { navigateTabs } from "../../shared/components/tab-navigation";
+import { navigateTabs } from "../../shared/lib/tab-navigation";
 import { MAX_CHAT_HISTORY_LIMIT, validChatHistoryLimit } from '../../../shared/chat-history';
 import { dshRuntime } from '../../plugins/dsh/runtime';
 const baseSettingsTabs = [
-  { id: "being", label: "Being", icon: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8ZM4 21a8 8 0 0 1 16 0" },
-  { id: "portal", label: "Portal", icon: "M5 4h14a1 1 0 0 1 1 1v10a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1Zm3 16h8m-4-4v4" },
-  { id: "town", label: "Town", icon: "m3 10 9-7 9 7M5 9v12h14V9m-9 12v-7h4v7" },
-  { id: "models", label: "模型", icon: "m12 3 9 5-9 5-9-5 9-5Zm-9 9 9 5 9-5M3 16l9 5 9-5" },
-  { id: "appearance", label: "外观与阅读", icon: "M4 4h16v13H4V4Zm4 17h8m-4-4v4M8 8h8m-8 4h5" },
-  { id: "general", label: "通用", icon: "M4 7h16M4 17h16M8 4v6m8 4v6" },
+  { id: "being", label: "Being", icon: "settings-being" as const },
+  { id: "portal", label: "Portal", icon: "settings-portal" as const },
+  { id: "town", label: "Town", icon: "settings-town" as const },
+  { id: "models", label: "模型", icon: "settings-models" as const },
+  { id: "appearance", label: "外观与阅读", icon: "settings-appearance" as const },
+  { id: "general", label: "通用", icon: "menu-settings" as const },
 ];
-function DisclosureIcon() {
-  return <svg className="settings-disclosure-icon" viewBox="0 0 20 20" aria-hidden="true"><path d="m5 8 5 5 5-5" /></svg>;
-}
 export const ClientSettings = memo(function ClientSettings({ model }: { model: AppModel }) {
   // A closed dialog retains its form state without reconciling
   // every control on background chat, Portal and Town notifications.
@@ -30,7 +28,7 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
   const app = model;
   const open = app.clientSettingsOpen || Boolean(app.settingsRoute);
   useSyncExternalStore(dshRuntime.subscribe, () => open ? dshRuntime.getVersion() : -1);
-  const settingsTabs = app.api.dshPlugins ? [...baseSettingsTabs, {id:'plugins', label:'插件', icon:'M9 3h6v6h6v6h-6v6H9v-6H3V9h6V3Z'}] : baseSettingsTabs;
+  const settingsTabs = app.api.dshPlugins ? [...baseSettingsTabs, {id:'plugins', label:'插件', icon:'settings-plugins' as const}] : baseSettingsTabs;
   const pluginSettings = dshRuntime.slots.filter(slot => slot.name === 'settings.section').sort((a,b) => (a.order || 0) - (b.order || 0));
   const route = app.settingsRoute;
   const [modelBusy, setModelBusy] = useState(false);
@@ -137,7 +135,7 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
             aria-controls={`settings-panel-${item.id}`} aria-selected={activeTab === item.id}
             disabled={busy} tabIndex={activeTab === item.id ? 0 : -1} onClick={() => void selectTab(item.id)}
             >
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d={item.icon} /></svg>
+            <Icon name={item.icon} />
             {item.label}
           </button>)}
         </div>
@@ -161,8 +159,8 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
             {pluginSettings.map((slot,index) => <button aria-label={slot.label || slot.id || slot.owner} key={`${slot.owner}:${slot.id || index}`} onClick={async () => {
               if (!await leave(true)) return;
               dshRuntime.panel = slot; dshRuntime.managerOpen = true; dshRuntime.changed();
-            }}><span><strong>{slot.label || slot.id || slot.owner}</strong><small>{slot.owner}</small></span><DisclosureIcon /></button>)}
-            <button aria-label="管理第三方插件" onClick={async () => { if (await leave(true)) dshRuntime.openManager(); }}><span><strong>管理第三方插件</strong><small>安装、启停与更新</small></span><DisclosureIcon /></button>
+            }}><span><strong>{slot.label || slot.id || slot.owner}</strong><small>{slot.owner}</small></span><Icon name="disclosure-down" className="settings-disclosure-icon" /></button>)}
+            <button aria-label="管理第三方插件" onClick={async () => { if (await leave(true)) dshRuntime.openManager(); }}><span><strong>管理第三方插件</strong><small>安装、启停与更新</small></span><Icon name="disclosure-down" className="settings-disclosure-icon" /></button>
           </div>
         </div>
         <div id="settings-panel-being" role="tabpanel" aria-labelledby="settings-tab-being" hidden={activeTab !== 'being'}>
@@ -194,7 +192,7 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
               if (event.currentTarget.open && route !== 'connection') app.openConnectionSettings('portal');
               else if (!event.currentTarget.open && route === 'connection' && !busy) app.openPortalSettings();
             }}>
-              <summary onClick={event => { if (busy) event.preventDefault(); }}><span><strong>本机配置</strong><small>名称、工作目录、后台常驻与工具权限</small></span><DisclosureIcon /></summary>
+              <summary onClick={event => { if (busy) event.preventDefault(); }}><span><strong>本机配置</strong><small>名称、工作目录、后台常驻与工具权限</small></span><Icon name="disclosure-down" className="settings-disclosure-icon" /></summary>
               {route === 'connection' && <ConnectionSettings model={app} embedded inline />}
             </details>
           } />}
@@ -216,10 +214,7 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
                   <button key={theme} id={`theme-${theme}`} type="button"
                     aria-pressed={app.colorScheme === theme}
                     onClick={() => void app.setTheme(theme)}>
-                    <svg viewBox="0 0 20 20" aria-hidden="true">
-                      {theme === "light" ? <><circle cx="10" cy="10" r="3.25" /><path d="M10 1.5v2m0 13v2M1.5 10h2m13 0h2M4 4l1.4 1.4m9.2 9.2L16 16M4 16l1.4-1.4m9.2-9.2L16 4" /></>
-                        : <path d="M16.8 12.1A7 7 0 0 1 7.9 3.2a7 7 0 1 0 8.9 8.9Z" />}
-                    </svg>
+                    <Icon name={theme === 'light' ? 'sun-20' : 'moon-20'}  />
                     {theme === "light" ? "浅色" : "深色"}
                   </button>
                 ))}
@@ -359,7 +354,7 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
             if (event.currentTarget.open && route !== 'diagnostics') app.openDiagnostics();
             else if (!event.currentTarget.open && route === 'diagnostics') app.returnToClientSettings();
           }}>
-            <summary id="open-diagnostics"><span><strong>连接诊断</strong><small>检查本机服务与连接，导出诊断报告</small></span><DisclosureIcon /></summary>
+            <summary id="open-diagnostics"><span><strong>连接诊断</strong><small>检查本机服务与连接，导出诊断报告</small></span><Icon name="disclosure-down" className="settings-disclosure-icon" /></summary>
             {open && route === 'diagnostics' && <Diagnostics model={app} embedded />}
           </details>
         </div>

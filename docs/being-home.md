@@ -81,3 +81,73 @@ Electron 集成测试使用临时 profile、回环 HTTPS/WSS 和精确测试证�
 - 删除正常预览时每 4 秒的重复截图轮询，仅保留呈现切换时的占位快照；稳定状态下账号/电脑查询降低至 15 秒，操作进行中仍为 3 秒；布局观察合并到每帧一次。
 
 保留现有认证和安全隔离设计，也保留客户端的导航、资料页与聊天布局。未改远端页面，未加入新的全局主题或布局规则。断网或进程被强制结束时，服务端租约最终仍依赖自身超时释放。
+
+## 2026-11-03 云端资料库接入
+
+本节更新前文「资料库保持空态」「当前客户端未申请文件权限」的阶段性记录。实现依据为同一份 [Being Home 客户端对接文档](https://d5.feishu.cn/docx/HXjcdWmProQqFkxlvducqR0Jn4g) revision 52 第 7 节，2026-11-03 经 Lark CLI 读取，并核对生产 OpenAPI schema。
+
+点击聊天顶部 Being 名称，进入「资料库」即可浏览云端工作区。支持目录面包屑、当前文件夹名称搜索、刷新，以及文件夹优先、名称排序；提供加载、操作中、空目录、无匹配结果和错误重试状态。未登录或权限不足时可前往「电脑」栏处理。文件服务独立于电脑电源状态，不需要唤醒电脑。
+
+- 资料库仅展示工作区内容并提供预览、下载，不提供上传、新建目录或其他云端写操作。下载通过原生保存对话框，由主进程流式写入并原子保存。
+- OAuth 文件权限仅申请 `files:read`；旧会话可能需要在「电脑」栏退出 Home 后重新登录授权。
+- 不超过 8 MiB 的文件可预览文本、栅格图片、PDF、XLSX、PPTX。列表已知文件超限时直接提示下载，不请求预览内容。HTML 提供隔离交互预览与源码切换，允许脚本、外部网页资源和网络请求；不支持的格式可下载查看。
+- 主进程核对 Home / Heart 归属并校验路径，凭据不传给 renderer。目录导航和预览关闭会丢弃各自的迟到响应；退出登录或身份切换会清空资料状态并使旧操作结果失效。
+
+界面沿用现有 Being 资料栏与 Tab 布局。组件私有样式放在相邻的 SCSS Module，使用 `_tokens.scss` 的 `--surface`、`--text`、`--secondary`、`--line`、`--hover` 和 `--selected` 适配明暗主题；标题和正文密度延续 `_workspace.scss` 的资料栏层级。预览复用附件与本地文件共用的右侧 `FilePreviewPanel`、关闭按钮和焦点规则，遵循 `desktop/renderer/STYLING.md` 的作用域约定；没有建立新的全局视觉体系。HTML 内容使用独立白色画布，不改变宿主主题。
+
+主要文件：
+
+| 文件 | 职责 |
+| --- | --- |
+| `desktop/main/home/files.ts` | 文件接口、路径校验、大小限制、原生选择与保存 |
+| `desktop/main/home/client.ts` / `service.ts` / `ipc.ts` | 文件权限、身份归属及 IPC 注册 |
+| `desktop/preload/preload.ts` / `desktop/shared/home.ts` | 主 frame 文件桥与类型契约 |
+| `desktop/renderer/app/models/home-library.ts` | 目录、操作、预览状态及迟到响应丢弃 |
+| `desktop/renderer/app/components/home-library.tsx` / `home-library.module.scss` | 资料库交互与局部样式 |
+| `desktop/renderer/app/components/home-file-preview.tsx` | 格式分发、已有文档预览组件复用及 HTML 隔离 |
+
+当前实现验证记录：
+
+```sh
+npm run typecheck
+npx vitest run tests/home-files.test.ts tests/home.test.ts tests/home-stream.test.ts tests/architecture.test.ts
+node tests/home-library-ui.mjs
+node tests/home-files-electron.mjs
+node tests/menu-keyboard.mjs
+node tests/settings-navigation.mjs
+node tests/update-progress.mjs
+npx vite build --config vite.renderer.config.ts
+```
+
+上述检查已通过，Vitest 共 45 项。UI 测试使用合成 Chrome fixture，覆盖明暗主题、窄栏、搜索、目录导航、下载、静态 HTML、Escape 与焦点恢复、竞态和退出登录，并确认没有上传、新建目录入口。Electron 测试运行实际 preload 与 IPC，模拟原生对话框和凭据，覆盖二进制保存、子 frame 隔离，确认文件请求均为 GET，且不调用电脑接口。Renderer 构建通过，保留已有 chunk 体积提示。没有使用生产账号执行下载，也未验证真实操作系统保存对话框。
+
+Grok Bot 的资料库交互参考为文件列表、点击预览、HTML 预览/源码切换及下载。Home 文件接口只返回名称、路径、类型和大小，因此目前按文件夹及名称展示，没有虚构 Grok 中的日期分组。
+
+初始化设置入口问题：`Topbar` 的设置菜单和更新入口通过 `createPortal` 挂载到 `document.body`，不受 `#client-main[hidden]` 影响。现在仅在 `startup === 'ready'` 时挂载这些控件；加载、失败及重试期间不显示，应用快捷键也等待初始化完成。菜单与完整 shell 测试覆盖这些状态，并验证恢复后的设置和更新交互。Review 还修复了下载目标无法打开时的响应流释放，并增加回归测试。
+
+可用 `npm run test:home-files` 重跑资料库的单元、浏览器交互与 Electron IPC 测试；两个集成测试已加入 `test:all`。新增 SCSS 的 Stylelint 与格式检查通过。Home 查看器样式也由 SCSS 构建，纳入 `tests/styles-build.test.ts` 的文档入口检查。
+
+## 对话中的文件交付
+
+共用的 Markdown 消息组件识别 `being.files` v1 JSON，包括纯 JSON、说明文字中嵌入的完整对象、JSON 代码块及一条消息中的多份交付；用文件卡片替换整个 JSON 区段，保留前后正文和 Markdown 引用。卡片显示名称、文件名、可选大小和说明。协议参考：[文件交付链路测试](https://beings.town/seeds/8U2i97peLWZSSLJf-QqDg)。流式输出完成前显示接收状态；格式错误、未知版本或 URL 与 path 不一致时显示错误并保留原文，不提供文件操作。
+
+卡片和普通 Markdown 中的 `https://home.beings.town/v1/me/files/content?path=…` 链接都在客户端内打开，不能直接跳转浏览器。只接受固定 HTTPS Home 接口；路径按 URL 查询参数解码一次，并与消息中的相对路径核对。聊天 iframe 只传递路径和当前 revision，宿主核验来源后复用资料库的 Home 文件 API、预览窗口与下载按钮。主进程使用当前 Home 登录 token 添加 `Authorization: Bearer …`，不使用 Heart token，不把凭据传给消息、iframe 或文件内容。
+
+HTML 使用隔离交互预览，可切换源码或下载原文件。登录状态、Home 身份或聊天连接变化时关闭旧预览并丢弃迟到响应。原始交付信息中的 size/sha256 是发送方元数据，不表示客户端已完成完整性校验。
+
+回归验证：`tests/being-files.test.ts`、`tests/being-files-ui.mjs`、`tests/home-files.test.ts`、`tests/home-files-electron.mjs`、`tests/home-library-ui.mjs` 与实际构建的 `tests/chat-react.mjs`。使用合成文件与隔离登录凭据，不读取生产用户文件。
+
+
+文件交付卡片的标题、大小和说明现在属于同一个按钮，hover、按下与键盘焦点覆盖完整卡片，点击说明也可打开。Home 资料库、聊天交付和本地附件共用 `file-preview-panel.tsx`，默认在对话右侧预览，可拖动宽度、展开全部、恢复对话和关闭；窄窗口使用可用宽度。保留 Home 认证、HTML 权限隔离、源码和下载，同一时间只显示一个文件预览。
+
+
+## 2026-11-04 文件加载态与 HTML 跳转
+
+文件读取和预览组件加载时使用居中的 22px 进度指示与 13px 次级文字，适配明暗主题；减少动态效果设置下停止旋转。
+
+云端 HTML 改为独立的 `beings://preview/runtime.html` 文档，避免继承客户端 shell 禁止脚本和网络的 CSP。云端及本地 HTML 均允许网页脚本、HTTP(S) 资源、网络请求、表单及弹窗。普通链接、`_blank` / `_top` 链接、`window.open` 和页面跳转通过主进程现有网页打开逻辑处理，保留左侧工作区；页内锚点正常使用。预览仍保持不透明源，无 Node、客户端 IPC 或父页面访问权限。
+
+`tests/html-preview-electron.mjs` 使用实际主窗口导航处理及协议响应验证上述行为；外部资源来自本地测试服务器，外部打开动作被记录，不启动真实浏览器。
+
+
+浏览器与文件预览统一占用右侧分栏：文件中的链接打开浏览器时关闭文件预览，重新打开文件时关闭浏览器，最多保留左侧工作区与右侧内容两栏；其他辅助栏暂时收起，关闭右侧内容后恢复。浏览器复用 `PanelResizeHandle` 的 20px 拖动区域、键盘调整及双击复位，宽度记忆使用 `usePanelWidth`。拖动期间隐藏原生网页视图，结束后按实际分栏位置更新原生画面，避免原生层截获拖动。`tests/preview-browser-split.mjs` 覆盖最大化文件打开链接、右侧原生网页、鼠标拖动、键盘调整、双击复位、文件/浏览器互换、窄窗口及草稿保留。

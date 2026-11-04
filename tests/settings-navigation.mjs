@@ -18,6 +18,16 @@ try {
   await page.goto(origin);
   await page.locator('#chat-frame').waitFor();
   const settings=page.locator('#client-settings-dialog');
+  for (const startup of ['loading', 'error', 'loading']) {
+    await page.evaluate(value => { fixtureApp.startup = value; fixtureApp.changed(); }, startup);
+    await page.locator('#startup-screen').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('.rail-settings-menu,.rail-update').count(), 0);
+    await page.keyboard.press('Meta+,');
+    await page.keyboard.press('Control+,');
+    assert.equal(await settings.isVisible(), false, 'Startup must not open settings through shortcuts');
+  }
+  await page.evaluate(() => { fixtureApp.startup = 'ready'; fixtureApp.changed(); });
+  await page.locator('#options-trigger').waitFor({ state: 'visible' });
   await page.evaluate(()=>fixtureApp.openConnectionSettings('portal'));
   await settings.locator('#workspace-input').fill('/fixture/retained-draft');
   await settings.getByRole('tab',{name:'外观与阅读',exact:true}).click();

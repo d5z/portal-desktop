@@ -1,3 +1,4 @@
+import { Icon } from '../../shared/icons/icon';
 import { catalogPage } from '../models/pagination';
 import { groveEntryKind, pluginReleaseUrl } from '../../../shared/plugins';
 import { Fragment, useEffect, useRef, useState } from "react";
@@ -226,11 +227,11 @@ export function Pagination({ town }: { town: TownModel }) {
   return <>
     <div className="pagination-controls">
       <button className="pagination-arrow" aria-label="← 上一页" title="上一页" disabled={loading || page.page <= 1} onClick={() => town.turnPage(-1)}>
-        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m12 5-5 5 5 5" /></svg>
+        <Icon name="chevron-left-20" />
       </button>
       <span className="pagination-page" aria-live="polite">{loading ? '正在读取…' : page.total ? `第 ${page.page} / ${page.pages} 页` : '暂无结果'}</span>
       <button className="pagination-arrow" aria-label="下一页 →" title="下一页" disabled={loading || page.page >= page.pages} onClick={() => town.turnPage(1)}>
-        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m8 5 5 5-5 5" /></svg>
+        <Icon name="chevron-right-20" />
       </button>
     </div>
     <small className="pagination-total">{loading ? '正在统计' : `共 ${page.total} 项`}</small>

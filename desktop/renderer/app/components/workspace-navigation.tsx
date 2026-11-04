@@ -1,3 +1,5 @@
+import { NavigationIcon } from '../../shared/icons/navigation';
+import { usePanelMotion } from "../hooks/use-panel-motion";
 import { dshRuntime } from "../../plugins/dsh/runtime";
 import { PluginIcon } from "../../plugins/icon";
 import { RecentHistory } from './recent-history';
@@ -9,24 +11,23 @@ import { PanelResizeHandle, usePanelWidth } from "../../shared/components/panel-
 import type { AppModel } from "../models/app";
 import { useModel } from "../../shared/hooks/use-model";
 import { BeingComputer } from "./being-computer";
+import { BeingLibrary } from "./home-library";
 
 const beingTabs = [["profile", "详情"], ["activity", "动态"], ["library", "资料库"], ["computer", "电脑"]] as const;
 
 const destinations = [
-  ["bonfire", "篝火", "M12 3c2 5 6 6 6 11a6 6 0 0 1-12 0c0-3 2-5 3-7 0 3 1 4 2 4 2-2 2-5 1-8Z"],
-  ["firesides", "围炉", "M4 5h16v11H9l-5 4V5Zm4 4h8m-8 3h5"],
-  ["mail", "私信", "M3 6h18v13H3V6Zm0 1 9 7 9-7"],
-  ["seeds", "种子花园", "M12 21V10m0 6C5 16 3 12 3 7c6 0 9 3 9 9Zm0-4c0-6 3-9 9-9 0 6-3 9-9 9Z"],
-  ["embers", "书架", "M4 4h5v16H4V4Zm5 0h5v16H9m7-15 4-1 3 15-4 1-3-15Z"],
-  ["scrolls", "卷轴", "M6 3h12v18H6V3Zm3 5h6m-6 4h6m-6 4h4"],
-  ["kits", "工具库", "M4 4h6v6H4V4Zm10 0h6v6h-6V4ZM4 14h6v6H4v-6Zm13 0v6m-3-3h6"],
-  ["announcements", "公告", "M4 4h16v16H4V4Zm4 4h8m-8 4h8m-8 4h5"],
-  ["contacts", "通讯录", "M5 3h16v18H5V3ZM2 7h4m-4 5h4m-4 5h4m5-8a2 2 0 1 0 4 0 2 2 0 1 0-4 0m-2 8v-1a4 4 0 0 1 8 0v1"],
-  ["town", "小镇广场", "m3 10 9-7 9 7M5 9v12h14V9m-9 12v-7h4v7"],
+  ["bonfire", "篝火", "rail-bonfire"],
+  ["firesides", "围炉", "rail-firesides"],
+  ["mail", "私信", "rail-mail"],
+  ["seeds", "种子花园", "rail-seeds"],
+  ["embers", "书架", "rail-embers"],
+  ["scrolls", "卷轴", "rail-scrolls"],
+  ["kits", "工具库", "rail-kits"],
+  ["announcements", "公告", "rail-announcements"],
+  ["contacts", "通讯录", "rail-contacts"],
+  ["town", "小镇广场", "rail-town"],
 ] as const;
-function Icon({ path }: { path: string }) {
-  return <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path className="rail-icon-line" pathLength="100" d={path} /></svg>;
-}
+
 function RailButton({ label, children, active, disabled, unread, onClick, className = "", plugin = false, id, expanded, navigationKey }: {
   navigationKey?: string; id?: string; expanded?: boolean; label: string; children: ReactNode; active?: boolean; disabled?: boolean; unread?: boolean;
   onClick: () => void; className?: string; plugin?: boolean;
@@ -93,14 +94,14 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
     };
   }, [moreOpen]);
   const entries = [
-    ...destinations.map(([key, label, path]) => ({
-      key, label, path, icon: undefined, active: app.view === key, plugin: false,
+    ...destinations.map(([key, label, glyph]) => ({
+      key, label, glyph, icon: undefined, active: app.view === key, plugin: false,
       unread: key === "bonfire" || key === "firesides" || key === "mail" ? town.unread(key) : false,
       open: () => app.navigate(key),
     })),
     ...plugins.navigationViews().map(({ plugin, view }) => ({
       key: `plugin:${plugin.id}:${view.id}`, label: view.title, icon: plugins.icon(plugin.id, view.id),
-      path: "M8 3h8v5h5v8h-5v5H8v-5H3V8h5V3Z", plugin: true, unread: false,
+      glyph: "plugin-navigation" as const, plugin: true, unread: false,
       active: app.view === "plugins" && plugins.selected?.id === plugin.id && plugins.selected.view === view.id,
       open: () => plugins.open(plugin.id, view.id, undefined, "navigation"),
     })),
@@ -122,18 +123,18 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
     </RailButton>
     <div className="rail-links" {...sort}>
       {orderedKeys.map(key => {
-        if (key === "chat") return <RailButton key={key} navigationKey={key}  label="对话" active={app.view === "chat"} onClick={() => app.navigate("chat")}><Icon path="M4 4h16v12H9l-5 4V4Z" /></RailButton>;
-        if (key === "search") return <RailButton key={key} navigationKey={key}  id="toggle-chat-search" expanded={app.searchOpen} label="查找对话" disabled={!app.snapshot?.settings.hasToken} onClick={() => app.openSearch()}><Icon path="m16 16 5 5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z" /></RailButton>;
+        if (key === "chat") return <RailButton key={key} navigationKey={key}  label="对话" active={app.view === "chat"} onClick={() => app.navigate("chat")}><NavigationIcon name="rail-chat" /></RailButton>;
+        if (key === "search") return <RailButton key={key} navigationKey={key}  id="toggle-chat-search" expanded={app.searchOpen} label="查找对话" disabled={!app.snapshot?.settings.hasToken} onClick={() => app.openSearch()}><NavigationIcon name="rail-search" /></RailButton>;
         const entry = entries.find(entry => entry.key === key)!;
         return <RailButton key={key} navigationKey={key} label={entry.label} active={entry.active}
 
-          plugin={entry.plugin} unread={entry.unread} onClick={entry.open}>{entry.plugin ? <PluginIcon icon={entry.icon} /> : <Icon path={entry.path} />}</RailButton>;
+          plugin={entry.plugin} unread={entry.unread} onClick={entry.open}>{entry.plugin ? <PluginIcon icon={entry.icon} /> : <NavigationIcon name={entry.glyph} />}</RailButton>;
       })}
       <div id="dsh-navigation" className="dsh-navigation" ref={dshRuntime.setNavigationHost} />
       <RailButton id="rail-more-trigger" label={moreOpen ? "收起更多功能" : "更多功能"} expanded={moreOpen}
         active={entries.some(entry => !pins.includes(entry.key) && entry.active)}
         unread={entries.some(entry => !pins.includes(entry.key) && entry.unread)} onClick={() => setMoreOpen(open => !open)}>
-        <Icon path={moreOpen ? "m7 14 5-5 5 5" : "M5 11h2v2H5zM11 11h2v2h-2zM17 11h2v2h-2z"} />
+        <NavigationIcon name={moreOpen ? "rail-collapse" : "rail-more"} />
       </RailButton>
     </div>
     <div className="rail-settings-placeholder" aria-hidden="true" />
@@ -141,15 +142,22 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
       <header><div><strong>更多功能</strong><p>将常用功能固定到左侧</p></div><button aria-label="收起更多功能" onClick={() => closeMore(true)}>×</button></header>
       <div className="rail-more-list">{entries.map(entry => <div className="rail-more-row" key={entry.key}>
         <button className="rail-more-destination" aria-current={entry.active ? "page" : undefined} data-plugin-navigation={entry.plugin || undefined}
-          onClick={() => { closeMore(); entry.open(); }}>{entry.plugin ? <PluginIcon icon={entry.icon} /> : <Icon path={entry.path} />}<span>{entry.label}</span>{entry.unread && <i aria-label="有新动态" />}</button>
+          onClick={() => { closeMore(); entry.open(); }}>{entry.plugin ? <PluginIcon icon={entry.icon} /> : <NavigationIcon name={entry.glyph} />}<span>{entry.label}</span>{entry.unread && <i aria-label="有新动态" />}</button>
         <button className="rail-pin-button" aria-label={`${pins.includes(entry.key) ? "取消固定" : "固定到左侧"}：${entry.label}`}
           aria-pressed={pins.includes(entry.key)} title={pins.includes(entry.key) ? "取消固定" : "固定到左侧"} onClick={() => togglePin(entry.key)}>
-          <Icon path="m9 3 6 0-1 6 4 4v2h-5v6l-1-2-1 2v-6H6v-2l4-4-1-6Z" />
+          <NavigationIcon name="rail-pin" />
         </button>
       </div>)}</div>
     </div>, document.body)}
   </nav>;
 }
+// Load on first visit, then keep state when the tab or the whole panel is hidden.
+function RetainedBeingTab({ active, children }: { active: boolean; children: ReactNode }) {
+  const [visited, setVisited] = useState(false);
+  useEffect(() => { if (active) setVisited(true); }, [active]);
+  return active || visited ? children : null;
+}
+
 export function BeingInfo({ app }: { app: AppModel }) {
   const town = useModel(app.town);
   const panel = useRef<HTMLElement>(null);
@@ -165,8 +173,17 @@ export function BeingInfo({ app }: { app: AppModel }) {
   const name = town.displayName || app.snapshot?.settings.being || "Being";
   const status = !app.snapshot?.settings.hasToken ? "未连接" : ({online:"已连接",connecting:"连接中",reconnecting:"重连中",offline:"已离线",degraded:"连接不稳定"}[app.connection] || "正在确认连接");
   const hidden = !app.beingInfoOpen || app.view !== "chat" || (app.subagentSettingsOpen && !app.settingsRoute);
+  const present = usePanelMotion(panel, !hidden, width);
   const browserAvailable = app.view === "chat" && !(app.subagentSettingsOpen && !app.settingsRoute);
   const modelKey = JSON.stringify([app.snapshot?.settings.endpoint, app.snapshot?.settings.being, app.snapshot?.settings.hasToken]);
+  const content = useRef<HTMLDivElement>(null);
+  const scrollPositions = useRef<Record<string, number>>({});
+  useLayoutEffect(() => { scrollPositions.current = {}; }, [modelKey]);
+  useLayoutEffect(() => {
+    if (!hidden && !privacyOpen && content.current) content.current.scrollTop = scrollPositions.current[tab] || 0;
+  }, [tab, hidden, privacyOpen, modelKey]);
+  const libraryActive = !hidden && !privacyOpen && tab === 'library';
+  const activityActive = !hidden && !privacyOpen && tab === 'activity';
   const [modelPreview, setModelPreview] = useState({ key: '', label: '' });
   const currentModel = modelPreview.key === modelKey ? modelPreview.label : '';
   const connected = Boolean(app.snapshot?.settings.hasToken);
@@ -181,13 +198,14 @@ export function BeingInfo({ app }: { app: AppModel }) {
   }, [app, hidden, connected, modelKey, app.subagentSettingsOpen]);
 
   const closeInfo = () => { app.toggleBeingInfo(); document.getElementById("toggle-being-info")?.focus(); };
-  return <aside ref={panel} style={{ width, flexBasis: width }} id="being-info" className="being-info" aria-label={privacyOpen ? "隐私说明" : "Being 信息"} hidden={hidden}
+  return <aside ref={panel} style={{ width, flexBasis: width }} id="being-info" className="being-info" aria-label={privacyOpen ? "隐私说明" : "Being 信息"} hidden={!present} inert={hidden} aria-hidden={hidden} data-closing={hidden && present || undefined}
     onKeyDown={event => {
       if (event.key === "Escape" && !event.defaultPrevented && !privacyOpen) {
         event.stopPropagation(); closeInfo();
       }
     }}>
     <PanelResizeHandle panel={panel} label="调整 Being 信息宽度" width={width} onResize={setWidth} initial={320} max={900} reserve={396} disabled={hidden} />
+    <div className="being-info-body">
     <button className="close being-info-close" aria-label={privacyOpen ? "关闭隐私说明" : "关闭 Being 信息"} onClick={() => {
       if (privacyOpen) { closePrivacy(); return; }
       closeInfo();
@@ -209,7 +227,9 @@ export function BeingInfo({ app }: { app: AppModel }) {
         }}
         onClick={() => setTab(key)}>{label}</button>)}
     </div>
-    <div className="being-info-content">
+    <div ref={content} className="being-info-content" onScroll={event => {
+      if (!hidden && !privacyOpen) scrollPositions.current[tab] = event.currentTarget.scrollTop;
+    }}>
     <section id="being-profile-panel" role="tabpanel" tabIndex={0} aria-labelledby="being-profile-tab" hidden={tab !== "profile"}>
       <h3>关于 Being</h3>
       <dl className="being-details">
@@ -225,10 +245,10 @@ export function BeingInfo({ app }: { app: AppModel }) {
       <button className="being-action-row being-connect" onClick={() => app.showSettings()}>连接设置 <span aria-hidden="true">›</span></button>
     </section>
     <section id="being-activity-panel" role="tabpanel" tabIndex={0} aria-labelledby="being-activity-tab" hidden={tab !== "activity"}>
-      {!hidden && !privacyOpen && tab === "activity" && <RecentHistory app={app} />}
+      <RetainedBeingTab key={modelKey} active={activityActive}><RecentHistory app={app} visible={activityActive} /></RetainedBeingTab>
     </section>
     <section id="being-library-panel" role="tabpanel" tabIndex={0} aria-labelledby="being-library-tab" hidden={tab !== "library"}>
-      <p className="being-library-empty">云电脑创建的 HTML 页面和文件会显示在这里。</p>
+      <RetainedBeingTab key={modelKey} active={libraryActive}><BeingLibrary api={app.api.home} active={libraryActive} onConnect={() => setTab('computer')} /></RetainedBeingTab>
     </section>
     <section id="being-computer-panel" role="tabpanel" tabIndex={0} aria-labelledby="being-computer-tab" hidden={tab !== "computer"}>
       <BeingComputer name={name} api={app.api.home} active={!hidden && !privacyOpen && tab === "computer"} context={app.snapshot?.settings.endpoint || ""} browserHost={browserHost} available={browserAvailable} />
@@ -239,5 +259,6 @@ export function BeingInfo({ app }: { app: AppModel }) {
       <header><button ref={privacyBack} className="topbar-icon-button" aria-label="返回资料页" onClick={closePrivacy}>‹</button><h2 id="being-privacy-title">隐私说明</h2></header>
       <div className="being-privacy-content"><PrivacyContent /></div>
     </section>}
+    </div>
   </aside>;
 }

@@ -1,10 +1,11 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import { chmod, copyFile, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
+import { build } from 'esbuild';
 import os from 'node:os';
 import path from 'node:path';
 import { command } from '../desktop/main/portal/background';
-import { assetName, macInstallerScript, stageInstaller } from '../desktop/main/updates/manual-installer';
+import { assetName, launchMacInstaller, macInstallerScript, stageInstaller } from '../desktop/main/updates/manual-installer';
 import { macInstallLocation, validateMacApp } from '../desktop/main/updates/mac-package';
 import { digest } from '../desktop/main/updates/runtime';
 
@@ -54,6 +55,74 @@ async function archiveFetcher(root: string, app: string, version: string, corrup
   const sum = `${corruptDigest ? '0'.repeat(64) : digest(data)}  ${assetName(version)}\n`;
   return (async (url: string | URL | Request) => new Response(String(url).endsWith('SHA256SUMS.txt') ? sum : data)) as typeof fetch;
 }
+
+mac('rejects an exited or unready installation worker without replacing the app', async () => {
+  const root = await temporary();
+  for (const scenario of ['exit', 'timeout']) {
+    const dir = path.join(root, scenario); await mkdir(dir);
+    const script = path.join(dir, 'install.sh');
+    await writeFile(script, scenario === 'exit' ? 'echo worker-failed >&2\nexit 42\n' : 'sleep 2\n');
+    await expect(launchMacInstaller(dir, script, 150)).rejects.toThrow(scenario === 'exit' ? '交接前退出' : '超时');
+    expect((await readdir(dir)).some(name => name.endsWith('.cancel'))).toBe(true);
+    if (scenario === 'exit') expect(await readFile(path.join(dir, 'install.log'), 'utf8')).toContain('worker-failed');
+  }
+}, nativeTimeout);
+
+mac('acknowledges readiness and honours cancellation before touching either application', async () => {
+  const root = await temporary();
+  const current = path.join(root, 'Current.app'), candidate = path.join(root, 'Candidate.app');
+  await mkdir(current); await mkdir(candidate);
+  await writeFile(path.join(current, 'version'), 'old');
+  await writeFile(path.join(candidate, 'version'), 'new');
+  const script = path.join(root, 'install.sh');
+  await writeFile(script, macInstallerScript(process.pid, current, candidate, path.join(root, 'Previous.app')));
+  await launchMacInstaller(root, script);
+  const ready = (await readdir(root)).find(name => name.endsWith('.ready'))!;
+  const status = path.join(root, ready.replace('.ready', '.json'));
+  const pid = Number(await readFile(path.join(root, ready), 'utf8'));
+  try {
+    expect(JSON.parse(await readFile(status, 'utf8')).stage).toBe('waiting-for-client');
+    await writeFile(path.join(root, ready.replace('.ready', '.cancel')), 'cancelled');
+    await vi.waitFor(async () => expect(JSON.parse(await readFile(status, 'utf8')).stage).toBe('cancelled'), { timeout: 3000 });
+    expect(await readFile(path.join(current, 'version'), 'utf8')).toBe('old');
+    expect(await readFile(path.join(candidate, 'version'), 'utf8')).toBe('new');
+    await expect(readFile(path.join(root, 'Previous.app/version'))).rejects.toMatchObject({ code: 'ENOENT' });
+  } finally { try { process.kill(pid); } catch { /* Already exited. */ } }
+}, nativeTimeout);
+
+mac('hands off to a detached worker that replaces and relaunches after its client exits', async () => {
+  const root = await temporary();
+  const current = path.join(root, 'Current.app'), candidate = path.join(root, 'Candidate.app'), backup = path.join(root, 'Previous.app');
+  await mkdir(current); await mkdir(candidate);
+  await writeFile(path.join(current, 'version'), 'old'); await writeFile(path.join(candidate, 'version'), 'new');
+  const launcher = path.join(root, 'open-fixture.sh'), calls = path.join(root, 'launches');
+  await writeFile(launcher, '#!/bin/sh\n/bin/cat "$2/version" > "$LAUNCH_LOG"\n', { mode: 0o700 });
+  const entry = path.join(root, 'parent.cjs');
+  await build({ stdin: { resolveDir: process.cwd(), loader: 'ts', contents: `
+    import { writeFile } from 'node:fs/promises';
+    import path from 'node:path';
+    import { launchMacInstaller, macInstallerScript } from './desktop/main/updates/manual-installer';
+    (async () => {
+      const [root, current, candidate, backup, launcher] = process.argv.slice(2);
+      const script = path.join(root, 'install.sh');
+      const quote = value => "'" + value.replaceAll("'", "'\\\\''") + "'";
+      await writeFile(script, macInstallerScript(process.pid, current, candidate, backup).replaceAll('/usr/bin/open', quote(launcher)));
+      await launchMacInstaller(root, script);
+    })().catch(error => { console.error(error); process.exitCode = 1; });
+  ` }, outfile: entry, bundle: true, platform: 'node', format: 'cjs' });
+  const child = spawn(process.execPath, [entry, root, current, candidate, backup, launcher], {
+    env: { ...process.env, LAUNCH_LOG: calls }, stdio: ['ignore', 'ignore', 'pipe'],
+  });
+  let errors = ''; child.stderr.on('data', chunk => { errors += String(chunk); });
+  try {
+    const code = await new Promise((resolve, reject) => { child.once('exit', resolve); child.once('error', reject); });
+    expect(code, errors).toBe(0);
+    await vi.waitFor(async () => expect(await readFile(path.join(root, 'install.log'), 'utf8')).toContain('completed'), { timeout: 10_000 });
+    expect(await readFile(calls, 'utf8')).toBe('new');
+    expect(await readFile(path.join(current, 'version'), 'utf8')).toBe('new');
+    expect(await readFile(path.join(backup, 'version'), 'utf8')).toBe('old');
+  } finally { child.kill(); }
+}, nativeTimeout);
 
 mac('stages a signed ZIP without touching the installed app or profile; cancellation cleans temporary downloads', async () => {
   const root = await temporary(), profile = path.join(root, 'profile');

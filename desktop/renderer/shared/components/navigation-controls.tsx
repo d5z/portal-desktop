@@ -1,3 +1,5 @@
+import { IconButton } from './icon-button';
+import { Icon } from '../icons/icon';
 import { useEffect, useRef } from "react";
 import clsx from "clsx";
 import styles from "./navigation-controls.module.scss";
@@ -100,26 +102,18 @@ export function NavigationControls({
       role="group"
       aria-label="页面历史"
     >
-      {back && <button
-        type="button"
-        aria-label="回退"
-        title="回退"
+      {back && <IconButton
+        label="回退"
         onClick={back}
       >
-        <svg viewBox="0 0 20 20" aria-hidden="true">
-          <path d="m12.5 4.5-5.5 5.5 5.5 5.5" />
-        </svg>
-      </button>}
-      {forward && <button
-        type="button"
-        aria-label="前进"
-        title="前进"
+        <Icon name="back-20" />
+      </IconButton>}
+      {forward && <IconButton
+        label="前进"
         onClick={forward}
       >
-        <svg viewBox="0 0 20 20" aria-hidden="true">
-          <path d="m7.5 4.5 5.5 5.5-5.5 5.5" />
-        </svg>
-      </button>}
+        <Icon name="forward-20" />
+      </IconButton>}
     </div>
   );
 }

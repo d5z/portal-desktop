@@ -1,3 +1,4 @@
+import { Icon } from '../shared/icons/icon';
 import { useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { useModel } from "../shared/hooks/use-model";
 import type { AppModel } from "../app/models/app";
@@ -26,7 +27,7 @@ export function Portal({ model, embedded = false, configuration }: { model: AppM
         </div>
         <div className="portal-card">
           <div className="portal-card-top">
-            <svg className="portal-symbol" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H4zM8 20h8m-4-4v4" /></svg>
+            <Icon name="monitor" className="portal-symbol" />
             <div>
               <h2 id="portal-name">
                 {snapshot?.settings.portalName || "Heart Portal"}
@@ -122,12 +123,12 @@ export function Portal({ model, embedded = false, configuration }: { model: AppM
         {configuration}
         <div className="capabilities">
           <div>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h7l2 2h9v12H3z" /></svg>
+            <Icon name="folder-flat" />
             <strong>文件与搜索</strong>
             <small>{snapshot?.settings.permissionMode === 'read-only' ? '旧版只读限制' : snapshot?.settings.permissionMode === 'full-access' ? '使用系统账户权限读写文件' : '读取普通文件；工作区外编辑需批准'}</small>
           </div>
           <div>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 8 4 4-4 4m8 0h6" /></svg>
+            <Icon name="terminal" />
             <strong>命令执行</strong>
             <small id="exec-label">
               {!snapshot?.settings.allowExec ? '未启用' : snapshot.settings.permissionMode === 'read-only'
@@ -135,7 +136,7 @@ export function Portal({ model, embedded = false, configuration }: { model: AppM
             </small>
           </div>
           <div>
-            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8 3h8v5h5v8h-5v5H8v-5H3V8h5z" /></svg>
+            <Icon name="plugin" />
             <strong>扩展工具</strong>
             <small id="kits-label">
               {snapshot?.settings.kitsEnabled

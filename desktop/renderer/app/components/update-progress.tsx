@@ -1,3 +1,4 @@
+import { Icon } from '../../shared/icons/icon';
 import type { CSSProperties } from 'react';
 import type { UpdateState } from '../../../shared/types';
 
@@ -48,9 +49,7 @@ export function UpdateProgress({ state, onDownload, onCancel, onInstall }: {
       ) : activity?.phase === 'ready' ? (
         <span className="client-update-install" aria-hidden="true">安装</span>
       ) : (
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18v2h14v-2" />
-        </svg>
+        <Icon name="update-download" />
       )}
     </button>
   );

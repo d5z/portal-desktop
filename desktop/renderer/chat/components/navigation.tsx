@@ -1,3 +1,4 @@
+import { Icon } from '../../shared/icons/icon';
 import useMemoizedFn from 'ahooks/es/useMemoizedFn';
 import { useEffect, useSyncExternalStore, useMemo, useRef, useLayoutEffect, useState, type CSSProperties, type RefObject } from "react";
 import { splitSchedulingHint } from "../models/scheduling";
@@ -25,7 +26,7 @@ export function JumpToLatest({ container, scrollLock, clearAnchor, status, trimH
         behavior: "instant" });
     }}>
     <span>{label}</span>
-    <svg viewBox="0 0 20 20" aria-hidden="true"><path d="m5 7.5 5 5 5-5" /></svg>
+    <Icon name="chevron-down-centered-20" />
   </button>;
 }
 

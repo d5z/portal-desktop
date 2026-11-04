@@ -2,11 +2,12 @@ import { createPublicKey, verify } from 'node:crypto';
 export const HOME_ORIGIN = 'https://home.beings.town';
 export const HOME_CLIENT = 'being-desktop';
 export const HOME_CALLBACK = 'http://127.0.0.1:47831/oauth/callback';
-export const HOME_SCOPE = 'openid offline_access being:read being:write account:write computer:read computer:write computer:connect';
+export const HOME_SCOPE = 'openid offline_access being:read being:write account:write files:read computer:read computer:write computer:connect';
 export class HomeError extends Error {
   constructor(public status: number, public code: string) { super(homeErrorMessage(status, code)); }
 }
 export function homeErrorMessage(status: number, code = '') {
+  if (code === 'invalid_path') return '文件路径无效，请返回工作区重新选择。';
   if (code === 'invalid_grant' || status === 401) return '登录已过期，请重新连接 Being Home。';
   if (status === 403) return '当前账号没有所需权限，请重新连接并授权。';
   if (status === 409) return '电脑或账号正在处理其他操作，请刷新状态后重试。';

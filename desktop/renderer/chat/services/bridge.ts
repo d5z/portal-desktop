@@ -100,6 +100,7 @@ export function createChatBridge(state: ChatState) {
       panel(value: ChatPanel, returnToSettings?: boolean): void;
       theme(value: "light" | "dark"): void;
       reading(value: number): void;
+      topInset?(value: number): void;
       reasoning?(show: boolean): void;
       search(query: string): void;
       jump(id: string): void;
@@ -249,6 +250,10 @@ export function createChatBridge(state: ChatState) {
         case "beings:reading":
           if (Number.isInteger(data.size) && data.size >= 13 && data.size <= 21)
             ui.reading(data.size);
+          return;
+        case 'beings:chat-top-inset':
+          if (Number.isFinite(data.value) && data.value >= 0 && data.value <= 128)
+            ui.topInset?.(data.value);
           return;
         case "beings:chat-action":
           if (data.action === "model" && embedded && location.protocol === "beings:") { send({ type: "beings:model-settings" }); return; }

@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
 import { build } from 'esbuild';
 import { mkdtemp, mkdir, readFile, writeFile, rm, symlink } from 'node:fs/promises';
 import os from 'node:os';
@@ -7,6 +7,7 @@ import { DshPluginManager } from '../desktop/main/plugins/dsh/manager';
 import { containedFile, readDshPackage } from '../desktop/main/plugins/dsh/package';
 import { externalizePluginScripts } from '../desktop/main/plugins/dsh/html';
 import { compileIndexInjections } from '../desktop/main/plugins/dsh/injections';
+import { startupPluginNotice } from '../desktop/renderer/plugins/dsh/issue';
 import { runInNewContext } from 'node:vm';
 const roots: string[] = [], managers: DshPluginManager[] = [];
 let workerDirectory: string, worker: string;
@@ -31,6 +32,18 @@ async function fixture() {
   return {home,manager,make};
 }
 describe('Town DSH compatibility host (real Cordis process)',()=>{
+ it('restores the plugin host once when an installer handoff fails after shutdown',async()=>{
+   const {manager,make}=await fixture();
+   await manager.install(await make('installer-recovery',`export const inject=['webServer'];export function apply(ctx){ctx.effect(()=>ctx.webServer.register({kind:'exact',path:'/recovered',handler(req,res){res.end(String(process.pid))}}))}`));
+   const read=async()=>await(await manager.resource(new Request('beings://desktop/recovered'))).text();
+   const before=await read();
+   await manager.shutdown();
+   expect((await manager.resource(new Request('beings://desktop/recovered'))).status).toBe(503);
+   await Promise.all([manager.resumeAfterFailedShutdown(),manager.resumeAfterFailedShutdown()]);
+   expect(manager.state().plugins[0].status).toBe('active');
+   const after=await read();expect(after).not.toBe(before);
+   await manager.resumeAfterFailedShutdown();expect(await read()).toBe(after);
+ });
  it('normalizes every supported injection before sending it to the renderer',()=>{
    const scripts=new Map<string,string>();
    const rows=compileIndexInjections([
@@ -128,9 +141,17 @@ describe('Town DSH compatibility host (real Cordis process)',()=>{
  },20000);
  it('reports missing services and never executes a dependent plugin',async()=>{
    const {manager,make}=await fixture();
-   await manager.install(await make('agent-plugin',`export const inject=['agents','sessions'];export function apply(){throw new Error('must not run')}`));
-   expect(manager.state().plugins[0]).toMatchObject({status:'blocked'});
-   expect(manager.state().plugins[0].error).toContain('agents');
+   const entry = await make('agent-plugin',`export const inject=['agents','sessions'];export function apply(){throw new Error('must not run')}`);
+   expect(await manager.install(entry)).toBe(false);
+   const disabled = {enabled:false,status:'disabled',missingServices:['agents','sessions']};
+   expect(manager.state().plugins[0]).toMatchObject(disabled);
+   await expect(manager.enable('agent-plugin',true)).rejects.toThrow('已停用');
+   expect(manager.state().plugins[0]).toMatchObject(disabled);
+   await manager.stop();
+   const restarted = new DshPluginManager(manager.home, worker, manager.npmCLI, manager.shellOrigin);
+   managers.push(restarted); await restarted.initialize();
+   expect(restarted.state().plugins[0]).toMatchObject(disabled);
+   expect(startupPluginNotice(restarted.state().plugins, {})).toBeUndefined();
  },10000);
  it('runs plugin disposers and rolls back a broken update while preserving configuration',async()=>{
    const {home,manager,make}=await fixture();
@@ -151,14 +172,35 @@ describe('Town DSH compatibility host (real Cordis process)',()=>{
    const {manager,make}=await fixture();
    await manager.install(await make('consumer',`export const inject=['fixture','webServer'];export function apply(ctx){ctx.effect(()=>ctx.webServer.register({kind:'exact',path:'/dep',handler(req,res){res.end(ctx.fixture)}}))}`));
    await manager.install(await make('provider',`export function apply(ctx){ctx.provide('fixture','available')}`));
+   expect(manager.state().plugins.find(p=>p.id==='consumer')).toMatchObject({enabled:false});
+   await manager.enable('consumer',true);
+   expect(manager.state().plugins.find(p=>p.id==='consumer')?.missingServices).toBeUndefined();
    expect(manager.state().plugins,JSON.stringify(manager.state().plugins)).toEqual(expect.arrayContaining([expect.objectContaining({id:'consumer',status:'active'}),expect.objectContaining({id:'provider',status:'active'})]));
    expect(await (await manager.resource(new Request('beings://desktop/dep'))).text()).toBe('available');
    await manager.enable('provider',false);expect(manager.state().plugins.find(p=>p.id==='consumer')?.status).toBe('blocked');expect(manager.matches('/dep')).toBe(false);
  },15000);
+ it('ignores late activation errors after a running worker crashes and can restart it',async()=>{
+   const {manager,make}=await fixture();
+   const peer = await make('healthy-peer', `export function apply(){}`);
+   await manager.install(peer);
+   await manager.install(await make('worker-exit', `export const inject=['webServer'];export function apply(ctx){
+     ctx.webServer.register({kind:'exact',path:'/exit',handler(req,res){res.end('ok');setTimeout(()=>process.kill(process.pid,'SIGKILL'),20)}});
+     ctx.on('webserver/index-inject',rows=>rows.push({kind:'style',text:'.fixture{}'}));
+   }`));
+   expect(await (await manager.resource(new Request('beings://desktop/exit'))).text()).toBe('ok');
+   await vi.waitFor(() => expect(manager.state().plugins.every(p => p.status === 'error')).toBe(true));
+   expect(manager.state().injections).toEqual([]);
+   await manager.reportFailures([{id:peer.plugin.id,installedAt:peer.plugin.installedAt,error:'stale client error'}]);
+   expect(manager.state().plugins.every(p => p.enabled)).toBe(true);
+   await manager.enable('worker-exit', false);
+   expect(manager.state().plugins.find(p => p.id === peer.plugin.id)).toMatchObject({enabled:true,status:'active'});
+ });
  it('contains crashing plugins and retains a usable recovery state',async()=>{
    const {manager,make}=await fixture();
-   await manager.install(await make('crash-plugin',`export function apply(){process.exit(7)}`));
-   expect(manager.state().plugins[0].status).toBe('error');
+   await manager.install(await make('healthy-peer',`export function apply(){}`));
+   expect(await manager.install(await make('crash-plugin',`export function apply(){process.exit(7)}`))).toBe(false);
+   expect(manager.state().plugins.find(p=>p.id==='crash-plugin')).toMatchObject({status:'disabled',enabled:false});
+   expect(manager.state().plugins.find(p=>p.id==='healthy-peer')).toMatchObject({status:'active',enabled:true});
    await manager.disableAll();expect(manager.state().plugins[0]).toMatchObject({enabled:false,status:'disabled'});
  },10000);
  it('installs an unmodified local npm package without executing lifecycle scripts',async()=>{
@@ -204,6 +246,8 @@ describe('Town DSH compatibility host (real Cordis process)',()=>{
    await manager.install(await make('legacy',`export const inject=['webServer'];export function apply(ctx){ctx.webServer.tapIndex(html=>html.replace('</body>','<div id="legacy-marker"></div></body>'));}`));
    await manager.install(await make('modern',`export const inject=['webServer'];export function apply(ctx){ctx.on('webserver/index-inject',rows=>rows.push({kind:'style',text:'.modern{}'},{kind:'html',placement:'body',html:'<div id="modern-marker"></div>'}));ctx.webServer.tapIndex(html=>html.includes('modern-marker')?html:html.replace('</body>','<div id="duplicate"></div></body>'));}`));
    const html=manager.state().injections.map(row=>row.kind==='html'?row.html:'').join('');
+   const rows = manager.state().injections;
+   expect(rows.filter(row => row.kind === 'html').map(row => row.owner)).toEqual(['modern', 'modern', 'legacy']);
    expect(html).toContain('legacy-marker');expect(html).toContain('modern-marker');expect(html).not.toContain('duplicate');expect(html).toContain('.modern{}');
  });
  it('rebases module imports, dynamic imports and import.meta.url against the plugin document',()=>{
@@ -243,6 +287,7 @@ describe('Town DSH compatibility host (real Cordis process)',()=>{
    const {manager,make}=await fixture();
    await manager.install(await make('nested-script',`export function apply(ctx){ctx.on('webserver/index-inject',rows=>rows.push({kind:'html',placement:'body',html:'<div id="mount"><script type="module">import \"/helper.js\";</script><script type="application/json" id="data">{"x":1}</script></div>'}));}`));
    const rows=manager.state().injections;
+   expect(rows.every(row => row.owner === 'nested-script')).toBe(true);
    expect(rows.some(row=>row.kind==='script-src'&&row.type==='module')).toBe(true);
    expect(rows.map(row=>row.kind==='html'?row.html:'').join('')).toContain('application/json');
    expect(rows.map(row=>row.kind==='html'?row.html:'').join('')).not.toContain('type="module"');

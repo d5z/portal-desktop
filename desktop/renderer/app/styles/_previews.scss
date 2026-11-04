@@ -1,10 +1,23 @@
 /* File preview shares the workspace with chat, without a modal backdrop. */
-.workspace-body:has(> .client-file-viewer) > .workspace-stage {
+.workspace-body:has(> .client-file-viewer, > #browser-panel:not([hidden])) > .workspace-stage {
   flex: 1 1 0;
   min-width: 280px;
 }
 
-.workspace-body:has(> .client-file-viewer) > .client-file-viewer ~ * {
+.workspace-body:has(> .client-file-viewer)
+  > :not(.workspace-stage, .workspace-rail, .client-file-viewer) {
+  display: none;
+}
+
+.workspace-body:has(> #browser-panel:not([hidden]))
+  > :not(.workspace-stage, .workspace-rail, #browser-panel) {
+  display: none;
+}
+
+/* A supplementary panel takes the second column; do not create a third chat column. */
+.workspace-body:has(> .client-file-viewer, > #browser-panel:not([hidden]))
+  .workspace-content.split-chat
+  > #chat-view {
   display: none;
 }
 
@@ -12,7 +25,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  flex: 0 0 auto;
+  flex: 0 1 auto;
   width: min(var(--file-preview-width, 640px), max(0px, calc(100% - 280px)));
   min-width: 0;
   min-height: 0;
@@ -32,23 +45,50 @@
   border-left: 0;
 }
 
-.client-file-viewer header {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--line);
-  flex: none;
+body > .client-file-viewer {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: 100;
 }
 
-.client-file-viewer header strong {
+@media (max-width: 639px) {
+  .workspace-body:has(> .client-file-viewer, > #browser-panel:not([hidden])) > .workspace-stage {
+    display: none;
+  }
+
+  .client-file-viewer,
+  #browser-panel {
+    flex: 1;
+    width: 100%;
+  }
+}
+
+.client-file-viewer > header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 48px;
+  box-sizing: border-box;
+  padding: 7px 8px;
+  border-bottom: 1px solid var(--line);
+  flex: none;
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+.client-file-viewer > header strong {
   flex: 1;
+  min-width: 0;
+  margin-inline: 4px;
+  font-size: 13px;
+  font-weight: 500;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 .client-file-viewer button {
+  -webkit-app-region: no-drag;
   border: 0;
   border-radius: 8px;
   padding: 7px 10px;
@@ -61,16 +101,17 @@
   justify-content: center;
 }
 
-.client-file-viewer button:hover {
+.client-file-viewer button:hover:not(:disabled) {
   background: var(--hover);
 }
 
+.client-file-viewer .file-preview-icon,
 .client-file-viewer .file-preview-layout-toggle {
-  width: 36px;
-  height: 36px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   flex: none;
-  border-radius: 50%;
+  border-radius: 8px;
   background: transparent;
   color: var(--secondary);
 }
@@ -84,6 +125,30 @@
   display: block;
 }
 
+.file-preview-modes {
+  display: flex;
+  flex: none;
+  gap: 2px;
+}
+
+.client-file-viewer .file-preview-modes button {
+  height: 30px;
+  padding: 4px 8px;
+  background: transparent;
+  color: var(--secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.client-file-viewer .file-preview-modes button[aria-pressed='true'] {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.client-file-viewer .file-preview-modes button:hover:not(:disabled) {
+  background: var(--hover);
+}
+
 .client-file-actions {
   display: flex;
   justify-content: space-between;
@@ -92,17 +157,6 @@
   font-size: 12px;
   color: var(--secondary);
   flex: none;
-}
-
-.local-file-actions {
-  flex-wrap: wrap;
-  align-items: center;
-}
-
-.local-file-actions > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
 }
 
 .client-file-actions .attachment-download {

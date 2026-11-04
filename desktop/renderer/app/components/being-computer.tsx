@@ -1,15 +1,9 @@
+import { Icon } from '../../shared/icons/icon';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { SplitChatToggle } from './navigation';
 import { PanelResizeHandle, usePanelWidth } from '../../shared/components/panel-resize';
 import type { HomeAPI, HomeAction, HomeState } from '../../../shared/home';
-function ComputerIcon({ kind }: { kind: 'refresh' | 'expand' | 'more' }) {
-  return <svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    {kind === 'refresh' ? <path d="M20 11a8 8 0 1 0-2.3 6.7M20 4v7h-7" />
-      : kind === 'expand' ? <path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4" />
-      : <><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>}
-  </svg>;
-}
 function ComputerPresence({ loading = false }: { loading?: boolean }) {
   return <svg className="being-computer-presence" data-loading={loading || undefined} viewBox="0 0 48 48" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <rect x="7" y="9" width="34" height="26" rx="7" /><path d="M18 41h12m-6-6v6" />
@@ -106,7 +100,7 @@ export function BeingComputer({ name, api, active, context, browserHost, availab
     const layout = () => {
       const el = showPanel ? viewport.current : previewViewport.current;
       if (!el) return;
-      const blocked = menuOpen || !!confirmation || !!el.closest('[hidden]') || !!document.querySelector('dialog[open], [data-resizing="true"], .browser-resizing');
+      const blocked = menuOpen || !!confirmation || !!el.closest('[hidden]') || !!document.querySelector('dialog[open], [data-resizing="true"]');
       const b = el.getBoundingClientRect(), clip = el.closest('.being-info-content')?.getBoundingClientRect();
       // A scrolled-out region must not intercept another surface's input.
       const visible = !blocked && b.width > 0 && b.height > 0 && b.y >= 0 && b.bottom <= innerHeight && b.x >= 0 && b.right <= innerWidth &&
@@ -169,9 +163,9 @@ export function BeingComputer({ name, api, active, context, browserHost, availab
     if (event.key === 'Escape' && menuOpen) { event.stopPropagation(); setMenuOpen(false); menu.current?.querySelector<HTMLButtonElement>('[aria-haspopup]')?.focus(); }
   }}>
     <button type="button" className="topbar-icon-button" aria-label="刷新电脑状态" title="刷新状态" aria-busy={refreshing} disabled={!!busy || refreshing}
-      onClick={() => void refresh()}><ComputerIcon kind="refresh" /></button>
+      onClick={() => void refresh()}><Icon name="refresh" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></button>
     {state.authenticated && <button type="button" className="topbar-icon-button" aria-label="电脑更多操作" title="更多" aria-haspopup="true" aria-expanded={menuOpen}
-      onClick={() => setMenuOpen(value => !value)}><ComputerIcon kind="more" /></button>}
+      onClick={() => setMenuOpen(value => !value)}><Icon name="more" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></button>}
     {menuOpen && <div className="being-computer-menu" aria-label="电脑操作">
       {viewing && <button type="button" disabled={!!busy} onClick={() => void run('open')}>重新连接浏览器</button>}
       {viewing && <button type="button" onClick={() => { autoOpen.current = false; void run('close'); }}>关闭浏览器</button>}
@@ -194,7 +188,7 @@ export function BeingComputer({ name, api, active, context, browserHost, availab
           {preview && <img src={preview} alt="" />}
           {!preview && <ComputerLoading label="正在连接…" />}
         </div>
-        <button ref={openButton} type="button" className="being-computer-open" aria-label="放大展示云端浏览器" onClick={() => setPanelOpen(true)}><ComputerIcon kind="expand" />放大展示</button>
+        <button ref={openButton} type="button" className="being-computer-open" aria-label="放大展示云端浏览器" onClick={() => setPanelOpen(true)}><Icon name="expand" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />放大展示</button>
       </div> : <div className="being-computer-screen" data-connection={running ? 'running' : 'sleeping'}>
         <ComputerPresence loading={loading} />
         <strong role="status">{busy === 'wake' ? '正在唤醒…' : busy === 'open' ? '正在连接…' : title}</strong>{detail && !busy && <p>{detail}</p>}

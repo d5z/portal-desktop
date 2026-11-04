@@ -1,3 +1,4 @@
+import {useDisclosurePresence} from "../hooks/use-disclosure-presence";
 import styles from './sbs-control.module.scss';
 import {createPortal} from 'react-dom';
 import {useEffect, useId, useLayoutEffect, useRef, useState} from 'react';
@@ -8,6 +9,7 @@ export function SbsControl({known, enabled, origin, phase, showContent, allScene
 }) {
   const trigger=useRef<HTMLButtonElement>(null), panel=useRef<HTMLDivElement>(null), id=useId();
   const [open,setOpen]=useState(false), [position,setPosition]=useState({top:0,left:0});
+  const present=useDisclosurePresence(open);
   const status=origin ? phase==='working' ? '正在执行工具' : phase==='replying' ? '正在整理回复'
     : phase==='thinking' ? '正在思考' : '正在执行回调'
     : !known ? 'SBS 状态同步中' : enabled ? 'SBS 待命中' : 'SBS 已关闭';
@@ -44,7 +46,7 @@ export function SbsControl({known, enabled, origin, phase, showContent, allScene
       <span className={styles.dot} data-enabled={known && enabled} data-active={!!origin} aria-hidden="true" />
     </button>
     {origin && <span className={styles.active} role="status" aria-live="polite"><span>{origin==='callback' ? 'SBS 回调' : 'SBS 活动'}</span>{status}</span>}
-    {open && createPortal(<div ref={panel} id={id} className={styles.panel} role="dialog" aria-labelledby={id+'-title'} tabIndex={-1} style={position}
+    {present && createPortal(<div ref={panel} id={id} className={styles.panel} data-open={open} inert={!open} aria-hidden={!open} role="dialog" aria-labelledby={id+'-title'} tabIndex={-1} style={position}
       onBlur={event=>{
         if(!event.currentTarget.contains(event.relatedTarget) && !trigger.current?.contains(event.relatedTarget))setOpen(false);
       }}>

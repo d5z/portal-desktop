@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { checkLocalFiles } from '../desktop/renderer/app/components/local-file-check';
+import { checkLocalFiles } from '../desktop/renderer/app/services/local-file-check';
 
 describe('local file check compatibility', () => {
   const path = '/Users/d5/portal-desktop Workspace/qimen-study/奇门遁甲.html';

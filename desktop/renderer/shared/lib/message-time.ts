@@ -12,3 +12,7 @@ export function appendChatText(draft:string,text:string) {
   const plain=text.trim();
   return plain ? `${draft.trim() ? draft.trimEnd() + '\n\n' : ''}${plain}` : draft;
 }
+
+export function fullMessageTime(time?:number, fallback='') {
+  return time !== undefined && Number.isFinite(new Date(time).getTime()) ? new Date(time).toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}) : fallback;
+}

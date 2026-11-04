@@ -1,4 +1,4 @@
-import { Icon, type IconName } from "./icons";
+import { Icon, type IconName } from "../desktop/renderer/shared/icons/web";
 import { InstallApp } from "./install-app";
 import type { InstallController } from "./install";
 

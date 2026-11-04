@@ -1,3 +1,4 @@
+import './home-viewer.scss';
 import RFB from '@novnc/novnc/lib/rfb.js';
 import type { BrowserState, BrowserInput, ViewerAPI, ViewerEvent } from '../../shared/home-viewer';
 import { framePoint, keyModifiers } from './input';

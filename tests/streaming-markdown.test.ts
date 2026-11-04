@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { marked, type Token } from 'marked';
-import { StreamingMarkdown } from '../desktop/renderer/shared/components/streaming-markdown';
+import { StreamingMarkdown } from '../desktop/renderer/shared/lib/streaming-markdown';
 
 const parse = (source: string) => marked.lexer(source, { gfm: true, breaks: true });
 const tree = (tokens: Token[]) => JSON.parse(JSON.stringify(tokens));

@@ -5,7 +5,8 @@
   --reply-min-width: calc(var(--reply-padding-x) * 2 + 25px);
   --reply-min-height: calc(var(--reading-size, 16px) * 1.7 + var(--reply-padding-y) * 2);
 
-  padding: 26px max(24px, calc((100% - 860px) / 2)) 24px;
+  padding: calc(26px + var(--chat-top-inset, 0px)) max(24px, calc((100% - 860px) / 2)) 24px;
+  scroll-padding-top: calc(20px + var(--chat-top-inset, 0px));
 }
 
 .message {
@@ -108,7 +109,7 @@
     --reply-padding-y: 13px;
     --reply-padding-x: 16px;
 
-    padding: 18px 20px 20px;
+    padding: calc(18px + var(--chat-top-inset, 0px)) 20px 20px;
   }
 
   #input-area {

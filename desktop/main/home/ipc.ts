@@ -1,7 +1,11 @@
 import type { HomeAction, HomeBounds } from '../../shared/home';
 import type { HomeService } from './service';
 import type { HomeViewer } from './viewer';
-export function registerHomeIpc(handle: (channel: string, callback: (...args: any[]) => unknown) => void, home: HomeService, viewer: HomeViewer) {
+import type { HomeFiles } from './files';
+export function registerHomeIpc(handle: (channel: string, callback: (...args: any[]) => unknown) => void, home: HomeService, viewer: HomeViewer, files: HomeFiles) {
+  handle('beings:home-files-list', (path: unknown) => files.list(path));
+  handle('beings:home-files-preview', (path: unknown) => files.preview(path));
+  handle('beings:home-files-download', (path: unknown) => files.download(path));
   handle('beings:home-state', () => { home.contextChanged(); return home.state; });
   handle('beings:home-refresh', () => home.refresh());
   handle('beings:home-action', (action: HomeAction) => {

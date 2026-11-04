@@ -2,7 +2,7 @@ import { Loader, Group, interpolate, type EntryOptions } from '@deepseek-ai/cord
 import { installLocalServices } from './local-services';
 import { compileIndexInjections, type IndexInjection } from './injections';
 /** Minimal Town-owned DSH host: Cordis kernel + routes. No Harness app or agents. */
-import { Context, type Fiber } from '@deepseek-ai/cordis';
+import { Context, Service, type Fiber } from '@deepseek-ai/cordis';
 import { Readable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
@@ -15,18 +15,19 @@ type Route = { kind: 'exact' | 'prefix'; path: string; handler(req: IncomingMess
 const token = process.env.TOWN_DSH_TOKEN!;
 let ready = false;
 const publishRoutes = () => { if (ready) process.send?.({ type: 'routes', routes: routes.map(({kind, path}) => ({kind, path})) }); };
-const routes: Route[] = [], taps: ((html: string) => string)[] = [];
+const routes: Route[] = [], taps: { fiber: Fiber; transform: (html: string) => string }[] = [];
 const clients: DshClientModule[] = [], plugins: DshPluginState['plugins'] = [];
 const ctx = new Context();
 const hostFibers: Fiber[] = [];
 const matches = (r: Route, pathname: string) => r.kind === 'exact' ? pathname === r.path : pathname === r.path || pathname.startsWith(r.path + '/');
 ctx.provide('webServer', {
+  ctx, [Service.tracker]: { property: 'ctx' },
   register(route: Route) {
     if (!['exact', 'prefix'].includes(route.kind) || !route.path.startsWith('/') || route.path === '/' || route.path.startsWith('/@town-dsh/') || typeof route.handler !== 'function') throw new Error('无效或保留的插件路由。');
     if (routes.some(r => r.path === route.path && r.kind === route.kind)) throw new Error(`路由冲突：${route.path}`);
     routes.push(route); publishRoutes(); return () => { const i = routes.indexOf(route); if (i >= 0) routes.splice(i, 1); publishRoutes(); };
   },
-  tapIndex(tap: (html: string) => string) { taps.push(tap); return () => { const i = taps.indexOf(tap); if (i >= 0) taps.splice(i, 1); }; },
+  tapIndex(transform: (html: string) => string) { const tap = { fiber: this.ctx.fiber, transform }; taps.push(tap); return () => { const i = taps.indexOf(tap); if (i >= 0) taps.splice(i, 1); }; },
 });
 ctx.provide('connection', {
   requestRejection: (req: IncomingMessage) => req.headers['x-town-plugin-token'] === token ? undefined : 403,
@@ -103,14 +104,22 @@ async function boot(entries: { root: string; plugin: DshPluginState['plugins'][n
   }
   await loader.root.update(treeRows);
   await loader.await();
+  const owners = new Map<Fiber, string>();
   for (const { record, ids, candidates } of loaded) {
     try {
       for (const id of ids) {
         const entry = loader.store[id];
         if (!entry || entry.disabled || entry.options.group) continue;
         const fiber = entry.fiber;
-        if (!fiber || fiber.state !== 2) throw new Error(`配置行 ${id} 启动失败；缺少宿主服务：${fiber ? Object.keys(fiber.inject).filter(key => !fiber.ctx.get(key)).join('、') : '模块无法加载（见 host.log）'}`);
-        hostFibers.push(fiber);
+        if (!fiber || fiber.state !== 2) {
+          const missing = fiber?.state === 0 ? Object.keys(fiber.inject).filter(key => !fiber.ctx.get(key)) : [];
+          if (missing.length) {
+            record.missingServices = missing;
+            throw new Error(`配置行 ${id} 缺少宿主服务：${missing.join('、')}`);
+          }
+          throw new Error(`配置行 ${id} 未能启动，详见 host.log。`);
+        }
+        hostFibers.push(fiber); owners.set(fiber, record.id);
         localServices.register(id, fiber, fiber.runtime?.Config, interpolate(entry.ctx, bases.get(id)), record.id);
       }
       for (const candidate of candidates) {
@@ -125,8 +134,20 @@ async function boot(entries: { root: string; plugin: DshPluginState['plugins'][n
     }
   }
   const injections: IndexInjection[] = [];
-  await (ctx as any).parallel('webserver/index-inject', injections);
-  const compiled = compileIndexInjections(injections, taps, inlineScripts);
+  const ownerOf = (fiber: Fiber) => {
+    while (fiber.runtime && !owners.has(fiber)) fiber = fiber.parent.fiber;
+    return owners.get(fiber);
+  };
+  // Listeners share a live array and may append after an await. Tag each write
+  // at its source without serializing callbacks or mutating plugin-owned rows.
+  const hooks = ctx.events._hooks['webserver/index-inject'] || [];
+  await Promise.all(hooks.map(({ ctx: subscriber, callback }) => {
+    const owner = ownerOf(subscriber.fiber);
+    return callback(new Proxy(injections, {
+      set(rows, key, value) { return Reflect.set(rows, key, key === 'length' ? value : { ...value, owner }); },
+    }));
+  }));
+  const compiled = compileIndexInjections(injections, taps.map(({ fiber, transform }) => ({ owner: ownerOf(fiber), transform })), inlineScripts);
   const state: DshPluginState = { plugins, clients, injections: compiled, routes: routes.map(({ kind, path }) => ({ kind, path })) };
   server.listen(0, '127.0.0.1', () => { ready = true; process.send?.({ type: 'ready', port: (server.address() as any).port, state }); });
 }

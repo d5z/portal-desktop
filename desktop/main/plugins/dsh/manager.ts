@@ -4,7 +4,8 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, rm, mkdtemp } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import path from 'node:path';
-import type { DshPlugin, DshPluginState } from '../../../shared/dsh-plugins';
+import type { DshPlugin, DshPluginState, DshActivationFailure } from '../../../shared/dsh-plugins';
+import { publicErrorMessage } from '../../../shared/errors';
 import { packageName, readDshPackage } from './package';
 import { externalizePluginScripts } from './html';
 const execute = promisify(execFile);
@@ -81,14 +82,52 @@ export class DshPluginManager {
     entry.config = previous?.config ?? await readFile(configFile, 'utf8').then(JSON.parse).catch(error => { if (error.code === 'ENOENT') return undefined; throw error; });
     this.entries = [...this.entries.filter(p => p.plugin.id !== entry.plugin.id), entry];
     try {
-      await this.save(); await this.restart();
+      await this.restart();
       const activated = this.snapshot.plugins.find(p => p.id === entry.plugin.id);
-      if (previous && activated?.status !== 'active') throw new Error('更新失败，已恢复旧版：' + (activated?.error || '插件未能启动'));
+      if (previous && activated?.status !== 'active') {
+        const reason = activated?.missingServices?.length
+          ? `新版与当前 Town 不适配，缺少服务：${activated.missingServices.join('、')}。`
+          : publicErrorMessage(activated?.error ?? '新版未能启动。', '新版未能启动，请查看插件宿主日志。');
+        throw new Error(`${entry.plugin.id} 更新失败，已恢复旧版。${reason}`);
+      }
+      if (activated?.status !== 'active') {
+        this.markFailed(entry, activated);
+        await this.restart();
+      }
+      await this.save();
+      return entry.plugin.enabled;
     } catch (error) { this.entries = oldEntries; await this.save(); await this.restart(); throw error; }
+  }); }
+  private markFailed(entry: Entry, result?: DshPlugin, error?: string) {
+    entry.plugin = { ...entry.plugin, enabled: false, status: 'disabled', missingServices: result?.missingServices,
+      error: (error || result?.error || '插件未能启动。').slice(0, 4096) };
+  }
+  // Only apply a renderer verdict to the package revision that was actually tested.
+  reportFailures(failures: DshActivationFailure[]) { return this.serial(async () => {
+    if (!Array.isArray(failures)) throw new Error('无效的插件启动结果。');
+    let changed = false;
+    for (const {id, installedAt, error} of failures) {
+      const entry = this.entries.find(e => e.plugin.id === id && e.plugin.installedAt === installedAt);
+      if (!entry?.plugin.enabled || typeof error !== 'string') continue;
+      const plugin = this.snapshot.plugins.find(p => p.id === id);
+      if (plugin?.status === 'error') continue; // The shared worker exited before the renderer reported back.
+      this.markFailed(entry, plugin, error);
+      changed = true;
+    }
+    if (changed) { await this.save(); await this.restart(); }
   }); }
   enable(id: string, enabled: boolean) { return this.serial(async () => {
     if (typeof enabled !== 'boolean') throw new Error('无效的启停状态。');
-    this.entry(id).plugin.enabled = enabled; await this.save(); await this.restart();
+    const entry = this.entry(id);
+    entry.plugin = { ...entry.plugin, enabled, status: 'disabled', error: undefined, missingServices: undefined };
+    await this.restart();
+    const result = this.snapshot.plugins.find(p => p.id === id);
+    if (enabled && result?.status !== 'active') {
+      this.markFailed(entry, result);
+      await this.save(); await this.restart();
+      throw new Error(`${id} 启用失败，插件已停用。`);
+    }
+    await this.save();
   }); }
   disableAll() { return this.serial(async () => { for (const entry of this.entries) entry.plugin.enabled = false; await this.save(); await this.restart(); }); }
   configure(id: string, config: Record<string, unknown>) { return this.serial(async () => {
@@ -149,7 +188,7 @@ export class DshPluginManager {
     this.documentScripts.clear();
     await this.stop();
     if (this.closing) return;
-    this.snapshot = { ...empty(), plugins: this.entries.map(e => ({ ...e.plugin, config: e.config, status: 'disabled', error: undefined })) };
+    this.snapshot = { ...empty(), plugins: this.entries.map(e => ({ ...e.plugin, config: e.config, status: 'disabled', error: e.plugin.enabled ? undefined : e.plugin.error })) };
     this.token = randomUUID();
     const child = fork(this.worker, [], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', DSH_HOME: path.join(this.home, 'data'), TOWN_DSH_TOKEN: this.token, TOWN_DSH_DOCUMENT_URL: this.shellOrigin === 'null' ? 'beings://desktop/' : this.shellOrigin + '/' }, stdio: ['ignore', 'pipe', 'pipe', 'ipc'], execArgv: [] });
     this.child = child;
@@ -161,6 +200,7 @@ export class DshPluginManager {
         child.once('error', error => { clearTimeout(timer); reject(error); });
         child.once('exit', () => {
           clearTimeout(timer); this.port = 0;
+          this.snapshot = { ...empty(), plugins: this.snapshot.plugins };
           for (const plugin of this.snapshot.plugins) if (plugin.enabled) { plugin.status = 'error'; plugin.error = '插件宿主已退出，请停用问题插件后重新启用。'; }
           reject(new Error('插件宿主在启动期间退出。'));
         });
@@ -177,9 +217,16 @@ export class DshPluginManager {
     }
   }
   async shutdown() { this.closing = true; await this.stop(); }
+  resumeAfterFailedShutdown() {
+    return this.serial(async () => {
+      if (!this.closing) return;
+      this.closing = false;
+      await this.restart();
+    });
+  }
   async stop() {
     const child = this.child; this.child = undefined; this.port = 0;
-    if (!child || child.exitCode !== null) return;
+    if (!child || child.exitCode !== null || child.signalCode !== null) return;
     await new Promise<void>(resolve => {
       const timer = setTimeout(() => child.kill('SIGKILL'), 1500);
       child.once('exit', () => { clearTimeout(timer); resolve(); }); child.kill('SIGTERM');

@@ -1,3 +1,4 @@
+import { Icon } from '../shared/icons/icon';
 import { useId, useState } from 'react';
 import { MAX_PLUGIN_ICON_BYTES, PLUGIN_ICON_TYPES, isPluginIconText, parsePluginIcon } from '../../shared/plugin-icon';
 import { Dialog } from '../shared/components/dialog';
@@ -12,7 +13,7 @@ export function PluginIcon({ icon }: { icon?: string }) {
     return <img className={styles.icon} src={icon} alt="" aria-hidden="true" draggable={false} onError={() => setFailed(icon)} />;
   }
   if (icon && isPluginIconText(icon)) return <span className={clsx(styles.icon, styles.text)} aria-hidden="true">{icon}</span>;
-  return <svg className={styles.icon} viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path className="rail-icon-line" pathLength="100" d="M8 3h8v5h5v8h-5v5H8v-5H3V8h5V3Z" /></svg>;
+  return <Icon name="plugin-navigation" className={styles.icon} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />;
 }
 
 export function PluginIconEditor({ model, id, view, title, overridden }: { model: PluginsModel; id: string; view: string; title: string; overridden: boolean }) {

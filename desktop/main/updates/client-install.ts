@@ -23,14 +23,28 @@ export class ClientInstall {
     return value;
   }
   async prepare(from: string, target: string, _connection: Connection | null, foreground: boolean) {
-    if (await this.read()) throw new Error('上次安装尚未完成，请重新打开客户端恢复。');
-    const services: InstallIntent['services'] = [];
+    // A cancelled installer or a paused Portal startup can leave this record
+    // behind. Carry its rollback state into the next attempt before stopping
+    // anything; requiring Portal to start first would prevent repair by upgrade.
+    const pending = await this.read();
+    const services: InstallIntent['services'] = pending?.services.filter(item => !item.service.existing && !item.service.kind) || [];
     const service = this.background.installedService;
-    if (service && !service.existing && !service.kind) services.push({ service, enabled: (await this.background.refresh()).enabled });
-    const intent: InstallIntent = { schema: 1, from, target, services, foreground };
+    if (service && !service.existing && !service.kind) {
+      const saved = services.find(item => item.service.label === service.label);
+      // Runtime synchronization may already have committed a new directory.
+      // Keep its registration, with the pre-install enabled preference.
+      if (saved) saved.service = service;
+      else services.push({ service, enabled: (await this.background.refresh()).enabled });
+    }
+    const intent: InstallIntent = { schema: 1, from, target, services, foreground: foreground || Boolean(pending?.foreground) };
     await atomic(this.file, JSON.stringify(intent));
     try { for (const item of services) await this.background.unload(item.service); }
-    catch (error) { await this.resume(intent); throw error; }
+    catch (error) {
+      // A retry can inherit a foreground engine that was already stopped. Leave
+      // its recovery record intact; this attempt has not run its own cleanup.
+      if (!(pending?.foreground && !foreground)) await this.resume(intent);
+      throw error;
+    }
     return intent;
   }
   async resume(intent: InstallIntent, startForeground?: () => Promise<unknown>) {

@@ -247,3 +247,43 @@
     transition: none;
   }
 }
+
+.panel {
+  box-shadow:
+    0 2px 6px #00000008,
+    0 16px 40px #00000018;
+  transform-origin: top right;
+  transition:
+    opacity 160ms ease,
+    transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
+
+  &[data-open='false'] {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.98);
+    pointer-events: none;
+  }
+
+  @starting-style {
+    opacity: 0;
+    transform: translateY(-5px) scale(0.98);
+  }
+}
+
+.trigger,
+.heading > button {
+  transition:
+    background-color 150ms ease,
+    transform 150ms ease;
+  &:active:not(:disabled) {
+    transform: scale(0.95);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .panel,
+  .trigger,
+  .heading > button {
+    transition: none;
+    transform: none;
+  }
+}

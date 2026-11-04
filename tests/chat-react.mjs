@@ -14,6 +14,12 @@ const history = [];
 const append = (role, content, scene_id = 'desktop-fixture') => history.push({ seq: seq++, role, content, scene_id, at: new Date().toISOString() });
 for (let i = 1; i <= 12; i++) { append('user', `历史问题 ${i}`); append('being', Array.from({ length: 6 }, (_, j) => `第 ${i} 轮回复，第 ${j + 1} 段。`).join('\n\n')); }
 history[0].at = '2024-01-02T03:04:05.000Z';
+history[21].content = '已生成 **小镇介绍页**。\n\n下面是文件信息： ' + JSON.stringify({type:'being.files',version:1,files:[{
+  path:'artifacts/20261104-delivery-v5/index.html',name:'文件交付链路测试',
+  url:'https://home.beings.town/v1/me/files/content?path=artifacts/20261104-delivery-v5/index.html',
+  size:5446,content_type:'text/html',caption:'云电脑生成 · 自包含 · 无外链'
+}]});
+
 append('being', '打开篝火，然后看 `seeds`。\n\n```javascript\nconst safe = "<script>never()</script>";\n```\n\n`https://example.com/manual`\n\n| 列一 | 列二 |\n| --- | --- |\n| 内容 | 内容 |\n\n[恶意链接](javascript:alert(1))\n\n<img src=x onerror=alert(1)>');
 history.at(-1).content += '\n\n' + markdownFence('markdown');
 history.at(-1).content += '\n\n```md\n## 第二个文档\n\n独立切换。\n```';
@@ -135,6 +141,17 @@ try {
   const child = () => page.frames().find(frame => frame.url().includes('/loom.html'));
   const post = data => page.evaluate(data => document.querySelector('iframe').contentWindow.postMessage(data, location.origin), data);
   await frame.locator('.message.user').nth(11).waitFor();
+  const deliveredFile = frame.getByRole('button', {name:'预览文件：文件交付链路测试',exact:true});
+  await deliveredFile.waitFor();
+  const deliveryMessage = deliveredFile.locator('xpath=ancestor::div[contains(concat(" ", normalize-space(@class), " "), " message ")][1]');
+  assert(!(await deliveryMessage.innerText()).includes('\"type\"'));
+  assert((await deliveryMessage.innerText()).includes('下面是文件信息'));
+  await mkdir('test-results', {recursive:true});
+  await deliveryMessage.screenshot({animations:'disabled',path:'test-results/chat-being-files-mixed.png'});
+  assert.equal(await frame.locator('a[href*="/v1/me/files/content"]').count(),0);
+  await mkdir('test-results', {recursive:true});
+  await deliveredFile.screenshot({animations:'disabled',path:'test-results/chat-being-files.png'});
+
   await child().evaluate(() => {
     document.querySelector('#input').addEventListener('keydown', event => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'f') event.stopPropagation();
@@ -155,6 +172,26 @@ try {
   const jsonDraft = '{"标题":"聚餐","人数":4,"id":9007199254740993123}';
   const editor = frame.locator('[data-slot="rich-composer"]');
   const input = frame.locator('#input');
+  await input.press('ControlOrMeta+a');
+  await input.press('Backspace');
+  await input.pressSequentially('3. ');
+  assert.equal(await input.locator('ol').getAttribute('start'), '3');
+  const assertNoPlaceholder = async () => {
+    assert.equal(await input.getAttribute('data-empty'), 'false');
+    assert.equal(await input.evaluate(el => getComputedStyle(el, '::before').content), 'none');
+  };
+  await assertNoPlaceholder();
+  await input.press('ArrowLeft');
+  await input.press('ArrowRight');
+  await frame.locator('#send-btn').focus();
+  await input.focus();
+  await assertNoPlaceholder();
+  await frame.locator('#input-area').screenshot({ path: 'test-results/chat-numbered-list-placeholder.png' });
+  await input.pressSequentially('第三项');
+  assert.match(await input.innerText(), /第三项/);
+  await input.press('ControlOrMeta+a');
+  await input.press('Backspace');
+  assert.equal(await input.getAttribute('data-empty'), 'true');
   const pasteDraft = async text => {
     await input.press('ControlOrMeta+a');
     await input.press('Backspace');

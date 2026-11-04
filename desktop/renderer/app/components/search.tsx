@@ -1,3 +1,4 @@
+import { Icon } from '../../shared/icons/icon';
 import { useEffect, useRef } from "react";
 import type { AppModel } from "../models/app";
 import { useModel } from "../../shared/hooks/use-model";
@@ -64,7 +65,7 @@ export function ChatSearch({ model }: { model: AppModel }) {
       }}
     >
       <div className="chat-search-field">
-        <svg className="search-symbol" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10.5" cy="10.5" r="7.5"/><path d="m16 16 5 5"/></svg>
+        <Icon name="search-wide" className="search-symbol" />
         <input
           id="chat-search-input"
           ref={input}
@@ -103,7 +104,7 @@ export function ChatSearch({ model }: { model: AppModel }) {
                 app.post({ type: "beings:search-jump", id: entry.id });
               }}
             >
-              <span className="search-result-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 11.5a9 9 0 0 1-9 8.5 10 10 0 0 1-4-.8L3 21l1.7-4.5A8 8 0 0 1 3 11.5a9 9 0 0 1 18 0Z"/></svg></span>
+              <span className="search-result-icon" aria-hidden="true"><Icon name="chat-outline" /></span>
               <span className="search-result-copy">
                 <strong>{app.snapshot?.chatSessions?.find(scene=>scene.scene_id===entry.sceneId)?.scene_meta?.scene_label || entry.sceneLabel || entry.sceneId || '未标记场景'}</strong>
                 <span>{entry.role === 'user' ? '你' : 'Being'} · <MatchText text={entry.text} query={query}/></span>

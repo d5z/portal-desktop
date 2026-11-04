@@ -1,3 +1,4 @@
+import { Icon } from '../../shared/icons/icon';
 import { useEffect, useRef, useState } from 'react';
 import { MAX_REMOTE_IMAGE_BYTES, REMOTE_IMAGE_MIME, remoteImageName, remoteImageSource } from '../../../shared/remote-image';
 
@@ -34,7 +35,7 @@ export function ImageGenerationDownload({src, name}: {src:string; name:string}) 
     aria-label={`下载原图 ${name}`} aria-busy={saving} disabled={saving}
     title={failed ? '下载失败，点击重试' : '下载原图'}
     onClick={event => { event.preventDefault(); event.stopPropagation(); void download(); }}>
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M12 3v12m-4-4 4 4 4-4M5 16v4h14v-4"/></svg>
+    <Icon name="download" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
     <span role="status">{saving ? '下载中…' : failed ? '重试下载' : '下载'}</span>
   </button>;
 }

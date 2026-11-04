@@ -7,7 +7,7 @@ import {
 } from "react";
 import type { BrowserAction, BrowserState, BrowserBounds } from "../../shared/types";
 import type { AppModel } from "../app/models/app";
-import { useBrowserSplit } from "./hooks/use-browser-split";
+import { PanelResizeHandle, usePanelWidth } from "../shared/components/panel-resize";
 export function Browser({ model: app }: { model: AppModel }) {
   const [state, setState] = useState<BrowserState>({
     open: false,
@@ -21,13 +21,14 @@ export function Browser({ model: app }: { model: AppModel }) {
   const panel = useRef<HTMLElement>(null),
     viewport = useRef<HTMLDivElement>(null),
     input = useRef<HTMLInputElement>(null),
-    divider = useRef<HTMLDivElement>(null),
     dragging = useRef(false);
+  const [width, setWidth] = usePanelWidth('browser', 640);
   const lastBounds = useRef<BrowserBounds | null>(null);
   const sendBounds = useCallback(() => {
     if (!viewport.current || !app.api) return;
-    const visible = !dragging.current && !panel.current?.hidden && app.startup === "ready" && !document.querySelector("dialog[open]");
-    const { x, y, width, height } = visible ? viewport.current.getBoundingClientRect() : { x:0, y:0, width:0, height:0 };
+    const rect = viewport.current.getBoundingClientRect();
+    const visible = !dragging.current && !panel.current?.hidden && rect.width > 0 && rect.height > 0 && app.startup === "ready" && !document.querySelector("dialog[open]");
+    const { x, y, width, height } = visible ? rect : { x:0, y:0, width:0, height:0 };
     const bounds = { x, y, width, height, visible };
     const previous = lastBounds.current;
     if (previous && previous.x === x && previous.y === y && previous.width === width && previous.height === height && previous.visible === visible) return;
@@ -43,7 +44,16 @@ export function Browser({ model: app }: { model: AppModel }) {
     },
     [sendBounds],
   );
-  const split = useBrowserSplit(panel, divider, state.open, setDragging);
+  useLayoutEffect(() => {
+    if (!state.open) return;
+    const current = panel.current;
+    window.dispatchEvent(new CustomEvent('beings:side-panel-open', { detail: current }));
+    const replace = (event: Event) => {
+      if ((event as CustomEvent).detail !== current) void app.run(() => app.api.browserAction('close'));
+    };
+    window.addEventListener('beings:side-panel-open', replace);
+    return () => window.removeEventListener('beings:side-panel-open', replace);
+  }, [app, state.open]);
   useEffect(() => {
     if (!app.api) return;
     let active = true,
@@ -68,7 +78,7 @@ export function Browser({ model: app }: { model: AppModel }) {
       stop();
     };
   }, [app]);
-  useLayoutEffect(sendBounds, [sendBounds, state.open, split.width, app.startup]);
+  useLayoutEffect(sendBounds, [sendBounds, state.open, width, app.startup]);
   useEffect(() => {
     if (!state.open) return;
     let scheduled = 0;
@@ -103,103 +113,90 @@ export function Browser({ model: app }: { model: AppModel }) {
   const act = (action: BrowserAction) =>
     void app.run(() => app.api.browserAction(action));
   return (
-    <>
-      <div
-        id="browser-divider"
-        ref={divider}
-        role="separator"
-        tabIndex={0}
-        aria-label="调整浏览器宽度"
-        aria-orientation="vertical"
-        aria-controls="browser-panel"
-        title="拖动调整宽度，双击恢复默认"
-        hidden={!state.open}
-        {...split.props}
-      />
-      <aside
-        id="browser-panel"
-        ref={panel}
-        aria-label="内置浏览器"
-        hidden={!state.open}
-        style={{ flexBasis: split.width || undefined }}
-      >
-        <div className="browser-heading">
-          <strong id="browser-title">{state.title}</strong>
-          <button
-            id="browser-external"
-            title="在系统浏览器打开"
-            aria-label="在系统浏览器打开"
-            disabled={!state.address}
-            onClick={() => act("external")}
-          >
-            ↗
-          </button>
-          <button
-            id="browser-close"
-            aria-label="关闭浏览器"
-            onClick={() => act("close")}
-          >
-            ×
-          </button>
-        </div>
-        <form
-          id="browser-address-form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            input.current?.blur();
-            if (address === state.address) act("reload");
-            else void app.run(() => app.api.openBrowser(address));
-          }}
+    <aside
+      id="browser-panel"
+      ref={panel}
+      aria-label="内置浏览器"
+      hidden={!state.open}
+      style={{ width }}
+    >
+      <PanelResizeHandle panel={panel} label="调整浏览器宽度" width={width} onResize={setWidth} initial={640} min={280} max={1200} reserve={280} disabled={!state.open} onDraggingChange={setDragging} />
+      <div className="browser-heading">
+        <strong id="browser-title">{state.title}</strong>
+        <button
+          id="browser-external"
+          title="在系统浏览器打开"
+          aria-label="在系统浏览器打开"
+          disabled={!state.address}
+          onClick={() => act("external")}
         >
-          <button
-            type="button"
-            id="browser-back"
-            aria-label="后退"
-            disabled={!state.canGoBack}
-            onClick={() => act("back")}
-          >
-            ←
-          </button>
-          <button
-            type="button"
-            id="browser-forward"
-            aria-label="前进"
-            disabled={!state.canGoForward}
-            onClick={() => act("forward")}
-          >
-            →
-          </button>
-          <button
-            type="button"
-            id="browser-reload"
-            aria-label={state.loading ? "停止加载" : "刷新网页"}
-            onClick={() => act(state.loading ? "stop" : "reload")}
-          >
-            {state.loading ? "×" : "↻"}
-          </button>
-          <input
-            id="browser-address"
-            ref={input}
-            aria-label="网页地址"
-            placeholder="输入网址"
-            autoComplete="off"
-            spellCheck={false}
-            value={address}
-            onChange={(event) => setAddress(event.target.value)}
-          />
-          <button type="submit">前往</button>
-        </form>
-        <div id="browser-viewport" ref={viewport}>
-          <p id="browser-message" role="status">
-            {state.error ||
-              (state.loading
-                ? "正在加载网页…"
-                : state.address
-                  ? ""
-                  : "输入网址，或从更多选项打开原版 Loom、小镇说明。")}
-          </p>
-        </div>
-      </aside>
-    </>
+          ↗
+        </button>
+        <button
+          id="browser-close"
+          aria-label="关闭浏览器"
+          onClick={() => act("close")}
+        >
+          ×
+        </button>
+      </div>
+      <form
+        id="browser-address-form"
+        onSubmit={(event) => {
+          event.preventDefault();
+          input.current?.blur();
+          if (address === state.address) act("reload");
+          else void app.run(() => app.api.openBrowser(address));
+        }}
+      >
+        <button
+          type="button"
+          id="browser-back"
+          aria-label="后退"
+          disabled={!state.canGoBack}
+          onClick={() => act("back")}
+        >
+          ←
+        </button>
+        <button
+          type="button"
+          id="browser-forward"
+          aria-label="前进"
+          disabled={!state.canGoForward}
+          onClick={() => act("forward")}
+        >
+          →
+        </button>
+        <button
+          type="button"
+          id="browser-reload"
+          aria-label={state.loading ? "停止加载" : "刷新网页"}
+          onClick={() => act(state.loading ? "stop" : "reload")}
+        >
+          {state.loading ? "×" : "↻"}
+        </button>
+        <input
+          id="browser-address"
+          ref={input}
+          aria-label="网页地址"
+          placeholder="输入网址"
+          autoComplete="off"
+          spellCheck={false}
+          value={address}
+          onChange={(event) => setAddress(event.target.value)}
+        />
+        <button type="submit">前往</button>
+      </form>
+      <div id="browser-viewport" ref={viewport}>
+        <p id="browser-message" role="status">
+          {state.error ||
+            (state.loading
+              ? "正在加载网页…"
+              : state.address
+                ? ""
+                : "输入网址，或从更多选项打开原版 Loom、小镇说明。")}
+        </p>
+      </div>
+    </aside>
   );
 }

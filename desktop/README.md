@@ -5,8 +5,8 @@ Portal Desktop 包含 Electron 主进程、隔离的 preload 和 React 界面。
 ```text
 desktop/
 ├─ main/                    Electron 主进程及本机能力
-│  ├─ main.ts               启动入口、服务组合、IPC 来源校验、退出清理
-│  ├─ app/                  窗口、托盘、登录启动、配置、profile、本地资源协议
+│  ├─ main.ts               ready 前身份、协议声明、单实例与安装控制入口
+│  ├─ app/                  bootstrap 服务组合、生命周期、可信 IPC、配置与本机窗口
 │  ├─ chat/                 Being 连接解析、就绪检查、受限聊天代理
 │  ├─ portal/               Rust 子进程、后台守护、旧服务发现与接管、状态读取
 │  ├─ town/                 Town REST、配对凭据、SSE 和 IPC
@@ -32,7 +32,9 @@ desktop/
 `main.js`、`preload.js` 或本地资源 URL。`scripts/runtime-bundle.mjs` 从 Portal 模块
 读取守护源码，保持运行时升级清单与实际构建一致。
 
+- [主进程模块边界](main/README.md)：启动顺序、状态所有权及功能接入规则。
 - [React 界面结构](renderer/README.md)：业务模块及二级目录规范。
+- [界面公共模块](renderer/shared/README.md)：图标、公共组件、纯函数及通信边界。
 - [桌面架构](ARCHITECTURE.md)：运行路径与信任边界。
 - [构建说明](BUILDING.md)、[测试说明](TESTING.md)：构建和验证入口。
 

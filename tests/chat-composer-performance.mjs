@@ -18,12 +18,13 @@ try {
     import {ChatState} from './desktop/renderer/chat/models/chat';
     import {useModel} from './desktop/renderer/shared/hooks/use-model';
     import {Markdown} from './desktop/renderer/shared/components/markdown';
+    import './desktop/renderer/shared/styles/_composer.scss';
     const state=window.state=new ChatState();
     window.renders=0; window.sent=[];
     function App(){
       useModel(state); window.renders++;
       const ref=useRef(null);
-      const props={textareaRef:ref,id:'input',onKeyDown:event=>{
+      const props={textareaRef:ref,id:'input',placeholder:'说点什么，或输入 / 选择功能…',onKeyDown:event=>{
         if(event.key==='Enter'&&!event.shiftKey&&!event.nativeEvent.isComposing){
           event.preventDefault();window.sent.push(state.draft);state.draft='';state.changed();
         }
@@ -60,6 +61,18 @@ try {
     assert.equal(await page.evaluate(() => window.sent.at(-1)), 'x' + text, 'Send reads the latest keystroke synchronously');
     assert.equal(await input.textContent(), '');
     assert.equal(await page.locator('#has-text').textContent(), 'false');
+    assert.equal(await input.getAttribute('data-empty'), 'true');
+    await input.pressSequentially('3.');
+    assert.equal(await input.getAttribute('data-empty'), 'false', 'Literal numbering hides the placeholder');
+    await input.press('Space');
+    assert.equal(await input.locator('ol').getAttribute('start'), '3');
+    assert.equal(await input.getAttribute('data-empty'), 'false', 'An empty list item must not show the blank-input placeholder');
+    assert.equal(await input.evaluate(el => getComputedStyle(el, '::before').content), 'none');
+    assert.match(await page.evaluate(() => window.state.draft), /^3\./, 'The unfinished list remains in the draft');
+    await input.pressSequentially('第三项');
+    await input.press('Enter');
+    assert.equal(await page.evaluate(() => window.sent.at(-1)), '3. 第三项');
+    assert.equal(await input.getAttribute('data-empty'), 'true', 'Sending restores the empty paragraph and placeholder');
   }
   assert.ok(counts.before >= 30, 'Baseline exercises the old global update path');
   assert.equal(counts.after, 0, 'Nonempty-to-nonempty typing must never rerender history');

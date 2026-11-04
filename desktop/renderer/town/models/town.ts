@@ -726,13 +726,11 @@ export class TownModel extends Store {
       this.api.town({ kind: "inbox" }),
       this.api.town({ kind: "sent" }),
     ]);
-    if (!inbox.ok && !sent.ok) return inbox;
-    if (!inbox.ok || !sent.ok) {
-      const usable = inbox.ok ? inbox : sent;
-      const failedLabel = inbox.ok ? "收件箱" : "已发送";
-      const failedMessage = inbox.ok ? (sent.ok ? "未知错误" : sent.message) : inbox.message;
-      return { ...usable, warnings: [`${failedLabel}加载失败：${failedMessage}`] };
+    if (!inbox.ok) {
+      if (!sent.ok) return inbox;
+      return { ...sent, inboxUnavailable: true, warnings: [`收件箱加载失败：${inbox.message}`] };
     }
+    if (!sent.ok) return { ...inbox, warnings: [`已发送加载失败：${sent.message}`] };
     const messages = [
       ...list(inbox.data, "messages"),
       ...list(sent.data, "messages"),
@@ -884,9 +882,10 @@ export class TownModel extends Store {
         this.validateData(result.data);
         this.data = shareTownData(this.data, result.data);
         if (Array.isArray(result.data.messages)) this.mentionNames = collectMentionNames(list(result.data, 'messages'), this.mentionNames);
-        if (channel !== "firesides" && this.tab !== "sent")
+        if (channel !== "firesides" && this.tab !== "sent" && !("inboxUnavailable" in result))
           this.acknowledge(channel, liveAtStart);
-        this.status = `来自 beings.town · ${date(result.fetchedAt)} 已刷新${this.view === "mail" ? " · 最近 100 封" : ""}${result.warnings?.length ? ` · ${result.warnings[0]}` : ""}`;
+        this.refreshError = result.warnings?.join('；') || '';
+        this.status = `来自 beings.town · ${date(result.fetchedAt)} 已刷新${this.view === "mail" ? " · 最近 100 封" : ""}`;
         if (this.catalogView()) {this.catalogUpdatedAt=Date.now();this.rememberCatalog();}
         if (key) cacheTownData(this.feedCache, key, { data: this.data, status: this.status });
       }

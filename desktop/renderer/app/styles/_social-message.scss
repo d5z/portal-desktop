@@ -1,0 +1,135 @@
+/* Shared TownMessage layout for bonfire, firesides and mail. */
+:is(#place-panel, .social-feed) .social-message {
+  display: block;
+  padding: 16px 0;
+  border: 0;
+  scroll-margin-top: 112px;
+}
+
+:is(#place-panel, .social-feed) .social-avatar {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  font-size: 11px;
+  margin-top: 0;
+}
+
+:is(#place-panel, .social-feed) .social-content {
+  min-width: 0;
+}
+
+:is(#place-panel, .social-feed) .social-meta {
+  gap: 8px;
+  min-height: 24px;
+  margin-bottom: 8px;
+  font-size: 11px;
+}
+
+:is(#place-panel, .social-feed) .social-author {
+  font-size: 13px;
+  font-weight: 550;
+}
+
+:is(#place-panel, .social-feed) .social-meta time {
+  font-size: 11px;
+  color: var(--secondary);
+}
+
+:is(#place-panel, .social-feed) .social-bubble {
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  padding: 12px 16px;
+  background: var(--message-surface);
+  border-radius: 12px;
+  overflow-wrap: anywhere;
+}
+
+:is(#place-panel, .social-feed) .social-mine .social-bubble {
+  background: var(--feed-tint);
+}
+
+:is(#place-panel, .social-feed) .social-bubble .social-body {
+  margin-top: 0;
+  line-height: 1.75;
+}
+
+:is(#place-panel, .social-feed) .social-bubble .social-preview {
+  line-height: 1.75;
+}
+
+:is(#place-panel, .social-feed) .social-foot {
+  gap: 4px;
+  margin-top: 4px;
+}
+
+:is(#place-panel, .social-feed) .social-foot .scene-select {
+  border: 0;
+  background: transparent;
+  min-height: 32px;
+  padding: 6px 10px;
+  color: var(--secondary);
+  font-size: 12px;
+  border-radius: 8px;
+}
+
+:is(#place-panel, .social-feed) .social-foot .scene-select:is(:hover, :focus-visible) {
+  background: var(--hover);
+  color: var(--text);
+}
+
+:is(#place-panel, .social-feed) .social-meta .message-time-actions {
+  flex-shrink: 0;
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+:is(#place-panel, .social-feed) .social-expansion > .expand-label {
+  min-height: 32px;
+  width: fit-content;
+  margin: 4px 0 0;
+  padding: 6px 0;
+  text-align: left;
+  border-radius: 8px;
+}
+
+:is(#place-panel, .social-feed) .social-expansion {
+  overflow: visible;
+}
+
+.social-expanded-body:not([hidden]) {
+  animation: message-reveal 140ms ease-out;
+}
+
+@keyframes message-reveal {
+  from {
+    opacity: 0.6;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .social-expanded-body:not([hidden]) {
+    animation: none;
+  }
+}
+
+@media (pointer: coarse) {
+  :is(#place-panel, .social-feed)
+    :is(.social-foot .scene-select, .social-expansion > .expand-label) {
+    min-height: 44px;
+  }
+}
+
+:is(#place-panel, .social-feed) .social-message.social-mine .social-avatar,
+:is(#place-panel, .social-feed) .social-message.social-mine .relation-tag {
+  background: var(--feed-tint);
+  color: var(--feed-action);
+}
+
+:is(#place-panel, .social-feed) .social-mine .social-author {
+  color: var(--feed-action);
+}

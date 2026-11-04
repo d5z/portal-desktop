@@ -9,15 +9,6 @@
   padding-block: 0 20px;
 }
 
-#place-panel .social-messages > .message-time-divider {
-  margin: 18px 0 8px;
-  font-size: 11px;
-}
-
-#place-panel .social-messages > .message-time-divider:first-child {
-  margin-top: 12px;
-}
-
 #place-panel .social-view .feed-controls {
   gap: 8px;
   min-height: 44px;
@@ -56,6 +47,25 @@ body:is([data-view='bonfire'], [data-view='firesides'], [data-view='mail'])
   padding-bottom: 12px;
 }
 
+#place-panel [data-module='bonfire'] .town-toolbar {
+  border-bottom: 0;
+}
+
+#town-refresh {
+  position: relative;
+}
+
+#town-refresh[data-unread]::after {
+  content: '';
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--green);
+}
+
 #place-panel .social-view .town-meta-row {
   min-height: 28px;
 }
@@ -71,131 +81,6 @@ body:is([data-view='bonfire'], [data-view='firesides'], [data-view='mail'])
 
 #place-panel .social-view #town-pagination:empty {
   display: none;
-}
-
-#place-panel .social-message {
-  grid-template-columns: 32px minmax(0, 1fr);
-  gap: 12px;
-  padding: 10px 0;
-  border: 0;
-}
-
-#place-panel .social-avatar {
-  width: 32px;
-  height: 32px;
-  font-size: 13px;
-  margin-top: 2px;
-}
-
-#place-panel .social-content {
-  min-width: 0;
-}
-
-#place-panel .social-meta {
-  gap: 8px;
-  min-height: 24px;
-  margin-bottom: 6px;
-  font-size: 11px;
-}
-
-#place-panel .social-author {
-  font-size: 13px;
-  font-weight: 550;
-}
-
-#place-panel .social-meta time {
-  font-size: 11px;
-  color: var(--secondary);
-}
-
-#place-panel .social-bubble {
-  width: fit-content;
-  max-width: 100%;
-  min-width: 0;
-  padding: 12px 16px;
-  background: var(--message-surface);
-  border-radius: 6px 20px 20px;
-  overflow-wrap: anywhere;
-}
-
-#place-panel .social-mine .social-bubble {
-  background: var(--feed-tint);
-  border-radius: 20px 6px 20px 20px;
-}
-
-#place-panel .social-bubble .social-body {
-  margin-top: 0;
-  line-height: 1.75;
-}
-
-#place-panel .social-bubble .social-preview {
-  line-height: 1.75;
-}
-
-#place-panel .social-foot {
-  gap: 4px;
-  margin-top: 4px;
-}
-
-#place-panel .social-foot .scene-select {
-  border: 0;
-  background: transparent;
-  min-height: 32px;
-  padding: 6px 10px;
-  color: var(--secondary);
-  font-size: 12px;
-  border-radius: 8px;
-}
-
-#place-panel .social-foot .scene-select:is(:hover, :focus-visible) {
-  background: var(--hover);
-  color: var(--text);
-}
-
-#place-panel .social-message {
-  scroll-margin-top: 112px;
-}
-
-#place-panel .social-meta .message-time-actions {
-  flex-shrink: 0;
-  font-variant-numeric: tabular-nums;
-}
-
-#place-panel .social-expansion > .expand-label {
-  min-height: 32px;
-  margin-top: 8px;
-  padding: 6px 10px;
-  border-radius: 8px;
-}
-
-#place-panel .social-expansion {
-  overflow: visible;
-}
-
-.social-expanded-body:not([hidden]) {
-  animation: message-reveal 140ms ease-out;
-}
-
-@keyframes message-reveal {
-  from {
-    opacity: 0.6;
-  }
-
-  to {
-    opacity: 1;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .social-expanded-body:not([hidden]) {
-    animation: none;
-  }
-}
-
-@media (pointer: coarse) {
-  #place-panel :is(.social-foot .scene-select, .social-expansion > .expand-label) {
-    min-height: 44px;
-  }
 }
 
 #place-panel .fireside-layout {
@@ -230,42 +115,10 @@ body:is([data-view='bonfire'], [data-view='firesides'], [data-view='mail'])
 }
 
 #place-panel .bonfire-announcements {
-  border-left: 1px solid var(--line);
+  margin-block: 4px 12px;
+  border: 0;
   border-radius: 12px;
   background: var(--surface);
-}
-
-#place-panel [data-module='mail'] .social-message {
-  max-width: 760px;
-  margin-right: 32px;
-}
-
-#place-panel [data-module='mail'] .social-message.social-mine {
-  grid-template-columns: minmax(0, 1fr) 32px;
-  width: calc(100% - 32px);
-  margin-left: auto;
-  margin-right: 0;
-}
-
-#place-panel [data-module='mail'] .social-mine .social-avatar {
-  grid-column: 2;
-  grid-row: 1;
-}
-
-#place-panel [data-module='mail'] .social-mine .social-content {
-  grid-column: 1;
-  grid-row: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
-#place-panel [data-module='mail'] .social-mine .social-meta {
-  justify-content: flex-end;
-}
-
-#place-panel [data-module='mail'] .social-mine .social-foot {
-  justify-content: flex-end;
 }
 
 @media (max-width: 600px) {
@@ -373,29 +226,6 @@ body:is([data-view='bonfire'], [data-view='firesides'], [data-view='mail'])
 
   #place-panel.central-place .town-content {
     padding: 8px 18px 20px;
-  }
-
-  #place-panel .social-message {
-    grid-template-columns: 28px minmax(0, 1fr);
-    gap: 8px;
-  }
-
-  #place-panel .social-avatar {
-    width: 28px;
-    height: 28px;
-  }
-
-  #place-panel .social-bubble {
-    padding: 12px 14px;
-  }
-
-  #place-panel [data-module='mail'] .social-message {
-    margin-right: 16px;
-  }
-
-  #place-panel [data-module='mail'] .social-message.social-mine {
-    grid-template-columns: minmax(0, 1fr) 28px;
-    width: calc(100% - 16px);
   }
 }
 

@@ -15,7 +15,7 @@ import {
   deploymentConnection,
   type WebConnection,
 } from "./connection";
-import { Icon } from "./icons";
+import { Icon } from "../desktop/renderer/shared/icons/web";
 import {
   loadScenes,
   saveScenes,

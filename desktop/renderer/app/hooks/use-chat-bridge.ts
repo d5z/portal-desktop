@@ -17,6 +17,34 @@ export function useChatBridge(
       app.post = () => {};
     };
   }, [app, frame]);
+  useLayoutEffect(() => {
+    const iframe = frame.current;
+    const header = document.querySelector<HTMLElement>('.workspace-stage > .topbar');
+    if (!iframe || !header) return;
+    let pending = 0;
+    const measure = () => {
+      const top = header.getBoundingClientRect();
+      const chat = iframe.getBoundingClientRect();
+      const inset = top.height && chat.height ? Math.max(0, Math.min(128, Math.ceil(top.bottom - chat.top))) : 0;
+      if (inset === app.chatTopInset) return;
+      app.chatTopInset = inset;
+      app.post({ type: 'beings:chat-top-inset', value: inset });
+    };
+    const schedule = () => {
+      cancelAnimationFrame(pending);
+      pending = requestAnimationFrame(measure);
+    };
+    const observer = new ResizeObserver(schedule);
+    observer.observe(iframe);
+    observer.observe(header);
+    measure();
+    window.addEventListener('resize', schedule);
+    return () => {
+      observer.disconnect();
+      cancelAnimationFrame(pending);
+      window.removeEventListener('resize', schedule);
+    };
+  }, [app, frame, app.startup, app.view, app.chatSource]);
   useEffect(() => {
     app.post({ type: 'beings:permission-state', mode: app.snapshot?.settings.permissionMode ?? 'auto-review', open: app.permissionSettingsOpen,
       revision: new URL(frame.current?.src || 'https://invalid').searchParams.get('revision') });

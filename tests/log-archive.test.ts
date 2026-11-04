@@ -23,7 +23,15 @@ it('packages client, rotated and Portal logs without configs or credentials', as
     await writeFile(path.join(runtime, 'supervisor.err.log'), 'runner failed');
     await writeFile(path.join(runtime, 'connection.url'), 'must-not-export');
     await writeFile(path.join(runtime, 'portal.toml'), 'must-not-export');
-    const file = await createLogArchive({ logsDirectory: log.directory, runtimeDirectories: [runtime, runtime], destination, secrets: ['known-private-token'] });
+    const installerDirectory = path.join(root, 'client-updates'), attempt = path.join(installerDirectory, 'attempt');
+    await mkdir(attempt, { recursive: true });
+    await writeFile(path.join(attempt, 'install-launch.log'), 'worker exited 42');
+    await writeFile(path.join(attempt, 'install.log'), 'replacing-client');
+    await writeFile(path.join(attempt, 'install-abcdef.json'), JSON.stringify({ stage: 'failed', detail: 'known-private-token' }));
+    await writeFile(path.join(attempt, 'connection.json'), 'must-not-export');
+    await writeFile(path.join(attempt, 'install.sh'), 'must-not-export');
+    await writeFile(path.join(attempt, 'Setup.exe'), 'must-not-export');
+    const file = await createLogArchive({ logsDirectory: log.directory, runtimeDirectories: [runtime, runtime], installerDirectory, destination, secrets: ['known-private-token'] });
     const files = unzipSync(await readFile(file));
     const text = Object.values(files).map(file => strFromU8(file)).join('\n');
     expect(Object.keys(files)).toContain('client/client-errors.log.previous');
@@ -33,6 +41,10 @@ it('packages client, rotated and Portal logs without configs or credentials', as
     expect(text).toContain('client started successfully');
     expect(Object.keys(files)).toContain('client/renderer/activity.log.1');
     expect(text).toContain('background output'); expect(text).toContain('runner failed');
+    expect(Object.keys(files)).toContain('installer/attempt/install-launch.log');
+    expect(Object.keys(files)).toContain('installer/attempt/install.log');
+    expect(JSON.parse(strFromU8(files['installer/attempt/install-abcdef.json']))).toMatchObject({ stage: 'failed' });
+    expect(text).toContain('worker exited 42');
     expect(text).not.toMatch(/known-private-token|bearer-value|key-value|must-not-export/);
     expect((await readdir(destination))).toEqual([path.basename(file)]);
   } finally { await rm(root, { recursive: true, force: true }); }

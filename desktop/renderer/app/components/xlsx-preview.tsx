@@ -1,6 +1,6 @@
 import {useEffect,useState,useId} from 'react';
-import {navigateTabs} from '../../shared/components/tab-navigation';
-import type {SheetPreview} from './xlsx-data';
+import {navigateTabs} from '../../shared/lib/tab-navigation';
+import type {SheetPreview} from '../lib/xlsx-data';
 // Keep the workbook parser in a worker; importing types must not load it in the shell.
 function columnName(index:number){let name='';for(let n=index+1;n>0;n=Math.floor((n-1)/26))name=String.fromCharCode(65+(n-1)%26)+name;return name;}
 export function XlsxPreview({blob}:{blob:Blob}) {

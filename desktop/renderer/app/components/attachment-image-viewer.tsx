@@ -1,9 +1,9 @@
-import {attachmentPreviewRequest} from './attachment-preview-request';
+import {attachmentPreviewRequest} from '../services/attachment-preview-request';
 import {useCallback,useEffect,useState,type RefObject} from 'react';
 import {AttachmentDownload} from '../../chat/components/attachment-download';
 import { RemoteImagePreview, RemoteImageGalleryPreview } from '../../shared/components/remote-image';
 import { MAX_REMOTE_IMAGE_BYTES, REMOTE_IMAGE_MIME, remoteImageURL } from '../../../shared/remote-image';
-import { requestRemoteImage } from '../../shared/components/remote-image-bridge';
+import { requestRemoteImage } from '../../shared/services/remote-image-bridge';
 import { imageGallery, type ImageGallery } from '../../../shared/image-gallery';
 import { ImageViewer } from '../../shared/components/image-viewer';
 

@@ -1,6 +1,6 @@
 import {AttachmentImageUpload} from './attachment-image-upload';
 import {AttachmentProcessing} from './attachment-processing';
-import {transferBytes} from '../services/attachment-transfer';
+import {formatBytes} from '../../shared/lib/format-bytes';
 import { useEffect, useLayoutEffect, useState } from 'react';
 import type { Message } from '../models/chat';
 import { attachmentMessageReader, messageReferences, type AttachmentMessage } from '../services/attachment-messages';
@@ -44,10 +44,10 @@ function LoadedAttachmentMessage({message}: {message: Message}) {
       const p = file.progress, complete = p?.phase === 'complete', failed = p?.phase === 'failed';
       const percent = complete ? 100 : Math.min(99, Math.floor((p?.loaded || 0) / (p?.total || file.size) * 100));
       if (file.blob && /^image\/(png|jpeg|gif|webp)$/.test(file.mime || '')) return <AttachmentImageUpload key={index} src={localImages[index]?.src || ''} blob={file.blob} name={file.name} percent={percent} complete={complete} phase={p?.phase} error={p?.error}/>;
-      return <section className="attachment-card attachment-upload-card" key={index}><div className="attachment-file-row"><span className="attachment-file-icon" aria-hidden="true">↑</span><span className="attachment-file-label"><strong>{file.name}</strong><small>{file.name.split('.').pop()?.toUpperCase()} · {transferBytes(file.size)}</small></span></div>
+      return <section className="attachment-card attachment-upload-card" key={index}><div className="attachment-file-row"><span className="attachment-file-icon" aria-hidden="true">↑</span><span className="attachment-file-label"><strong>{file.name}</strong><small>{file.name.split('.').pop()?.toUpperCase()} · {formatBytes(file.size)}</small></span></div>
         <p role="status">{failed ? `上传失败：${p?.error || '请重试'}` : complete ? '上传完成' : p?.phase === 'confirming' ? '正在确认上传' : p?.phase === 'uploading' ? '正在上传' : p ? '正在准备上传' : '等待上传'}{!failed && ` · ${percent}%`}</p>
         {!complete && !failed && <progress aria-label={`${file.name} 上传进度`} max={100} value={percent} />}
-        <small>{transferBytes(p?.loaded || 0)} / {transferBytes(p?.total || file.size)}</small>
+        <small>{formatBytes(p?.loaded || 0)} / {formatBytes(p?.total || file.size)}</small>
       </section>;
     })}
     {!message.text.startsWith('[发送了') && <p className="attachment-original-text"><CommandMessageText text={message.text}/></p>}

@@ -36,7 +36,11 @@ try {
     build.onLoad({ filter: /desktop[\\/]main[\\/]main\.ts$/ }, async args => {
       let source = await readFile(args.path, 'utf8');
       if (packaged) source = source.replace("path.resolve('desktop/generated')", JSON.stringify(rendererAssets));
-      const anchor = 'store = new SettingsStore(directory, secretStorage, binary);';
+      return { contents: source, loader: 'ts' };
+    });
+    build.onLoad({ filter: /desktop[\\/]main[\\/]app[\\/]configuration\.ts$/ }, async args => {
+      const source = await readFile(args.path, 'utf8');
+      const anchor = 'const store = new SettingsStore(directory, secretStorage, binary);';
       assert(source.includes(anchor));
       return { contents: source.replace(anchor, `${anchor}\n(globalThis as any).pluginFixtureStore = store;`), loader: 'ts' };
     });

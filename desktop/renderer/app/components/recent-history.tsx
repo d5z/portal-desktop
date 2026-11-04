@@ -1,9 +1,12 @@
-import { useEffect, useState } from 'react';
+import { Icon } from '../../shared/icons/icon';
+import { useEffect, useRef, useState } from 'react';
 import type { RecentChatMessage } from '../../../shared/types';
 import type { AppModel } from '../models/app';
 import { mergeRecentQuestions, recentQuestionGroups } from '../models/recent-history';
 
-export function RecentHistory({ app }: { app: AppModel }) {
+export function RecentHistory({ app, visible = true }: { app: AppModel; visible?: boolean }) {
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
   const endpoint = app.snapshot?.settings.hasToken ? app.snapshot.settings.endpoint : '';
   const [revision, refresh] = useState(0);
   const [result, setResult] = useState<{ endpoint: string; local: RecentChatMessage[]; remote: RecentChatMessage[] }>({ endpoint: '', local: [], remote: [] });
@@ -41,7 +44,7 @@ export function RecentHistory({ app }: { app: AppModel }) {
       reading = false; if (active) setLoading(false);
     };
     void read();
-    const timer = setInterval(() => { if (!document.hidden) void read(); }, 30000);
+    const timer = setInterval(() => { if (visibleRef.current && !document.hidden) void read(); }, 30000);
     return () => { active = false; abort.abort(); clearInterval(timer); };
   }, [app, endpoint, revision, app.chatSource, app.chatLoading]);
   const rows = result.endpoint === endpoint ? mergeRecentQuestions(result.local, result.remote) : [];
@@ -57,7 +60,7 @@ export function RecentHistory({ app }: { app: AppModel }) {
       <h4 className="being-history-date">{group.label}</h4>
       <ol aria-label={group.label + '的提问'}>{group.questions.map(({ message: row, preview, time }) => {
         const scene = scenes.get(row.scene_id);
-        const content = <><span className="being-history-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 11.5a8 8 0 0 1-8 8H4l1.7-3.4A8 8 0 1 1 20 11.5Z"/><path d="M8 9h8M8 13h5"/></svg></span>
+        const content = <><span className="being-history-icon" aria-hidden="true"><Icon name="chat-history" /></span>
           <span className="being-history-text"><span className="being-history-preview">{preview}</span>
           {time && <time className="being-history-time" dateTime={row.at}>{time}</time>}</span></>;
         return <li key={row.seq}>{scene ? <button type="button" className="being-history-row" title={preview} onClick={() => void app.run(() => app.changeChatSession('select', scene.scene_id, undefined, row.seq))}>{content}</button>

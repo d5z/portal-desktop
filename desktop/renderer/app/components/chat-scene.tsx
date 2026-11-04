@@ -1,3 +1,5 @@
+import { Icon } from '../../shared/icons/icon';
+import { useDisclosurePresence } from "../../shared/hooks/use-disclosure-presence";
 import { createPortal } from "react-dom";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChatScene } from "../../../shared/types";
@@ -75,14 +77,15 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
     finally { changing.current = false; setBusy(false); }
   };
   const [expanded, setExpanded] = useState(false);
+  const scenePresent = useDisclosurePresence(expanded && visible);
   const trigger = useRef<HTMLButtonElement>(null);
   // Reserve the same responsive width as the pinned list, without remounting chat.
   useLayoutEffect(() => {
     const stage = trigger.current?.closest<HTMLElement>(".workspace-stage");
-    if (!stage || !pinned || !expanded || !visible) return;
+    if (!stage || !pinned || !scenePresent) return;
     stage.style.setProperty("--scene-panel-width", `${width}px`);
     return () => { stage.style.removeProperty("--scene-panel-width"); };
-  }, [pinned, expanded, visible, width]);
+  }, [pinned, scenePresent, width]);
   const label = scene?.scene_meta.scene_label || "场景标记不可用";
   const collapse = () => { setMenu(undefined); setExpanded(false); trigger.current?.focus(); };
   const reveal = () => { setExpanded(true); onReveal?.(); };
@@ -107,18 +110,16 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
         <button ref={trigger} id="chat-scene-indicator" className="chat-scene-indicator" type="button"
           aria-label={`${expanded && visible ? "收起" : "展开"}场景列表`} aria-controls="chat-session-panel" aria-expanded={expanded && visible}
           title={label} onClick={() => expanded && visible ? collapse() : reveal()}>
-          <svg className="chat-scene-icon" viewBox="0 0 20 20" aria-hidden="true">
-            <path d="m5 7 5 5 5-5" />
-          </svg>
+          <Icon name="chevron-down-20" className="chat-scene-icon" />
           <span className="chat-scene-label">{scene ? label : "场景"}</span>
         </button>
       </div>
-      {visible && expanded && <aside ref={panel} style={{ width }} id="chat-session-panel" className="chat-session-panel" data-pinned={pinned} aria-label="场景列表"
+      {scenePresent && <aside ref={panel} style={{ width }} id="chat-session-panel" className="chat-session-panel" data-open={visible && expanded} inert={!visible || !expanded} aria-hidden={!visible || !expanded} data-pinned={pinned} aria-label="场景列表"
         onKeyDown={event => { if (event.key === "Escape" && !editing && !open && !deleting && !menu) { event.preventDefault(); collapse(); } }}>
         <PanelResizeHandle panel={panel} label="调整场景列表宽度" width={width} onResize={setWidth} initial={320} min={240} max={480} reserve={48} edge="right" />
         <div className="chat-session-panel-heading">
           <label className="chat-session-search">
-            <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5" /><path d="m13 13 4 4" /></svg>
+            <Icon name="search-20" />
             <input ref={search} type="search" aria-label="搜索场景" placeholder="搜索" value={query} onChange={event => setQuery(event.target.value)} />
           </label>
           <button type="button" aria-label="收起场景列表" title="收起场景列表" onClick={collapse}>×</button>

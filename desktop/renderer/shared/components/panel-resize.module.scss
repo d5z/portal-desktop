@@ -48,8 +48,12 @@
   transition-delay: 0ms;
 }
 
-.handle[data-resizing='true'] { user-select: none; }
+.handle[data-resizing='true'] {
+  user-select: none;
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .handle::before { transition: none; }
+  .handle::before {
+    transition: none;
+  }
 }

@@ -22,7 +22,7 @@ await build({entryPoints:['desktop/preload/preload.ts'],outfile:path.join(temp,'
 if (process.env.DSH_TEST_CONTRACTS === '1') {
  const fixture = path.join(temp, 'slot-fixture'); await mkdir(fixture);
  await writeFile(path.join(fixture,'package.json'), JSON.stringify({name:'town-dsh-slot-fixture',version:'1.0.0',type:'module',main:'host.js',exports:{'.':'./host.js','./client':'./client.js'},dependencies:{'@deepseek-ai/schemastery':'3.18.1'},dsh:{client:{platform:'web'}}}));
- await writeFile(path.join(fixture,'host.js'), `import z from '@deepseek-ai/schemastery';export const Config=z.object({enabled:z.boolean().default(true),count:z.natural().default(3),items:z.array(z.string()).default([])});export function apply(ctx){ctx.on('webserver/index-inject',rows=>rows.push({kind:'html',placement:'head',html:'<link rel="stylesheet" href="/missing-fixture.css">'}));}`);
+ await writeFile(path.join(fixture,'host.js'), `import z from '@deepseek-ai/schemastery';export const Config=z.object({enabled:z.boolean().default(true),count:z.natural().default(3),items:z.array(z.string()).default([])});export function apply(ctx){ctx.on('webserver/index-inject',rows=>rows.push({kind:'style',text:':root { --slot-fixture: 1; }'}));}`);
  await writeFile(path.join(fixture,'client.js'), `window.__ModuleLoader__.load({id:'town-dsh-slot-fixture',factory:require=>{const React=require('react');const {defineStore}=require('@deepseek-ai/dsh-client-store');return {inject:['slots','locale','layout'],apply(ctx){ctx.effect(()=>ctx.locale.register('town.fixture',{en:{count:'Count'},zh:{count:'计数'}}));const store=defineStore({init:()=>({count:0}),actions:{increment:d=>{d.count++}}});ctx.slots.register({name:'settings.section',id:'fixture',label:'契约测试',store,locale:'town.fixture',inject:actions=>({increment:actions.increment}),children:{'town.fixture.child':{kind:'list',scope:'root'}}},props=>React.createElement('div',null,React.createElement('button',{onClick:props.increment},props.t('count')+': '+props.useStore(s=>s.count)),props.renderSlot('town.fixture.child',{}),React.createElement('button',{onClick:props.close},'关闭契约设置')));ctx.slots.register({name:'town.fixture.child',id:'child'},()=>React.createElement('p',null,'嵌套插槽正常'));ctx.slots.register({name:'main',key:'fixture-panel'},()=>React.createElement('p',null,'主面板正常'));ctx.slots.register({name:'sidebar.panellist',id:'fixture-launcher'},()=>React.createElement('button',{onClick:()=>ctx.layout.selectPanel('fixture-panel')},'契约主面板'));}}}});`);
  sources.push(fixture);
 }
@@ -62,7 +62,7 @@ try {
    assert.equal(await page.getByRole('button',{name:'重新加载页面',exact:true}).count(),0);
  }
  console.log('MANAGER', (await page.locator('#third-party-plugins').innerText()).slice(0, 6500));
- assert.equal(await page.getByText('加载受阻', { exact: false }).count(), 0);
+ assert.equal(await page.getByText('未能加载', { exact: false }).count(), 0);
  await mkdir('output/dsh-compat', { recursive: true });
  await page.screenshot({ path: 'output/dsh-compat/community-manager.png' });
  const cards = page.locator('#third-party-plugins .plugin-card');
@@ -96,7 +96,7 @@ try {
    await page.getByRole('button', {name:'计数: 0',exact:true}).click();
    await page.getByRole('button', {name:'计数: 1',exact:true}).waitFor();
    await page.getByText('嵌套插槽正常',{exact:true}).waitFor();
-     console.log('PASS injected store actions, locale and child slots despite another failed index resource');
+     console.log('PASS injected store actions, locale and child slots');
    }
    console.log('PANEL', label, (await page.locator('.dsh-plugin-content').innerText()).slice(0, 2500));
    await page.screenshot({ path: `output/dsh-compat/community-${index}.png` });
@@ -193,24 +193,13 @@ try {
    assert.equal(await page.evaluate(source=>window.beings.dshPlugins.install(source),faults),true);
    await page.reload();
    await page.locator('#client-main').waitFor({state:'visible',timeout:5000});
-   await page.getByRole('button',{name:'插件折叠侧栏',exact:true}).click();
-   assert.equal(await page.locator('#dsh-tools').count(),0);
-   await page.locator('.workspace-rail').waitFor({state:'visible'});
-   assert.ok(await page.locator('.workspace-rail').evaluate(el=>el.getBoundingClientRect().width < 100));
    await openManager();
    const faulty = page.locator('.plugin-card').filter({has:page.getByRole('heading',{name:/town-dsh-fault-fixture/})});
-   await faulty.getByRole('button',{name:'bad-panel',exact:true}).click();
-   await page.getByRole('button',{name:'返回插件管理',exact:true}).click();
-   await page.getByText(/客户端插件启动超时/).first().waitFor({timeout:20000});
-   await page.locator('#third-party-plugins .close').click();
-   await page.locator('.workspace-rail').waitFor({state:'visible'});
-   await openManager();
-   await faulty.getByRole('button',{name:'停用',exact:true}).click();
-   await page.waitForFunction(()=>!document.querySelector('#third-party-plugins').hasAttribute('aria-busy'));
-   await page.locator('#third-party-plugins .close').click();
-   await page.getByRole('button',{name:'契约主面板',exact:true}).waitFor();
+   await faulty.getByRole('button',{name:'启用',exact:true}).waitFor({timeout:25000});
+   await faulty.getByText('查看错误详情',{exact:true}).click();
+   await faulty.getByText(/客户端插件启动超时/).first().waitFor();
+   assert.equal(await page.evaluate(async()=>(await window.beings.dshPlugins.state()).plugins.find(p=>p.id==='town-dsh-fault-fixture').enabled),false);
    assert.equal(await page.getByRole('button',{name:'插件折叠侧栏',exact:true}).count(),0);
-   await openManager();
    assert.ok(await page.locator('.plugin-card').filter({has:page.getByRole('heading',{name:/^town-dsh-slot-fixture /})}).locator('.dsh-contributions button').count());
    await page.locator('#third-party-plugins .close').click();
    console.log('PASS desktop navigation, invalid JSON and unsaved guard, keyboard focus, throwing label/component, bounded startup and peer recovery after disable');

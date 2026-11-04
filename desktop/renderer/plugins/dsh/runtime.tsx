@@ -1,3 +1,4 @@
+import { startupPluginNotice } from './issue';
 import { LocalRemote } from './remote';
 import settingsPluginsURL from '@deepseek-ai/dsh-client-ui-settings-plugins/client?url';
 import settingsURL from '@deepseek-ai/dsh-client-ui-settings/client?url';
@@ -88,6 +89,12 @@ export class DshClientRuntime extends Store {
     const owner = this.state.plugins.find(plugin => plugin.id === client.owner)!;
     return JSON.stringify([client.owner, this.packageKey(owner), client.url]);
   }
+  clientsReady(owner: string) {
+    return this.phase === 'ready' && this.state.clients.filter(client => client.owner === owner).every(client => {
+      const live = this.fibers.get(client.id);
+      return live?.key === this.clientKey(client) && live.fiber.state === 2;
+    });
+  }
   private injectionKeys(rows: DshPluginState['injections']) {
     const counts = new Map<string, number>();
     return rows.map(row => {
@@ -103,51 +110,69 @@ export class DshClientRuntime extends Store {
       await this.start();
       await this.refresh();
       if (this.phase === 'error') throw new Error('插件运行环境初始化失败，请重新加载页面后重试。');
-      const desired = new Map(this.state.clients.map(client => [client.id, client]));
-      const nextInjections = new Set(this.injectionKeys(this.state.injections));
-      this.injectionReloadRequired = [...this.injected].some(key => !nextInjections.has(key));
-      this.reloadOwners = new Set(this.cleanupFailures);
-      if (this.injectionReloadRequired) for (const [id, key] of this.appliedPackages) {
-        const next = this.state.plugins.find(plugin => plugin.id === id && plugin.enabled);
-        if (!next || this.packageKey(next) !== key) this.reloadOwners.add(id);
-      }
-      const removed = new Set([...this.fibers].filter(([id, live]) => {
-        const next = desired.get(id);
-        return !next || live.key !== this.clientKey(next) || live.fiber.uid === null || this.needsReload(live.owner);
-      }).map(([id]) => id));
-      // Factories can capture exports as well as declaring injected services.
-      // Recreate consumers of a replaced/removed module, retaining other fibers.
-      for (let changed = true; changed;) {
-        changed = false;
-        for (const [id, live] of this.fibers) if (!removed.has(id) && [...live.dependencies].some(dep => removed.has(dep))) {
-          removed.add(id); changed = true;
-        }
-      }
-      const disposals: Promise<void>[] = [];
-      for (const [id, live] of [...this.fibers].reverse()) if (removed.has(id)) {
-        this.fibers.delete(id); this.exports.delete(id); delete this.errors[live.owner];
-        disposals.push(this.disposeClient(live));
-      }
-      await Promise.all(disposals);
-      for (const owner of Object.keys(this.errors)) if (!this.state.plugins.some(p => p.id === owner && p.enabled) && !this.cleanupFailures.has(owner)) delete this.errors[owner];
-      if (!this.injectionReloadRequired) for (const id of this.appliedPackages.keys()) {
-        if (!this.state.plugins.some(plugin => plugin.id === id && plugin.enabled)) this.appliedPackages.delete(id);
-      }
-      await this.activate(this.state);
-      // Reset subscribers only after removed consumers have unsubscribed and
-      // the replacement host and client services are ready.
-      (this.ctx as any).emit('connection/reset');
-      await this.refreshForms();
-      if (this.mainPanel && !this.slots.some(slot => slot.name === 'main' && slot.key === this.mainPanel)) this.selectPanel(null);
-      if (this.rightbar.open && !this.slots.some(slot => slot.name === 'rightbar')) this.closeRightbar();
-      if (this.panel && !this.slots.some(slot => slot.owner === this.panel!.owner && slot.name === this.panel!.name && slot.id === this.panel!.id && slot.key === this.panel!.key)) this.panel = undefined;
-      if (this.configuration && !this.configurationViews.some(view => view.ns === this.configuration.ns)) this.configuration = undefined;
-      this.lifecycleVersion++;
-      this.changed();
+      await this.reconcile();
+      await this.disableFailedPlugins();
     };
     const result = this.applying.then(apply);
     this.applying = result.catch(() => {});
     return result;
+  }
+  startupNotice?: string;
+  private async disableFailedPlugins() {
+    const api = window.beings?.dshPlugins;
+    if (!api) return;
+    // Removing a failed provider can expose another missing dependency.
+    for (;;) {
+      const failures = this.state.plugins.filter(p => p.enabled && (p.status === 'blocked' || (p.status === 'active' && this.errors[p.id])))
+        .map(p => ({id:p.id, installedAt:p.installedAt, error:p.error || this.errors[p.id] || '插件未能启动。'}));
+      if (!failures.length) return;
+      await api.reportFailures(failures);
+      await this.refresh();
+      await this.reconcile();
+    }
+  }
+  private async reconcile() {
+    const desired = new Map(this.state.clients.map(client => [client.id, client]));
+    const nextInjections = new Set(this.injectionKeys(this.state.injections));
+    this.injectionReloadRequired = [...this.injected].some(key => !nextInjections.has(key));
+    this.reloadOwners = new Set(this.cleanupFailures);
+    if (this.injectionReloadRequired) for (const [id, key] of this.appliedPackages) {
+      const next = this.state.plugins.find(plugin => plugin.id === id && plugin.enabled);
+      if (!next || this.packageKey(next) !== key) this.reloadOwners.add(id);
+    }
+    const removed = new Set([...this.fibers].filter(([id, live]) => {
+      const next = desired.get(id);
+      return !next || live.key !== this.clientKey(next) || live.fiber.uid === null || this.needsReload(live.owner);
+    }).map(([id]) => id));
+    // Factories can capture exports as well as declaring injected services.
+    // Recreate consumers of a replaced/removed module, retaining other fibers.
+    for (let changed = true; changed;) {
+      changed = false;
+      for (const [id, live] of this.fibers) if (!removed.has(id) && [...live.dependencies].some(dep => removed.has(dep))) {
+        removed.add(id); changed = true;
+      }
+    }
+    const disposals: Promise<void>[] = [];
+    for (const [id, live] of [...this.fibers].reverse()) if (removed.has(id)) {
+      this.fibers.delete(id); this.exports.delete(id); delete this.errors[live.owner];
+      disposals.push(this.disposeClient(live));
+    }
+    await Promise.all(disposals);
+    for (const owner of Object.keys(this.errors)) if (!this.state.plugins.some(p => p.id === owner && p.enabled) && !this.cleanupFailures.has(owner)) delete this.errors[owner];
+    if (!this.injectionReloadRequired) for (const id of this.appliedPackages.keys()) {
+      if (!this.state.plugins.some(plugin => plugin.id === id && plugin.enabled)) this.appliedPackages.delete(id);
+    }
+    await this.activate(this.state);
+    // Reset subscribers only after removed consumers have unsubscribed and
+    // the replacement host and client services are ready.
+    (this.ctx as any).emit('connection/reset');
+    await this.refreshForms();
+    if (this.mainPanel && !this.slots.some(slot => slot.name === 'main' && slot.key === this.mainPanel)) this.selectPanel(null);
+    if (this.rightbar.open && !this.slots.some(slot => slot.name === 'rightbar')) this.closeRightbar();
+    if (this.panel && !this.slots.some(slot => slot.owner === this.panel!.owner && slot.name === this.panel!.name && slot.id === this.panel!.id && slot.key === this.panel!.key)) this.panel = undefined;
+    if (this.configuration && !this.configurationViews.some(view => view.ns === this.configuration.ns)) this.configuration = undefined;
+    this.lifecycleVersion++;
+    this.changed();
   }
   private async disposeClient({ fiber, owner }: { fiber: ReturnType<Context['plugin']>; owner: string }) {
     let timer: ReturnType<typeof setTimeout> | undefined;
@@ -233,6 +258,8 @@ export class DshClientRuntime extends Store {
       await this.script(settingsPluginsURL);
       this.exports.set('@deepseek-ai/dsh-client-ui-settings-plugins', this.modules.get('@deepseek-ai/dsh-client-ui-settings-plugins')!.factory(this.require));
       await this.activate(this.state, ready);
+      this.startupNotice = startupPluginNotice(this.state.plugins, this.errors);
+      await this.disableFailedPlugins();
       this.phase = 'ready';
       this.changed();
     } catch (error) { this.phase = 'error'; this.state.error = String(error); this.changed(); }
@@ -253,10 +280,13 @@ export class DshClientRuntime extends Store {
     if (!this.injectionReloadRequired) for (const [index, row] of state.injections.entries()) {
       const key = injectionKeys[index];
       if (this.injected.has(key)) continue;
-      try { await this.inject(row); this.injected.add(key); } catch (error) { this.errors['index-inject'] = String(error); }
+      try { await this.inject(row); this.injected.add(key); } catch (error) { this.errors[row.owner ?? 'index-inject'] = String(error); }
     }
     ready?.resolve();
     const clients = state.clients.filter(client => !this.needsReload(client.owner));
+    // Clear dependency errors once per pass; a healthy sibling module must not
+    // erase a failed module's verdict for the same package.
+    for (const {owner} of clients) if (/^(缺少客户端模块：|缺少客户端服务：)/.test(this.errors[owner] || '')) delete this.errors[owner];
     await Promise.all(clients.map(async client => { try {
       const key = this.clientKey(client);
       if (this.moduleKeys.get(client.id) !== key) { this.modules.delete(client.id); this.exports.delete(client.id); }
@@ -271,7 +301,6 @@ export class DshClientRuntime extends Store {
       }
       const [client] = pending.splice(index, 1);
       try {
-        delete this.errors[client.owner];
         const module = this.modules.get(client.id); if (!module) throw new Error(`模块未注册：${client.id}`);
         const dependencies = new Set(client.inject);
         const exports = module.factory(id => { dependencies.add(id); return this.require(id); });
@@ -305,8 +334,10 @@ export class DshClientRuntime extends Store {
       if (before === fibers.map(f => f.fiber.state).join(',')) break;
     }
     for (const { fiber, owner } of fibers) {
-      if (fiber.state === 2 && /^(缺少客户端模块：|客户端插件启动失败或缺少服务：)/.test(this.errors[owner] || '')) delete this.errors[owner];
-      else if (fiber.state !== 2 && !this.errors[owner]) this.errors[owner] = '客户端插件启动失败或缺少服务：' + Object.keys(fiber.inject).filter(key => !fiber.ctx.get(key)).join('、');
+      if (fiber.state !== 2 && !this.errors[owner]) {
+        const missing = fiber.state === 0 ? Object.keys(fiber.inject).filter(key => !fiber.ctx.get(key)) : [];
+        this.errors[owner] = missing.length ? '缺少客户端服务：' + missing.join('、') : '客户端插件启动失败。';
+      }
     }
     this.changed();
   }
@@ -315,7 +346,7 @@ export class DshClientRuntime extends Store {
       const element = document.createElement('script'); element.src = src; if (type) element.type = type;
       const timer = setTimeout(() => { element.remove(); reject(new Error(`插件脚本加载超时：${src}`)); }, 15000);
       element.onload = () => { clearTimeout(timer); resolve(); };
-      element.onerror = () => { clearTimeout(timer); reject(new Error(`插件脚本加载失败：${src}`)); };
+      element.onerror = () => { clearTimeout(timer); element.remove(); reject(new Error(`插件脚本加载失败：${src}`)); };
       document.head.append(element);
     });
   }
@@ -324,6 +355,7 @@ export class DshClientRuntime extends Store {
     if (row.kind === 'html' && row.html) {
       const template = document.createElement('template'); template.innerHTML = row.html;
       for (const script of template.content.querySelectorAll('script')) if (!script.type || ['module', 'text/javascript', 'application/javascript'].includes(script.type)) script.remove();
+      const nodes = [...template.content.childNodes];
       if (row.placement !== 'head') {
         // Electron's native drag hit testing ignores DOM z-index. Injected UI
         // must exclude the underlying Town titlebar from its hit area. Keep an
@@ -337,7 +369,7 @@ export class DshClientRuntime extends Store {
         if (selectors.length) {
           const style = document.createElement('style');
           style.textContent = `:where(${selectors.join(',')}) { -webkit-app-region: no-drag; }`;
-          document.head.append(style);
+          nodes.push(style); document.head.append(style);
         }
       }
       const styles = [...template.content.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')].map(link => new Promise<void>((resolve, reject) => {
@@ -346,7 +378,8 @@ export class DshClientRuntime extends Store {
         link.onerror = () => { clearTimeout(timer); reject(new Error(`插件样式加载失败：${link.href}`)); };
       }));
       (row.placement === 'head' ? document.head : document.body).append(template.content);
-      await Promise.all(styles); return;
+      try { await Promise.all(styles); } catch (error) { for (const node of nodes) node.remove(); throw error; }
+      return;
     }
     throw new Error(`Town 尚未提供此 index 注入类型：${row.kind}`);
   }
