@@ -1,8 +1,6 @@
 import { watch, type FSWatcher } from 'node:fs';
 import { readFile, stat } from 'node:fs/promises';
 import path from 'node:path';
-import os from 'node:os';
-import { parse } from 'smol-toml';
 import type { SceneTask } from '../../shared/types';
 
 const statuses = new Set(['queued', 'running', 'done', 'failed', 'cancelled', 'interrupted', 'budget_exhausted', 'timeout']);
@@ -25,15 +23,8 @@ export class SceneTaskObserver {
   private file = '';
   private generation = 0;
   constructor(private publish: (tasks: SceneTask[]) => void, private scenes: () => Set<string>) {}
-  async configure(config?: string) {
-    let directory = path.join(os.homedir(), '.heart-portal/subagent');
-    if (config) {
-      try {
-        const data = parse(await readFile(config, 'utf8')) as { subagent?: { state_dir?: string } };
-        const value = data.subagent?.state_dir?.trim();
-        if (value) directory = value.startsWith('~/') ? path.join(os.homedir(), value.slice(2)) : path.resolve(value);
-      } catch { /* Default Portal state directory. */ }
-    }
+  async configure(directory?: string) {
+    if (!directory) { this.close(); this.file = ''; return []; }
     const file = path.join(directory, 'ledger.json');
     if (file !== this.file || !this.watcher) {
       this.close(); this.file = file;

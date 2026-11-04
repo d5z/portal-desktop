@@ -1,5 +1,8 @@
 import { open } from 'node:fs/promises';
 import type { PortalState } from '../../shared/types';
+import path from 'node:path';
+
+export interface SubagentState { enabled: boolean; configured: boolean; ready: boolean; state_dir: string }
 
 export interface PortalSample {
   schema: 1; pid: number; nonce: string; boot_id: string; sequence: number;
@@ -21,6 +24,21 @@ export async function readPortalReady(file: string, pid: number, nonce: string):
     const ready = await readStatus(file);
     return Boolean(nonce && ready?.pid === pid && ready?.nonce === nonce);
   } catch { return false; }
+}
+
+/** Only accept capabilities published by the selected live engine. */
+export async function readSubagentState(directory: string, pid?: number): Promise<SubagentState | null> {
+  if (!pid) return null;
+  try {
+    const [ready, status] = await Promise.all([
+      readStatus(path.join(directory, '.portal-ready.json')),
+      readStatus(path.join(directory, '.portal-subagent-status.json')),
+    ]);
+    if (ready?.pid !== pid || status?.pid !== pid || typeof ready.nonce !== 'string' || !ready.nonce || status.nonce !== ready.nonce ||
+      typeof status.enabled !== 'boolean' || typeof status.configured !== 'boolean' || typeof status.ready !== 'boolean' ||
+      typeof status.state_dir !== 'string' || !path.isAbsolute(status.state_dir)) return null;
+    return { enabled: status.enabled, configured: status.configured, ready: status.ready, state_dir: status.state_dir };
+  } catch { return null; }
 }
 // Telemetry from the selected runtime only; never grants ownership or permissions.
 export async function readPortalSample(file: string, pid: number, nonce: string): Promise<PortalSample | null> {

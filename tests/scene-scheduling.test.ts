@@ -17,12 +17,10 @@ it('only exposes bounded, scene-scoped task status and generic auth errors', () 
 it('observes atomic ledger replacement without polling and stops on dispose', async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(),'scene-task-watch-'));
   const listener = vi.fn(); const observer = new SceneTaskObserver(listener,()=>new Set(['a']));
-  const config = path.join(directory,'portal.toml');
-  await writeFile(config, `[subagent]\nstate_dir = ${JSON.stringify(directory)}\n`);
   const task = {task_id:'task1',scene_id:'a',status:'running',created_ms:10};
   try {
     await writeFile(path.join(directory,'ledger.json'),JSON.stringify({tasks:[task]}));
-    expect((await observer.configure(config))[0].status).toBe('running');
+    expect((await observer.configure(directory))[0].status).toBe('running');
     await writeFile(path.join(directory,'ledger.tmp'),JSON.stringify({tasks:[{...task,status:'done',ended_ms:20}]}));
     await rename(path.join(directory,'ledger.tmp'),path.join(directory,'ledger.json'));
     // OS file events can be coalesced/delayed on busy hosted macOS runners;

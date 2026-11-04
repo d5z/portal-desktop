@@ -162,7 +162,7 @@
     "micromark-util-classify-character": "2.0.1",
     "micromark-util-sanitize-uri": "2.0.1",
     "micromark-util-symbol": "2.0.1",
-    "npm": "11.11.0",
+    "npm": "11.21.1",
     "parse5": "7.3.0",
     "pdfjs-dist": "^6.4.299",
     "react": "^19.3.0",
