@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import type { SettingsDetail } from "../../shared/components/settings-surface";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import type { ChatRuntime, ChatState, ConfigResult } from "../models/chat";
 import { useModel } from "../../shared/hooks/use-model";
 import { NavigationControls } from "../../shared/components/navigation-controls";
@@ -54,6 +55,7 @@ export function BeingModelSettings({
   back,
   contentOnly = false,
   inlineEditing = false,
+  onDetailChange,
   onBusy,
   mobilePage = false,
   fallback,
@@ -66,6 +68,7 @@ export function BeingModelSettings({
   back?: () => void;
   contentOnly?: boolean;
   inlineEditing?: boolean;
+  onDetailChange?: (detail: SettingsDetail | null) => void;
   onBusy?: (busy: boolean) => void;
   mobilePage?: boolean;
   fallback: ReactNode;
@@ -237,6 +240,11 @@ export function BeingModelSettings({
     setKey("");
     setFailure(null);
   }
+  useLayoutEffect(() => {
+    if (legacy) return;
+    onDetailChange?.(picker ? { id: 'Heart/picker', title: '更换 Being 模型', back: leavePicker } : null);
+    return () => onDetailChange?.(null);
+  }, [picker, legacy, onDetailChange]);
   async function saveKey() {
     if (disabled || !key.trim() || !route) return;
     setBusy(true);
@@ -463,9 +471,9 @@ export function BeingModelSettings({
       <div className="settings-body llm-route-settings" aria-busy={disabled}>
         {(!picker || inlineEditing) && (
           <div id={id("llm-overview")}>
-            <div className="settings-section-heading">
+            {!onDetailChange && <div className="settings-section-heading">
               <h3>模型</h3>
-            </div>
+            </div>}
             <section
               id={id("llm-current")}
               className="llm-current"
@@ -537,6 +545,7 @@ export function BeingModelSettings({
             <button
               type="button"
               className="step2-back"
+              hidden={Boolean(onDetailChange)}
               disabled={disabled}
               onClick={leavePicker}
             >

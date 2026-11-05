@@ -2,6 +2,7 @@ export const composerCommands = [
   { id: 'image', label: '出图', description: '根据描述生成或编辑图片', aliases: ['出图', '图片', 'imagegen'] },
   { id: 'ui', label: '智能 UI', description: '生成或修改可交互界面', aliases: ['智能UI', '智能ui', '界面'] },
   { id: 'doc', label: '生成文档', description: '生成 HTML 页面或 Markdown 文档', aliases: ['文档', 'html', 'md', 'markdown', 'document'] },
+  { id: 'computer', label: '使用云电脑', description: '在云电脑上执行任务、生成并交付文件', aliases: ['云电脑', '电脑', 'cloud'] },
   { id: 'subagent', label: 'Subagent', description: '委派子代理处理任务并汇总结果', aliases: ['子代理', 'agent'] },
 ] as const;
 export type ComposerCommand = typeof composerCommands[number];

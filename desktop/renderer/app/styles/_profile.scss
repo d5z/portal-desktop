@@ -244,16 +244,25 @@
   font-weight: 550;
 }
 
-:root[data-theme='dark'] input[type='checkbox'] {
+:root[data-theme='dark']
+  input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  ) {
   background: #555b65;
   box-shadow: inset 0 0 0 1px #ffffff12;
 }
 
-:root[data-theme='dark'] input[type='checkbox']::before {
+:root[data-theme='dark']
+  input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  )::before {
   background: #e9edf3;
 }
 
-:root[data-theme='dark'] input[type='checkbox']:checked {
+:root[data-theme='dark']
+  input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  ):checked {
   background: #609c76;
 }
 
@@ -265,7 +274,10 @@
   background: #609c76;
 }
 
-:root[data-theme='dark'] input[type='checkbox']:disabled {
+:root[data-theme='dark']
+  input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  ):disabled {
   opacity: 0.45;
   cursor: default;
 }

@@ -615,3 +615,15 @@ Content-Type: application/json
 - [SDK 类型定义](plugins/sdk/index.d.ts) · [清单定义](desktop/shared/plugins.ts) · [插件示例：Starmap](https://github.com/chunqing-liu/starmap)
 - Town 服务端帮助：[种子](https://beings.town/api/seeds/help)、[Grove](https://beings.town/api/grove/help)、[卷轴](https://beings.town/api/scrolls/help)、[公告](https://beings.town/api/announcements/help)、[通讯录](https://beings.town/api/contacts/help)
 - 协议参考：[Heart / Loom](https://github.com/d5z/loom-local/blob/b113faad06613ca3b19baaba7723191e8cc6d5b7/loom.html) · [Town 客户端指南](https://github.com/jeremyliu16/beings-town-client-sdk/blob/ba33a8ed7ae5fdca689ef3cabb65d5d7d6d5ae00/client-sdk-guide.md)
+
+## DSH 插件兼容接口（SDK 包 1.6）
+
+DSH 插件使用 Cordis Context，与 `window.grove` 分开。SDK 包 1.6 的 [dsh.d.ts](plugins/sdk/dsh.d.ts) 从根入口导出通用 Host/Client 类型；Grove 运行时仍为 1.5.0。
+
+宿主对照 DeepSeek Harness 的公开契约实现 Loader、依赖注入、路由、生命周期、配置、插槽、命令、快捷键、模型/凭证、附件和语音服务子集。`webServer` 在插件 apply 时提供真实 host/protocol/port/getOrigin；`connection` 提供认证启动 URL 和请求鉴权。桌面窗口由插件自己的辅助进程创建，宿主不按插件名称加载内部模块、不注入私有变量、不调用私有 HTTP 路由。插件应通过 Cordis disposer 关闭自己的进程。
+
+插件配置保留在「设置 → 插件」，官方插件在前，Harness 插件配置在列表中展开，不另开页面。模型默认先检查 Being；当前 Being 接口无法独立生成时回退到已有 subagent 配置，仅适配 OpenAI Chat Completions 兼容协议；未配置或协议不支持时明确提示。没有独立 DeepSeek 模型设置页，语音转写和 OAuth 暂不适配。已安装的服务提供者优先。快捷键按实际组合检测冲突并显示，不按插件 ID 改键。主题服务不读写插件私有持久化数据。
+
+`attachments.saveImages()` 返回 Harness 格式的 `sha256:<64 位小写 hex>` 引用，`imageHostPath()` 接收原引用定位本地文件。图片发送、原版插件历史取图和冷启动后取图均有回归测试。
+
+通用契约、剩余缺口及开发示例见 [DSH 兼容层](plugins/DSH-COMPATIBILITY.md)；原版插件回归样本见 [dsh-pet 验收](docs/dsh-pet-compatibility.md)。版本号和“已加载”不代表完整 Harness 等价兼容。

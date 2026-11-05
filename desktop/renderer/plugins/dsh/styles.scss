@@ -13,8 +13,8 @@
   inset: 0;
   margin: auto;
   z-index: 1001;
-  width: min(720px, calc(100vw - 48px));
-  height: min(680px, calc(100dvh - 48px));
+  width: min(960px, calc(100vw - 48px));
+  height: min(800px, calc(100dvh - 48px));
   max-height: calc(100dvh - 48px);
   padding: 0;
   overflow: hidden;
@@ -30,14 +30,61 @@
   flex-direction: column;
 }
 
+#third-party-plugins.dsh-manager-embedded {
+  display: flex;
+  position: static;
+  width: 100%;
+  height: auto;
+  max-height: none;
+  margin: 0;
+  border-radius: 0;
+  overflow: visible;
+  background: transparent;
+  z-index: auto;
+}
+
+.dsh-manager-nav {
+  display: flex;
+  flex: none;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 0 16px;
+}
+
+.dsh-manager-nav button {
+  margin-left: 0;
+  min-height: 36px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.dsh-manager-nav button:not(.primary) {
+  color: var(--secondary);
+}
+
+.dsh-manager-nav button:not(.primary):is(:hover, [aria-expanded='true']) {
+  color: var(--text);
+  background: var(--hover);
+}
+
+.dsh-manager-main {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
 #third-party-plugins .dsh-manager-heading {
   display: flex;
   flex: none;
   align-items: center;
   gap: 12px;
   height: auto;
-  min-height: 88px;
-  padding: 22px 28px;
+  min-height: 72px;
+  padding: 14px 24px;
   position: static;
   border-bottom: 1px solid var(--line);
 }
@@ -48,8 +95,9 @@
 }
 
 .dsh-manager-heading h2 {
+  flex: 1;
   margin: 0;
-  font-size: 22px;
+  font-size: 17px;
   font-weight: 600;
   line-height: 1.3;
 }
@@ -65,35 +113,11 @@
   flex: none;
 }
 
-.dsh-back {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 32px;
-  height: 36px;
-  margin-left: -10px;
-  border-radius: 8px;
-}
-
-.dsh-back:hover {
-  background: var(--hover);
-}
-
-.dsh-back svg {
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentcolor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-
 .dsh-manager-body {
   flex: 1;
   min-height: 0;
   overflow: auto;
-  padding: 24px 28px 28px;
+  padding: 20px 24px 24px;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
   scroll-padding: 24px;
@@ -102,12 +126,20 @@
 .dsh-plugin-content {
   width: 100%;
   min-width: 0;
+  overflow-x: clip;
   overflow-wrap: anywhere;
   font-size: var(--dsh-content-font-size, 14px);
 }
 
 .dsh-plugin-content > * {
   margin-inline: auto;
+}
+
+.dsh-plugin-content > .dsh-compatibility:first-child {
+  margin: 0 0 16px;
+  padding: 0 0 8px;
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
 }
 
 .dsh-plugin-content :is(button, select) {
@@ -122,7 +154,8 @@
   max-width: 100%;
 }
 
-#third-party-plugins :is(button, input, select, textarea, summary):focus-visible {
+#third-party-plugins :is(button, input, select, textarea, summary):focus-visible,
+.dsh-rightbar-heading button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -161,24 +194,14 @@
 }
 
 .dsh-install button,
-.dsh-actions button,
-.dsh-contributions button {
+.dsh-actions button {
   min-height: 36px;
 }
 
-.dsh-actions,
-.dsh-contributions {
+.dsh-actions {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
-}
-
-.dsh-contributions:empty {
-  display: none;
-}
-
-.dsh-contributions {
-  margin-top: 14px;
 }
 
 .dsh-reload {
@@ -191,34 +214,6 @@
 
 .dsh-reload button {
   margin-top: 8px;
-}
-
-#third-party-plugins .plugin-card {
-  display: block;
-  padding: 22px 0;
-  margin: 0;
-  border: 0;
-  border-top: 1px solid var(--line);
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
-}
-
-#third-party-plugins .plugin-card h3 {
-  font-size: 15px;
-  margin: 0 0 8px;
-  overflow-wrap: anywhere;
-}
-
-#third-party-plugins .plugin-card > p {
-  margin: 8px 0 14px;
-  font-size: 13px;
-  line-height: 1.7;
-}
-
-#third-party-plugins .plugin-card .card-meta {
-  font-size: 12px;
-  color: var(--secondary);
 }
 
 .dsh-plugin-issue,
@@ -348,8 +343,8 @@
   }
 
   #third-party-plugins .dsh-manager-heading {
-    padding: 18px 20px;
-    min-height: 80px;
+    padding: 12px 20px;
+    min-height: 64px;
   }
 
   .dsh-manager-body {
@@ -357,7 +352,7 @@
   }
 
   .dsh-manager-heading h2 {
-    font-size: 20px;
+    font-size: 17px;
   }
 }
 
@@ -444,15 +439,27 @@ body[data-town-dsh] :is(#client-settings-dialog, #third-party-plugins) {
   background: var(--control);
 }
 
-body[data-town-dsh] input[type='checkbox']::before {
+body[data-town-dsh]
+  input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  )::before {
   background: var(--control);
 }
 
-body[data-town-dsh-theme] :is(input[type='checkbox'], .being-wake-track) {
+body[data-town-dsh-theme]
+  :is(
+    input[type='checkbox']:where(
+        :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+      ),
+    .being-wake-track
+  ) {
   background: var(--selected);
 }
 
-body[data-town-dsh-theme] input[type='checkbox']:checked,
+body[data-town-dsh-theme]
+  input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  ):checked,
 body[data-town-dsh-theme] .being-wake-switch[aria-checked='true'] .being-wake-track {
   background: var(--accent);
 }
@@ -588,9 +595,11 @@ body[data-town-dsh-theme] ::selection {
   right: 0;
   top: 64px;
   bottom: 0;
-  width: min(400px, 100vw);
+  width: min(400px, calc(100vw - 96px));
   z-index: 90;
-  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   background: var(--bg);
   border-left: 1px solid var(--line);
 }
@@ -624,35 +633,32 @@ body[data-town-dsh-theme] ::selection {
   font-weight: 600;
 }
 
-.dsh-config-field {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 16px 0;
-  border-bottom: 1px solid var(--line);
+.dsh-config-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: start;
 }
 
-.dsh-config-field label {
-  display: flex;
-  flex: 1;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
+.dsh-config-control :is(input, textarea, select) {
+  width: 100%;
   min-width: 0;
-}
-
-.dsh-config-field label > span {
-  flex: 1 1 180px;
-  font-size: 13px;
-}
-
-.dsh-config-field :is(input:not([type='checkbox']), textarea, select) {
-  width: min(100%, 260px);
-  padding: 8px 10px;
+  min-height: 40px;
+  padding: 9px 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
   background: var(--control);
   color: var(--text);
+}
+
+.dsh-config-control textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+.dsh-config-control > button {
+  min-height: 40px;
+  white-space: nowrap;
 }
 
 .dsh-sr-only {
@@ -690,20 +696,73 @@ body[data-town-dsh-theme] ::selection {
   background: var(--control);
 }
 
-.dsh-rightbar {
-  width: min(400px, calc(100vw - 96px));
-  padding: 16px;
+.dsh-rightbar-heading {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 4px;
+  min-height: 48px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--line);
+}
+
+.dsh-rightbar-heading h2 {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.dsh-rightbar-heading button {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+}
+
+.dsh-rightbar-heading button:hover {
+  background: var(--hover);
+}
+
+.dsh-rightbar-heading svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.dsh-rightbar-content {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.dsh-rightbar-content > .dsh-compatibility {
+  flex: none;
+  max-height: 35%;
+  overflow: auto;
+  margin: 0;
+  padding: 0 16px;
+  border-top: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.dsh-pane-slot {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
 }
 
 .dsh-rightbar.fullscreen {
   left: 88px;
-}
-
-.dsh-rightbar > button {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: var(--control);
 }
 
 .dsh-manager-heading h2 {
@@ -718,21 +777,417 @@ body[data-town-dsh] {
   --mono: var(--dsh-font-family-code, var(--ds-font-family-code, ui-monospace, monospace));
 }
 
-/* VS Code Themes 1.x previews mix light/dark cards, but its favorite control
-   uses the active theme's text. Give that control its own matching surface. */
-.dsh-plugin-content .vst-card .vst-fav-star {
-  color: var(--text);
-  background: var(--control);
-  border-color: var(--secondary);
+.dsh-list-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
 }
 
-.dsh-plugin-content .vst-card .vst-fav-star:hover {
-  color: var(--text);
-  border-color: var(--text);
+.dsh-list-toolbar input {
+  flex: 1;
+  min-width: 120px;
 }
 
-.dsh-plugin-content .vst-card .vst-fav-star.is-fav {
-  color: light-dark(#805900, #f5c518);
+.dsh-list-toolbar :is(input, select) {
+  min-height: 36px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
   background: var(--control);
-  border-color: currentcolor;
+  color: var(--text);
+}
+
+.dsh-plugin-row {
+  border-bottom: 1px solid var(--line);
+}
+
+.dsh-plugin-select:hover {
+  background: var(--hover);
+}
+
+.dsh-plugin-select {
+  position: relative;
+  display: block;
+  width: 100%;
+  min-width: 0;
+  padding: 20px 36px 20px 0;
+  text-align: left;
+}
+
+.dsh-plugin-row-heading {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  line-height: 1.5;
+}
+
+.dsh-plugin-row-heading strong {
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.dsh-status,
+.dsh-plugin-version {
+  font-size: 12px;
+  color: var(--secondary);
+}
+
+.dsh-status[data-issue] {
+  color: var(--warning, #a86b08);
+}
+
+.dsh-plugin-description {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 1;
+  overflow: hidden;
+  margin: 6px 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--secondary);
+  overflow-wrap: anywhere;
+}
+
+.dsh-row-open {
+  position: absolute;
+  right: 8px;
+  top: 24px;
+  display: grid;
+  place-items: center;
+  width: 20px;
+  color: var(--secondary);
+}
+
+.dsh-row-open svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.5;
+  transform: rotate(-90deg);
+}
+
+.dsh-empty {
+  padding: 48px 12px;
+  text-align: center;
+  color: var(--secondary);
+  line-height: 1.7;
+}
+
+.dsh-empty h3 {
+  color: var(--text);
+}
+
+.dsh-detail-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 24px;
+  margin-bottom: 20px;
+}
+
+.dsh-detail-summary p,
+.dsh-services > p,
+.dsh-help p {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--secondary);
+  overflow-wrap: anywhere;
+}
+
+.dsh-detail-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 16px 0 24px;
+  border-bottom: 1px solid var(--line);
+}
+
+.dsh-detail-tabs button {
+  min-height: 40px;
+  padding: 8px 12px;
+  color: var(--secondary);
+}
+
+.dsh-detail-tabs button[aria-current='page'] {
+  color: var(--text);
+  box-shadow: inset 0 -2px var(--accent);
+}
+
+.dsh-more summary {
+  cursor: pointer;
+  padding: 8px 12px;
+  font-size: 13px;
+}
+
+.dsh-more > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.dsh-more button {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+.dsh-command-section {
+  margin-bottom: 28px;
+}
+
+.dsh-services h3,
+.dsh-help h3,
+.dsh-command-section h3 {
+  margin-top: 0;
+  font-size: 15px;
+}
+
+.dsh-help h3:not(:first-child) {
+  margin-top: 28px;
+}
+
+.dsh-detail-summary > details {
+  flex: 1;
+  min-width: 120px;
+}
+
+.dsh-detail-summary > details > summary {
+  cursor: pointer;
+  color: var(--secondary);
+  font-size: 13px;
+  padding: 6px 0;
+}
+
+/* Settings expand in the list and share the library's single scroll surface. */
+#third-party-plugins.dsh-manager-embedded .dsh-manager-heading {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+}
+
+.dsh-manager-embedded .dsh-manager-heading h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
+.dsh-manager-embedded .dsh-manager-body {
+  overflow: visible;
+  padding: 0;
+  scrollbar-gutter: auto;
+}
+
+.dsh-manager-embedded .dsh-manager-main {
+  overflow: visible;
+}
+
+#third-party-plugins.dsh-manager-embedded {
+  flex-direction: column;
+  background: transparent;
+}
+
+.dsh-list-count {
+  color: var(--secondary);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.dsh-settings-host {
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.dsh-model-status {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--surface);
+  font-size: 12px;
+  line-height: 1.7;
+  color: var(--secondary);
+}
+
+.dsh-model-status summary {
+  cursor: pointer;
+}
+
+.dsh-model-status p {
+  margin: 8px 0 0;
+}
+
+#settings-plugin-content-town .plugin-card {
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  padding: 20px 0;
+}
+
+.dsh-plugin-row-heading .dsh-status {
+  margin-left: auto;
+}
+
+.dsh-utility-section {
+  position: relative;
+  padding: 20px 0;
+  margin-bottom: 20px;
+  border-block: 1px solid var(--line);
+}
+
+.dsh-utility-section > h3,
+.dsh-utility-section > section > h3 {
+  margin: 0 36px 12px 0;
+  font-size: 15px;
+}
+
+.dsh-utility-close {
+  position: absolute;
+  top: 16px;
+  right: 0;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.dsh-utility-close:hover {
+  background: var(--hover);
+}
+
+.dsh-utility-close svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.5;
+}
+
+.dsh-services,
+.dsh-help,
+.dsh-command-section {
+  max-width: 760px;
+}
+
+@container (max-width: 600px) {
+  .dsh-manager-nav {
+    gap: 4px;
+  }
+
+  .dsh-manager-nav button {
+    padding-inline: 8px;
+  }
+
+  .dsh-plugin-row-heading .dsh-status {
+    margin-left: 0;
+  }
+}
+
+/* Public guidance uses the same compact typography as settings help. */
+.dsh-help {
+  display: grid;
+  gap: 20px;
+  padding-right: 36px;
+}
+
+.dsh-help h3 {
+  margin: 0 0 8px;
+  font-size: 13px;
+  font-weight: 550;
+}
+
+.dsh-help p {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
+
+@container (min-width: 560px) {
+  .dsh-help {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px;
+  }
+}
+
+:is(#place-panel, #client-settings-dialog) .dsh-manager-nav button {
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+#settings-plugin-content-town .plugin-card {
+  display: block;
+}
+
+#settings-plugin-content-town .plugin-card:first-child {
+  padding-top: 0;
+}
+
+#settings-plugin-content-town .plugin-actions {
+  display: block;
+  margin-top: 24px;
+}
+
+#dsh-install-dialog {
+  width: min(520px, calc(100vw - 32px));
+}
+
+#dsh-install-dialog .dialog-heading {
+  padding: 24px 24px 16px;
+}
+
+#dsh-install-dialog .dialog-heading h2 {
+  font-size: 20px;
+}
+
+#dsh-install-dialog .dialog-body {
+  padding: 0 24px 24px;
+}
+
+#dsh-install-dialog .dialog-body > .field-help:first-child {
+  margin: 0 0 20px;
+}
+
+#dsh-install-dialog .dialog-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 16px 24px;
+  margin: 0;
+  border-top: 1px solid var(--line);
+}
+
+#dsh-install-dialog .field-help {
+  color: var(--secondary);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.dsh-install-alternatives {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 12px 0 20px;
+  font-size: 12px;
+}
+
+.dsh-install-alternatives a {
+  color: var(--secondary);
+  text-underline-offset: 3px;
+}
+
+.dsh-operation-status {
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.7;
 }

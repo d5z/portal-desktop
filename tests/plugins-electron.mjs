@@ -65,6 +65,7 @@ try {
   assert.equal(await page.locator('#place-panel').evaluate(el => el.tagName), 'SECTION');
   assert.equal(await page.evaluate(() => typeof window.beings.panelWindow), 'undefined');
   await page.getByRole('tab', { name: 'Plugin', exact: true }).click();
+  await page.getByRole('tab', { name: '官方插件', exact: true }).click();
   await page.getByRole('button', { name: '导入插件目录' }).click();
   await page.locator('.plugin-card').waitFor();
   const importedPlugins = (await page.evaluate(() => window.beings.plugins.list())).plugins;
@@ -116,6 +117,7 @@ try {
   await pluginFrame.waitForFunction(() => document.getElementById('plugin-status').textContent === '已保存到本机');
   // Placement is configured per view; pinned entries survive a renderer restart.
   await page.getByRole('button', { name: '管理插件', exact: true }).click();
+  if (!await page.getByLabel('流程看板显示位置', { exact: true }).isVisible()) await page.getByText('显示位置与图标', { exact: true }).click();
   await page.getByLabel('流程看板显示位置', { exact: true }).selectOption('navigation');
   await page.locator('.workspace-rail').getByRole('button', { name: '流程看板', exact: true }).waitFor();
   await page.reload();
@@ -131,6 +133,7 @@ try {
   assert.equal(await page.locator('.plugin-pinned-tabs').count(), 0);
   await page.screenshot({ path: path.join(screenshots, 'plugin-function-row.png') });
   await page.getByRole('button', { name: '管理插件', exact: true }).click();
+  if (!await page.getByLabel('流程看板显示位置', { exact: true }).isVisible()) await page.getByText('显示位置与图标', { exact: true }).click();
   await page.getByLabel('流程看板显示位置', { exact: true }).selectOption('window');
   await page.getByLabel('流程看板显示位置', { exact: true }).waitFor({ state: 'visible' });
   const opened = app.waitForEvent('window');
@@ -170,6 +173,7 @@ try {
   await closedFloating;
   assert.match(await page.evaluate(async token => { try { await window.beings.plugins.call(token, 'storage.load'); return ''; } catch (e) { return e.message; } }, floatingToken), /关闭/);
   await page.getByRole('button', { name: '管理插件', exact: true }).click();
+  if (!await page.getByLabel('流程看板显示位置', { exact: true }).isVisible()) await page.getByText('显示位置与图标', { exact: true }).click();
   await page.getByLabel('流程看板显示位置', { exact: true }).selectOption('page');
   await page.locator('.plugin-card').getByRole('button', { name: '流程看板', exact: true }).click();
   await page.frameLocator('.plugin-frame:visible').getByRole('button', { name: /插件持久化验收/ }).waitFor();
@@ -359,6 +363,7 @@ try {
   assert.match(await page.evaluate(async token => { try { await window.beings.plugins.call(token, 'workspace.context'); return ''; } catch (error) { return error.message; } }, sideToken), /关闭/);
   await page.locator('.workspace-rail').getByRole('button', { name: '工具库', exact: true }).click();
   await page.getByRole('tab', { name: 'Plugin', exact: true }).click();
+  await page.getByRole('tab', { name: '官方插件', exact: true }).click();
   await page.getByLabel('仅本机存在', { exact: true }).check();
   await page.locator('.plugin-card:visible').waitFor();
   assert.equal(await page.getByRole('tab', { name: '本机 Kits', exact: true }).count(), 0);

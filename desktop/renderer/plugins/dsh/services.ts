@@ -1,6 +1,5 @@
 import type { Context } from '@deepseek-ai/cordis';
 import { bindThemeController, presentColorScheme } from '../../shared/color-scheme';
-import { isStaleThemeRestore, rememberClientTheme } from './theme-compat';
 
 type Theme = { id: string; colorScheme: 'light' | 'dark'; tokens: Record<string, string> };
 const read = (key: string, fallback: any) => { try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; } catch { return fallback; } };
@@ -36,7 +35,7 @@ export function installPresentationServices(ctx: Context) {
   };
   const theme = {
     getTheme: () => snapshot,
-    setTheme(id: string) { if (id !== 'system' && !themes.some(t => t.id === id)) throw new Error(`未知主题：${id}`); if (isStaleThemeRestore(id)) return; preference = id; save('town.dsh.theme', id); publish(); },
+    setTheme(id: string) { if (id !== 'system' && !themes.some(t => t.id === id)) throw new Error(`未知主题：${id}`); preference = id; save('town.dsh.theme', id); publish(); },
     register(def: Theme) {
       if (!def.id || def.id === 'system' || !['light', 'dark'].includes(def.colorScheme) || themes.some(t => t.id === def.id)) throw new Error(`无效或重复的主题：${def.id}`);
       themes.push({ ...def, tokens: { ...def.tokens } }); publish();
@@ -55,7 +54,7 @@ export function installPresentationServices(ctx: Context) {
     exportInspectTokens: () => Object.keys(snapshot.active.tokens).map(name => ({ name, cssVariable: name, description: 'Plugin theme token', valueType: 'CSS value', requiresLightAndDark: true })),
   };
   ctx.provide('theme', theme); media.addEventListener('change', publish); publish();
-  ctx.effect(() => bindThemeController({ current: () => snapshot.active.colorScheme, select: id => { rememberClientTheme(id); theme.setTheme(id); }, active: () => document.body.hasAttribute('data-town-dsh') }));
+  ctx.effect(() => bindThemeController({ current: () => snapshot.active.colorScheme, select: id => theme.setTheme(id), active: () => document.body.hasAttribute('data-town-dsh') }));
   ctx.effect(() => () => media.removeEventListener('change', publish));
 
   const dictionaries = new Map<string, Map<string, Record<string, string>>>();

@@ -1,5 +1,7 @@
 import { startupPluginNotice } from './issue';
 import { LocalRemote } from './remote';
+import { installInteractions, type SidebarTab } from './interactions';
+import type { ChatSceneActivity } from '../../../shared/types';
 import settingsPluginsURL from '@deepseek-ai/dsh-client-ui-settings-plugins/client?url';
 import settingsURL from '@deepseek-ai/dsh-client-ui-settings/client?url';
 import TimerService from '@deepseek-ai/cordis-plugin-timer';
@@ -36,6 +38,29 @@ export class DshClientRuntime extends Store {
   configForm(ns: string): any { return (this.ctx.get('configForms') as any).get(ns); }
   async refreshForms() { try { const result = await (this.ctx.get('remote.settings') as any)?.describe(); this.configurationViews = result?.ok ? result.value.namespaces.map((view: any) => ({ ...view, schema: (this.ctx.get('settingsSchema') as any).rehydrate(view.schema) })) : []; this.changed(); } catch (error) { console.error(error); } }
   managerOpen = false;
+  private libraryHost: HTMLDivElement | null = null;
+  settingsHost: HTMLDivElement | null = null;
+  get managerHost() { return this.settingsHost || this.libraryHost; }
+  settingsNavigate?: () => void;
+  closeSettings?: () => Promise<boolean>;
+  settingsBusy = false;
+  requestSettingsLeave?: (action: () => void) => void;
+  managerNavigate?: () => void;
+  managerPage: 'installed' | 'install' | 'commands' | 'help' = 'installed';
+  managedPlugin?: string;
+  setManagerHost = (host: HTMLDivElement | null) => { this.libraryHost = host; this.changed(); };
+  setSettingsHost = (host: HTMLDivElement | null) => { this.settingsHost = host; if (!host) this.closeManager(); else this.changed(); };
+  get settingsSlots() {
+    const slots = this.slots.filter(slot => ['settings.section', 'settings.plugins.tab', 'settings.plugin.item', 'plugins.bundle.config'].includes(slot.name));
+    // Bundle configuration replaces the legacy namespace seat for the same package.
+    return slots.filter(slot => slot.name !== 'settings.plugin.item' || !slots.some(other => other.owner === slot.owner && other.name === 'plugins.bundle.config' && other.key === slot.key));
+  }
+  openPlugin(id: string) {
+    this.managedPlugin = id; this.managerPage = 'installed'; this.configuration = undefined;
+    this.panel = this.settingsSlots.find(slot => slot.owner === id);
+    if (!this.panel) this.configuration = this.configurationViews.find(view => view.owner === id && view.autoGenerate && Object.keys(view.schema?.dict || {}).length);
+    this.managerOpen = true; (this.settingsNavigate || this.managerNavigate)?.(); this.changed();
+  }
   phase: 'loading' | 'ready' | 'error' = 'loading';
   lifecycleVersion = 0;
   private reloadOwners = new Set<string>();
@@ -66,8 +91,31 @@ export class DshClientRuntime extends Store {
   }
   mainPanel: string | null = null;
   selectPanel(key: string | null) { (this.ctx.get('layout') as any)?.selectPanel(key); }
+  toggleRightbarFullscreen() { (this.ctx.get('layout') as any)?.openRightbar(this.rightbar.track, !this.rightbar.fullscreen); }
+  openRightbar() { this.activeSidebarTab = undefined; (this.ctx.get('layout') as any).openRightbar(true, false); }
   closeRightbar() { (this.ctx.get('layout') as any)?.closeRightbar(); }
   rightbar = { open: false, track: true, fullscreen: false };
+  openSidebarTab(kind: string) { (this.ctx.get('sidebarRight') as any).openTab(kind); }
+  sidebarTabs: SidebarTab[] = [];
+  activeSidebarTab?: string;
+  private activity: Record<string, ChatSceneActivity> = {};
+  private activityQueue: Promise<unknown> = Promise.resolve();
+  shortcutConflicts: string[] = [];
+  openSession?: (id: string) => Promise<void>;
+  updateActivity(activity: Record<string, ChatSceneActivity>) {
+    this.activity = activity;
+    if (!this.ctx.get('remote')) return;
+    this.activityQueue = this.activityQueue.then(async () => {
+      const result = await (this.ctx.get('remote') as LocalRemote).call('townActivity', 'update', [activity]);
+      if (!result.ok) throw new Error(result.error.message);
+    }).catch(error => console.warn(error));
+  }
+  commandUi?: ReturnType<typeof installInteractions>;
+  async executeCommand(text: string) {
+    const result = await (this.ctx.get('remote.commands') as any).execute('', text, []);
+    if (!result.ok) throw new Error(result.error.message);
+    return result.value as { kind: string; text?: string };
+  }
   private navigation = new AbortController();
   private modules = new Map<string, Module>();
   private exports = new Map<string, any>();
@@ -168,7 +216,7 @@ export class DshClientRuntime extends Store {
     (this.ctx as any).emit('connection/reset');
     await this.refreshForms();
     if (this.mainPanel && !this.slots.some(slot => slot.name === 'main' && slot.key === this.mainPanel)) this.selectPanel(null);
-    if (this.rightbar.open && !this.slots.some(slot => slot.name === 'rightbar')) this.closeRightbar();
+    if (this.rightbar.open && !(this.activeSidebarTab ? this.sidebarTabs.some(tab => tab.id === this.activeSidebarTab) : this.slots.some(slot => slot.name === 'rightbar'))) this.closeRightbar();
     if (this.panel && !this.slots.some(slot => slot.owner === this.panel!.owner && slot.name === this.panel!.name && slot.id === this.panel!.id && slot.key === this.panel!.key)) this.panel = undefined;
     if (this.configuration && !this.configurationViews.some(view => view.ns === this.configuration.ns)) this.configuration = undefined;
     this.lifecycleVersion++;
@@ -195,10 +243,15 @@ export class DshClientRuntime extends Store {
     })).filter(slot => this.state.plugins.some(plugin => plugin.id === slot.owner && plugin.enabled && plugin.status === 'active') && !this.needsReload(slot.owner));
   }
   renderRoot() { return this.registry?.renderSlot('root', {}) ?? null; }
-  openManager() { this.managerOpen = true; this.panel = undefined; this.configuration = undefined; void this.refreshForms(); this.changed(); }
-  closeManager() { this.managerOpen = false; this.panel = undefined; this.configuration = undefined; this.changed(); }
+  openSettingsSection(id: string) {
+    const slot = this.slots.find(slot => slot.name === 'settings.section' && slot.id === id);
+    if (!slot) throw new Error(`未提供设置页：${id}`);
+    this.configuration = undefined; this.managerPage = 'installed'; this.managedPlugin = slot.owner; this.panel = slot; this.managerOpen = true; (this.settingsNavigate || this.managerNavigate)?.(); this.changed();
+  }
+  openManager(page: DshClientRuntime['managerPage'] = 'installed') { this.managerOpen = true; this.managerPage = page; this.managedPlugin = undefined; this.panel = undefined; this.configuration = undefined; if (!this.managerHost) (this.settingsNavigate || this.managerNavigate)?.(); void this.refreshForms(); this.changed(); }
+  closeManager() { this.managerOpen = false; this.managedPlugin = undefined; this.managerPage = 'installed'; this.panel = undefined; this.configuration = undefined; this.changed(); }
   start() { return this.starting ??= this.boot(); }
-  async refresh() { if (window.beings?.dshPlugins) this.state = await window.beings.dshPlugins.state(); this.changed(); }
+  async refresh() { if (window.beings?.dshPlugins) this.state = await window.beings.dshPlugins.state(); this.updateActivity(this.activity); this.changed(); }
   private require = (id: string): any => {
     const libraries: Record<string, any> = { react: React, 'react-dom': ReactDOM, 'react-dom/client': ReactDOMClient, 'react/jsx-runtime': JSXRuntime, '@deepseek-ai/cordis': Cordis, '@deepseek-ai/dsh-client-ui-slots': SlotCore, '@deepseek-ai/dsh-client-store': DshStore };
     if (id in libraries) return libraries[id];
@@ -233,7 +286,7 @@ export class DshClientRuntime extends Store {
       const settings = this.modules.get('@deepseek-ai/dsh-client-ui-settings')!.factory(this.require);
       await this.ctx.plugin(settings).await();
       this.exports.set('@deepseek-ai/dsh-client-ui-settings', settings);
-      const rootChildren = Object.fromEntries(DSH_SLOTS.map(name => [name, { kind: ['main', 'plugins.bundle.config', 'settings.plugin.item'].includes(name) ? 'keyed' : ['sidebar', 'rightbar', 'settings.trigger', 'settings.header', 'settings.close', 'settings.launcher'].includes(name) ? 'single' : 'list', scope: 'root' }]));
+      const rootChildren = Object.fromEntries(DSH_SLOTS.map(name => [name, { kind: ['main', 'sidebar.right.pane.tab', 'plugins.bundle.config', 'settings.plugin.item'].includes(name) ? 'keyed' : ['sidebar', 'rightbar', 'settings.trigger', 'settings.header', 'settings.close', 'settings.launcher'].includes(name) ? 'single' : 'list', scope: 'root' }]));
       registry.register({ name: 'root', children: rootChildren }, TownSlotRoot);
       (this.ctx as any).on('slots/changed', () => { this.changed(); });
       registry.onEntryError((name: string, entry: any, error: unknown) => { this.errors[this.ownerByModule.get(entry.registrant) || entry.registrant || name] = String(error); this.changed(); });
@@ -251,6 +304,12 @@ export class DshClientRuntime extends Store {
         closeRightbar: () => { this.rightbar = { ...this.rightbar, open: false }; document.body.classList.remove('dsh-rightbar-track'); this.changed(); },
       };
       this.ctx.provide('layout', layout); this.exports.set('@deepseek-ai/dsh-client-ui-layout', layout);
+      this.commandUi = installInteractions(this.ctx, this);
+      this.ctx.provide('uiWorkspace', { openSession: (id: string) => {
+        if (!this.openSession) throw new Error('Town 会话尚未连接');
+        return this.openSession(id);
+      } });
+      this.ctx.provide('uiSettings', { openSection: (id: string) => this.openSettingsSection(id) });
       const connection = { isLoopback: true, fetch: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init) };
       this.ctx.provide('connection', connection);
       this.exports.set('@deepseek-ai/dsh-client-connection', connection);

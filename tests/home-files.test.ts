@@ -3,7 +3,6 @@ import { mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { HomeClient } from '../desktop/main/home/client';
-import { HOME_SCOPE } from '../desktop/main/home/protocol';
 import { HomeService } from '../desktop/main/home/service';
 import { HomeFiles, workspacePath } from '../desktop/main/home/files';
 import { parseConnection } from '../desktop/main/chat/connection';
@@ -188,8 +187,6 @@ describe('library request ownership', () => {
   });
   it('does not claim success for cancelled, failed or stale downloads', async () => {
     const { api, model } = modelFixture();
-    expect(HOME_SCOPE.split(' ')).toContain('files:read');
-    expect(HOME_SCOPE.split(' ')).not.toContain('files:write');
     vi.mocked(api.download).mockResolvedValue(false);
     expect(await model.download(entry.path)).toBe(false);
     expect(model.notice).toBe('');

@@ -41,3 +41,6 @@ export interface GroveSDK {
   };
   ui: { openExternal(url: string): Promise<void>; notice(text: string): Promise<void>; navigate(view: string, id?: string): Promise<void> };
 }
+
+/** DSH Cordis service subset, separate from window.grove. */
+export type { DshServiceConfig, DshImageRef, TownDshHostServices, TownDshClientServices } from './dsh';

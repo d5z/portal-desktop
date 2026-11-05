@@ -32,6 +32,40 @@ async function fixture() {
   return {home,manager,make};
 }
 describe('Town DSH compatibility host (real Cordis process)',()=>{
+ it('provides the same listener, authenticated launch and helper lifecycle to unrelated plugins', async () => {
+   const {manager,make}=await fixture();
+   const opened=vi.fn(); manager.openClient=opened;
+   for (const name of ['desktop-widget','status-panel']) {
+     await manager.install(await make(name, `import {spawn} from 'node:child_process';
+       export const inject=['webServer','connection'];
+       export function apply(ctx) {
+         const origin=ctx.webServer.getOrigin();
+         if (!ctx.webServer.port || new URL(origin).port!==String(ctx.webServer.port)) throw new Error('Listener must exist during apply');
+         const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{env:{...process.env,ELECTRON_RUN_AS_NODE:'1'},stdio:'ignore'});
+         ctx.effect(()=>()=>new Promise(resolve=>{child.once('exit',resolve);child.kill();}));
+         ctx.effect(()=>ctx.webServer.register({kind:'exact',path:'/${name}',handler(req,res) {
+           res.setHeader('content-type','application/json');
+           res.end(JSON.stringify({origin,host:ctx.webServer.host,protocol:ctx.webServer.protocol,url:ctx.connection.authenticatedUrl(origin),pid:child.pid,rejection:ctx.connection.requestRejection(req)}));
+         }}));
+       }`));
+   }
+   const state=await(await manager.resource(new Request('beings://desktop/desktop-widget'))).json();
+   expect(state).toMatchObject({host:'127.0.0.1',protocol:'http:'});
+   expect(state.rejection).toBeUndefined();
+   expect((await fetch(state.origin+'/desktop-widget')).status).toBe(401);
+   const launch=await fetch(state.url,{redirect:'manual'});
+   expect(launch.status).toBe(303); expect(launch.headers.get('location')).toBe('./');
+   const cookie=launch.headers.get('set-cookie')!.split(';')[0];
+   expect((await fetch(state.origin+'/status-panel',{headers:{cookie}})).status).toBe(200);
+   expect((await fetch(state.origin+'/status-panel',{headers:{cookie,origin:'https://foreign.test'}})).status).toBe(403);
+   expect((await fetch(state.origin+'/',{headers:{cookie}})).status).toBe(200);
+   await vi.waitFor(()=>expect(opened).toHaveBeenCalledOnce());
+   await manager.enable('desktop-widget',false);
+   expect(()=>process.kill(state.pid,0)).toThrow();
+   const peer=await(await manager.resource(new Request('beings://desktop/status-panel'))).json();
+   expect(peer.pid).not.toBe(state.pid);
+   expect((await fetch(peer.origin+'/status-panel',{headers:{cookie}})).status).toBe(401);
+ });
  it('restores the plugin host once when an installer handoff fails after shutdown',async()=>{
    const {manager,make}=await fixture();
    await manager.install(await make('installer-recovery',`export const inject=['webServer'];export function apply(ctx){ctx.effect(()=>ctx.webServer.register({kind:'exact',path:'/recovered',handler(req,res){res.end(String(process.pid))}}))}`));

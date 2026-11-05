@@ -630,7 +630,7 @@ function ChatView({
                 sendDraft(event.ctrlKey || (isMac && event.metaKey) ? undefined : "interrupt");
               }}
             />
-            <ComposerAddMenu state={state} onUpload={() => fileInput.current?.click()} onExamples={openExamples} onSelect={() => requestAnimationFrame(() => composer.current?.focus())}
+            <ComposerAddMenu state={state} onUpload={() => fileInput.current?.click()} onSelect={() => requestAnimationFrame(() => composer.current?.focus())}
               onConfigureSubagent={configureSubagent}
               onEnableSubagent={parent !== window && location.protocol === 'beings:' ? () => { void enableSubagent(); } : undefined}
               subagentEnabling={subagentEnabling} subagentEnableFailed={subagentEnableFailed}/>

@@ -271,7 +271,9 @@ select option::checkmark {
   color: var(--muted);
 }
 
-input[type='checkbox'] {
+input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  ) {
   appearance: none;
   width: 30px;
   height: 18px;
@@ -282,7 +284,9 @@ input[type='checkbox'] {
   cursor: pointer;
 }
 
-input[type='checkbox']::before {
+input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  )::before {
   content: '';
   width: 12px;
   height: 12px;
@@ -294,11 +298,15 @@ input[type='checkbox']::before {
   transition: transform 0.15s;
 }
 
-input[type='checkbox']:checked {
+input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  ):checked {
   background: var(--accent);
 }
 
-input[type='checkbox']:checked::before {
+input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  ):checked::before {
   transform: translateX(12px);
 }
 

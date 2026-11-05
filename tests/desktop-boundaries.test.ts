@@ -172,8 +172,8 @@ describe('Portal save input boundary', () => {
       exclusive: new MutationQueue().run,
       controller: { save } as unknown as import('../desktop/main/portal/controller').PortalController,
       beforeSave: () => { order.push('before'); },
-      afterSave: () => { order.push('after'); },
-      snapshot: () => ({}) as import('../desktop/shared/types').Snapshot,
+      afterSave: async () => { await new Promise(resolve => setTimeout(resolve, 0)); order.push('after'); },
+      snapshot: () => { order.push('snapshot'); return {} as import('../desktop/shared/types').Snapshot; },
     });
     const invoke = handlers.get('beings:save')!;
     await expect(invoke({ subagentEnabled: 'yes' })).rejects.toThrow('开关状态');
@@ -184,6 +184,6 @@ describe('Portal save input boundary', () => {
       subagentEnabled: false, subagentSetup: { provider: 'openai', model: 'fixture', api_key: '', thinking: 'medium' } };
     await invoke(input);
     expect(save).toHaveBeenCalledExactlyOnceWith(input);
-    expect(order).toEqual(['before', 'save', 'after']);
+    expect(order).toEqual(['before', 'save', 'after', 'snapshot']);
   });
 });

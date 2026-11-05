@@ -6,7 +6,7 @@ import { validateSubagentSetup } from './subagent-setup';
 
 export function registerPortalIpc(options: {
   handle: RegisterHandler; exclusive: Exclusive; controller: PortalController;
-  snapshot(): Snapshot; beforeSave(): void; afterSave(): void;
+  snapshot(): Snapshot; beforeSave(): void; afterSave(): void | Promise<void>;
 }) {
   const { handle, exclusive, controller } = options;
   handle('beings:connection-defaults', controller.connectionDefaults);
@@ -16,7 +16,7 @@ export function registerPortalIpc(options: {
     if (input.subagentSetup) validateSubagentSetup(input.subagentSetup);
     options.beforeSave();
     await controller.save(input);
-    options.afterSave();
+    await options.afterSave();
     return options.snapshot();
   }));
   handle('beings:portal-start', () => exclusive(() => controller.start()));

@@ -17,5 +17,5 @@ export function startupPluginNotice(plugins: DshPlugin[], errors: Record<string,
   if (!failures.length) return;
   const first = failures[0], issue = pluginIssue(first, errors[first.id])!;
   return failures.length === 1 ? `${first.id}：${issue.title}。${issue.reason}`
-    : `${failures.length} 个第三方插件未能加载，可在「第三方插件」中查看原因。`;
+    : `${failures.length} 个 DeepSeek Harness 插件未能加载，可在「DeepSeek Harness 插件」中查看原因。`;
 }

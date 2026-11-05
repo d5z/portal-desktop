@@ -1,12 +1,16 @@
 {
   "name": "@beings/grove-plugin-sdk",
-  "version": "1.5.0",
-  "description": "TypeScript contract for the host-provided Grove desktop plugin SDK",
+  "version": "1.6.0",
+  "description": "TypeScript contracts for the Grove desktop SDK and Town DSH compatibility services",
   "license": "MIT",
   "types": "index.d.ts",
   "files": [
     "index.d.ts",
     "agent.d.ts",
+    "dsh.d.ts",
     "README.md"
-  ]
+  ],
+  "peerDependencies": {
+    "@types/node": ">=22"
+  }
 }

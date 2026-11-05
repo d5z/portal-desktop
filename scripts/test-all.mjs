@@ -74,6 +74,7 @@ try {
   await npm('town-names', ['run', 'test:town-names']);
   await npm('seed-garden', ['run', 'test:seed-garden']);
   await step('home-library-ui', process.execPath, ['tests/home-library-ui.mjs']);
+  await step('home-file-formats', process.execPath, ['tests/home-file-formats.mjs']);
   await step('being-files-ui', process.execPath, ['tests/being-files-ui.mjs']);
   await step('home-files-electron', process.execPath, ['tests/home-files-electron.mjs']);
   await step('html-preview-electron', process.execPath, ['tests/html-preview-electron.mjs']);

@@ -194,6 +194,13 @@ body > .client-file-viewer {
     monospace;
 }
 
+.client-file-body > img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: auto;
+}
+
 .client-file-body table {
   border-collapse: collapse;
   font-size: 13px;

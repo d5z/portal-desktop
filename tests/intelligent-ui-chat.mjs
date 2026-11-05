@@ -47,15 +47,15 @@ try {
     const menu=document.querySelector('.composer-add-menu'), r=menu?.getBoundingClientRect();
     return menu?.style.top && r.top>=0 && r.bottom<=innerHeight && r.left>=0 && r.right<=innerWidth;
   }).catch(async error=>{console.error(await page.locator('.composer-add-menu').evaluate(el=>({html:el.outerHTML,bounds:el.getBoundingClientRect().toJSON()})));throw error;});
-  const examples = page.getByRole('menuitem', {name:'交互示例',exact:true});
-  assert.equal(await examples.count(), 1);
-  assert.equal(await examples.locator('..').getByRole('menuitem', {name:/智能 UI.*\/ui/}).count(), 1, 'One example button shares the UI command row');
-  await examples.click();
+  assert.equal(await page.getByRole('menuitem', {name:'交互示例',exact:true}).count(), 0);
+  await page.keyboard.press('Escape');
+  await input.fill('/智能');
+  await page.getByRole('option', {name:'交互示例',exact:true}).click();
   await page.getByRole('complementary', {name:'智能 UI 交互示例'}).waitFor();
   const chatBounds = await page.locator('#app').boundingBox(), panelBounds = await page.locator('[data-slot="ui-examples-panel"]').boundingBox();
   assert.ok(panelBounds.x >= chatBounds.x + chatBounds.width - 1, 'Examples occupy a separate panel to the right');
   assert.equal(await page.locator('#input-area [data-slot="ui-examples-panel"], #input-area .iui-playground').count(), 0);
-  assert.equal(await input.textContent(), '保留我的草稿');
+  assert.equal(await input.textContent(), '/智能');
   assert.equal(sends.length, 0);
 
   await page.getByLabel('选择交互示例').selectOption('simulation');
@@ -69,6 +69,7 @@ try {
   await page.getByRole('button', { name: '关闭交互示例' }).click();
   await input.fill('/ui');
   const picker = page.getByRole('listbox', {name:'斜杠功能'});
+  await picker.getByRole('option', {name:'交互示例',exact:true}).waitFor();
   assert.equal(await picker.getByRole('option', {name:'交互示例',exact:true}).count(), 1);
   await input.press('ArrowDown');
   assert.equal(await picker.getByRole('option', {selected:true}).getAttribute('aria-label'), '交互示例');
@@ -118,7 +119,7 @@ try {
   await page.getByRole('textbox', { name: 'message input' }).fill('给我一个实时预算');
   await page.screenshot({ path: 'test-results/intelligent-ui-composer-fixed.png' });
   await page.getByRole('button', {name:'添加附件和工具'}).click();
-  await page.getByRole('menuitem', {name:/智能 UI.*\/ui/}).click();
+  await page.getByRole('menuitem', {name:/智能 UI/}).click();
   await page.getByRole('button', { name: '发送消息', exact: true }).click();
   await page.getByRole('slider', { name: '人数' }).waitFor();
   assert.ok(sends[0].message.includes('[客户端 Intelligent UI Beta 上下文]'));

@@ -59,14 +59,14 @@ app.whenReady().then(()=>{
   await window.getByRole('button',{name:'展开对话',exact:true}).click();
   const bonfireBounds=await window.locator('#place-panel').boundingBox();
   await window.getByRole('button',{name:'回到对话',exact:true}).click();
-  await page.getByRole('button',{name:'添加附件和工具'}).click();
-  await page.getByRole('menuitem',{name:/交互示例/}).click();
+  await page.getByRole('textbox',{name:'message input'}).fill('/智能');
+  await page.getByRole('option',{name:'交互示例',exact:true}).click();
   await window.getByRole('heading',{name:'智能交互示例',exact:true}).waitFor();
   assert.equal(await page.locator('[data-slot="ui-examples-panel"]').count(),0,'Desktop must not render a second panel inside chat');
   const preview=await (await window.locator('.ui-examples-frame').elementHandle()).contentFrame();
   const placeBounds=await window.locator('#place-panel').boundingBox();
   assert.ok(Math.abs(placeBounds.x-bonfireBounds.x)<2 && Math.abs(placeBounds.width-bonfireBounds.width)<2,'Examples reuse the bonfire place panel layout');
-  assert.equal(await page.getByRole('textbox',{name:'message input'}).textContent(),'保留草稿');
+  assert.equal(await page.getByRole('textbox',{name:'message input'}).textContent(),'/智能');
   await window.getByRole('button',{name:'收起对话',exact:true}).click();
   assert.equal(await window.locator('#chat-view').isVisible(),false);
   await window.getByRole('button',{name:'展开对话',exact:true}).click();
@@ -113,7 +113,7 @@ app.whenReady().then(()=>{
   assert.equal(await page.locator('.message.user').count(),0,'Preview and continue never send automatically');
   await page.getByRole('textbox',{name:'message input'}).fill('生成一个可以点击并显示动画时间的计数器');
   await page.getByRole('button',{name:'添加附件和工具'}).click();
-  await page.getByRole('menuitem',{name:/智能 UI.*\/ui/}).click();
+  await page.getByRole('menuitem',{name:/智能 UI/}).click();
   await page.getByRole('button',{name:'发送消息',exact:true}).click();
   await page.locator('.message.being .iui-app').getByRole('button',{name:'增加一次'}).click();
   await page.waitForFunction(()=>document.querySelector('.message.being .iui-app .iui-metric output')?.textContent==='1');

@@ -20,7 +20,7 @@ export function Plugins({ model, theme, contextKey }: PluginSurfaceProps) {
     {selected && installed && plugins.api ?
       <PluginFrame key={`${selected.id}:${selected.revision}:${contextKey}`} api={plugins.api} model={plugins} id={selected.id}
         view={selected.view} command={selected.command} theme={theme} title={installed.manifest.name} /> :
-      <button className="secondary" onClick={() => plugins.manage()}>返回工具库 · Plugin</button>}
+      <button className="secondary" onClick={() => plugins.manage()}>返回工具库 · 插件</button>}
   </section>;
 }
 
@@ -40,18 +40,20 @@ export function PluginSidebar({ model, theme, contextKey }: PluginSurfaceProps) 
   </aside>;
 }
 
-export function PluginCard({ model, plugin }: { model: PluginsModel; plugin: import('../../shared/plugins').InstalledPlugin }) {
+export function PluginCard({ model, plugin, embedded = false, beforeOpen }: { model: PluginsModel; embedded?: boolean; beforeOpen?: () => Promise<boolean>; plugin: import('../../shared/plugins').InstalledPlugin }) {
   const plugins = useModel(model);
   return <article className="plugin-card">
-    <h3>{plugin.manifest.name} <span className="mini-tag">Plugin</span></h3>
+    {!embedded && <h3>{plugin.manifest.name} <span className="mini-tag">Plugin</span></h3>}
     <p>{plugin.manifest.description}</p>
     <p className="card-meta">{plugin.manifest.author} · v{plugin.manifest.version} · {plugin.source.kind === 'grove' ? 'Grove' : '本地导入'} · {plugin.enabled ? '已启用' : '已停用'}</p>
-    <p className="field-help">能力：{['页面、主题', ...plugin.manifest.capabilities.map(c => PLUGIN_CAPABILITIES[c])].join('；')}</p>
+    <details className="plugin-permissions"><summary>插件权限</summary><p className="field-help">能力：{['页面、主题', ...plugin.manifest.capabilities.map(c => PLUGIN_CAPABILITIES[c])].join('；')}</p></details>
     <div className="plugin-actions">
+      <div className="plugin-launch-actions">{plugin.manifest.contributes.views.map(view => <button key={view.id} disabled={!plugin.enabled || plugins.busy} className="secondary" onClick={async () => { if (!beforeOpen || await beforeOpen()) plugins.open(plugin.manifest.id, view.id); }}>{view.id === plugin.manifest.contributes.settingsView ? '插件设置' : view.title}</button>)}</div>
+      <details className="plugin-display-settings"><summary>显示位置与图标</summary>
       <div className="plugin-view-list">
         <div className="plugin-view-heading"><span>页面入口</span><span>显示位置</span></div>
         {plugin.manifest.contributes.views.map(view => <div className="plugin-view-placement" key={view.id}>
-          <div className={iconStyles.viewEntry}><button disabled={!plugin.enabled || plugins.busy} className="secondary" onClick={() => plugins.open(plugin.manifest.id, view.id)}>{view.id === plugin.manifest.contributes.settingsView ? "插件设置" : view.title}</button>
+          <div className={iconStyles.viewEntry}><span>{view.title}</span>
             <PluginIconEditor model={plugins} id={plugin.manifest.id} view={view.id} title={view.title} overridden={plugin.iconOverrides?.[view.id] !== undefined} />
           </div>
           <select aria-label={`${view.title}显示位置`} disabled={plugins.busy}
@@ -64,12 +66,13 @@ export function PluginCard({ model, plugin }: { model: PluginsModel; plugin: imp
         <div className="plugin-view-heading"><span>侧栏快捷入口</span><span>在标题栏显示</span></div>
         <p className="field-help">默认隐藏；隐藏后仍可从这里打开侧栏，不影响插件功能。</p>
         {plugin.manifest.contributes.slots.filter(slot => slot.location === 'right-sidebar').map(slot => <div className="plugin-view-placement" key={slot.id}>
-          <button className="secondary" disabled={!plugin.enabled || plugins.busy} onClick={() => plugins.openSlot(plugin.manifest.id, slot)}>{slot.title}</button>
+          <button className="secondary" disabled={!plugin.enabled || plugins.busy} onClick={async () => { if (!beforeOpen || await beforeOpen()) plugins.openSlot(plugin.manifest.id, slot); }}>{slot.title}</button>
           <input type="checkbox" aria-label={`在标题栏显示${slot.title}`} disabled={plugins.busy}
             checked={plugin.visibleSidebarSlots?.includes(slot.id) === true}
             onChange={event => void plugins.setSidebarSlotVisible(plugin.manifest.id, slot.id, event.target.checked)} />
         </div>)}
       </div>}
+      </details>
       <div className="plugin-management">
         <span>插件管理</span>
         <div>

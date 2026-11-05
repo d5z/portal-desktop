@@ -12,6 +12,7 @@ const bundle = await build({ plugins:[browserAssets(),{name:'preview-chat-origin
   import {createRoot} from 'react-dom/client';
   import {App} from './desktop/renderer/app/page';
   import {AppModel} from './desktop/renderer/app/models/app';
+  import {dshRuntime} from './desktop/renderer/plugins/dsh/runtime';
   import './desktop/renderer/app/styles.scss';
   const app = new AppModel({platform:'darwin',appearance:async theme=>theme || 'light',notifications:async()=>({supported:true,message:'',preferences:{enabled:false,mail:true,firesides:true,bonfire:false}}),clientStartup:async()=>({supported:true,enabled:false,message:''}),browserBounds:async()=>{},browserState:async()=>({open:false,address:'',tabs:[]}),onBrowser:listener=>{window.fixtureBrowserState=listener;return()=>{delete window.fixtureBrowserState;};}});
   app.start = () => () => {};
@@ -56,6 +57,7 @@ const bundle = await build({ plugins:[browserAssets(),{name:'preview-chat-origin
     : {models:[{id:'glm-5.3',name:'GLM 5.3',context:262144,reasoning:true,tool_call:true},{id:'fixture-next',name:'示例备用模型'}]}});
   app.api.subagentConfig = async () => ({provider:'openai',model:'local-fixture',thinking:'medium'});
   window.fixtureApp = app;
+  window.fixtureDsh = dshRuntime;
   createRoot(document.getElementById('root')).render(<App model={app} />);
 ` }, bundle: true, write: false, outdir: '/fixture', loader: {'.png':'dataurl'}, jsx:'automatic', define: {'process.env.NODE_ENV':'"production"','import.meta.env.DEV':'false'} });
 const server = createServer((request,response) => {

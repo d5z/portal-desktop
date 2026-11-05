@@ -32,7 +32,7 @@ try {
   const picker = page.getByRole('listbox', { name: '斜杠功能' });
   await input.fill('/');
   await picker.waitFor();
-  assert.equal(await picker.getByRole('option').count(), 5);
+  assert.equal(await picker.getByRole('option').count(), 6);
   await input.press('ArrowDown');
   assert.equal(await picker.getByRole('option', { selected: true }).locator('strong').textContent(), '智能 UI');
   await input.press('Enter');
@@ -50,7 +50,7 @@ try {
   assert.equal(await input.locator('[data-command=image]').textContent(), '出图');
   await input.pressSequentially('一只猫');
   await page.getByRole('button', { name: '添加附件和工具' }).click();
-  await page.getByRole('menuitem', { name: /Subagent.*\/subagent/ }).click();
+  await page.getByRole('menuitem', { name: /Subagent/ }).click();
   assert.equal(await input.locator('.composer-command-token').count(), 2);
   assert.ok((await input.textContent()).endsWith('一只猫'));
   await input.press('Enter');
@@ -60,7 +60,7 @@ try {
   assert.equal(sends[1].message.includes('Intelligent UI Beta'), false, 'Commands must not carry over to the next turn');
   await input.fill('生成 HTML 报告');
   await page.getByRole('button', { name: '添加附件和工具' }).click();
-  await page.getByRole('menuitem', { name: /生成文档.*\/doc/ }).click();
+  await page.getByRole('menuitem', { name: /生成文档/ }).click();
   assert.equal(await input.locator('[data-command=doc]').textContent(), '生成文档');
   assert.ok((await input.textContent()).endsWith('生成 HTML 报告'));
   await input.fill('/md');
@@ -71,6 +71,19 @@ try {
   await page.waitForFunction(() => [...document.querySelectorAll('.message.user .content')].some(el => el.textContent === '生成文档 生成 Markdown 报告'));
   assert.ok(sends[2].message.includes('https://beings.town/seeds/izFYd7gqLYeHwKFXQVSX3'));
   assert.equal(sends[2].message.includes('Intelligent UI Beta'), false);
+  await input.fill('生成表格');
+  await page.getByRole('button', { name: '添加附件和工具' }).click();
+  await page.getByRole('menuitem', { name: /使用云电脑/ }).click();
+  assert.equal(await input.locator('[data-command=computer]').textContent(), '使用云电脑');
+  assert.ok((await input.textContent()).endsWith('生成表格'));
+  await input.press('Enter');
+  await page.waitForFunction(() => [...document.querySelectorAll('.message.user .content')].some(el => el.textContent === '使用云电脑 生成表格'));
+  assert.ok(sends[3].message.startsWith('/computer 生成表格'));
+  assert.ok(sends[3].message.includes('https://beings.town/seeds/8U2i97peLWZSSLJf-QqDg'));
+  await input.fill('/云电脑');
+  assert.equal(await picker.getByRole('option').count(), 1);
+  await input.press('Tab');
+  assert.equal(await input.locator('[data-command=computer]').textContent(), '使用云电脑');
   // Labels remain part of the editable document and serialize as slash commands.
   await input.fill('/ui ');
   await input.locator('[data-command=ui]').waitFor();
@@ -113,14 +126,14 @@ try {
   await input.fill('/');
   await input.dispatchEvent('compositionstart');
   await input.press('Enter');
-  assert.equal(sends.length, 3);
+  assert.equal(sends.length, 4);
   await input.dispatchEvent('compositionend');
   await input.fill('');
   await page.reload();
-  await page.waitForFunction(() => document.querySelectorAll('.message.user .content').length === 3);
-  assert.deepEqual(await page.locator('.message.user .content').allTextContents(), ['智能 UI 交互预算', '出图 Subagent 一只猫', '生成文档 生成 Markdown 报告']);
+  await page.waitForFunction(() => document.querySelectorAll('.message.user .content').length === 4);
+  assert.deepEqual(await page.locator('.message.user .content').allTextContents(), ['智能 UI 交互预算', '出图 Subagent 一只猫', '生成文档 生成 Markdown 报告', '使用云电脑 生成表格']);
   assert.equal((await page.locator('#messages').textContent()).includes('客户端斜杠功能上下文'), false);
-  assert.equal(await page.locator('.message.user .message-command-token').count(), 4);
+  assert.equal(await page.locator('.message.user .message-command-token').count(), 5);
   await page.locator('.message.user').first().getByRole('button', {name:'复制正文', exact:true}).press('Enter');
   assert.equal(await page.evaluate(() => navigator.clipboard.readText()), '/ui 交互预算');
   for (const width of [1100, 375, 320]) {
@@ -187,7 +200,7 @@ try {
     }
     await picker.getByRole('option', { selected: true }).click();
     assert.equal((await input.evaluate(el => el.editor.getMarkdown())).trim(), '/image');
-    assert.equal(sends.length, 3, 'Selecting a visible option must not send');
+    assert.equal(sends.length, 4, 'Selecting a visible option must not send');
   } finally {
     await page.evaluate(() => {
       delete visualViewport.height; delete visualViewport.offsetTop;

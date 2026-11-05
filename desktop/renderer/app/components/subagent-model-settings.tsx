@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import type { SettingsDetail } from "../../shared/components/settings-surface";
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { PanelResizeHandle, usePanelWidth } from '../../shared/components/panel-resize';
 import { ChatSettings } from '../../chat/components/settings';
 import { ChatState, type ChatRuntime, type LlmConfig, type ConfigResult, type Preset } from '../../chat/models/chat';
@@ -8,7 +9,7 @@ import { subagentCatalog } from '../models/subagent-catalog';
 import type { SubagentSetup } from '../../../shared/types';
 
 /** Same model page, with a local Portal adapter instead of Heart's HTTP API. */
-export function SubagentModelSettings({ app, embedded = false, inline = false, onBusyChange }: { app: AppModel; embedded?: boolean; inline?: boolean; onBusyChange?: (busy: boolean) => void }) {
+export function SubagentModelSettings({ app, embedded = false, inline = false, onBusyChange, onDetailChange, detailOpen = false, subagentConfiguration }: { app: AppModel; embedded?: boolean; inline?: boolean; onBusyChange?: (busy: boolean) => void; onDetailChange?: (detail: SettingsDetail | null) => void; detailOpen?: boolean; subagentConfiguration?: ReactNode }) {
   const panel = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
   const [width, setWidth] = usePanelWidth("being", 320);
@@ -116,7 +117,7 @@ export function SubagentModelSettings({ app, embedded = false, inline = false, o
             app.editForm('subagentSetup', input);
             if (inline) {
               state.config = { enabled: input.enabled !== false, provider: input.provider, model: input.model, thinking: input.thinking, base_url: input.base_url, api: input.api, presets };
-              state.configStatus = '已加入待保存配置，请点击上方保存按钮应用。';
+              state.configStatus = '已加入待保存配置，请点击下方保存按钮应用。';
               state.configStatusClass = 'success';
               state.changed();
             } else app.closeSubagentSettings();
@@ -162,7 +163,7 @@ export function SubagentModelSettings({ app, embedded = false, inline = false, o
         </div>
         <button ref={closeButton} type="button" className="btn-close" aria-label="关闭模型设置" disabled={busy} onClick={close}>✕</button>
       </div>
-      <div className="model-target-header"><div className="toggle-group model-targets" role="tablist" aria-label="模型配置对象">
+      <div className="model-target-header" hidden={detailOpen}><div className="toggle-group model-targets" role="tablist" aria-label="模型配置对象">
         {(['Heart', 'subagent'] as const).map(value => <button key={value} type="button" role="tab" id={`model-tab-${value}`} aria-controls={`model-content-${value}`} aria-selected={target === value} tabIndex={target === value ? 0 : -1}
           onKeyDown={event => {
             if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || busy) return;
@@ -176,7 +177,9 @@ export function SubagentModelSettings({ app, embedded = false, inline = false, o
         {visited.has(value) && <ChatSettings state={value === 'Heart' ? being.state : adapter.state} runtime={value === 'Heart' ? being.runtime : adapter.runtime}
           copyPreset={value === 'subagent' ? beingPreset : undefined} catalogHint={value === 'subagent' ? catalogHint : undefined}
           onEnableSubagent={value === 'subagent' && !staged ? () => app.enableSubagent() : undefined}
-          open contentOnly inlineEditing={inline} target={value} staged={value === 'subagent' && staged} close={close} onBusy={setBusy} />}
+          onDetailChange={value === target ? onDetailChange : undefined}
+          open contentOnly target={value} pending={value === 'subagent' && Boolean(app.form?.subagentSetup)} staged={value === 'subagent' && staged} close={close} onBusy={setBusy} />}
+        {value === 'subagent' && <div hidden={detailOpen}>{subagentConfiguration}</div>}
       </div>)}
     </aside>
   </div>;

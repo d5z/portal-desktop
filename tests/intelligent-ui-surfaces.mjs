@@ -117,7 +117,7 @@ try{
   assert.equal(await appSurface.getByRole('button',{name:'用当前选择继续',exact:true}).count(),1);
   await page.getByRole('textbox',{name:'message input'}).fill('调整模拟计划');
   await page.getByRole('button',{name:'添加附件和工具'}).click();
-  await page.getByRole('menuitem',{name:/智能 UI.*\/ui/}).click();
+  await page.getByRole('menuitem',{name:/智能 UI/}).click();
   await page.locator('#send-btn').click();
   await appSurface.getByText('按当前选择调整后的建议',{exact:true}).waitFor();
   const appAction=JSON.parse(sends.at(-1).message.match(/\[客户端当前界面选择\]\n(.*?)\n\[\/客户端当前界面选择\]/s)[1]);

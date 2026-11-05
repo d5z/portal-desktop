@@ -12,7 +12,8 @@
   height: 68px;
   margin-bottom: -68px;
   z-index: 5;
-  -webkit-app-region: drag;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
 
   &::before {
     content: '';
@@ -27,6 +28,20 @@
       color-mix(in srgb, var(--bg) 78%, transparent) 40%,
       transparent
     );
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 24px;
+    z-index: -1;
+    pointer-events: auto;
+    -webkit-app-region: drag;
+  }
+
+  > * {
+    pointer-events: auto;
   }
 
   :global([id='chat-scene-indicator']),

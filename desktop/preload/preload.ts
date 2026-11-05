@@ -24,6 +24,11 @@ const api: DesktopAPI = {
     },
   },
   dshPlugins: {
+    onModelNotice: callback => {
+      const listener = (_event: unknown, message: string) => callback(message);
+      ipcRenderer.on('beings:dsh-model-notice', listener);
+      return () => ipcRenderer.removeListener('beings:dsh-model-notice', listener);
+    },
     reportFailures: failures => ipcRenderer.invoke('beings:dsh-activation-failures', failures),
     state: () => ipcRenderer.invoke('beings:dsh-state'),
     install: source => ipcRenderer.invoke('beings:dsh-install', source),

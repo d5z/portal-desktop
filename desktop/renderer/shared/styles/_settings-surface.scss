@@ -1,0 +1,102 @@
+/* The same two structures are used for preferences and editable fields. */
+.settings-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  min-height: 64px;
+  padding: 16px 0;
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.settings-item-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.settings-item-label {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+  font-weight: 500;
+}
+
+.settings-item-copy small {
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--secondary, var(--text-dim));
+  overflow-wrap: anywhere;
+}
+
+.settings-item-control {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
+.settings-item-control > input[type='checkbox'] {
+  flex: none;
+  margin: 0;
+}
+
+label.settings-item {
+  cursor: pointer;
+}
+
+label.settings-item:has(input:disabled) {
+  cursor: default;
+}
+
+.settings-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 12px 0;
+}
+
+.settings-field > label {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 500;
+  color: var(--text);
+}
+
+.settings-field > .field-help {
+  margin: 0;
+}
+
+.settings-actions {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 16px;
+  margin-top: 24px;
+  border-top: 1px solid var(--line);
+}
+.settings-item-control > button {
+  white-space: nowrap;
+}
+
+label.settings-item:has(input:enabled):hover {
+  background: var(--hover);
+}
+
+.settings-item-control > input[type='checkbox'] {
+  width: 30px;
+  height: 18px;
+}
+
+.settings-item:has(input:disabled) .settings-item-copy {
+  opacity: 0.6;
+}
+
+.settings-item-control > input:disabled {
+  opacity: 0.5;
+}

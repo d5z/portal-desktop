@@ -2,12 +2,20 @@ import { useEffect, useLayoutEffect, type RefObject } from "react";
 import type { AppModel } from "../models/app";
 import { validPlaceTarget } from "../../shared/lib/navigation";
 import { CHAT_SCENE_ACTIVITY_LABELS, type ChatSceneActivity } from "../../../shared/types";
+import { dshRuntime } from '../../plugins/dsh/runtime';
 
 /** This is the only shell bridge into the separate, sandboxed Loom document. */
 export function useChatBridge(
   app: AppModel,
   frame: RefObject<HTMLIFrameElement | null>,
 ) {
+  // Follow the model so disconnect/reload resets clear the pet's work status too.
+  useEffect(() => { dshRuntime.updateActivity(app.chatSceneActivity); }, [app.chatSceneActivity]);
+  useEffect(() => {
+    dshRuntime.openSession = async id => { await app.changeChatSession('select', id); app.navigate('chat'); };
+    const stopNotice = app.api.dshPlugins?.onModelNotice?.(message => app.toast(message));
+    return () => { dshRuntime.openSession = undefined; stopNotice?.(); };
+  }, [app]);
   useLayoutEffect(() => {
     app.post = (data) => {
       if (frame.current?.getAttribute("src"))

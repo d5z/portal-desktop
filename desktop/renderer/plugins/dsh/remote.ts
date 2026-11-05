@@ -2,6 +2,7 @@ import { Service, type Context } from '@deepseek-ai/cordis';
 /** Local authenticated Town transport for plugin-owned, explicitly decorated Remote methods. */
 export class LocalRemote extends Service {
   settings: Record<string, (...args: any[]) => Promise<any>>;
+  commands: Record<string, (...args: any[]) => Promise<any>>;
   private ownerContext: Context;
   private mounts = new Map<string, { face: Record<string, any>; dispose: () => unknown }>();
   constructor(ctx: Context) {
@@ -9,6 +10,8 @@ export class LocalRemote extends Service {
     this.ownerContext = ctx;
     this.settings = { describe: () => this.call('settings', 'describe', []), mutate: (...args) => this.call('settings', 'mutate', args) };
     ctx.provide('remote.settings', this.settings);
+    this.commands = { list: () => this.call('commands', 'list', []), execute: (...args) => this.call('commands', 'execute', args) };
+    ctx.provide('remote.commands', this.commands);
   }
   async call(service: string, method: string, args: unknown[], signal?: AbortSignal) {
     const response = await fetch('/@town-dsh/rpc', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ service, method, args }), signal });

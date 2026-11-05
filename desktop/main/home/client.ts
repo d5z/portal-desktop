@@ -4,7 +4,7 @@ import { mkdir, readFile, writeFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import type { SecretStorage } from '../app/settings';
 import type { HomeOperation } from '../../shared/home';
-import { HOME_CALLBACK, HOME_CLIENT, HOME_ORIGIN, HOME_SCOPE, HomeError, homeURL, verifyIdentityToken } from './protocol';
+import { HOME_CALLBACK, HOME_CLIENT, HOME_ORIGIN, HOME_REQUIRED_SCOPE, HomeError, homeURL, verifyIdentityToken } from './protocol';
 interface Tokens { access: string; refresh: string; expires: number; subject: string }
 export interface PendingOperation { kind: 'ensure' | 'stop' | 'recreate'; key: string; operation?: HomeOperation }
 interface Saved { version: 1; tokens: Tokens; pending?: PendingOperation }
@@ -156,11 +156,11 @@ export class HomeClient {
       await new Promise<void>((resolve, reject) => { server.once('error', () => reject(new Error('登录回调端口 47831 被占用，请关闭其他登录窗口后重试。'))); server.listen(47831, '127.0.0.1', resolve); });
       const config = await this.raw<{ client_id: string; redirect_uris: string[]; authorization_endpoint: string; audience: string; scope: string }>('/native/client-config/' + HOME_CLIENT);
       if (config.client_id !== HOME_CLIENT || !Array.isArray(config.redirect_uris) || !config.redirect_uris.includes(HOME_CALLBACK) || !config.audience || typeof config.scope !== 'string' ||
-          HOME_SCOPE.split(' ').some(scope => !config.scope.split(' ').includes(scope))) throw new Error('Home 桌面客户端注册配置不匹配。');
+          HOME_REQUIRED_SCOPE.split(' ').some(scope => !config.scope.split(' ').includes(scope))) throw new Error('Home 桌面客户端注册配置不匹配。');
       const url = homeURL(config.authorization_endpoint);
       if (url.pathname !== '/oidc/oauth2/auth') throw new Error('Home 登录入口无效。');
       url.search = new URLSearchParams({ client_id: HOME_CLIENT, response_type: 'code', redirect_uri: HOME_CALLBACK,
-        scope: HOME_SCOPE, audience: config.audience, state, nonce, code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256' }).toString();
+        scope: config.scope, audience: config.audience, state, nonce, code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256' }).toString();
       if (generation !== this.generation) throw new Error('登录已取消。');
       await this.openExternal(url.href);
       const code = await callback;

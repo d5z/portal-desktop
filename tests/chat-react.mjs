@@ -159,7 +159,7 @@ try {
   });
   // Function selection stays in the add menu, without adding controls to the action row.
   await frame.getByRole('button', { name: '添加附件和工具', exact: true }).click();
-  await frame.getByRole('menuitem', { name: /智能 UI.*\/ui/ }).click();
+  await frame.getByRole('menuitem', { name: /智能 UI/ }).click();
   await frame.getByRole('menu', { name: '添加附件和工具', exact: true }).waitFor({state:'hidden'});
   await mkdir('test-results', { recursive: true });
   await frame.locator('#input-area').screenshot({ path: 'test-results/chat-composer-compact.png' });

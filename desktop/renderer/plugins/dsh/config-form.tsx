@@ -1,7 +1,9 @@
-import { cloneElement, useEffect, useState, useSyncExternalStore } from 'react';
+import { SettingsField, SettingsItem } from "../../shared/components/settings-surface";
+import { cloneElement, useId, useEffect, useState, useSyncExternalStore } from 'react';
 import { dshRuntime } from './runtime';
 /** Schema-driven fallback for plugins that do not register their own configuration page. */
 export function DshConfigForm({ view, onState }: { view: any; onState: (state: { dirty: boolean; busy: boolean }) => void }) {
+  const formId = useId();
   const form = dshRuntime.configForm(view.ns);
   const snapshot: any = useSyncExternalStore(form.subscribe.bind(form), form.getSnapshot.bind(form));
   const [edits, setEdits] = useState<Record<string, { op: string; path: string[]; value?: unknown }>>({});
@@ -35,12 +37,17 @@ export function DshConfigForm({ view, onState }: { view: any; onState: (state: {
         try { edit(path, JSON.parse(e.target.value)); }
         catch { setInvalid(current => ({ ...current, [key]: `${name} 需要有效 JSON` })); }
       }} />;
-    return <div className="dsh-config-field" key={key}><label><span>{label}</span>{cloneElement(control, { 'aria-label': label })}</label><button type="button" className="secondary" onClick={() => edit(path, undefined, 'unset')}>恢复默认</button></div>;
+    const id = `${formId}-${key}`;
+    const input = cloneElement(control, { id, 'aria-label': label });
+    const reset = <button type="button" className="secondary" onClick={() => edit(path, undefined, 'unset')}>恢复默认</button>;
+    return field.type === 'boolean'
+      ? <SettingsItem key={key} label={label}>{input}{reset}</SettingsItem>
+      : <SettingsField key={key} label={label} htmlFor={id}><div className="dsh-config-control">{input}{reset}</div></SettingsField>;
   });
   return <form className="dsh-config-form" onSubmit={async event => { event.preventDefault(); if (busy || Object.keys(invalid).length || snapshot.status !== 'ready' || !snapshot.writable) return; setBusy(true); setError(''); try { if (await form.mutate(Object.values(edits), snapshot.revision)) { setEdits({}); setJsonDrafts({}); } else setError('配置已变化或校验未通过，请检查后重试。'); } catch (error) { setError(String(error)); } finally { setBusy(false); } }}>
     <fieldset disabled={busy || snapshot.status !== 'ready' || !snapshot.writable}>{fields(view.schema, snapshot.value)}</fieldset>
     {error && <p role="alert">{error}</p>}
     {Object.entries(invalid).map(([key, message]) => <p key={key} role="alert">{message}</p>)}
-    <button className="primary" disabled={busy || !!Object.keys(invalid).length || snapshot.status !== 'ready' || !snapshot.writable || !Object.keys(edits).length}>{busy ? '正在保存…' : '保存配置'}</button>
+    <div className="settings-actions"><button className="primary" disabled={busy || !!Object.keys(invalid).length || snapshot.status !== 'ready' || !snapshot.writable || !Object.keys(edits).length}>{busy ? '正在保存…' : '保存配置'}</button></div>
   </form>;
 }

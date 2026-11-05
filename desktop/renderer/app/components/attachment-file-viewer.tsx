@@ -11,19 +11,9 @@ import {useEffect,useState,useCallback,useRef,type RefObject} from 'react';
 import {PptxPreview} from './pptx-preview';
 import {AttachmentDownload} from '../../chat/components/attachment-download';
 import {Markdown} from '../../shared/components/markdown';
-import {csvRows,validFilePreview} from '../lib/file-preview-data';
+import {validFilePreview} from '../lib/file-preview-data';
+import { TextFile, FileImage } from './file-preview-content';
 type FileView={id:string;name:string;extension:string;blob?:Blob;text?:string;segments?:{label:string;text:string}[];endpoint:string;path?:string;url?:string};
-function JsonValue({value,label,depth=0}:{value:unknown;label?:string;depth?:number}) {
-  if(depth>=12)return <pre>{label}: {JSON.stringify(value)}</pre>;
-  if(value!==null && typeof value==='object')return <details open><summary>{label && `${label}: `}{Array.isArray(value)?`数组 (${value.length})`:`对象 (${Object.keys(value).length})`}</summary><div className="file-json-children">{Object.entries(value).slice(0,100).map(([key,v])=><JsonValue key={key} label={key} value={v} depth={depth+1}/>)}{Object.keys(value).length>100 && <p>仅显示前 100 项，请打开原件查看全部。</p>}</div></details>;
-  return <div>{label && <strong>{label}: </strong>}<span>{JSON.stringify(value)}</span></div>;
-}
-function TextFile({extension,text}:{extension:string;text:string}) {
-  if(extension==='md' || extension==='markdown')return <Markdown content={text} intelligentUI={false}/>;
-  if(extension==='json'){try{return <div className="file-json"><JsonValue value={JSON.parse(text)}/></div>;}catch{return <><p>JSON 格式不完整，以下显示原文。</p><pre>{text}</pre></>;}}
-  if(extension==='csv'){const rows=csvRows(text);return <><table><tbody>{rows.slice(0,200).map((row,i)=><tr key={i}>{row.map((value,j)=>i===0?<th key={j}>{value}</th>:<td key={j}>{value}</td>)}</tr>)}</tbody></table>{rows.length>200 && <p>仅展示前 200 行，请打开原文件查看全部内容。</p>}</>;}
-  return <pre>{text}</pre>;
-}
 export function AttachmentFileViewer({frame}:{frame:RefObject<HTMLIFrameElement|null>}) {
   const [file,setFile]=useState<FileView|null>(null);
   const [localPath,setLocalPath]=useState<string|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[source,setSource]=useState(false);
@@ -98,12 +88,7 @@ export function AttachmentFileViewer({frame}:{frame:RefObject<HTMLIFrameElement|
     {busy && <div className="client-file-body" role="status">正在读取本地文件…</div>}
     {error && <div className="client-file-body" role="alert">{error}</div>}
     {file && (html && !source ? <iframe key={file.id} title="HTML 文件预览" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads" referrerPolicy="no-referrer" src={file.url}/> :
-      file.blob?.type.startsWith('image/') ? <LocalImage blob={file.blob} name={file.name}/> :
+      file.blob?.type.startsWith('image/') ? <FileImage blob={file.blob} name={file.name}/> :
       file.extension==='xlsx'?<XlsxPreview key={file.id} blob={file.blob!}/>:file.extension==='pptx'?<PptxPreview key={file.id} blob={file.blob!}/>:file.extension==='pdf'?<PdfPreview key={file.id} blob={file.blob!}/>:<div className="client-file-body">{file.segments?file.segments.map((s,i)=><section key={i}>{s.label && <h3>{s.label}</h3>}<Markdown content={s.text} intelligentUI={false}/></section>):<TextFile extension={file.extension} text={file.text || ''}/>}</div>)}
   </FilePreviewPanel>;
-}
-function LocalImage({blob,name}:{blob:Blob;name:string}) {
-  const [url,setURL]=useState('');
-  useEffect(()=>{const next=URL.createObjectURL(blob);setURL(next);return()=>URL.revokeObjectURL(next);},[blob]);
-  return <div className="client-file-body">{url && <img src={url} alt={name} style={{maxWidth:'100%',height:'auto'}}/>}</div>;
 }

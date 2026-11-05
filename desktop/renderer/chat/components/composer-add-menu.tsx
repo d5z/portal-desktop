@@ -2,12 +2,11 @@ import { Icon } from '../../shared/icons/icon';
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { canUseComposerCommand, composerCommands, insertComposerCommand } from '../models/composer-commands';
 import { ComposerMenuIcon } from '../../shared/icons/composer-menu';
-import { ComposerExamples } from './composer-examples';
 import type { ChatState } from '../models/chat';
 
 
-export function ComposerAddMenu({ state, onUpload, onExamples, onSelect, onConfigureSubagent, onEnableSubagent, subagentEnabling, subagentEnableFailed }: {
-  state: ChatState; onUpload: () => void; onExamples: () => void; onSelect: () => void;
+export function ComposerAddMenu({ state, onUpload, onSelect, onConfigureSubagent, onEnableSubagent, subagentEnabling, subagentEnableFailed }: {
+  state: ChatState; onUpload: () => void; onSelect: () => void;
   onConfigureSubagent?: () => void; onEnableSubagent?: () => void; subagentEnabling?: boolean; subagentEnableFailed?: boolean;
 }) {
   const id = useId();
@@ -50,17 +49,15 @@ export function ComposerAddMenu({ state, onUpload, onExamples, onSelect, onConfi
         const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
         items[next]?.focus();
       }}>
-      <div className="composer-menu-header"><strong>添加到对话</strong><span>快捷调用 <kbd>/</kbd></span></div>
-      {composerCommands.map(command => <div key={command.id} className="composer-command-row" role="presentation"><button className="composer-command-main" type="button" role="menuitem" onClick={() => {
+      <button type="button" role="menuitem" title="图片、文档和其他文件" onClick={() => { close(); onUpload(); }}><ComposerMenuIcon kind="file"/><span className="composer-menu-copy"><strong>上传附件</strong></span></button>
+      <div role="separator"/>
+      {composerCommands.map(command => <button key={command.id} className="composer-command-main" type="button" role="menuitem" title={command.description} onClick={() => {
         close();
         if (!canUseComposerCommand(command.id, state, onConfigureSubagent)) return;
         state.draft = insertComposerCommand(state.draft, command.id);
         state.changed(); onSelect();
-      }}><ComposerMenuIcon kind={command.id}/><span className="composer-menu-copy"><strong>{command.label}</strong><small>{command.id === 'subagent' && onConfigureSubagent && state.subagentConfigured !== true ? '尚未配置 · 点击配置模型' : command.description}</small></span><code className="composer-menu-shortcut">/{command.id}</code></button>
-        {command.id === 'ui' && <ComposerExamples onSelect={() => { close(); onExamples(); }}/>}</div>)}
-      {onEnableSubagent && state.subagentConfigured && state.subagentEnabled === false && <button type="button" role="menuitem" disabled={subagentEnabling} onClick={onEnableSubagent}><ComposerMenuIcon kind="subagent"/><span className="composer-menu-copy"><strong>{subagentEnabling ? '正在开启 Subagent…' : '开启 Subagent'}</strong><small>{subagentEnableFailed ? '开启失败，请重试' : '已配置模型，开启后即可委派任务'}</small></span></button>}
-      <div role="separator"/><div className="composer-add-heading">附件</div>
-      <button type="button" role="menuitem" onClick={() => { close(); onUpload(); }}><ComposerMenuIcon kind="file"/><span className="composer-menu-copy"><strong>上传附件</strong><small>图片、文档和其他文件</small></span></button>
+      }}><ComposerMenuIcon kind={command.id}/><span className="composer-menu-copy"><strong>{command.label}</strong>{command.id === 'subagent' && onConfigureSubagent && state.subagentConfigured !== true && <small>需配置</small>}</span></button>)}
+      {onEnableSubagent && state.subagentConfigured && state.subagentEnabled === false && <button type="button" role="menuitem" disabled={subagentEnabling} onClick={onEnableSubagent}><ComposerMenuIcon kind="subagent"/><span className="composer-menu-copy"><strong>{subagentEnabling ? '正在开启 Subagent…' : subagentEnableFailed ? '重试开启 Subagent' : '开启 Subagent'}</strong></span></button>}
     </div>
   </div>;
 }

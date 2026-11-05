@@ -3,7 +3,7 @@ import { memo, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStor
 import { PermissionPicker } from '../../shared/components/permission-picker';
 import type { AppModel } from "../models/app";
 import { Dialog } from "../../shared/components/dialog";
-import { SettingsSurface } from "../../shared/components/settings-surface";
+import { SettingsSurface, SettingsItem, SettingsField, type SettingsDetail } from "../../shared/components/settings-surface";
 import { SubagentModelSettings } from "./subagent-model-settings";
 import { TownAuth } from "../../town/components/auth";
 import { Portal } from "../../portal/page";
@@ -12,6 +12,9 @@ import { NavigationControls } from "../../shared/components/navigation-controls"
 import { navigateTabs } from "../../shared/lib/tab-navigation";
 import { MAX_CHAT_HISTORY_LIMIT, validChatHistoryLimit } from '../../../shared/chat-history';
 import { dshRuntime } from '../../plugins/dsh/runtime';
+import { PluginCard } from '../../plugins/page';
+import { useManagerFocus } from '../../plugins/dsh/use-manager-focus';
+import { useModel } from '../../shared/hooks/use-model';
 const baseSettingsTabs = [
   { id: "being", label: "Being", icon: "settings-being" as const },
   { id: "portal", label: "Portal", icon: "settings-portal" as const },
@@ -26,15 +29,24 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
   useSyncExternalStore(model.subscribe, () => model.clientSettingsOpen || model.settingsRoute ? model.getVersion() : -1);
   useSyncExternalStore(model.town.subscribe, () => model.settingsRoute === "town" ? model.town.getVersion() : -1);
   const app = model;
+  const plugins = useModel(app.plugins);
+  const [pluginKind, setPluginKind] = useState<'town' | 'dsh'>('town');
+  const [townPluginId, setTownPluginId] = useState('');
+  const dshPluginId = useSyncExternalStore(dshRuntime.subscribe, () => dshRuntime.managedPlugin || '');
+  useEffect(() => {
+    dshRuntime.settingsNavigate = () => { setPluginKind('dsh'); app.openPluginSettings(); };
+    return () => { dshRuntime.settingsNavigate = undefined; };
+  }, [app]);
   const open = app.clientSettingsOpen || Boolean(app.settingsRoute);
-  useSyncExternalStore(dshRuntime.subscribe, () => open ? dshRuntime.getVersion() : -1);
   const settingsTabs = app.api.dshPlugins ? [...baseSettingsTabs, {id:'plugins', label:'插件', icon:'settings-plugins' as const}] : baseSettingsTabs;
-  const pluginSettings = dshRuntime.slots.filter(slot => slot.name === 'settings.section').sort((a,b) => (a.order || 0) - (b.order || 0));
   const route = app.settingsRoute;
+  const [modelDetail, setModelDetail] = useState<SettingsDetail | null>(null);
+  const [generalDetail, setGeneralDetail] = useState<'notifications' | null>(null);
   const [modelBusy, setModelBusy] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [confirmClose, setConfirmClose] = useState(false);
-  const busy = app.saving || modelBusy || leaving || (route === "town" && app.town.authBusy && !app.town.autoPairId);
+  const pluginBusy = useSyncExternalStore(dshRuntime.subscribe, () => Boolean(dshRuntime.settingsHost && dshRuntime.settingsBusy));
+  const busy = pluginBusy || app.saving || modelBusy || leaving || (route === "town" && app.town.authBusy && !app.town.autoPairId);
   const leave = async (close = false, discard = false) => {
     if (busy) return false;
     if (close && app.hasConnectionDraft && !discard) { setConfirmClose(true); return false; }
@@ -49,6 +61,10 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
     else app.returnToClientSettings();
     return true;
   };
+  useEffect(() => {
+    dshRuntime.closeSettings = open ? () => leave(true) : undefined;
+    return () => { dshRuntime.closeSettings = undefined; };
+  }, [app, open, busy, route]);
   const [downloadDirectory,setDownloadDirectory]=useState("");
   const [downloadError,setDownloadError]=useState("");
   const [choosingDownload,setChoosingDownload]=useState(false);
@@ -69,24 +85,41 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
     update(); media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
   }, []);
-  useEffect(() => { if (body.current) body.current.scrollTop = 0; }, [tab, open]);
+  const pageScroll = useRef(new Map<string, number>());
   const [historyLimit, setHistoryLimit] = useState(String(app.chatHistoryLimit));
   useEffect(() => { setHistoryLimit(String(app.chatHistoryLimit)); }, [app.chatHistoryLimit, app.clientSettingsOpen]);
 
   const routeTab = route === 'connection' ? (app.connectionSettingsSection === 'subagent' ? 'models' : app.connectionSettingsSection)
     : route === 'diagnostics' ? 'general' : route === 'model' ? 'models' : route;
-  useLayoutEffect(() => { if (routeTab) setTab(routeTab); }, [routeTab]);
+  useLayoutEffect(() => { if (routeTab) setTab(routeTab); if (routeTab === 'plugins') setPluginKind('dsh'); }, [routeTab]);
   const activeTab = routeTab || tab;
   useLayoutEffect(() => {
     if (open && compact) document.getElementById(`settings-tab-${activeTab}`)?.scrollIntoView({block:'nearest', inline:'nearest'});
   }, [activeTab, open, compact]);
-  const title = settingsTabs.find(item => item.id === activeTab)?.label;
+  useEffect(() => { if (open && activeTab === 'plugins') void dshRuntime.refresh().catch(app.toast); }, [open, activeTab, app]);
+  const townPlugin = plugins.library.plugins.find(plugin => plugin.manifest.id === townPluginId);
+  const detailId = activeTab === 'plugins' ? (pluginKind === 'dsh' ? dshPluginId : townPlugin?.manifest.id) : undefined;
+  const detail: SettingsDetail | null = activeTab === 'models' ? modelDetail
+    : route === 'connection' && activeTab === 'portal' ? { id: 'connection', title: '本机配置', back: app.returnToClientSettings }
+    : route === 'diagnostics' ? { id: 'diagnostics', title: '连接诊断', back: app.returnToClientSettings }
+    : activeTab === 'general' && generalDetail ? { id: generalDetail, title: '通知设置', back: () => setGeneralDetail(null) } : null;
+  const title = detail?.title || (detailId ? (pluginKind === 'town' ? townPlugin?.manifest.name : dshPluginId) : settingsTabs.find(item => item.id === activeTab)?.label);
+  // A path identifies the right-hand page independently of the outer modal.
+  const pagePath = activeTab === 'plugins' ? `${activeTab}/${pluginKind}${detailId ? `/${detailId}` : ''}` : `${activeTab}${detail ? `/${detail.id}` : ''}`;
+  const backToPlugins = () => {
+    const back = () => { if (pluginKind === 'dsh') dshRuntime.openManager(); else setTownPluginId(''); };
+    if (pluginKind === 'dsh' && dshRuntime.requestSettingsLeave) dshRuntime.requestSettingsLeave(back); else back();
+  };
   const heading = useRef<HTMLHeadingElement>(null);
   const continueEditing = useRef<HTMLButtonElement>(null);
+  useLayoutEffect(() => {
+    if (!open) return;
+    if (body.current) body.current.scrollTop = pageScroll.current.get(pagePath) || 0;
+    heading.current?.focus({ preventScroll: true });
+  }, [pagePath, open]);
   useLayoutEffect(() => { if (confirmClose) continueEditing.current?.focus(); }, [confirmClose]);
   useEffect(() => { if (!open || !app.hasConnectionDraft) setConfirmClose(false); }, [open, app.hasConnectionDraft]);
-  // Routes only select a category or expand an in-page section. They never
-  // replace the category with another settings page.
+  // The outer modal stays mounted while the right-hand page changes.
   const previouslyOpen = useRef(false);
   useLayoutEffect(() => {
     const opening = open && !previouslyOpen.current;
@@ -98,6 +131,8 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
   const selectTab = async (next: string) => {
     if (busy || next === activeTab) return;
     if (route && !await leave()) return;
+    setGeneralDetail(null);
+    setModelDetail(null);
     setTab(next);
     if (next === 'being') app.openConnectionSettings();
     else if (next === 'portal') app.openPortalSettings();
@@ -108,11 +143,23 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
       app.openConnectionSettings('subagent');
     }
   };
+  const close = () => {
+    const action = () => void leave(true);
+    if (dshRuntime.settingsHost && dshRuntime.requestSettingsLeave) dshRuntime.requestSettingsLeave(action);
+    else action();
+  };
+  // Community settings open editors/previews in document.body. Keep the frame
+  // out of Chromium's top layer, with the same background and focus isolation.
+  useManagerFocus(open, close, 'client-settings-dialog');
   return (
+    <>
+    {open && <div className="client-settings-backdrop" />}
     <Dialog
       open={open}
+      modal={false}
+      aria-modal="true"
       busy={busy}
-      onClose={() => void leave(true)}
+      onClose={close}
       id="client-settings-dialog"
       aria-labelledby="client-settings-title"
     >
@@ -127,20 +174,25 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
             className="close"
             aria-label="关闭客户端设置"
             disabled={busy}
-            onClick={() => void leave(true)}
+            onClick={close}
           ></button>
         </div>
         <div className="settings-tabs" role="tablist" aria-label="设置分类" aria-orientation={compact ? "horizontal" : "vertical"} onKeyDown={navigateTabs}>
           {settingsTabs.map(item => <button key={item.id} id={`settings-tab-${item.id}`} role="tab"
             aria-controls={`settings-panel-${item.id}`} aria-selected={activeTab === item.id}
-            disabled={busy} tabIndex={activeTab === item.id ? 0 : -1} onClick={() => void selectTab(item.id)}
+            disabled={busy} tabIndex={activeTab === item.id ? 0 : -1} onClick={() => { const action = () => void selectTab(item.id); if (dshRuntime.settingsHost && dshRuntime.requestSettingsLeave) dshRuntime.requestSettingsLeave(action); else action(); }}
             >
             <Icon name={item.icon} />
             {item.label}
           </button>)}
         </div>
         <section className="settings-page">
-        <h2 className="settings-page-title" ref={heading} tabIndex={-1}>{title}</h2>
+        <div className="settings-page-heading">
+          {(detailId || detail) && <button className="settings-page-back"
+            aria-label={detailId ? '返回插件列表' : `返回${settingsTabs.find(item => item.id === activeTab)?.label}`}
+            disabled={busy} onClick={detailId ? backToPlugins : detail?.back}><Icon name="chevron-left-20" /></button>}
+          <h2 className="settings-page-title" ref={heading} tabIndex={-1}>{title}</h2>
+        </div>
         {confirmClose && <div className="settings-unsaved" role="alert">
           <span>配置尚未保存。关闭会放弃本次修改。</span>
           <div><button ref={continueEditing} type="button" disabled={busy} onClick={async () => {
@@ -152,28 +204,28 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
           }}>继续编辑</button>
           <button type="button" disabled={busy} onClick={() => void leave(true, true)}>放弃并关闭</button></div>
         </div>}
-        <div className="dialog-body settings-home-body settings-inline-body" ref={body}>
+        <div className="dialog-body settings-home-body settings-inline-body" ref={body} onScroll={event => pageScroll.current.set(pagePath, event.currentTarget.scrollTop)}>
         <div id="settings-panel-plugins" role="tabpanel" aria-labelledby="settings-tab-plugins" hidden={activeTab !== 'plugins'}>
-          <p className="field-help">调整插件的外观和行为。</p>
-          <div className="dsh-settings-links">
-            {pluginSettings.map((slot,index) => <button aria-label={slot.label || slot.id || slot.owner} key={`${slot.owner}:${slot.id || index}`} onClick={async () => {
-              if (!await leave(true)) return;
-              dshRuntime.panel = slot; dshRuntime.managerOpen = true; dshRuntime.changed();
-            }}><span><strong>{slot.label || slot.id || slot.owner}</strong><small>{slot.owner}</small></span><Icon name="disclosure-down" className="settings-disclosure-icon" /></button>)}
-            <button aria-label="管理第三方插件" onClick={async () => { if (await leave(true)) dshRuntime.openManager(); }}><span><strong>管理第三方插件</strong><small>安装、启停与更新</small></span><Icon name="disclosure-down" className="settings-disclosure-icon" /></button>
+          <div className="plugin-library-tabs" hidden={Boolean(detailId)} role="tablist" aria-label="设置中的插件类型" onKeyDown={navigateTabs}>
+            {([['town','官方插件'],['dsh','DeepSeek Harness 插件']] as const).map(([kind,label]) => <button key={kind} role="tab" id={`settings-plugin-${kind}`} aria-controls={`settings-plugin-content-${kind}`} aria-selected={pluginKind === kind} tabIndex={pluginKind === kind ? 0 : -1} onClick={() => { const change = () => setPluginKind(kind); if (dshRuntime.requestSettingsLeave) dshRuntime.requestSettingsLeave(change); else change(); }}>{label}</button>)}
           </div>
+          <div id="settings-plugin-content-town" role="tabpanel" aria-labelledby="settings-plugin-town" hidden={pluginKind !== 'town'}>
+            {townPlugin ? <PluginCard embedded key={townPlugin.manifest.id} model={plugins} plugin={townPlugin} beforeOpen={() => leave(true)} /> : <div className="settings-plugin-list">{plugins.library.plugins.map(plugin => <button className="settings-plugin-link" key={plugin.manifest.id} onClick={() => setTownPluginId(plugin.manifest.id)}>
+              <span><strong>{plugin.manifest.name}</strong><small>{plugin.manifest.description}</small></span><Icon name="chevron-right-20" />
+            </button>)}</div>}
+            {!plugins.library.plugins.length && <p className="field-help">尚未安装官方插件，可在工具库的 Plugin 中添加。</p>}
+          </div>
+          <div id="settings-plugin-content-dsh" role="tabpanel" aria-labelledby="settings-plugin-dsh" hidden={pluginKind !== 'dsh'}>
+            {open && <div className="dsh-settings-host" ref={dshRuntime.setSettingsHost} />}
+          </div>
+
         </div>
         <div id="settings-panel-being" role="tabpanel" aria-labelledby="settings-tab-being" hidden={activeTab !== 'being'}>
           {open && activeTab === 'being' && <>
-            <section className="general-settings-group">
-              <label className="general-setting-row" htmlFor="settings-sbs">
-                <span>自主醒来</span>
-                <input id="settings-sbs" type="checkbox" role="switch" checked={app.sbsKnown && app.sbsEnabled}
-                  disabled={!app.snapshot?.settings.hasToken || !app.sbsKnown || app.chatLoading || busy}
-                  onChange={() => app.toggleSbs()} />
-              </label>
-              <p className="general-setting-help">{app.sbsKnown ? "允许 Being 在没有新消息时主动思考与行动。" : "连接 Being 后同步开关状态。"}</p>
-            </section>
+            <SettingsItem label="自主醒来" htmlFor="settings-sbs" description={app.sbsKnown ? "允许 Being 在没有新消息时主动思考与行动。" : "连接 Being 后同步开关状态。"}>
+              <input id="settings-sbs" type="checkbox" role="switch" checked={app.sbsKnown && app.sbsEnabled}
+                disabled={!app.snapshot?.settings.hasToken || !app.sbsKnown || app.chatLoading || busy} onChange={() => app.toggleSbs()} />
+            </SettingsItem>
             <ConnectionSettings model={app} embedded inline />
           </>}
         </div>
@@ -182,20 +234,14 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
         </div>
         <div id="settings-panel-models" role="tabpanel" aria-labelledby="settings-tab-models" hidden={activeTab !== 'models'}>
           {open && activeTab === 'models' && <>
-            {route === 'connection' && <ConnectionSettings model={app} embedded inline locked={modelBusy} />}
-            <SubagentModelSettings app={app} embedded inline onBusyChange={setModelBusy} />
+            <SubagentModelSettings app={app} embedded inline onBusyChange={setModelBusy} onDetailChange={setModelDetail} detailOpen={Boolean(modelDetail)}
+              subagentConfiguration={route === 'connection' && <ConnectionSettings model={app} embedded inline locked={modelBusy} />} />
           </>}
         </div>
         <div id="settings-panel-portal" role="tabpanel" aria-labelledby="settings-tab-portal" hidden={activeTab !== 'portal'}>
-          {open && activeTab === 'portal' && <Portal model={app} embedded configuration={
-            <details className="settings-disclosure" open={route === 'connection'} onToggle={event => {
-              if (event.currentTarget.open && route !== 'connection') app.openConnectionSettings('portal');
-              else if (!event.currentTarget.open && route === 'connection' && !busy) app.openPortalSettings();
-            }}>
-              <summary onClick={event => { if (busy) event.preventDefault(); }}><span><strong>本机配置</strong><small>名称、工作目录、后台常驻与工具权限</small></span><Icon name="disclosure-down" className="settings-disclosure-icon" /></summary>
-              {route === 'connection' && <ConnectionSettings model={app} embedded inline />}
-            </details>
-          } />}
+          {open && activeTab === 'portal' && (detail ? <ConnectionSettings model={app} embedded inline /> : <Portal model={app} embedded configuration={
+            <button className="settings-page-link" onClick={() => app.openConnectionSettings('portal')}><span><strong>本机配置</strong><small>名称、工作目录、后台常驻与工具权限</small></span><Icon name="chevron-right-20" /></button>
+          } />)}
         </div>
         <div
           id="settings-panel-appearance"
@@ -207,8 +253,7 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
             className="settings-group appearance-settings-group"
             aria-labelledby="settings-appearance"
           >
-            <div className="appearance-setting-row">
-              <span id="settings-appearance">主题配色</span>
+            <SettingsItem label={<span id="settings-appearance">主题配色</span>}>
               <div id="theme-toggle" className="theme-options" role="group" aria-label="主题配色">
                 {(["light", "dark"] as const).map(theme => (
                   <button key={theme} id={`theme-${theme}`} type="button"
@@ -219,7 +264,7 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
                   </button>
                 ))}
               </div>
-            </div>
+            </SettingsItem>
             <div className="reading-setting">
               <label htmlFor="reading-size">
                 阅读字号{" "}
@@ -254,24 +299,19 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
                 </button>
               </div>
             </div>
-            <label className="reasoning-setting" htmlFor="show-reasoning">
-              <span><strong>显示思考链路</strong><small id="show-reasoning-help">查看服务端返回的思考过程与工具调用。关闭时，以省略号气泡提示正在处理。</small></span>
+            <SettingsItem label="显示思考链路" htmlFor="show-reasoning" descriptionId="show-reasoning-help" description="查看服务端返回的思考过程与工具调用。关闭时，以省略号气泡提示正在处理。">
               <input id="show-reasoning" type="checkbox" role="switch" aria-label="显示思考链路" aria-describedby="show-reasoning-help"
                 checked={app.showReasoning} onChange={event => app.setShowReasoning(event.target.checked)} />
-            </label>
+            </SettingsItem>
             <form className="reading-setting history-setting" onSubmit={event => { event.preventDefault(); app.setChatHistoryLimit(Number(historyLimit)); }}>
-              <div className="history-setting-row">
-                <label htmlFor="chat-history-limit">每次加载的历史消息数</label>
-                <div className="history-setting-input">
-                  <input id="chat-history-limit" type="number" min="1" max={MAX_CHAT_HISTORY_LIMIT} step="1" required
+              <SettingsItem label="每次加载的历史消息数" descriptionId="chat-history-limit-help" description={`可设为 1–${MAX_CHAT_HISTORY_LIMIT} 条，默认 100 条。保存后用于后续加载，已有记录会保留。`}>
+                <span className="history-setting-input">
+                  <input id="chat-history-limit" aria-label="每次加载的历史消息数" type="number" min="1" max={MAX_CHAT_HISTORY_LIMIT} step="1" required
                     value={historyLimit} aria-describedby="chat-history-limit-help" onChange={event => setHistoryLimit(event.target.value)} />
                   <span aria-hidden="true">条</span>
-                </div>
-              </div>
-              <div className="reading-setting-footer">
-                <p id="chat-history-limit-help">可设为 1–{MAX_CHAT_HISTORY_LIMIT} 条，默认 100 条。<br />保存后用于后续加载，已有记录会保留。</p>
+                </span>
                 <button type="submit" disabled={!validChatHistoryLimit(Number(historyLimit)) || Number(historyLimit) === app.chatHistoryLimit}>保存</button>
-              </div>
+              </SettingsItem>
             </form>
           </section>
         </div>
@@ -281,32 +321,40 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
           aria-labelledby="settings-tab-general"
           hidden={activeTab !== "general"}
         >
+          <div hidden={Boolean(detail)}>
           <section className="general-settings-group" aria-labelledby="settings-downloads">
-            <div className="download-setting-row">
-              <div className="download-setting-info">
-                <span id="settings-downloads">下载位置</span>
-                <p title={downloadDirectory || undefined}>{downloadDirectory || '首次下载时选择保存位置'}</p>
-              </div>
+            <SettingsItem label={<span id="settings-downloads">下载位置</span>} description={downloadDirectory || '首次下载时选择保存位置'}>
             <button className="download-setting-change" type="button" aria-label="设置下载位置" disabled={choosingDownload} onClick={async()=>{
               setChoosingDownload(true);setDownloadError('');
               try {const value=await app.api.downloadDirectory?.(true);if(value)setDownloadDirectory(value);}
               catch {setDownloadError('无法设置下载位置，请重试');}finally{setChoosingDownload(false);}
             }}>{choosingDownload ? '选择中…' : downloadDirectory ? '更改' : '选择'}</button>
-            </div>
+            </SettingsItem>
             {downloadError && <p className="general-setting-help" role="alert">{downloadError}</p>}
           </section>
+          <button className="settings-page-link" onClick={() => setGeneralDetail('notifications')}><span><strong>通知设置</strong><small>桌面通知、私信、围炉与场景提醒</small></span><Icon name="chevron-right-20" /></button>
+
+          <section className="general-settings-group" aria-label="启动设置">
+            <SettingsItem label="开机自启" htmlFor="client-startup-input" description={app.clientStartup && !app.clientStartup.supported ? app.clientStartup.message : undefined}>
+              <input id="client-startup-input" type="checkbox" role="switch" checked={Boolean(app.clientStartup?.enabled)}
+                disabled={app.startupBusy || !app.clientStartup?.supported} onChange={event => void app.changeClientStartup(event.target.checked)} />
+            </SettingsItem>
+            {app.clientError && <p className="form-error" id="client-settings-error" role="alert">
+              {app.clientError}
+            </p>}
+          </section>
+
+          <button id="open-diagnostics" className="settings-page-link" onClick={() => app.openDiagnostics()}><span><strong>连接诊断</strong><small>检查本机服务与连接，导出诊断报告</small></span><Icon name="chevron-right-20" /></button>
+          </div>
+          {open && route === 'diagnostics' && <Diagnostics model={app} embedded />}
+          <div hidden={route === 'diagnostics' || generalDetail !== 'notifications'}>
           <section className="general-settings-group" aria-labelledby="settings-notifications">
-            <label className="general-setting-row">
-              <span id="settings-notifications">桌面通知</span>
-              <input id="notification-enabled" type="checkbox" role="switch"
-                aria-label="开启桌面通知"
-                checked={Boolean(app.notificationSettings?.preferences.enabled)}
-                disabled={app.notificationsBusy || !app.notificationSettings?.supported}
+            <SettingsItem label={<span id="settings-notifications">桌面通知</span>} htmlFor="notification-enabled"
+              description={app.notificationSettings ? app.notificationSettings.message || '选择允许显示桌面提醒的通知类型。' : '正在读取通知设置…'}>
+              <input id="notification-enabled" type="checkbox" role="switch" aria-label="开启桌面通知"
+                checked={Boolean(app.notificationSettings?.preferences.enabled)} disabled={app.notificationsBusy || !app.notificationSettings?.supported}
                 onChange={event => void app.changeNotifications({ enabled: event.target.checked })} />
-            </label>
-            <p className="general-setting-help">
-              {app.notificationSettings?.message || "正在读取通知设置…"}
-            </p>
+            </SettingsItem>
             <div className="notification-switches" role="group" aria-label="通知类型">
               {([
                 ["mail", "私信", "私信通知"],
@@ -314,14 +362,13 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
                 ["bonfire", "篝火", "篝火通知"],
                 ["scenes", "场景对话完成", "场景对话完成通知"],
               ] as const).map(([key, title, help]) => (
-                <label key={key}>
-                  <span>{title}</span>
+                <SettingsItem key={key} label={title} htmlFor={`notification-${key}`}>
                   <input id={`notification-${key}`} type="checkbox" role="switch"
                     aria-label={help}
                     checked={Boolean(app.notificationSettings?.preferences[key])}
                     disabled={app.notificationsBusy || !app.notificationSettings?.supported || !app.notificationSettings.preferences.enabled}
                     onChange={event => void app.changeNotifications({ [key]: event.target.checked })} />
-                </label>
+                </SettingsItem>
               ))}
             </div>
             {import.meta.env.DEV && <button id="notification-test" type="button"
@@ -329,39 +376,13 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
               onClick={() => void app.testNotification()}>发送测试通知</button>}
             {app.notificationsError && <p className="form-error" role="alert">{app.notificationsError}</p>}
           </section>
-          <section className="general-settings-group" aria-label="启动设置">
-              <label className="general-setting-row">
-                <span>开机自启</span>
-                <input
-                  id="client-startup-input"
-                  type="checkbox"
-                  role="switch"
-                  checked={Boolean(app.clientStartup?.enabled)}
-                  disabled={app.startupBusy || !app.clientStartup?.supported}
-                  onChange={(event) =>
-                    void app.changeClientStartup(event.target.checked)
-                  }
-                />
-              </label>
-            {app.clientStartup && !app.clientStartup.supported &&
-              <p className="general-setting-help" id="client-startup-help">{app.clientStartup.message}</p>}
-            {app.clientError && <p className="form-error" id="client-settings-error" role="alert">
-              {app.clientError}
-            </p>}
-          </section>
-
-          <details className="settings-disclosure" open={route === 'diagnostics'} onToggle={event => {
-            if (event.currentTarget.open && route !== 'diagnostics') app.openDiagnostics();
-            else if (!event.currentTarget.open && route === 'diagnostics') app.returnToClientSettings();
-          }}>
-            <summary id="open-diagnostics"><span><strong>连接诊断</strong><small>检查本机服务与连接，导出诊断报告</small></span><Icon name="disclosure-down" className="settings-disclosure-icon" /></summary>
-            {open && route === 'diagnostics' && <Diagnostics model={app} embedded />}
-          </details>
+          </div>
         </div>
         </div>
         </section>
       </div>
     </Dialog>
+    </>
   );
 });
 
@@ -418,7 +439,7 @@ export const ConnectionSettings = memo(function ConnectionSettings({ model, embe
         </div>}
         <fieldset className="dialog-body settings-fields" disabled={saving}>
           {section === 'being' && <>
-          <label htmlFor="connection-link">Being 完整连接地址</label>
+          <SettingsField label="Being 完整连接地址" htmlFor="connection-link" descriptionId="connection-help" description="粘贴包含 token 的完整 Loom 地址，Being 由地址确定。凭据加密保存在系统密钥库支持的本地配置中。">
           <input
             id="connection-link"
             type="password"
@@ -435,18 +456,13 @@ export const ConnectionSettings = memo(function ConnectionSettings({ model, embe
                 : "https://echo.beings.town/your_being/?token=…"
             }
           />
-          <p className="field-help" id="connection-help">
-            粘贴包含 token 的完整 Loom 地址，Being
-            由地址确定。凭据加密保存在系统密钥库支持的本地配置中。
-          </p>
+          </SettingsField>
           </>}
           {section !== 'being' && !app.snapshot?.settings.hasToken && <p className="field-help">
             请先连接 Being，再保存本机配置。<button type="button" className="text-button" onClick={() => app.openConnectionSettings()}>前往 Being 连接</button>
           </p>}
           {section === 'portal' && <>
-          <div className="field-row">
-            <div>
-              <label htmlFor="portal-name-input">本机 Portal 名称</label>
+          <SettingsField label="本机 Portal 名称" htmlFor="portal-name-input" descriptionId="portal-name-help" description={app.portalNameHelp}>
               <input
                 id="portal-name-input"
                 required
@@ -457,12 +473,8 @@ export const ConnectionSettings = memo(function ConnectionSettings({ model, embe
                   app.editForm("portalName", event.target.value)
                 }
               />
-            </div>
-          </div>
-          <p id="portal-name-help" className="field-help">
-            {app.portalNameHelp}
-          </p>
-          <label htmlFor="workspace-input">工作目录</label>
+          </SettingsField>
+          <SettingsField label="工作目录" htmlFor="workspace-input" description="使用客户端自带的 Portal，安装和升级后自动使用配套版本，沿用已有配置。">
           <div className="picker">
             <input
               id="workspace-input"
@@ -485,20 +497,14 @@ export const ConnectionSettings = memo(function ConnectionSettings({ model, embe
               选择…
             </button>
           </div>
-          <p className="field-help">
-            使用客户端自带的 Portal，安装和升级后自动使用配套版本，沿用已有配置。
-          </p>
+          </SettingsField>
           <p className="field-help" id="existing-config-note" hidden={!imported}>
             {imported
               ? `沿用现有配置：${form?.portalConfigPath}。工作目录、命令、截图及扩展工具以该文件为准；在原配置中修改后重启 Portal 生效。`
               : ""}
           </p>
-          <div className="switch-list">
-            <label>
-              <span>
-                <strong>Portal 后台常驻与登录自启</strong>
-                <small>退出客户端后继续运行；连续故障最多重试 5 次</small>
-              </span>
+          <div className="settings-item-list">
+            <SettingsItem label="Portal 后台常驻与登录自启" description="打开客户端时自动启动 Portal；退出后继续运行，连续故障最多重试 5 次。未启用时，退出客户端后停止。" htmlFor="background-input">
               <input
                 id="background-input"
                 type="checkbox"
@@ -509,13 +515,8 @@ export const ConnectionSettings = memo(function ConnectionSettings({ model, embe
                   app.editForm("backgroundEnabled", event.target.checked)
                 }
               />
-            </label>
-            <p id="portal-startup-help">打开客户端时自动启动 Portal；未启用后台常驻时，退出客户端后停止。</p>
-            <label>
-              <span>
-                <strong>允许命令执行</strong>
-                <small>同时受下方工具权限模式约束</small>
-              </span>
+            </SettingsItem>
+            <SettingsItem label="允许命令执行" description="同时受下方工具权限模式约束" htmlFor="exec-input">
               <input
                 id="exec-input"
                 type="checkbox"
@@ -525,12 +526,8 @@ export const ConnectionSettings = memo(function ConnectionSettings({ model, embe
                   app.editForm("allowExec", event.target.checked)
                 }
               />
-            </label>
-            <label>
-              <span>
-                <strong>启用 Kits 与自定义工具</strong>
-                <small>允许调用已安装的扩展和工具</small>
-              </span>
+            </SettingsItem>
+            <SettingsItem label="启用 Kits 与自定义工具" description="允许调用已安装的扩展和工具" htmlFor="kits-input">
               <input
                 id="kits-input"
                 type="checkbox"
@@ -540,31 +537,23 @@ export const ConnectionSettings = memo(function ConnectionSettings({ model, embe
                   app.editForm("kitsEnabled", event.target.checked)
                 }
               />
-            </label>
+            </SettingsItem>
             <section className="permission-settings-section"><div className="permission-section-heading"><strong>工作权限</strong><small>主助手与子代理共用</small></div>
               <PermissionPicker value={form?.permissionMode ?? 'auto-review'} onChange={mode => app.editForm('permissionMode', mode)}/>
               <p className="permission-note">仅适用于 Portal 调用，主助手和子代理共用。</p>
             </section>
           </div>
           </>}
-          {section === 'subagent' && <div className="switch-list">
-            <div className="subagent-switch-row">
-              <label htmlFor="subagent-enabled-input">
-                <strong>启用 subagent</strong>
-                <small>允许 Being 在场景内委派子任务，关闭后保留模型配置</small>
-                {form?.subagentSetup && <small>{form.subagentSetup.provider} / {form.subagentSetup.model} · 随连接保存</small>}
-              </label>
-              <div className="subagent-switch-actions">
-                {!inline && <button type="button"
-                  disabled={saving || !(form?.subagentEnabled ?? subagentEnabled ?? false)}
-                  onClick={() => app.openSubagentSettings(true)}>配置 ›</button>}
+          {section === 'subagent' && <div className="settings-item-list">
+            <SettingsItem label="启用 subagent" htmlFor="subagent-enabled-input" description="允许 Being 在场景内委派子任务，关闭后保留模型配置。">
                 <input id="subagent-enabled-input" type="checkbox" role="switch"
                   checked={form?.subagentEnabled ?? subagentEnabled ?? false}
                   disabled={saving || subagentEnabled === undefined}
                   onChange={event => app.editForm('subagentEnabled', event.target.checked)} />
-              </div>
-              {form?.subagentSetup && <button type="button" className="subagent-skip" disabled={saving || !(form?.subagentEnabled ?? subagentEnabled ?? false)} onClick={() => app.editForm("subagentSetup", undefined)}>取消本次 subagent 配置</button>}
-            </div>
+            </SettingsItem>
+            {form?.subagentSetup && <p className="field-help">{form.subagentSetup.provider} / {form.subagentSetup.model} · 随连接保存</p>}
+            {!inline && <button type="button" disabled={saving || !(form?.subagentEnabled ?? subagentEnabled ?? false)} onClick={() => app.openSubagentSettings(true)}>配置模型</button>}
+            {form?.subagentSetup && <button type="button" className="text-button" disabled={saving} onClick={() => app.editForm("subagentSetup", undefined)}>取消本次 subagent 配置</button>}
           </div>}
           <p ref={error} tabIndex={-1} className="form-error" id="settings-error" role="alert">
             {app.formError}

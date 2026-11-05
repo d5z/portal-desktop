@@ -85,6 +85,7 @@ const glyphs = {
   'composer-doc': { viewBox: '0 0 24 24', content: (<><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9Z"/><path d="M14 3v6h6M8 13h8M8 17h5"/></>) },
   'composer-subagent': { viewBox: '0 0 24 24', content: (<><rect x="8" y="3" width="8" height="6" rx="2"/><path d="M12 9v4M6 16v-3h12v3"/><rect x="3" y="16" width="6" height="5" rx="1.5"/><rect x="15" y="16" width="6" height="5" rx="1.5"/></>) },
   'composer-example': { viewBox: '0 0 24 24', content: (<><path d="m9 5-6 7 6 7m6-14 6 7-6 7"/><path d="m13 5-2 14"/></>) },
+  'composer-computer': { viewBox: '0 0 24 24', content: (<><rect x="3" y="3" width="18" height="13" rx="2"/><path d="M12 16v5M8 21h8"/></>) },
   'permission-read': { viewBox: '0 0 24 24', content: (<><rect x="5" y="3" width="14" height="18" rx="3"/><path d="M9 8h6M9 12h6M9 16h3"/></>) },
   'permission-unlock': { viewBox: '0 0 24 24', content: (<><rect x="5" y="10" width="14" height="11" rx="3"/><path d="M9 10V7a4 4 0 0 1 7-2M12 14v3"/></>) },
   'permission-shield': { viewBox: '0 0 24 24', content: (<><path d="m12 3 8 3v6c0 5-8 9-8 9s-8-4-8-9V6l8-3Z"/><path d="m8.5 12 2.5 2.5 4.5-5"/></>) },

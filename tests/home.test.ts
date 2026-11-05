@@ -5,7 +5,7 @@ import os from 'node:os';
 import { createHash, generateKeyPairSync, sign } from 'node:crypto';
 import { HomeClient, type PendingOperation } from '../desktop/main/home/client';
 import { HomeService } from '../desktop/main/home/service';
-import { HOME_CALLBACK, HOME_CLIENT, HOME_ORIGIN, HOME_SCOPE, HomeError, ticketURL, verifyIdentityToken, viewerNavigation } from '../desktop/main/home/protocol';
+import { HOME_CALLBACK, HOME_CLIENT, HOME_ORIGIN, HomeError, ticketURL, verifyIdentityToken, viewerNavigation } from '../desktop/main/home/protocol';
 import { parseConnection } from '../desktop/main/chat/connection';
 import type { HomeComputer } from '../desktop/shared/home';
 const directories: string[] = [];
@@ -19,12 +19,13 @@ function identity(nonce: string, extra = {}) {
   return `${header}.${body}.${sign('RSA-SHA256', Buffer.from(header + '.' + body), privateKey).toString('base64url')}`;
 }
 const jsonResponse = (value: unknown, status = 200) => new Response(JSON.stringify(value), { status, headers: { 'Content-Type': 'application/json' } });
-async function loggedIn() {
+const registeredScope = 'openid profile email offline_access being:read being:write account:write files:read files:write computer:read computer:write computer:exec computer:connect';
+async function loggedIn(scope = registeredScope) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'home-unit-')); directories.push(dir);
   let auth = new URL(HOME_ORIGIN), counter = 0;
   const fetcher = vi.fn<typeof fetch>(async (input, init) => {
     const pathname = new URL(String(input)).pathname;
-    if (pathname.endsWith('/being-desktop')) return jsonResponse({ client_id: HOME_CLIENT, redirect_uris: [HOME_CALLBACK], authorization_endpoint: HOME_ORIGIN + '/oidc/oauth2/auth', audience: 'urn:being:home', scope: HOME_SCOPE });
+    if (pathname.endsWith('/being-desktop')) return jsonResponse({ client_id: HOME_CLIENT, redirect_uris: [HOME_CALLBACK], authorization_endpoint: HOME_ORIGIN + '/oidc/oauth2/auth', audience: 'urn:being:home', scope });
     if (pathname.endsWith('/openid-configuration')) return jsonResponse({ issuer: HOME_ORIGIN + '/oidc/', jwks_uri: HOME_ORIGIN + '/oidc/keys' });
     if (pathname.endsWith('/keys')) return jsonResponse({ keys: [jwk] });
     if (pathname.endsWith('/token')) {
@@ -43,9 +44,24 @@ async function loggedIn() {
     await fetch(HOME_CALLBACK + '?' + new URLSearchParams({ state: auth.searchParams.get('state')!, code: 'code-fixture' }));
   }, fetcher);
   await client.login(() => {});
-  return { client, fetcher, dir };
+  return { client, fetcher, dir, auth };
 }
 describe('Home OAuth and credential boundary', () => {
+  it('requests every registered permission, including file access and newly advertised scopes', async () => {
+    const scope = registeredScope + ' fixture:additional';
+    const { auth } = await loggedIn(scope);
+    expect(auth.searchParams.get('scope')).toBe(scope);
+  });
+  it('rejects registration without file read permission', async () => {
+    await expect(loggedIn(registeredScope.replace('files:read ', ''))).rejects.toThrow('注册配置不匹配');
+  });
+  it('explains how to renew an old grant without refreshing the same insufficient permissions', async () => {
+    const { client, fetcher } = await loggedIn(); fetcher.mockReset();
+    fetcher.mockResolvedValue(jsonResponse({ error: 'insufficient_scope' }, 403));
+    await expect(client.request('/v1/me/files/content?path=artifacts/intro.pptx')).rejects.toThrow('退出 Home 后重新登录');
+    expect(fetcher).toHaveBeenCalledTimes(1);
+    expect(client.authenticated).toBe(true);
+  });
   it('validates PKCE and OIDC, persists encrypted credentials, and keeps native token calls free of browser headers', async () => {
     const { client, fetcher, dir } = await loggedIn();
     expect(client.authenticated).toBe(true);

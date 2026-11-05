@@ -4,10 +4,11 @@ import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, writeFile, rename, rm, mkdtemp } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import path from 'node:path';
-import type { DshPlugin, DshPluginState, DshActivationFailure } from '../../../shared/dsh-plugins';
+import type { DshPlugin, DshPluginState, DshActivationFailure, DshModelCompatibility } from '../../../shared/dsh-plugins';
 import { publicErrorMessage } from '../../../shared/errors';
 import { packageName, readDshPackage } from './package';
 import { externalizePluginScripts } from './html';
+import { DEFAULT_DSH_SERVICE_CONFIG, type DshServiceConfig } from '../../../shared/dsh-plugins';
 const execute = promisify(execFile);
 type Entry = { root: string; plugin: DshPlugin; config?: Record<string, unknown> };
 const empty = (): DshPluginState => ({ plugins: [], clients: [], injections: [], routes: [] });
@@ -23,6 +24,12 @@ export class DshPluginManager {
   private pending: Promise<unknown> = Promise.resolve();
   private initializing?: Promise<void>;
   private closing = false;
+  openClient?: () => void;
+  resolveModel?: () => Promise<{ compatibility: DshModelCompatibility; services?: DshServiceConfig }>;
+  onModelNotice?: (message: string) => void;
+  private modelCompatibility?: DshModelCompatibility;
+  private modelNoticeAt = 0;
+  private services = { ...DEFAULT_DSH_SERVICE_CONFIG };
   constructor(readonly home: string, readonly worker: string, readonly npmCLI: string, readonly shellOrigin: string) {}
   private serial<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.pending.then(operation); this.pending = result.catch(() => {}); return result;
@@ -35,15 +42,22 @@ export class DshPluginManager {
     await mkdir(this.home, { recursive: true, mode: 0o700 });
     try {
       this.entries = JSON.parse(await readFile(path.join(this.home, 'plugins.json'), 'utf8'));
-      if (!Array.isArray(this.entries)) throw new Error('第三方插件安装记录损坏。');
+      if (!Array.isArray(this.entries)) throw new Error('DeepSeek Harness 插件安装记录损坏。');
       for (const entry of this.entries) {
         packageName(entry.plugin?.id);
-        if (!path.resolve(entry.root).startsWith(path.resolve(this.home, 'packages') + path.sep)) throw new Error('第三方插件路径无效。');
+        if (!path.resolve(entry.root).startsWith(path.resolve(this.home, 'packages') + path.sep)) throw new Error('DeepSeek Harness 插件路径无效。');
       }
     } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') { this.entries = []; this.snapshot.error = String(error); return; } }
     await this.restart();
   }
-  state() { return this.snapshot; }
+  state() { return { ...this.snapshot, ...(this.modelCompatibility ? { modelCompatibility: this.modelCompatibility } : {}) }; }
+  async refreshModelCompatibility() {
+    if (!this.resolveModel) return;
+    const model = await this.resolveModel();
+    this.modelCompatibility = model.compatibility;
+    this.services = model.services ?? { ...DEFAULT_DSH_SERVICE_CONFIG };
+    if (this.child?.connected) this.child.send({ type: 'model-compatibility', value: this.modelCompatibility, services: this.services });
+  }
   private async save() {
     const file = path.join(this.home, 'plugins.json');
     await writeFile(file + '.tmp', JSON.stringify(this.entries, null, 2), { mode: 0o600 });
@@ -54,12 +68,13 @@ export class DshPluginManager {
     const packages = path.join(this.home, 'packages'); await mkdir(packages, { recursive: true });
     const stage = await mkdtemp(path.join(packages, 'package-'));
     try {
-      await writeFile(path.join(stage, 'package.json'), JSON.stringify({ name: 'town-third-party-install', private: true, dependencies: { '@deepseek-ai/cordis': '4.0.5', '@deepseek-ai/dsh-typert-protocol': '0.2.1-rc.5', '@deepseek-ai/dsh-settings': '0.2.1-rc.5' } }));
+      const hostLibraries = { '@deepseek-ai/cordis': '4.0.5', '@deepseek-ai/dsh-typert-protocol': '0.2.1-rc.5', '@deepseek-ai/dsh-settings': '0.2.1-rc.5', '@deepseek-ai/dsh-home-paths': '0.2.1-rc.5', '@deepseek-ai/dsh-credentials': '0.2.1-rc.5', '@deepseek-ai/dsh-llm': '0.2.1-rc.5' };
+      await writeFile(path.join(stage, 'package.json'), JSON.stringify({ name: 'town-third-party-install', private: true, dependencies: hostLibraries }));
       await execute(process.execPath, [this.npmCLI, 'install', '--prefix', stage, '--ignore-scripts', '--legacy-peer-deps', '--no-audit', '--no-fund', '--install-links', '--save-exact', '--', source], {
         env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', npm_config_update_notifier: 'false' }, timeout: 180000, maxBuffer: 2 * 1024 * 1024, windowsHide: true,
       });
       const manifest = JSON.parse(await readFile(path.join(stage, 'package.json'), 'utf8'));
-      const names = Object.keys(manifest.dependencies || {}).filter(name => !['@deepseek-ai/cordis', '@deepseek-ai/dsh-typert-protocol', '@deepseek-ai/dsh-settings'].includes(name));
+      const names = Object.keys(manifest.dependencies || {}).filter(name => !(name in hostLibraries));
       if (names.length !== 1) throw new Error('一次只能安装一个 DSH 插件包。');
       packageName(names[0]);
       const root = path.join(stage, 'node_modules', names[0]);
@@ -143,7 +158,7 @@ export class DshPluginManager {
     await this.save(); await this.restart();
     // Keep immutable package copies and DSH_HOME data for recovery; no user data deletion.
   }); }
-  private entry(id: string) { packageName(id); const entry = this.entries.find(p => p.plugin.id === id); if (!entry) throw new Error('第三方插件不存在。'); return entry; }
+  private entry(id: string) { packageName(id); const entry = this.entries.find(p => p.plugin.id === id); if (!entry) throw new Error('DeepSeek Harness 插件不存在。'); return entry; }
   matches(pathname: string) { return pathname.startsWith('/@town-dsh/') || this.snapshot.routes.some(r => r.kind === 'exact' ? pathname === r.path : pathname === r.path || pathname.startsWith(r.path + '/')); }
   async resource(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -188,6 +203,7 @@ export class DshPluginManager {
     this.documentScripts.clear();
     await this.stop();
     if (this.closing) return;
+    await this.refreshModelCompatibility();
     this.snapshot = { ...empty(), plugins: this.entries.map(e => ({ ...e.plugin, config: e.config, status: 'disabled', error: e.plugin.enabled ? undefined : e.plugin.error })) };
     this.token = randomUUID();
     const child = fork(this.worker, [], { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', DSH_HOME: path.join(this.home, 'data'), TOWN_DSH_TOKEN: this.token, TOWN_DSH_DOCUMENT_URL: this.shellOrigin === 'null' ? 'beings://desktop/' : this.shellOrigin + '/' }, stdio: ['ignore', 'pipe', 'pipe', 'ipc'], execArgv: [] });
@@ -196,7 +212,7 @@ export class DshPluginManager {
     for (const stream of [child.stdout, child.stderr]) stream?.on('data', chunk => { void import('node:fs/promises').then(async ({ appendFile, stat, truncate }) => { if ((await stat(logFile).catch(() => ({ size: 0 }))).size > 2 * 1024 * 1024) await truncate(logFile); await appendFile(logFile, chunk, { mode: 0o600 }); }).catch(() => {}); });
     try {
       await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('第三方插件启动超时。')), 30000);
+        const timer = setTimeout(() => reject(new Error('DeepSeek Harness 插件启动超时。')), 30000);
         child.once('error', error => { clearTimeout(timer); reject(error); });
         child.once('exit', () => {
           clearTimeout(timer); this.port = 0;
@@ -205,11 +221,16 @@ export class DshPluginManager {
           reject(new Error('插件宿主在启动期间退出。'));
         });
         child.on('message', (message: any) => {
+          if ((message.type === 'model-unavailable' || message.type === 'model-error') && Date.now() - this.modelNoticeAt > 2000) {
+            this.modelNoticeAt = Date.now();
+            this.onModelNotice?.(message.type === 'model-error' ? message.message : this.modelCompatibility?.message || '当前模型暂不支持插件生成。');
+          }
+          if (message.type === 'open-client' && this.port) this.openClient?.();
           if (message.type === 'routes') this.snapshot.routes = message.routes;
           if (message.type === 'ready') { clearTimeout(timer); this.port = message.port; this.snapshot = message.state; resolve(); }
           if (message.type === 'error') { clearTimeout(timer); reject(new Error(message.error)); }
         });
-        child.send({ entries: this.entries });
+        child.send({ entries: this.entries, services: this.services, modelCompatibility: this.modelCompatibility });
       });
     } catch (error) {
       await this.stop();

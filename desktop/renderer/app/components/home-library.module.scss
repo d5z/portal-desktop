@@ -287,38 +287,10 @@
   }
 }
 
-.previewBody {
-  min-height: 0;
-  flex: 1;
-  overflow: auto;
-  overscroll-behavior: contain;
-  padding: 20px;
-
-  &:has(> .previewLoading) {
-    display: flex;
-  }
-
-  pre {
-    margin: 0;
-    white-space: pre-wrap;
-    overflow-wrap: anywhere;
-    font-size: 13px;
-    line-height: 1.7;
-    tab-size: 2;
-  }
-}
-
 .html {
   flex: 1;
   min-height: 0;
   width: 100%;
   border: 0;
   background: white;
-}
-
-.image {
-  display: block;
-  max-width: 100%;
-  height: auto;
-  margin: auto;
 }

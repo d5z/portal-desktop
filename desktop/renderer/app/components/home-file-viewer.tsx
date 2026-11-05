@@ -5,17 +5,25 @@ import { HomeFileAction } from '../../shared/components/being-files';
 import { HomeLibrary } from '../models/home-library';
 import { HomeFilePanel } from './home-file-panel';
 
-export function HomeFileViewer({ api, frame, scope, children }: {
-  api?: HomeAPI; frame: RefObject<HTMLIFrameElement | null>; scope: string; children: ReactNode;
+export function HomeFileViewer({ api, frame, scope, children, onNotice }: {
+  api?: HomeAPI; frame: RefObject<HTMLIFrameElement | null>; scope: string; children: ReactNode; onNotice?: (message: string) => void;
 }) {
   const store = useMemo(() => new HomeLibrary(api?.files || {
     list: async () => { throw new Error('请更新客户端后访问 Home 文件。'); },
     preview: async () => { throw new Error('请更新客户端后访问 Home 文件。'); },
     download: async () => { throw new Error('请更新客户端后访问 Home 文件。'); },
   }), [api]);
-  const open = useCallback((path: string) => {
+  const open = useCallback((path: string, action: 'preview' | 'download' = 'preview') => {
+    if (action === 'download') {
+      if (store.busy) return;
+      void store.download(path).then(() => {
+        const message = store.error || store.notice;
+        if (message) onNotice?.(message);
+      });
+      return;
+    }
     void store.open({ path, name: path.split('/').pop()!, type: 'file', size: 0 });
-  }, [store]);
+  }, [store, onNotice]);
   useEffect(() => {
     store.reset();
     let identity: string | undefined, disposed = false, received = false;
@@ -33,10 +41,10 @@ export function HomeFileViewer({ api, frame, scope, children }: {
     const receive = (event: MessageEvent) => {
       const target = frame.current, message = event.data;
       if (!target?.getAttribute('src') || event.source !== target.contentWindow || event.origin !== 'beings://chat' ||
-          message?.type !== 'beings:home-file-preview' || message.revision !== new URL(target.src).searchParams.get('revision')) return;
+          !['beings:home-file-preview', 'beings:home-file-download'].includes(message?.type) || message.revision !== new URL(target.src).searchParams.get('revision')) return;
       let path: string;
       try { path = workspacePath(message.path); } catch { return; }
-      open(path);
+      open(path, message.type === 'beings:home-file-download' ? 'download' : 'preview');
     };
     window.addEventListener('message', receive);
     return () => window.removeEventListener('message', receive);

@@ -19,7 +19,7 @@ import type { HistoryScope } from "../../chat/models/scenes";
 import { CHAT_HISTORY_LIMIT_KEY, DEFAULT_CHAT_HISTORY_LIMIT, chatHistoryLimit, validChatHistoryLimit } from '../../../shared/chat-history';
 import { LocalHistoryReader } from './local-history';
 
-type SettingsRoute = "" | "connection" | "town" | "model" | "portal" | "diagnostics";
+type SettingsRoute = "" | "connection" | "town" | "model" | "portal" | "diagnostics" | "plugins";
 
 export class AppModel extends Store {
   permissionSettingsOpen = false;
@@ -352,7 +352,7 @@ export class AppModel extends Store {
   navigate = (view: string, id?: string) => {
     // Chat links and settings entries use the same Portal surface.
     if (view === 'portal') { this.openPortalSettings(); return; }
-    if (view === 'plugin-library') { view = 'kits'; this.town.groveKind = 'plugin'; }
+    if (view === 'plugin-library') { view = 'kits'; this.town.groveKind = 'plugin'; this.town.pluginKind = 'town'; }
     this.view = view;
     const scene = this.snapshot?.chatScene?.scene_id;
     if (view === "chat" && this.chatHistoryScope === "current" && scene && this.chatSceneActivity[scene] === "done") {
@@ -574,6 +574,7 @@ export class AppModel extends Store {
     this.subagentSettingsOpen = true;
     this.changed();
   }
+  openPluginSettings() { this.beginSettingsRoute("plugins"); }
   openPortalSettings() {
     this.beginSettingsRoute("portal");
   }
@@ -611,6 +612,7 @@ export class AppModel extends Store {
     else if (route === "model") this.openModelSettings();
     else if (route === "portal") this.openPortalSettings();
     else if (route === "diagnostics") this.openDiagnostics();
+    else if (route === "plugins") this.openPluginSettings();
   };
   closeClientSettings = () => {
     this.closeSettings();

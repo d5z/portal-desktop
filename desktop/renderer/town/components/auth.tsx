@@ -1,6 +1,7 @@
+import { Icon } from "../../shared/icons/icon";
 import type { TownModel } from "../models/town";
 import { useModel } from "../../shared/hooks/use-model";
-import { SettingsSurface } from "../../shared/components/settings-surface";
+import { SettingsSurface, SettingsField } from "../../shared/components/settings-surface";
 import { NavigationControls } from "../../shared/components/navigation-controls";
 import { townPairPrompt } from '../../../shared/town-pairing';
 export function TownAuth({ model, embedded = false, inline = false, pairPrompt = townPairPrompt, returnToSettings = false, onReturnToSettings = () => {}, onDismissSettingsRoute = () => {} }: {
@@ -57,7 +58,7 @@ export function TownAuth({ model, embedded = false, inline = false, pairPrompt =
         </p>
         {!town.authLoading && !town.authManual && <p className="field-help">无需手动复制配对码。自动连接最多等待 90 秒，你可以随时取消。</p>}
         <div hidden={!town.authManual}>
-        <label htmlFor="town-being">Town ID 或 Being 名</label>
+        <SettingsField label="Town ID 或 Being 名" htmlFor="town-being">
         <input
           id="town-being"
           autoComplete="username"
@@ -71,7 +72,8 @@ export function TownAuth({ model, embedded = false, inline = false, pairPrompt =
             town.changed();
           }}
         />
-        <label htmlFor="town-pair-code">配对码</label>
+        </SettingsField>
+        <SettingsField label="配对码" htmlFor="town-pair-code" description={!town.authChatBeing ? '尚未连接 Being 对话，可先连接对话以使用自动配对，或继续手动配对。' : '也可以把下面这段请求发给 Being，再填写它返回的配对码。'}>
         <input
           id="town-pair-code"
           type="password"
@@ -86,10 +88,8 @@ export function TownAuth({ model, embedded = false, inline = false, pairPrompt =
             town.changed();
           }}
         />
-        <p className="field-help">
-          {!town.authChatBeing ? '尚未连接 Being 对话，可先连接对话以使用自动配对，或继续手动配对。' : '也可以把下面这段请求发给 Being，再填写它返回的配对码。'}
-        </p>
-        <details className="town-manual-prompt"><summary>获取配对码的请求</summary><p>{pairPrompt}</p>
+        </SettingsField>
+        <details className="town-manual-prompt"><summary><span>获取配对码的请求</span>{embedded && <Icon name="chevron-right-20" />}</summary><p>{pairPrompt}</p>
           <button type="button" className="text-button" onClick={() => void town.api.copyText(pairPrompt).catch(error => town.toast(error))}>复制请求</button>
         </details>
         </div>
@@ -98,9 +98,9 @@ export function TownAuth({ model, embedded = false, inline = false, pairPrompt =
           {town.authManual ? '使用自动配对' : '改用手动配对'}
         </button>}
         <details className="town-advanced-auth">
-          <summary>高级：使用已有 Town 凭据</summary>
-          <label htmlFor="town-token">Town 专用凭据</label>
-          <input
+          <summary><span>高级：使用已有 Town 凭据</span>{embedded && <Icon name="chevron-right-20" />}</summary>
+          <SettingsField label="Town 专用凭据" htmlFor="town-token" description="这里接受 Town 凭据，不是 Loom 对话链接中的 token。">
+        <input
             id="town-token"
             type="password"
             autoComplete="off"
@@ -112,6 +112,7 @@ export function TownAuth({ model, embedded = false, inline = false, pairPrompt =
               town.changed();
             }}
           />
+        </SettingsField>
           <button
             type="button"
             id="save-town-token"
@@ -121,9 +122,7 @@ export function TownAuth({ model, embedded = false, inline = false, pairPrompt =
           >
             保存已有凭据
           </button>
-          <p className="field-help">
-            这里接受 Town 凭据，不是 Loom 对话链接中的 token。
-          </p>
+
         </details>
         <p id="town-auth-state" className="field-help" role="status" aria-live="polite">
           {town.authState}

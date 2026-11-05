@@ -6,6 +6,8 @@ import { remoteMethods } from '@deepseek-ai/dsh-typert-protocol';
 import { mkdir, readFile, writeFile, rename } from 'node:fs/promises';
 import path from 'node:path';
 import type { IncomingMessage, ServerResponse } from 'node:http';
+import { LocalCommands } from './commands';
+import { CHAT_SCENE_ACTIVITY_LABELS, type ChatSceneActivity } from '../../../shared/types';
 
 type Row = { owner: string; fiber: Fiber; schema: any; base: any; revision: number; autoGenerate: boolean };
 const forbidden = new Set(['__proto__', 'constructor', 'prototype']);
@@ -17,6 +19,9 @@ function merge(base: any, user: any): any {
 }
 export async function installLocalServices(ctx: Context) {
   new TimerService(ctx);
+  const commands = new LocalCommands(ctx);
+  let activity: Record<string, ChatSceneActivity> = {}, activitySeq = 0;
+  ctx.provide('townActivity', { getSnapshot: () => ({ ...activity }) });
   const file = path.join(process.env.DSH_HOME!, 'config-forms.json');
   await mkdir(path.dirname(file), { recursive: true });
   const persisted: Record<string, { value: any; revision: number }> = await readFile(file, 'utf8').then(JSON.parse).catch(error => { if (error.code === 'ENOENT') return {}; throw error; });
@@ -102,6 +107,18 @@ export async function installLocalServices(ctx: Context) {
       if (typeof key !== 'string' || typeof method !== 'string' || forbidden.has(key) || forbidden.has(method) || !Array.isArray(args)) throw new Error('无效 RPC 请求');
       let value: unknown;
       if (key === 'settings' && method === 'describe') value = { writable: true, hasDocument: true, namespaces: settings.describe() };
+      else if (key === 'commands' && method === 'list') value = commands.list();
+      else if (key === 'commands' && method === 'execute') value = await commands.execute(args[0], args[1], args[2]);
+      else if (key === 'townActivity' && method === 'update') {
+        const next = args[0];
+        if (!object(next) || Object.keys(next).length > 500 || Object.entries(next).some(([id, status]) => !id || id.length > 256 || typeof status !== 'string' || !Object.hasOwn(CHAT_SCENE_ACTIVITY_LABELS, status))) throw new Error('无效 Town 场景状态');
+        for (const [id, status] of Object.entries(next)) {
+          if (!activity[id] || activity[id] === status) continue;
+          const kind = status === 'done' ? 'completed' : status === 'error' || status === 'timeout' ? 'error' : undefined;
+          if (kind) (ctx as any).emit('session/event', { header: { id, origin: 'town' } }, { type: 'turn/end', seq: ++activitySeq, data: { reason: { kind } } });
+        }
+        activity = next; (ctx as any).emit('town/activity', { ...activity }); value = true;
+      }
       else if (key === 'settings' && method === 'mutate') value = await mutate(args[0], args[1], args[2]);
       else {
         const service: any = ctx.get(key);

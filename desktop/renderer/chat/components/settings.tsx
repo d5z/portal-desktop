@@ -1,6 +1,7 @@
+import { SettingsItem, type SettingsDetail } from "../../shared/components/settings-surface";
 import { Icon } from '../../shared/icons/icon';
 import { BeingModelSettings } from "./being-model-settings";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChatRuntime, ChatState, Preset } from "../models/chat";
 import { useModel } from "../../shared/hooks/use-model";
 import { NavigationControls } from "../../shared/components/navigation-controls";
@@ -54,8 +55,10 @@ function LegacyChatSettings({
   target = "Heart",
   onTarget,
   staged = false,
+  pending = false,
   contentOnly = false,
   inlineEditing = false,
+  onDetailChange,
   onBusy,
   copyPreset,
   catalogHint,
@@ -70,8 +73,10 @@ function LegacyChatSettings({
   target?: "Heart" | "subagent";
   onTarget?: (target: "Heart" | "subagent") => void;
   staged?: boolean;
+  pending?: boolean;
   contentOnly?: boolean;
   inlineEditing?: boolean;
+  onDetailChange?: (detail: SettingsDetail | null) => void;
   onBusy?: (busy: boolean) => void;
   copyPreset?: Preset;
   catalogHint?: string;
@@ -89,6 +94,11 @@ function LegacyChatSettings({
     [temperature, setTemperature] = useState(1);
   const keyInput = useRef<HTMLInputElement>(null),
     closeButton = useRef<HTMLButtonElement>(null);
+  const draftTitle = draft?.preset.label;
+  useLayoutEffect(() => {
+    onDetailChange?.(draftTitle ? { id: `${target}/edit`, title: draftTitle, back: () => { setDraft(null); setError(""); } } : null);
+    return () => onDetailChange?.(null);
+  }, [draftTitle, target, onDetailChange]);
   useEffect(() => {
     if (open) {
       void runtime.loadLlmConfig();
@@ -267,7 +277,7 @@ function LegacyChatSettings({
         {onTarget && <div className="toggle-group model-targets" role="group" aria-label="模型配置对象">
           {(["Heart", "subagent"] as const).map(value => <button key={value} type="button" className={target === value ? "active" : ""} aria-pressed={target === value} disabled={disabled || (staged && value === "Heart")} title={staged && value === "Heart" ? "完成连接后可配置 Being 模型" : undefined} onClick={() => { if (value !== target) onTarget(value); }}>{value === "Heart" ? "Being 模型" : value}</button>)}
         </div>}
-        {subagent && state.config.enabled === false && <div className="subagent-disabled-notice" role="status">
+        {subagent && state.config.enabled === false && !(onDetailChange && draft) && <div className="subagent-disabled-notice" role="status">
           <strong>subagent 尚未启用</strong>
           <p>{onEnableSubagent ? '当前模型配置已保留，启动后 Being 即可委派后台任务。' : '可先配置模型。请在连接设置中打开「启用 subagent」并保存，启用后 Being 才能委派后台任务。'}</p>
           {onEnableSubagent && <button type="button" className="subagent-enable-button" disabled={disabled} onClick={() => { void enableSubagent(); }}>
@@ -275,10 +285,6 @@ function LegacyChatSettings({
           </button>}
         </div>}
         <div id={fieldId("llm-step1")}  hidden={!!draft && !inlineEditing}>
-          {subagent && <div className="subagent-copy-being">
-            <button type="button" className="btn-apply" disabled={disabled || !copyPreset} onClick={() => { if (copyPreset) select(copyPreset); }}>使用 Being 当前模型</button>
-            {catalogHint && <p className="hint">{catalogHint}</p>}
-          </div>}
           <section
             id={fieldId("llm-current")}
             className={`llm-current${subagent && state.config.enabled === false ? " is-disabled" : ""}`}
@@ -286,7 +292,7 @@ function LegacyChatSettings({
           >
             <div className="current-model-caption">
               <span className="model-indicator" />
-              {subagent && state.config.enabled === false ? "未启用" : staged ? "待保存配置" : "当前使用"}
+              {subagent && state.config.enabled === false ? "未启用" : pending ? "待保存配置" : "当前使用"}
             </div>
             <h3 className="model-name">
               {current?.label ||
@@ -302,6 +308,10 @@ function LegacyChatSettings({
             )}
             {subagent && state.config.model && <button type="button" className="llm-custom-link" disabled={disabled} onClick={() => select({ id: "__custom", provider: state.config.provider || "", model: state.config.model || "", base_url: state.config.base_url, api: state.config.api, label: "编辑 subagent 模型" })}>编辑配置</button>}
           </section>
+
+          {subagent && <SettingsItem label="使用 Being 当前模型" description={catalogHint}>
+            <button type="button" className="secondary" aria-label="使用 Being 当前模型" disabled={disabled || !copyPreset} onClick={() => { if (copyPreset) select(copyPreset); }}>使用</button>
+          </SettingsItem>}
 
           <section
             className="model-catalog"
@@ -325,7 +335,7 @@ function LegacyChatSettings({
                 <span aria-hidden="true">＋</span> 自定义
               </button>
             </div>
-            <div className="model-search">
+            <div className="model-search" hidden={!presets.length}>
               <Icon name="search" width="16"
                 height="16"
                 fill="none"
@@ -501,6 +511,7 @@ function LegacyChatSettings({
           >
             <button
               className="step2-back"
+              hidden={Boolean(onDetailChange)}
               type="button"
               disabled={busy}
               onClick={() => {
@@ -512,7 +523,7 @@ function LegacyChatSettings({
               {inlineEditing ? "收起配置" : "← 返回模型列表"}
             </button>
             <div className="model-form-heading">
-              <h3 id={fieldId("step2-title")} >{draft.preset.label}</h3>
+              <h3 id={fieldId("step2-title")} hidden={Boolean(onDetailChange)}>{draft.preset.label}</h3>
               <p>
                 {subagent ? "模型与接口已带入。需要认证时请填写密钥；仅同一接口的本机已有密钥可留空沿用。" : custom
                   ? "填写模型名称及服务商的连接信息。"
@@ -647,14 +658,14 @@ function LegacyChatSettings({
               <select id={fieldId("subagent-thinking")}  className="field-input" value={thinking} disabled={disabled} onChange={event => setThinking(event.target.value)}>
                 {["off", "minimal", "low", "medium", "high", "xhigh", "max"].map(value => <option key={value} value={value}>{value}</option>)}
               </select>
-              <p className="hint">{staged ? (inlineEditing ? "加入待保存配置后，点击本页上方保存按钮应用。" : "返回后点击保存、连接并启动，才会安装并保存配置。") : "保存后自动重启 Portal，无需重启 Desktop；运行中的任务可能中断。"}安装需要本机 npm。</p>
+              <p className="hint">{staged ? (inlineEditing ? "加入待保存配置后，点击本页上方保存按钮应用。" : "返回模型页后点击保存，才会应用配置。") : "保存后自动重启 Portal，无需重启 Desktop；运行中的任务可能中断。"}安装需要本机 npm。</p>
             </div>}
             {error && (
               <div id={fieldId("s2-error")}  className="step2-error" role="alert">
                 {error}
               </div>
             )}
-            <button
+            <div className="settings-actions"><button
               id={fieldId("s2-apply")}
               type="button"
               className="btn-apply"
@@ -662,7 +673,7 @@ function LegacyChatSettings({
               onClick={() => void apply()}
             >
               {busy ? "正在应用…" : subagent && staged ? (inlineEditing ? "加入待保存配置" : "使用此配置并返回") : "保存并使用"}
-            </button>
+            </button></div>
           </div>
         )}
         {state.configStatus && !draft && (

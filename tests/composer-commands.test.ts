@@ -50,6 +50,22 @@ it('includes the document guide only in the request and preserves the visible co
   expect(matchingComposerCommands('markdown').map(command => command.id)).toEqual(['doc']);
 });
 
+it('resolves cloud computer aliases and adds its guide only to the request', () => {
+  for (const name of ['computer', '云电脑', '电脑', 'cloud']) {
+    expect(parseComposerCommands(`/${name} 生成表格`).commands).toEqual(['computer']);
+  }
+  expect(matchingComposerCommands('云电脑').map(command => command.id)).toEqual(['computer']);
+  const text = insertComposerCommand('生成表格', 'computer');
+  const request = withComposerCommandContext(text, false);
+  expect(request).toContain('https://beings.town/seeds/8U2i97peLWZSSLJf-QqDg');
+  expect(request).not.toContain('Intelligent UI Beta');
+  expect(withComposerCommandContext(request, false)).toBe(request);
+  expect(stripClientMessageContext(request)).toBe('/computer 生成表格');
+  const combined = withComposerCommandContext('/doc /computer 生成报告', false);
+  expect(combined).toContain('用户通过 /doc');
+  expect(combined).toContain('用户通过 /computer');
+});
+
 it('expands context once and strips it from display, preserving slash tokens and scene cues', () => {
   const text = withSceneTransition('/image /ui /subagent 设计', { sceneId: 'b' }, { sceneId: 'a' });
   const request = withComposerCommandContext(text, false, '{"title":"当前界面"}');

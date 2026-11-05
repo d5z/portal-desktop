@@ -18,9 +18,7 @@
 
 切换标签或收起面板保留同一个画面会话，同时释放人工控制权。再次显示时默认观看。明确关闭浏览器、退出 Home、切换 Being 或服务端会话失效才清理会话。停止、恢复等操作仍位于资料页更多菜单。
 
-资料库保持空态，留给后续真实生成的 HTML 和文件。本次不接文件列表或任务列表。
-
-2026-11-03 另核对文档 revision 52 的第 7 章：工作空间可通过 `GET /v1/me/files?path=…` 列目录、`GET /v1/me/files/content?path=…` 读取二进制内容，所需权限为 `files:read`。该服务独立于电脑运行；资料库后续应单独接入这些接口与隔离预览，不通过画面流同步文件。当前客户端未申请文件权限。
+资料库通过 `GET /v1/me/files?path=…` 列目录、`GET /v1/me/files/content?path=…` 读取文件，所需权限为 `files:read`。该服务独立于电脑运行，不通过画面流同步文件；实现和授权策略见下文。
 
 ## 接口与会话
 
@@ -84,12 +82,12 @@ Electron 集成测试使用临时 profile、回环 HTTPS/WSS 和精确测试证�
 
 ## 2026-11-03 云端资料库接入
 
-本节更新前文「资料库保持空态」「当前客户端未申请文件权限」的阶段性记录。实现依据为同一份 [Being Home 客户端对接文档](https://d5.feishu.cn/docx/HXjcdWmProQqFkxlvducqR0Jn4g) revision 52 第 7 节，2026-11-03 经 Lark CLI 读取，并核对生产 OpenAPI schema。
+实现依据为同一份 [Being Home 客户端对接文档](https://d5.feishu.cn/docx/HXjcdWmProQqFkxlvducqR0Jn4g) revision 52 第 7 节，2026-11-03 经 Lark CLI 读取，并核对生产 OpenAPI schema。
 
 点击聊天顶部 Being 名称，进入「资料库」即可浏览云端工作区。支持目录面包屑、当前文件夹名称搜索、刷新，以及文件夹优先、名称排序；提供加载、操作中、空目录、无匹配结果和错误重试状态。未登录或权限不足时可前往「电脑」栏处理。文件服务独立于电脑电源状态，不需要唤醒电脑。
 
 - 资料库仅展示工作区内容并提供预览、下载，不提供上传、新建目录或其他云端写操作。下载通过原生保存对话框，由主进程流式写入并原子保存。
-- OAuth 文件权限仅申请 `files:read`；旧会话可能需要在「电脑」栏退出 Home 后重新登录授权。
+- OAuth 默认申请桌面客户端注册配置提供的全部权限（见下节）；旧会话需要在「电脑」栏退出 Home 后重新登录才能补充授权。
 - 不超过 8 MiB 的文件可预览文本、栅格图片、PDF、XLSX、PPTX。列表已知文件超限时直接提示下载，不请求预览内容。HTML 提供隔离交互预览与源码切换，允许脚本、外部网页资源和网络请求；不支持的格式可下载查看。
 - 主进程核对 Home / Heart 归属并校验路径，凭据不传给 renderer。目录导航和预览关闭会丢弃各自的迟到响应；退出登录或身份切换会清空资料状态并使旧操作结果失效。
 
@@ -127,6 +125,18 @@ Grok Bot 的资料库交互参考为文件列表、点击预览、HTML 预览/�
 
 可用 `npm run test:home-files` 重跑资料库的单元、浏览器交互与 Electron IPC 测试；两个集成测试已加入 `test:all`。新增 SCSS 的 Stylelint 与格式检查通过。Home 查看器样式也由 SCSS 构建，纳入 `tests/styles-build.test.ts` 的文档入口检查。
 
+## 2026-11-05 默认完整授权
+
+通过 Lark CLI 重新读取对接文档 revision 52 的授权、文件接口及错误处理约定，并核对生产 `GET /native/client-config/being-desktop`。每次登录直接使用该配置返回的完整 `scope`；本地 `HOME_REQUIRED_SCOPE` 只用于校验客户端运行所需的基础权限，不再裁剪授权范围。
+
+核对时注册权限为 `openid profile email offline_access being:read being:write account:write files:read files:write computer:read computer:write computer:exec computer:connect`。最终授予权限仍由 Home 授权流程决定。旧 token 刷新不会增加 scope；收到 `insufficient_scope` 时明确提示在「电脑」栏退出 Home 后重新登录授权全部权限。
+
+验证覆盖实际 loopback OAuth 请求中的完整 scope（含服务端额外登记权限）、缺少 `files:read` 时拒绝无效配置，以及权限不足时不重复刷新。文件链接继续由客户端带 Home Bearer token 读取，裸 URL 在外部浏览器中仍可能因没有此凭据而返回 401。
+
+云端文件预览沿用本地文件的布局与渲染：PPTX、PDF、XLSX 直接填充右侧面板，移除导致 PPTX iframe 回落到浏览器默认 300×150 尺寸的中间滚动容器。Markdown 正文、可折叠 JSON、CSV 表格及图片共用 `file-preview-content.tsx`，并补齐本地已有的 SVG 图片和 SQL 文本。HTML 保持隔离预览与源码切换。DOCX 只有聊天附件提供服务端解析文本，未接入云端原始 DOCX 预览。
+
+`node tests/home-file-formats.mjs` 使用合成的真实 PPTX、XLSX、PDF 验证渲染、翻页、面板尺寸、展开/恢复和窄屏深色布局，并覆盖 Markdown、JSON、CSV、SVG、SQL 及不支持格式的下载提示；已加入 `test:all`。另运行资料库、文件卡片、本地文件预览及 Home 文件 IPC 回归。
+
 ## 对话中的文件交付
 
 共用的 Markdown 消息组件识别 `being.files` v1 JSON，包括纯 JSON、说明文字中嵌入的完整对象、JSON 代码块及一条消息中的多份交付；用文件卡片替换整个 JSON 区段，保留前后正文和 Markdown 引用。卡片显示名称、文件名、可选大小和说明。协议参考：[文件交付链路测试](https://beings.town/seeds/8U2i97peLWZSSLJf-QqDg)。流式输出完成前显示接收状态；格式错误、未知版本或 URL 与 path 不一致时显示错误并保留原文，不提供文件操作。
@@ -139,6 +149,8 @@ HTML 使用隔离交互预览，可切换源码或下载原文件。登录状态
 
 
 文件交付卡片的标题、大小和说明现在属于同一个按钮，hover、按下与键盘焦点覆盖完整卡片，点击说明也可打开。Home 资料库、聊天交付和本地附件共用 `file-preview-panel.tsx`，默认在对话右侧预览，可拖动宽度、展开全部、恢复对话和关闭；窄窗口使用可用宽度。保留 Home 认证、HTML 权限隔离、源码和下载，同一时间只显示一个文件预览。
+
+对话中的文件卡片在悬停或键盘聚焦时显示独立下载按钮，触屏设备常显。点击直接调用 Home 文件下载并选择本地保存位置，不读取预览内容或打开右侧面板；成功与失败由客户端提示，取消保存不提示成功。聊天 iframe 的下载请求沿用来源、revision 和工作区路径校验，凭据仍只由主进程持有。
 
 
 ## 2026-11-04 文件加载态与 HTML 跳转

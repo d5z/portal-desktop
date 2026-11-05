@@ -72,17 +72,15 @@ export function ChatComposer({ state, onKeyDown, onConfigureSubagent, onExamples
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
   }}>
     {open && <div ref={menu} className="composer-slash-menu" role="listbox" aria-label="斜杠功能" id={id}>
-      <div className="composer-menu-header"><strong>选择功能</strong><span>本次对话 <kbd>/</kbd></span></div>
       {commands.map(command => {
         const index = actions.indexOf(command.id);
         return <div key={command.id} className="composer-command-row" role="presentation"><button className="composer-command-main" type="button" role="option" id={`${id}-${index}`}
-        aria-selected={active === index} tabIndex={-1} onMouseDown={event => event.preventDefault()}
+        aria-selected={active === index} title={command.description} tabIndex={-1} onMouseDown={event => event.preventDefault()}
         onMouseEnter={() => setSelected(index)} onClick={() => select(command.id)}>
         <ComposerMenuIcon kind={command.id}/>
-        <span className="composer-menu-copy"><strong>{command.label}</strong><small>{command.id === 'subagent' && onConfigureSubagent && state.subagentConfigured !== true ? '尚未配置 · 点击配置模型' : command.description}</small></span><code className="composer-menu-shortcut">/{command.id}</code><span className="composer-menu-return" aria-hidden="true">↵</span>
+        <span className="composer-menu-copy"><strong>{command.label}</strong>{command.id === 'subagent' && onConfigureSubagent && state.subagentConfigured !== true && <small>需配置</small>}</span>
       </button>{command.id === 'ui' && onExamples && <ComposerExamples onSelect={() => select('example')} option={{ id: `${id}-${index + 1}`, selected: active === index + 1, onHover: () => setSelected(index + 1) }}/>}</div>;
       })}
-      <div className="composer-menu-footer" aria-hidden="true"><span><kbd>↑</kbd><kbd>↓</kbd> 选择</span><span><kbd>↵</kbd> 使用</span><span><kbd>esc</kbd> 关闭</span></div>
     </div>}
     <RichComposer {...props} editorExtensions={composerEditorExtensions} aria-controls={open ? id : undefined} aria-autocomplete="list" aria-activedescendant={open ? `${id}-${active}` : undefined}
       value={state.draft} onCompositionStart={event => { setComposing(true); props.onCompositionStart?.(event); }}

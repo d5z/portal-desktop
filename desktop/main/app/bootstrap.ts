@@ -14,6 +14,7 @@ import { registerKitsIpc } from '../kits/ipc';
 import { createDesktopPlugins } from '../plugins/desktop';
 import { registerDshIpc } from '../plugins/dsh/ipc';
 import { DshPluginManager } from '../plugins/dsh/manager';
+import { resolvePluginModel } from '../plugins/dsh/being-model';
 import { BackgroundPortal } from '../portal/background';
 import { createPortalController } from '../portal/controller';
 import { registerPortalIpc } from '../portal/ipc';
@@ -154,6 +155,9 @@ export function createDesktopApplication(options: DesktopOptions) {
     }, file => shell.openPath(file), file => shell.showItemInFolder(file));
     const localFiles = new LocalFilePreviews(() => store.settings.workspace);
     dshPlugins = new DshPluginManager(path.join(directory, 'third-party-plugins'), path.join(assets, 'dsh-plugin-host.cjs'), app.isPackaged ? path.join(process.resourcesPath, 'npm/bin/npm-cli.js') : path.resolve('node_modules/npm/bin/npm-cli.js'), new URL(shellURL()).origin);
+    dshPlugins.openClient = () => { lifecycle.window?.show(); lifecycle.window?.focus(); };
+    dshPlugins.resolveModel = () => resolvePluginModel(directory, store.settings, !!store.connection, request => proxy.handle(request));
+    dshPlugins.onModelNotice = message => lifecycle.window?.webContents.send('beings:dsh-model-notice', message);
     // Plugin host startup must not delay the native window or Town's own IPC.
     // Its state endpoint waits for initialization, and mutations share its queue.
     void dshPlugins.initialize();
@@ -203,7 +207,11 @@ export function createDesktopApplication(options: DesktopOptions) {
     registerPortalIpc({
       handle, exclusive, controller: portalController, snapshot,
       beforeSave: () => { cancelTownPairing?.(); approvalDialogs.cancel(); },
-      afterSave: () => { closePluginSessions(); proxy.abortAll(); }
+      afterSave: async () => {
+        closePluginSessions(); proxy.abortAll();
+        await dshPlugins?.whenReady();
+        await dshPlugins?.refreshModelCompatibility();
+      }
     });
     appearance.registerIpc(handle, exclusive, theme => desktopPlugins.windows.updateTheme(theme));
     cancelTownPairing = registerTownIpc({

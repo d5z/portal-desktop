@@ -84,7 +84,7 @@ export function App({ model }: { model: AppModel }) {
     return () => document.removeEventListener("keydown", keyboard, true);
   }, [app]);
   return (
-    <HomeFileViewer api={app.api.home} frame={frame} scope={app.chatSource}>
+    <HomeFileViewer api={app.api.home} frame={frame} scope={app.chatSource} onNotice={app.toast}>
       <DshPluginSurfaces />
       <AttachmentImageViewer key={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}`} frame={frame}/>
       <section

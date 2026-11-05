@@ -1,12 +1,36 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { TownModel, str } from '../models/town';
-import { CatalogDetail, LocalKitDetail } from './catalog';
+import { CatalogDetail, LocalKitDetail, Pagination } from './catalog';
 import { PluginCard } from '../../plugins/page';
+import { dshRuntime } from '../../plugins/dsh/runtime';
+import { navigateTabs } from '../../shared/lib/tab-navigation';
 
 export { toolEntries } from '../models/tool-library';
 import { toolPage } from '../models/pagination';
 
 export function ToolsLibrary({ town }: { town: TownModel }) {
+  return town.groveKind === 'plugin' ? <PluginLibrary town={town} /> : <ToolCatalog town={town} />;
+}
+
+function PluginLibrary({ town }: { town: TownModel }) {
+  const [kind, setKind] = useState<'dsh' | 'town'>(town.pluginKind);
+  useEffect(() => {
+    dshRuntime.managerNavigate = () => { town.pluginKind = 'dsh'; setKind('dsh'); };
+    return () => { dshRuntime.managerNavigate = undefined; dshRuntime.closeManager(); };
+  }, [town]);
+  return <div className="plugin-library">
+    <div className="plugin-library-tabs" role="tablist" aria-label="插件类型" onKeyDown={navigateTabs}>
+      {([['town', '官方插件'], ['dsh', 'DeepSeek Harness 插件']] as const).map(([id, label]) => <button key={id} id={`plugin-type-${id}`} role="tab" aria-selected={kind === id} aria-controls={`plugin-library-${id}`} tabIndex={kind === id ? 0 : -1} onClick={() => { town.pluginKind = id; setKind(id); }}>{label}</button>)}
+    </div>
+    <div id="plugin-library-dsh" role="tabpanel" aria-labelledby="plugin-type-dsh" hidden={kind !== 'dsh'}>{kind === 'dsh' && <div className="dsh-library-host" ref={dshRuntime.setManagerHost} />}</div>
+    <div id="plugin-library-town" role="tabpanel" aria-labelledby="plugin-type-town" hidden={kind !== 'town'}>
+      <div className="town-plugin-toolbar"><p>管理 Town 插件与本地扩展</p><input type="search" aria-label="搜索 Town 插件" placeholder="搜索 Town 插件…" value={town.search} onChange={event => town.setSearch(event.target.value)} /><label className="tools-local-filter"><input type="checkbox" checked={town.localOnly} onChange={event => { town.localOnly = event.target.checked; town.offset = 0; town.changed(); }} />仅本机存在</label>{town.plugins?.api && <button className="primary" disabled={town.plugins.busy} onClick={() => void town.plugins!.act(() => town.plugins!.api!.importLocal())}>导入插件目录</button>}{town.plugins && <button className="secondary" onClick={() => town.plugins!.showCommands(true)}>快捷操作</button>}</div>
+      <ToolCatalog town={town} /><div className="plugin-library-pagination"><Pagination town={town} /></div>
+    </div>
+  </div>;
+}
+
+function ToolCatalog({ town }: { town: TownModel }) {
   const { items: visible } = toolPage(town);
   const selected = town.toolSelection;
   const entry = visible.find(item => item.key === selected) || (town.localKit ? visible.find(item => item.kit?.name === town.localKit?.name) : undefined) || visible[0];

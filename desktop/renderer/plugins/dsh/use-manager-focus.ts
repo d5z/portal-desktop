@@ -2,12 +2,12 @@ import { useLayoutEffect, useRef } from 'react';
 
 /** Keep Town inert without putting settings in Chromium's top layer: plugin
  * previews and editors intentionally mount above this dialog in document.body. */
-export function useManagerFocus(open: boolean, close: () => void) {
+export function useManagerFocus(open: boolean, close: () => void, id = 'third-party-plugins') {
   const closeRef = useRef(close);
   closeRef.current = close;
   useLayoutEffect(() => {
     if (!open) return;
-    const dialog = document.getElementById('third-party-plugins')!;
+    const dialog = document.getElementById(id)!;
     const active = document.activeElement as HTMLElement | null;
     // show() can focus a dialog child before this parent's layout effect runs.
     const previous = active && !dialog.contains(active)
@@ -40,5 +40,5 @@ export function useManagerFocus(open: boolean, close: () => void) {
       background.forEach((element, index) => { element.inert = inert[index]; });
       if (previous?.isConnected && !previous.closest('[inert]')) previous.focus();
     };
-  }, [open]);
+  }, [open, id]);
 }

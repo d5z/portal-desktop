@@ -55,6 +55,8 @@ export function createMainWindow(options: MainWindowOptions) {
     // Only a chat document may embed the isolated Intelligent UI runtime.
     // The runtime is an ordinary navigation, so CSP permission alone is insufficient.
     const parentURL = event.frame?.parent?.url;
+    // DSH notification clicks focus this host instead of launching another app.
+    if (url === 'dsh://open' && parentURL === options.shellURL()) { event.preventDefault(); window.show(); window.focus(); return; }
     const chatParent = parentURL ? new URL(parentURL) : undefined;
     const runtimeDocument = !event.isMainFrame && parsed.protocol === 'beings:' && parsed.hostname === 'chat'
       && parsed.pathname === '/iui-runtime.html' && !parsed.search && !parsed.hash

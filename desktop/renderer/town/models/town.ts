@@ -194,6 +194,7 @@ export class TownModel extends Store {
   announcementsLoading = false;
   announcementsError = "";
   groveStatus = "";
+  pluginKind: 'dsh' | 'town' = 'town';
   groveKind: "" | "kit" | "app" | "plugin" = "";
   localOnly = false;
   toolSelection = '';

@@ -2,14 +2,14 @@
 #client-settings-dialog .client-settings-content {
   display: grid;
   grid-template-columns: 168px minmax(0, 1fr);
-  grid-template-rows: 72px minmax(0, 1fr);
+  grid-template-rows: 76px minmax(0, 1fr);
   background: var(--bg);
 }
 
 #client-settings-dialog .client-settings-content > .dialog-heading {
   grid-column: 1;
   grid-row: 1;
-  padding: 24px 20px 12px;
+  padding: 20px;
   background: var(--surface);
 }
 
@@ -35,7 +35,7 @@
   gap: 4px;
   align-items: stretch;
   margin: 0;
-  padding: 4px 12px 20px;
+  padding: 0 12px 20px;
   border-radius: 0;
   background: var(--surface);
 }
@@ -47,7 +47,7 @@
   gap: 10px;
   min-height: 42px;
   padding: 10px 12px;
-  border-radius: 9px;
+  border-radius: 8px;
   font-size: 13px;
   text-align: left;
   color: var(--text);
@@ -85,7 +85,7 @@
   flex-shrink: 0;
   margin: 0;
   padding: 28px 54px 24px 32px;
-  font-size: 22px;
+  font-size: 20px;
 }
 
 #client-settings-dialog .dialog-body {
@@ -143,12 +143,11 @@
 #client-settings-dialog .appearance-settings-group {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 0;
 }
 
-#client-settings-dialog
-  :is(.appearance-setting-row, .reading-setting, .reasoning-setting, .general-settings-group) {
-  padding: 18px 0;
+#client-settings-dialog :is(.appearance-setting-row, .reading-setting, .reasoning-setting) {
+  padding: 16px 0;
   margin: 0;
   background: none;
   border-radius: 0;
@@ -157,7 +156,9 @@
 }
 
 #client-settings-dialog .general-settings-group {
-  margin-bottom: 16px;
+  padding: 0;
+  margin: 0;
+  border: 0;
 }
 
 #client-settings-dialog :is(.general-setting-row, .download-setting-row) {

@@ -33,7 +33,7 @@ try {
    await page.locator('#options-trigger').click();
    await page.locator('#client-settings-button').click();
    await page.getByRole('tab',{name:'插件',exact:true}).click();
-   await page.getByRole('button',{name:'管理第三方插件',exact:true}).click();
+   await page.getByRole('tab',{name:'DeepSeek Harness 插件',exact:true}).click();
  };
  page.on('pageerror', error => console.log('PAGE ERROR', error.message));
  page.on('console', message => { if (message.type() === 'error') console.log('CONSOLE', message.text().slice(0, 500)); });
@@ -46,32 +46,33 @@ try {
  await page.evaluate(()=>window.beings.notifications({enabled:true}));
  console.log('PASS plugin browser notification permission follows Town master switch');
  await app.evaluate(({ dialog }) => { dialog.showMessageBox = async () => ({ response: 1 }); });
- await page.getByRole('button', { name: '更多功能', exact: true }).click();
- await page.getByRole('button', { name: '工具库', exact: true }).click();
- await page.getByRole('tab', { name: 'Plugin', exact: true }).click();
- await page.getByRole('button', { name: '第三方插件', exact: true }).click();
+ await openManager();
  await page.evaluate(()=>{window.__installDocument=document;window.__installTown=document.querySelector('#client-main');});
- for (const source of sources) {
+ for (const [sourceIndex, source] of sources.entries()) {
+   await page.getByRole('navigation',{name:'插件管理导航'}).getByRole('button',{name:'安装插件',exact:true}).click();
    await page.locator('#dsh-source').fill(source);
    await page.getByRole('button',{name:'安装',exact:true}).click();
    await page.waitForFunction(()=>!document.querySelector('#third-party-plugins').hasAttribute('aria-busy'));
    const state = await page.evaluate(() => window.beings.dshPlugins.state());
    console.log('INSTALLED LIVE', JSON.stringify(state.plugins.map(p => ({ id: p.id, status: p.status, error: p.error }))));
+   assert.equal(state.plugins.length,sourceIndex+1,'each requested package must actually be installed');
    assert.ok(state.plugins.every(p => p.status === 'active'), JSON.stringify(state.plugins));
    assert.equal(await page.evaluate(()=>window.__installDocument===document&&window.__installTown===document.querySelector('#client-main')),true,'Installing must preserve the document and Town component tree');
    assert.equal(await page.getByRole('button',{name:'重新加载页面',exact:true}).count(),0);
+   // The original FontTune opens its floating controls on first load.
+   // Use its own close control before installing the next package.
+   if (await page.locator('.dfp-floatClose').isVisible()) await page.locator('.dfp-floatClose').click();
  }
  console.log('MANAGER', (await page.locator('#third-party-plugins').innerText()).slice(0, 6500));
  assert.equal(await page.getByText('未能加载', { exact: false }).count(), 0);
  await mkdir('output/dsh-compat', { recursive: true });
  await page.screenshot({ path: 'output/dsh-compat/community-manager.png' });
- const cards = page.locator('#third-party-plugins .plugin-card');
- for (let index = 0; index < await cards.count(); index++) {
-   const buttons = cards.nth(index).locator('.dsh-contributions button');
-   if (!await buttons.count()) continue;
-   const target = await buttons.filter({hasText:'契约测试'}).count() ? buttons.filter({hasText:'契约测试'}) : buttons.first();
-   const label = await target.innerText();
-   await target.click();
+ const installedIds = await page.evaluate(async()=>(await window.beings.dshPlugins.state()).plugins.map(p=>p.id));
+ const detail = async id => { await page.waitForFunction(()=>!document.querySelector('#third-party-plugins').hasAttribute('aria-busy')); const back = page.getByRole('button',{name:'返回插件列表',exact:true}); if (await back.isVisible()) await back.click(); await page.getByRole('button',{name:'配置 '+id,exact:true}).click(); };
+ for (let index = 0; index < installedIds.length; index++) {
+   const id = installedIds[index];
+   await detail(id);
+   const label = id;
    await page.waitForTimeout(500);
    assert.equal(await page.getByText('插件界面加载失败', { exact: false }).count(), 0);
    if (await page.locator('.pomo-card-header').count()) {
@@ -86,41 +87,41 @@ try {
    await page.waitForFunction(async()=>{const response=await fetch('/@town-dsh/rpc',{method:'POST',body:JSON.stringify({service:'settings',method:'describe',args:[]})});const data=await response.json();return data.value.namespaces.some(n=>n.ns==='ui-pomodoro'&&n.value.focusMinutes===7)});
      console.log('PASS original Pomodoro configuration persisted');
    }
-   if (label === 'VS Code Themes') {
+   if (id === 'dsh-vscode-themes2') {
    await page.getByText('Dracula', {exact:true}).click();
    await page.waitForFunction(()=>document.documentElement.dataset.theme === 'dark');
      assert.ok(await page.evaluate(()=>localStorage.getItem('town.dsh.theme')?.includes('dracula')));
      console.log('PASS original VS Code theme applied without page reload');
    }
-   if (label === '契约测试') {
+   if (id === 'town-dsh-slot-fixture') {
    await page.getByRole('button', {name:'计数: 0',exact:true}).click();
    await page.getByRole('button', {name:'计数: 1',exact:true}).waitFor();
    await page.getByText('嵌套插槽正常',{exact:true}).waitFor();
      console.log('PASS injected store actions, locale and child slots');
    }
-   console.log('PANEL', label, (await page.locator('.dsh-plugin-content').innerText()).slice(0, 2500));
+   console.log('PANEL', label, (await page.locator('.dsh-manager-body').innerText()).slice(0, 2500));
    await page.screenshot({ path: `output/dsh-compat/community-${index}.png` });
-   await page.getByRole('button', { name: '返回插件管理', exact: true }).click();
+   await page.getByRole('button',{name:'返回插件列表',exact:true}).click();
  }
  if (process.env.DSH_TEST_CONTRACTS === '1') {
-   await page.getByRole('button',{name:'town-dsh-slot-fixture 配置',exact:true}).click();
+   await detail('town-dsh-slot-fixture'); await page.getByRole('button',{name:'高级配置',exact:true}).click();
    await page.getByLabel('items',{exact:true}).fill('[invalid');
    await page.getByLabel('count',{exact:true}).fill('8');
    assert.equal(await page.getByRole('button',{name:'保存配置',exact:true}).isDisabled(),true,'Another field must not clear invalid JSON');
-   await page.getByRole('button',{name:'返回插件管理',exact:true}).click();
+   await page.getByRole('button',{name:'返回插件列表',exact:true}).click();
    await page.getByText('配置尚未保存，是否放弃更改？',{exact:true}).waitFor();
    await page.getByRole('button',{name:'继续编辑',exact:true}).click();
    assert.equal(await page.getByLabel('count',{exact:true}).inputValue(),'8');
    await page.getByLabel('items',{exact:true}).fill('["desktop"]');
    await page.getByRole('button',{name:'保存配置',exact:true}).click();
    await page.waitForFunction(async()=>{const r=await fetch('/@town-dsh/rpc',{method:'POST',body:JSON.stringify({service:'settings',method:'describe'})});return (await r.json()).value.namespaces.some(n=>n.ns==='town-dsh-slot-fixture'&&n.value.count===8)});
-   await page.getByRole('button',{name:'返回插件管理',exact:true}).click();
+   await page.getByRole('button',{name:'返回插件列表',exact:true}).click();
    console.log('PASS generated schema form saves validated host configuration');
  }
  // Nonmodal settings must contain keyboard focus while still allowing plugin previews.
- await page.locator('#third-party-plugins .close').focus();
+ await page.locator('#close-client-settings').focus();
  await page.keyboard.press('Shift+Tab');
- assert.ok(await page.evaluate(()=>document.activeElement.closest('#third-party-plugins')));
+ assert.ok(await page.evaluate(()=>document.activeElement.closest('#client-settings-dialog')));
  assert.equal(await page.locator('#client-main').evaluate(el=>el.inert),true);
  await page.keyboard.press('Escape');
  await page.locator('#third-party-plugins').waitFor({state:'hidden'});
@@ -149,36 +150,36 @@ try {
    await page.getByRole('button',{name:'契约主面板',exact:true}).click();
    await page.getByText('主面板正常',{exact:true}).waitFor();
    await page.getByRole('button',{name:'返回 Town',exact:true}).click();
-   const fixtureCard = page.locator('.plugin-card').filter({has:page.getByRole('heading',{name:/^town-dsh-slot-fixture /})});
+   const fixtureCard = page.locator('#third-party-plugins');
    for (let cycle=0;cycle<3;cycle++) {
      await openManager();
-     await fixtureCard.getByRole('button',{name:'停用',exact:true}).click();
+     await detail('town-dsh-slot-fixture'); await fixtureCard.getByRole('button',{name:'停用',exact:true}).click();
      await page.waitForFunction(()=>!document.querySelector('#third-party-plugins').hasAttribute('aria-busy'));
      if (sources.some(source=>source.includes('pomodoro'))) {
        assert.equal(await page.locator('.dsh-rail-entries').getByRole('button',{name:'番茄钟',exact:true}).count(),1);
-       const pomodoro = page.locator('.plugin-card').filter({has:page.getByRole('heading',{name:/^dsh-pomodoro /})});
-       assert.ok(await pomodoro.locator('.dsh-contributions button').count(),'Peer configuration must remain available');
+       await detail('dsh-pomodoro'); assert.ok(await page.locator('.dsh-plugin-content').isVisible(),'Peer configuration must remain available');
+       await detail('town-dsh-slot-fixture');
      }
      assert.equal(await page.getByRole('button',{name:'契约主面板',exact:true}).count(),0);
      await fixtureCard.getByRole('button',{name:'启用',exact:true}).click();
      await page.waitForFunction(()=>!document.querySelector('#third-party-plugins').hasAttribute('aria-busy'));
-     assert.ok(await fixtureCard.locator('.dsh-contributions button').count(), await fixtureCard.innerText());
-     await page.getByRole('button',{name:'关闭',exact:true}).click();
+     assert.ok(await page.locator('.dsh-plugin-content').isVisible(), await fixtureCard.innerText());
+     await page.getByRole('button',{name:'关闭客户端设置',exact:true}).click();
      await page.getByRole('button',{name:'契约主面板',exact:true}).waitFor();
      assert.equal(await page.getByRole('button',{name:'契约主面板',exact:true}).count(),1);
    }
    console.log('PASS three real host/client enable-disable cycles preserve peer icons and configuration');
    if (sources.some(source=>source.includes('pomodoro'))) {
-     const pomodoro = page.locator('.plugin-card').filter({has:page.getByRole('heading',{name:/^dsh-pomodoro /})});
+     const pomodoro = page.locator('#third-party-plugins');
      for (let cycle=0;cycle<2;cycle++) {
-       await openManager();await pomodoro.getByRole('button',{name:'停用',exact:true}).click();
+       await openManager();await detail('dsh-pomodoro');await pomodoro.getByRole('button',{name:'停用',exact:true}).click();
        await page.waitForFunction(()=>!document.querySelector('#third-party-plugins').hasAttribute('aria-busy'));
        assert.equal(await page.locator('.dsh-rail-entries').getByRole('button',{name:'番茄钟',exact:true}).count(),0);
-       assert.ok(await fixtureCard.locator('.dsh-contributions button').count());
+       await detail('town-dsh-slot-fixture'); assert.ok(await page.locator('.dsh-plugin-content').isVisible()); await detail('dsh-pomodoro');
        await pomodoro.getByRole('button',{name:'启用',exact:true}).click();
        await page.waitForFunction(()=>!document.querySelector('#third-party-plugins').hasAttribute('aria-busy'));
-       assert.ok(await pomodoro.locator('.dsh-contributions button').count(),await pomodoro.innerText());
-       await page.getByRole('button',{name:'关闭',exact:true}).click();
+       assert.ok(await page.locator('.dsh-plugin-content').isVisible(),await pomodoro.innerText());
+       await page.getByRole('button',{name:'关闭客户端设置',exact:true}).click();
        await page.locator('.dsh-rail-entries').getByRole('button',{name:'番茄钟',exact:true}).waitFor();
      }
      console.log('PASS original Pomodoro unload/remount preserves peer navigation and restores its entry');
@@ -194,14 +195,15 @@ try {
    await page.reload();
    await page.locator('#client-main').waitFor({state:'visible',timeout:5000});
    await openManager();
-   const faulty = page.locator('.plugin-card').filter({has:page.getByRole('heading',{name:/town-dsh-fault-fixture/})});
+   await detail('town-dsh-fault-fixture');
+   const faulty = page.locator('#third-party-plugins');
    await faulty.getByRole('button',{name:'启用',exact:true}).waitFor({timeout:25000});
    await faulty.getByText('查看错误详情',{exact:true}).click();
    await faulty.getByText(/客户端插件启动超时/).first().waitFor();
    assert.equal(await page.evaluate(async()=>(await window.beings.dshPlugins.state()).plugins.find(p=>p.id==='town-dsh-fault-fixture').enabled),false);
    assert.equal(await page.getByRole('button',{name:'插件折叠侧栏',exact:true}).count(),0);
-   assert.ok(await page.locator('.plugin-card').filter({has:page.getByRole('heading',{name:/^town-dsh-slot-fixture /})}).locator('.dsh-contributions button').count());
-   await page.locator('#third-party-plugins .close').click();
+   await detail('town-dsh-slot-fixture'); assert.ok(await page.locator('.dsh-plugin-content').isVisible());
+   await page.locator('#close-client-settings').click();
    console.log('PASS desktop navigation, invalid JSON and unsaved guard, keyboard focus, throwing label/component, bounded startup and peer recovery after disable');
  }
  if (sources.some(source=>source.includes('vscode-themes'))) await page.waitForFunction(()=>document.documentElement.dataset.theme==='dark');
@@ -212,7 +214,7 @@ try {
  }
  await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setSize(920,640));
  await openManager();
- const bounds=await page.locator('#third-party-plugins').evaluate(el=>{const r=el.getBoundingClientRect();return {inside:r.left>=0&&r.top>=0&&r.right<=innerWidth&&r.bottom<=innerHeight,overflow:el.scrollWidth>el.clientWidth};});
+ const bounds=await page.locator('#client-settings-dialog').evaluate(el=>{const r=el.getBoundingClientRect();return {inside:r.left>=0&&r.top>=0&&r.right<=innerWidth&&r.bottom<=innerHeight,overflow:el.scrollWidth>el.clientWidth};});
  assert.equal(bounds.inside,true); assert.equal(bounds.overflow,false);
  await page.waitForFunction(()=>document.elementFromPoint(innerWidth/2,innerHeight/2)?.closest('#third-party-plugins'));
  await page.locator('#third-party-plugins').evaluate(async el=>{await Promise.allSettled(el.getAnimations().map(animation=>animation.finished));});
@@ -223,6 +225,34 @@ try {
  assert.equal(await page.evaluate(()=>document.activeElement.id),'options-trigger');
  await app.evaluate(({BrowserWindow})=>BrowserWindow.getAllWindows()[0].setSize(1280,860));
  console.log('PASS dark branding and 920×640 desktop settings, focus restored to Town settings');
+ // Kit uses official plugins first; plugin configuration stays in client Settings.
+ await page.getByRole('button',{name:'更多功能',exact:true}).click();
+ await page.getByRole('button',{name:'工具库',exact:true}).click();
+ await page.getByRole('tab',{name:'Plugin',exact:true}).click();
+ const pluginTabs = page.getByRole('tablist',{name:'插件类型'});
+ assert.deepEqual(await pluginTabs.getByRole('tab').allTextContents(),['官方插件','DeepSeek Harness 插件']);
+ assert.equal(await pluginTabs.getByRole('tab',{name:'官方插件',exact:true}).getAttribute('aria-selected'),'true');
+ await pluginTabs.getByRole('tab',{name:'官方插件',exact:true}).focus();
+ await page.keyboard.press('ArrowRight');
+ await page.locator('#plugin-library-dsh').waitFor({state:'visible'});
+ assert.equal(await page.locator('dialog#third-party-plugins').count(),0);
+ await page.screenshot({path:'output/dsh-compat/plugin-inline-list.png'});
+ const targetId = installedIds.includes('dsh-pet') ? 'dsh-pet' : installedIds[0];
+ await detail(targetId);
+ await page.locator('#client-settings-dialog').waitFor({state:'visible'});
+ assert.equal(await page.locator('#client-settings-dialog #third-party-plugins').count(),1);
+ assert.equal(await page.getByRole('button',{name:'模型与语音',exact:true}).count(),0);
+ assert.equal(await page.locator('.dsh-plugin-row').count(),0,'settings replace the plugin list');
+ assert.equal(await page.locator('.settings-detail-page').count(),1);
+ assert.equal(await page.locator('.dsh-manager-body').evaluate(el=>getComputedStyle(el).overflowY),'visible','the embedded manager must not create a second scroll area');
+ await page.screenshot({path:'output/dsh-compat/plugin-inline-settings.png'});
+ for (const [width,height] of [[920,640],[1280,860]]) {
+   await app.evaluate(({BrowserWindow},size)=>BrowserWindow.getAllWindows()[0].setSize(...size),[width,height]);
+   assert.equal(await page.locator('#settings-panel-plugins').evaluate(el=>el.scrollWidth>el.clientWidth),false,'inline settings must fit the library width');
+ }
+ await page.getByRole('button',{name:'返回插件列表',exact:true}).click();
+ await detail(targetId);
+ console.log('PASS official tab first/default, keyboard tab switching, original settings inside client Settings, one scroll surface and narrow layout');
  console.log('PROFILE', temp);
  if (process.env.DSH_TEST_HOLD === '1') { await app.evaluate(({ app, BrowserWindow }) => { app.focus({ steal: true }); BrowserWindow.getAllWindows()[0].focus(); }); await new Promise(resolve => setTimeout(resolve, 180000)); }
  console.log('PASS community plugin installation, coexistence and settings');

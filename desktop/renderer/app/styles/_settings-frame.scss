@@ -40,33 +40,6 @@
   color: var(--secondary);
 }
 
-#client-settings-dialog .switch-list {
-  margin-top: 24px;
-  padding: 0 16px;
-  background: var(--utility-surface);
-  border-radius: var(--utility-radius);
-}
-
-#client-settings-dialog .switch-list > label {
-  padding: 16px 0;
-  margin: 0;
-}
-
-#client-settings-dialog .switch-list :is(strong, .permission-section-heading) {
-  font-size: 13px;
-  font-weight: 500;
-}
-
-#client-settings-dialog .switch-list small {
-  font-size: 12px;
-  line-height: 1.6;
-  color: var(--secondary);
-}
-
-#client-settings-dialog .subagent-switch-row {
-  padding: 16px 0;
-}
-
 #client-settings-dialog .notification-switches {
   padding: 12px 0 0;
   border-top: 1px solid var(--line);
@@ -193,9 +166,9 @@
 }
 
 .portal-card-top > .portal-status {
-  font-size: 16px;
-  padding: 8px 12px;
-  border-radius: 8px;
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 6px;
   background: var(--bg);
 }
 
@@ -210,9 +183,10 @@
 }
 
 #client-settings-dialog .portal-details {
+  display: grid;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr);
   padding: 20px 0;
   gap: 20px;
-  flex-direction: column;
 }
 
 #client-settings-dialog .portal-details small {
@@ -324,10 +298,25 @@
   min-width: 0;
 }
 
+.client-settings-backdrop {
+  position: fixed;
+  inset: 0;
+  background: #0005;
+  z-index: 1000;
+  -webkit-app-region: no-drag;
+}
+
 #client-settings-dialog {
+  position: fixed;
+  inset: 0;
+  margin: auto;
+  z-index: 1001;
   border: 0;
 
   --muted: var(--secondary);
+  --hover: color-mix(in srgb, var(--text) 5%, transparent);
+  --pressed: color-mix(in srgb, var(--text) 9%, transparent);
+  --selected: color-mix(in srgb, var(--text) 10%, var(--surface));
 }
 
 #client-settings-dialog summary:focus-visible {
@@ -358,7 +347,7 @@
   min-height: 36px;
 }
 
-/* One scroll surface per category; disclosures expand without replacing it. */
+/* One scroll surface per right-hand settings page. */
 #client-settings-dialog .settings-inline-body {
   overflow: auto;
   scrollbar-gutter: stable;
@@ -391,83 +380,8 @@
   background: transparent;
 }
 
-#client-settings-dialog .settings-inline-form .switch-list {
-  margin-top: 0;
-  padding: 0;
-  background: transparent;
-}
-
-#client-settings-dialog
-  .settings-inline-form
-  :is(input:not([type='checkbox'], [type='range']), select, textarea) {
-  border-radius: 10px;
-}
-
-#client-settings-dialog .settings-inline-body :is(button:not(.close), .toggle-group) {
-  border-radius: 10px;
-}
-
-#client-settings-dialog .settings-disclosure {
-  padding: 0;
-  margin: 0 0 20px;
-  background: var(--utility-surface);
-  border-radius: 16px;
-}
-
-#client-settings-dialog .settings-disclosure > summary {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 20px;
-  list-style: none;
-  color: var(--text);
-  cursor: pointer;
-  border-radius: 16px;
-}
-
-#client-settings-dialog .settings-disclosure > summary::-webkit-details-marker {
-  display: none;
-}
-
-#client-settings-dialog .settings-disclosure > summary > span {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  min-width: 0;
-}
-
-#client-settings-dialog .settings-disclosure strong {
-  font-size: 14px;
-  font-weight: 500;
-}
-
-#client-settings-dialog .settings-disclosure small {
-  font-size: 12px;
-  color: var(--secondary);
-  line-height: 1.6;
-}
-
-.settings-disclosure-icon {
-  width: 18px;
-  height: 18px;
-  flex: none;
-  fill: none;
-  stroke: currentcolor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  transition: transform 140ms ease;
-}
-
-.settings-disclosure[open] > .settings-disclosure-icon,
-.settings-disclosure[open] > summary > .settings-disclosure-icon {
-  transform: rotate(180deg);
-}
-
-#client-settings-dialog .settings-disclosure > .settings-inline-form {
-  margin: 0;
-  padding: 0 20px 20px;
+#client-settings-dialog .settings-inline-body :is(button:not(.close, [role='tab']), .toggle-group) {
+  border-radius: 8px;
 }
 
 #client-settings-dialog .settings-inline-body .embedded-portal-settings {
@@ -480,7 +394,7 @@
 }
 
 #client-settings-dialog .settings-inline-body #diagnostics-dialog {
-  padding: 0 20px 20px;
+  padding: 0 0 20px;
   overflow: visible;
 }
 
@@ -509,28 +423,8 @@
 }
 
 #client-settings-dialog .settings-inline-body :is([id$='llm-step2'], [id$='llm-picker']) {
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid var(--line);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .settings-disclosure-icon {
-    transition: none;
-  }
-}
-
-@media (max-width: 600px) {
-  #client-settings-dialog .settings-inline-form {
-    padding: 0;
-  }
-
-  #client-settings-dialog .settings-disclosure > summary {
-    padding: 16px;
-  }
-}
-
-#client-settings-dialog .settings-inline-form .switch-list {
+  margin-top: 0;
+  padding-top: 0;
   border: 0;
 }
 
@@ -546,4 +440,418 @@
 html:not([data-theme='dark']) .town-logo-dark,
 html[data-theme='dark'] .town-logo-light {
   display: none;
+}
+
+/* Every nested settings page keeps the same frame, title and back action. */
+#client-settings-dialog .settings-page-heading {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  min-height: 76px;
+  padding: 20px 54px 20px 32px;
+}
+
+#client-settings-dialog .settings-page-heading .settings-page-title {
+  flex: 1;
+  min-width: 0;
+  padding: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.settings-page-back {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 6px;
+  border-radius: 8px;
+  color: var(--secondary);
+}
+
+.settings-page-back svg,
+:is(.settings-plugin-link, .settings-page-link) > svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.5;
+}
+
+:is(.settings-plugin-link, .settings-page-link) {
+  display: flex;
+  align-items: center;
+  position: relative;
+  gap: 16px;
+  width: calc(100% + 24px);
+  min-height: 76px;
+  margin-inline: -12px;
+  padding: 16px 12px;
+  border: 0;
+  text-align: left;
+}
+
+:is(.settings-plugin-link, .settings-page-link)::after {
+  position: absolute;
+  right: 12px;
+  bottom: 0;
+  left: 12px;
+  height: 1px;
+  background: var(--line);
+  content: '';
+  pointer-events: none;
+}
+
+:is(.settings-plugin-link, .settings-page-link) > span {
+  flex: 1;
+  min-width: 0;
+}
+
+:is(.settings-plugin-link, .settings-page-link) strong {
+  display: block;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+:is(.settings-plugin-link, .settings-page-link) small {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: var(--secondary);
+}
+
+.settings-detail-page {
+  min-width: 0;
+}
+
+@media (max-width: 600px) {
+  #client-settings-dialog .settings-page-heading {
+    padding: 12px 20px 20px;
+  }
+}
+
+#client-settings-dialog
+  :is(.theme-options, .toggle-group)
+  button:not(.active, [aria-pressed='true']):hover:not(:disabled) {
+  background: var(--hover);
+}
+
+#client-settings-dialog .settings-tabs button[aria-selected='false']:hover:not(:disabled) {
+  background: var(--hover);
+}
+
+#client-settings-dialog .settings-tabs button[aria-selected='true'] {
+  background: var(--selected);
+}
+
+#client-settings-dialog .settings-page-heading .settings-page-title:focus {
+  outline: none;
+}
+
+@media (max-width: 600px) {
+  #client-settings-dialog .portal-details {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+}
+
+#client-settings-dialog
+  :is(.settings-inline-form, .model-settings-content)
+  :is(input:not([type='checkbox'], [type='range']), select) {
+  min-height: 40px;
+  padding: 9px 12px;
+  font-size: 13px;
+  line-height: 20px;
+  border-radius: 8px;
+}
+
+#client-settings-dialog
+  :is(.settings-inline-form, .model-settings-content)
+  :is(input:not([type='checkbox'], [type='range']), select):hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--text) 24%, var(--line));
+}
+
+#client-settings-dialog
+  :is(.primary, .secondary, .text-button, .download-setting-change, .btn-apply) {
+  min-height: 36px;
+  padding: 8px 12px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+#client-settings-dialog #settings-panel-being .settings-inline-form {
+  margin-top: 8px;
+}
+
+#client-settings-dialog :is(.town-manual-prompt, .town-advanced-auth) > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 40px;
+  margin-inline: -12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  list-style: none;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+#client-settings-dialog
+  :is(.town-manual-prompt, .town-advanced-auth)
+  > summary::-webkit-details-marker {
+  display: none;
+}
+
+#client-settings-dialog :is(.town-manual-prompt, .town-advanced-auth) > summary:hover {
+  background: var(--hover);
+}
+
+#client-settings-dialog :is(.town-manual-prompt, .town-advanced-auth) > summary svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.5;
+}
+
+#client-settings-dialog :is(.town-manual-prompt, .town-advanced-auth)[open] > summary svg {
+  transform: rotate(90deg);
+}
+
+#client-settings-dialog .history-setting {
+  padding: 0;
+  border: 0;
+}
+
+#client-settings-dialog .history-setting-input {
+  white-space: nowrap;
+}
+
+#client-settings-dialog #chat-history-limit {
+  width: 72px;
+  height: 36px;
+}
+
+#client-settings-dialog .notification-switches {
+  display: block;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+#client-settings-dialog .settings-inline-form {
+  margin-bottom: 0;
+}
+
+#client-settings-dialog .dialog-footer,
+#client-settings-dialog .files-footer {
+  justify-content: flex-end;
+  align-items: center;
+  gap: 8px;
+}
+
+#client-settings-dialog .dialog-footer > .text-button:first-child {
+  margin-right: auto;
+}
+
+#client-settings-dialog .dialog-footer > span {
+  min-width: 200px;
+  line-height: 1.6;
+}
+
+#client-settings-dialog .settings-inline-form .dialog-footer {
+  margin-top: 24px;
+  padding-top: 16px;
+}
+
+#client-settings-dialog .connection-description {
+  margin: 0 0 8px;
+}
+
+#client-settings-dialog :is(.form-error, #town-auth-state):empty {
+  display: none;
+}
+
+#client-settings-dialog .permission-settings-section {
+  margin-top: 24px;
+  padding-top: 0;
+  border: 0;
+}
+
+#client-settings-dialog .settings-item-list .permission-section-heading {
+  font-size: 14px;
+}
+
+#client-settings-dialog #diagnostics-dialog {
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  background: transparent;
+}
+
+#client-settings-dialog #diagnostics-checks {
+  margin-block: 20px;
+}
+
+#client-settings-dialog .diagnostic-row {
+  display: grid;
+  grid-template-columns: minmax(120px, 1fr) minmax(0, 2fr);
+  gap: 20px;
+  align-items: start;
+  padding: 16px 0;
+}
+
+#client-settings-dialog #diagnostics-dialog .files-footer {
+  padding: 16px 0 0;
+  border-top: 1px solid var(--line);
+}
+
+#client-settings-dialog #diagnostics-dialog .files-footer button {
+  min-height: 36px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+
+@media (max-width: 600px) {
+  #client-settings-dialog .history-setting .settings-item {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  #client-settings-dialog .history-setting .settings-item-control {
+    justify-content: flex-start;
+  }
+
+  #client-settings-dialog .dialog-footer > span {
+    flex-basis: 100%;
+  }
+
+  #client-settings-dialog .diagnostic-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 4px;
+  }
+}
+
+#client-settings-dialog #settings-panel .model-form-heading {
+  margin: 0 0 8px;
+}
+
+#client-settings-dialog #settings-panel .settings-section {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+  margin: 0;
+}
+
+#client-settings-dialog #settings-panel .settings-section > :is(label, .hint) {
+  margin: 0;
+}
+
+#client-settings-dialog #settings-panel .field-label {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+#client-settings-dialog #settings-panel .llm-current {
+  margin: 0 0 8px;
+}
+
+#client-settings-dialog #settings-panel .model-catalog {
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+#client-settings-dialog #settings-panel .model-empty {
+  margin: 8px 0 0;
+  padding: 0;
+}
+
+#client-settings-dialog .reading-sample {
+  margin: 12px 0;
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--surface);
+}
+
+#client-settings-dialog .reading-sample > span {
+  margin-bottom: 4px;
+}
+
+#client-settings-dialog #settings-plugin-content-town .plugin-card {
+  padding: 0;
+  border: 0;
+}
+
+#client-settings-dialog .plugin-view-placement > div:first-child {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 80px;
+  gap: 12px;
+}
+
+#client-settings-dialog .plugin-view-placement {
+  padding: 12px 0;
+  margin: 0;
+  border-bottom: 1px solid var(--line);
+}
+
+#client-settings-dialog .plugin-view-placement select {
+  min-height: 40px;
+}
+
+#client-settings-dialog .plugin-view-placement > div > button {
+  justify-content: center;
+}
+
+#client-settings-dialog .plugin-management {
+  margin-top: 24px;
+}
+
+#client-settings-dialog .plugin-management > span {
+  color: var(--text);
+  font-size: 14px;
+}
+
+#client-settings-dialog .plugin-actions {
+  gap: 20px;
+}
+
+#client-settings-dialog .dsh-detail-summary {
+  padding-bottom: 16px;
+  margin-bottom: 8px;
+  border-bottom: 1px solid var(--line);
+}
+
+#client-settings-dialog .dsh-config-form > fieldset {
+  margin: 0;
+}
+
+@media (max-width: 600px) {
+  #client-settings-dialog .plugin-view-heading {
+    display: none;
+  }
+
+  #client-settings-dialog .plugin-view-placement {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+}
+
+#client-settings-dialog .settings-item-list > .settings-item:last-child,
+#client-settings-dialog .diagnostic-row:last-child,
+#client-settings-dialog .plugin-view-placement:last-child {
+  border-bottom: 0;
+}
+
+#client-settings-dialog .dsh-config-control > .secondary,
+#client-settings-dialog .plugin-view-placement button {
+  min-height: 40px;
 }

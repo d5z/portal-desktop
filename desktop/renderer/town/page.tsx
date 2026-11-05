@@ -1,5 +1,4 @@
 import { Icon } from '../shared/icons/icon';
-import { dshRuntime } from '../plugins/dsh/runtime';
 import { CodeClipboard } from '../shared/components/markdown';
 import { ToolsLibrary } from './components/tools-library';
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -39,6 +38,7 @@ export function Town({ model }: { model: TownModel }) {
       !town.directId &&
       (["embers", "scrolls", "seeds", "announcements"].includes(town.view) ||
         (town.view === "kits" && town.tab === "grove")),
+    pluginLibrary = town.view === 'kits' && town.groveKind === 'plugin' && !town.directId,
     refreshing = Boolean((town.loading || town.detailLoading) && (town.data || town.ringData || town.library || town.detail)),
     root = useRef<HTMLElement>(null);
   useLayoutEffect(() => { if (root.current) root.current.scrollTop = 0; }, [town.view, town.directId]);
@@ -113,17 +113,14 @@ export function Town({ model }: { model: TownModel }) {
           {town.view === "kits" && town.tab === "grove" && <div className="segmented grove-kind-filter" role="tablist" aria-label="Grove 类型" onKeyDown={navigateTabs}>
             {([["", "全部"], ["app", "App"], ["kit", "Kit"], ["plugin", "Plugin"]] as const).map(([value, label]) => <button key={value} role="tab" id={`grove-kind-${value || 'all'}`} aria-controls="town-body" tabIndex={town.groveKind === value ? 0 : -1} aria-selected={town.groveKind === value} className={town.groveKind === value ? "selected" : ""} onClick={() => { town.groveKind = value; town.offset = 0; town.toolSelection = ""; town.selectedId = ""; town.localKit = undefined; town.changed(); }}>{label}</button>)}
           </div>}
-          {town.view === 'kits' && !town.directId && <>
+          {town.view === 'kits' && !town.directId && !pluginLibrary && <>
             <label className="tools-local-filter"><input type="checkbox" checked={town.localOnly} onChange={e => { town.localOnly = e.target.checked; town.offset = 0; town.toolSelection = ""; town.localKit = undefined; town.changed(); }} />仅本机存在</label>
-            {town.groveKind === 'plugin' && town.plugins?.api && <button className="primary" disabled={town.plugins.busy} onClick={() => void town.plugins!.act(() => town.plugins!.api!.importLocal())}>导入插件目录</button>}
-            {town.groveKind === 'plugin' && <button className="secondary" onClick={() => dshRuntime.openManager()}>第三方插件</button>}
-            {town.groveKind === 'plugin' && town.plugins && <button className="secondary" title="Ctrl / ⌘ + Shift + P" onClick={() => town.plugins!.showCommands(true)}>快捷操作</button>}
             {town.groveKind === 'kit' && town.supportsLocalKits && <button className="primary" onClick={() => void town.importKit()}>导入 Kit</button>}
           </>}
           <select
             id="grove-status"
             aria-label="Grove 成长阶段"
-            hidden={town.view !== "kits" || town.localOnly || Boolean(town.directId)}
+            hidden={town.view !== "kits" || town.localOnly || Boolean(town.directId) || pluginLibrary}
             value={town.groveStatus}
             onChange={(event) => {
               town.groveStatus = event.target.value;
@@ -146,13 +143,13 @@ export function Town({ model }: { model: TownModel }) {
             type="search"
             aria-label={social ? "搜索已加载的消息与作者" : town.view === "contacts" ? "搜索通讯录" : "筛选当前列表"}
             placeholder={social ? "搜索消息、作者…" : town.view === "contacts" ? "搜索 Being、人类伙伴…" : town.view === "announcements" ? "搜索公告…" : "筛选当前列表…"}
-            hidden={Boolean(town.directId) || town.view === "seeds"}
+            hidden={Boolean(town.directId) || town.view === "seeds" || pluginLibrary}
             value={town.search}
             onChange={(event) => town.setSearch(event.target.value)}
           />
           {town.view === "seeds" && !town.directId && <SeedSearch town={town} />}
           <div className="town-header-actions">
-            {town.view === "kits" && town.tab === "grove" && <button className="secondary grove-help-button" onClick={() => void town.run(() => town.api.openTownLink("/grove"))}>Grove Help ↗</button>}
+            {town.view === "kits" && town.tab === "grove" && !pluginLibrary && <button className="secondary grove-help-button" onClick={() => void town.run(() => town.api.openTownLink("/grove"))}>Grove Help ↗</button>}
             <button
               id="town-write"
               className="town-write-button"
@@ -171,12 +168,13 @@ export function Town({ model }: { model: TownModel }) {
             <button
               id="town-auth-button"
               className="secondary"
-              hidden={town.view === "seeds"}
+              hidden={town.view === "seeds" || pluginLibrary}
               onClick={() => void town.auth()}
             >
               {town.authLabel}
             </button>
             <button
+              hidden={pluginLibrary}
               id="town-refresh"
               className="icon-button"
               title={hasUpdates ? "有新内容，点击刷新" : "刷新内容"}
@@ -233,7 +231,7 @@ export function Town({ model }: { model: TownModel }) {
           {definition && <TownBody town={town} />}
         </div>
         <div id="town-pagination" className="pagination">
-          {definition && <Pagination town={town} />}
+          {definition && !pluginLibrary && <Pagination town={town} />}
         </div>
       </div>
     </section>

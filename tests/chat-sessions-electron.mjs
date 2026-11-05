@@ -104,7 +104,7 @@ try {
     frame.contentWindow.postMessage({type:'beings:scene-tasks',revision:new URL(frame.src).searchParams.get('revision'),endpoint:snapshot.settings.endpoint,
       tasks:[],subagentReady:false,subagentConfigured:false,subagentEnabled:false},'beings://chat');
   });
-  const subagentSetup = chat.getByRole('menuitem',{name:/Subagent.*\/subagent/});
+  const subagentSetup = chat.getByRole('menuitem',{name:/Subagent/});
   await chat.getByRole('button',{name:'添加附件和工具'}).click();
   await subagentSetup.waitFor();
   await clickWhenPointerReady(page, subagentSetup);
