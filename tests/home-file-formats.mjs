@@ -86,6 +86,10 @@ try {
     assert(box.height > parent.height - 100, 'preview must fill available panel height');
   };
   await fillsPanel('iframe[title="幻灯片预览"]');
+  // A sandboxed iframe paints in another process. Wait for its input hit test
+  // to catch up too; DOM visibility alone can still send the click to the iframe.
+  await slides.getByRole('button', { name: '下一张' }).hover();
+  await slides.locator('#next:hover').waitFor();
   await slides.getByRole('button', { name: '下一张' }).click();
   await slides.locator('#stage').getByText('Being — slide 2').waitFor();
   await slides.getByRole('status').filter({ hasText: '2 / 2' }).waitFor();
@@ -98,6 +102,8 @@ try {
   await page.setViewportSize({ width: 800, height: 700 });
   await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
   await fillsPanel('iframe[title="幻灯片预览"]');
+  await slides.getByRole('button', { name: '第 1 张幻灯片' }).hover();
+  await slides.locator('#thumbs button[data-index="0"]:hover').waitFor();
   await slides.getByRole('button', { name: '第 1 张幻灯片' }).click();
   await slides.locator('#stage').getByText('Being — slide 1').waitFor();
   await page.screenshot({ path: 'output/playwright/home-pptx-narrow-dark.png' });
