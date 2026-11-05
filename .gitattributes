@@ -1,0 +1,2 @@
+# Prettier checks these files with LF on every platform, including Windows.
+*.scss text eol=lf

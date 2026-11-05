@@ -102,6 +102,9 @@ try {
     let last=performance.now();function tick(now){if(!window.measuring)return;window.samples.push(now-last);last=now;requestAnimationFrame(tick);}requestAnimationFrame(tick);
   });
   const performanceSession = await page.context().newCDPSession(page);
+  const traceEvents = [];
+  performanceSession.on('Tracing.dataCollected', data => traceEvents.push(...data.value));
+  await performanceSession.send('Tracing.start', {categories:'devtools.timeline,disabled-by-default-devtools.timeline', transferMode:'ReportEvents'});
   await performanceSession.send('Performance.enable');
   const cpuBefore = (await performanceSession.send('Performance.getMetrics')).metrics.find(metric => metric.name === 'TaskDuration').value;
   answer='';
@@ -122,6 +125,10 @@ try {
   metrics.idleP95FrameMs=idleP95FrameMs;
   metrics.frameBudgetMs=Math.max(100,idleP95FrameMs+50);
   await mkdir('test-results',{recursive:true});await writeFile('test-results/chat-render-performance.json',JSON.stringify(metrics,null,2));
+  const traceComplete = new Promise(resolve => performanceSession.once('Tracing.tracingComplete', resolve));
+  await performanceSession.send('Tracing.end');
+  await traceComplete;
+  if (metrics.maxLongTaskMs >= 100) await writeFile('test-results/chat-render-performance-trace.json', JSON.stringify({traceEvents}));
   console.log('Rendering metrics: '+JSON.stringify(metrics));
   assert.ok(metrics.frames>=20,'Stream must paint incrementally');
   assert.ok(metrics.messageLayoutReads <= 20, 'Following the tail must not measure historical bubbles on every frame');

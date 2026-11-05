@@ -46,6 +46,7 @@ let browser;
 try {
   browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } : { channel: 'chrome' }) });
   const page = await browser.newPage({ viewport: { width: 1100, height: 850 } });
+  await page.context().tracing.start({ screenshots: true, snapshots: true, sources: true });
   page.setDefaultTimeout(10000);
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   const origin = 'http://127.0.0.1:' + server.address().port;
@@ -250,6 +251,10 @@ try {
   assert.match(await child().evaluate(() => navigator.clipboard.readText()), /开始回复/);
   assert.deepEqual(errors, []);
   console.log('PASS: long and same-turn replies follow bottom; viewport/composer/content resizing preserves follow; upward scroll holds reading position; latest resumes follow; message copy works.');
+} catch (error) {
+  await mkdir('test-results', {recursive:true});
+  await browser.contexts()[0].tracing.stop({path:`test-results/chat-scroll${topInset ? '-floating-header' : ''}-trace.zip`});
+  throw error;
 } finally {
   heldResponse?.end(); await browser?.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
 }

@@ -66,8 +66,10 @@ const server = createServer((req, res) => {
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 const browser = await chromium.launch({ channel: 'chrome', headless: true });
+const context = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+await context.tracing.start({ screenshots: true, snapshots: true, sources: true });
 try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  const page = await context.newPage();
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   await page.goto(`http://127.0.0.1:${server.address().port}`);
   await page.getByRole('heading', { name: '云端文件预览' }).waitFor();
@@ -129,4 +131,9 @@ try {
   await panel.getByText('文件已保存').waitFor();
   assert.deepEqual(errors, []);
   console.log('PASS: Home PPTX layout/slide navigation/resize, XLSX sheets/cells, PDF pixels, shared Markdown/JSON/CSV/images/text, unsupported download.');
+} catch (error) {
+  await mkdir('test-results', { recursive: true });
+  await context.tracing.stop({ path: 'test-results/home-file-formats-trace.zip' });
+  console.error(await context.pages()[0].locator('iframe').contentFrame().locator('body').innerText());
+  throw error;
 } finally { await browser.close(); server.closeAllConnections(); server.close(); }
