@@ -1,12 +1,13 @@
 import { IconButton } from '../../shared/components/icon-button';
 import { formatBytes } from '../../shared/lib/format-bytes';
 import { Icon } from '../../shared/icons/icon';
-import { useEffect, useId, useState } from 'react';
+import { useContext, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
 import type { HomeAPI } from '../../../shared/home';
 import { useModel } from '../../shared/hooks/use-model';
 import { FileTypeIcon } from '../../shared/components/file-type-icon';
-import { homeRecentFiles } from '../models/home-recent-files';
+import { LocalFileAction } from '../../shared/components/local-file-link';
+import { homeRecentFiles, type RecentFile } from '../models/home-recent-files';
 import { HomeLibrary } from '../models/home-library';
 import styles from './home-library.module.scss';
 import { HomeFilePanel } from './home-file-panel';
@@ -18,15 +19,16 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
   const [store] = useState(() => new HomeLibrary(api.files!));
   const model = useModel(store);
   const recent = useModel(homeRecentFiles);
+  const openLocal = useContext(LocalFileAction);
   const [tab, setTab] = useState<'recent' | 'workspace'>('recent');
   const tabId = useId();
-  const [tip, setTip] = useState<{ path: string; left: number; top: number; width: number; above: boolean } | null>(null);
-  const hovered = recent.entries.find(entry => entry.path === tip?.path);
-  const showTip = (element: HTMLButtonElement, path: string) => {
+  const [tip, setTip] = useState<{ path: string; source: RecentFile['source']; left: number; top: number; width: number; above: boolean } | null>(null);
+  const hovered = recent.entries.find(entry => entry.path === tip?.path && entry.source === tip?.source);
+  const showTip = (element: HTMLButtonElement, entry: RecentFile) => {
     const bounds = element.parentElement!.getBoundingClientRect();
     const width = Math.min(320, bounds.width, innerWidth - 24);
     const above = bounds.top > 150;
-    setTip({ path, width, left: Math.max(12, Math.min(bounds.left, innerWidth - width - 12)), top: above ? bounds.top - 8 : bounds.bottom + 8, above });
+    setTip({ path: entry.path, source: entry.source, width, left: Math.max(12, Math.min(bounds.left, innerWidth - width - 12)), top: above ? bounds.top - 8 : bounds.bottom + 8, above });
   };
   useEffect(() => {
     if (!tip) return;
@@ -77,15 +79,15 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
     </>}
     </div>
     <section role="tabpanel" id={`${tabId}-recent`} aria-labelledby={`${tabId}-recent-tab`} hidden={tab !== 'recent'}>
-      {!recent.entries.length && <p className={styles.recentEmpty}>打开云电脑中的文件后，会显示在这里。</p>}
-      <ul className={styles.recentFiles} aria-label="最近的文件">{recent.entries.map(entry => <li key={entry.path} onMouseLeave={() => setTip(null)}>
-        <button className={styles.recentFile} type="button" disabled={model.busy}
-          aria-describedby={hovered?.path === entry.path ? `${tabId}-file-tip` : undefined}
-          onMouseEnter={event => showTip(event.currentTarget, entry.path)} onFocus={event => showTip(event.currentTarget, entry.path)} onBlur={() => setTip(null)}
-          onClick={() => { setTip(null); void model.open(entry); }}>
-          <FileTypeIcon path={entry.path} className={styles.fileTypeIcon} /><span>{entry.name}</span>
+      {!recent.entries.length && <p className={styles.recentEmpty}>打开本机或云电脑中的文件后，会显示在这里。</p>}
+      <ul className={styles.recentFiles} aria-label="最近的文件">{recent.entries.map(entry => <li key={`${entry.source}:${entry.path}`} onMouseLeave={() => setTip(null)}>
+        <button className={styles.recentFile} type="button" disabled={entry.source === 'local' ? !openLocal : model.busy}
+          aria-describedby={hovered === entry ? `${tabId}-file-tip` : undefined}
+          onMouseEnter={event => showTip(event.currentTarget, entry)} onFocus={event => showTip(event.currentTarget, entry)} onBlur={() => setTip(null)}
+          onClick={() => { setTip(null); if (entry.source === 'local') openLocal?.(entry.path); else void model.open(entry); }}>
+          <FileTypeIcon path={entry.path} className={styles.fileTypeIcon} /><span className={styles.recentName}>{entry.name}</span><span className={styles.fileSource}>{entry.source === 'local' ? '本机' : '云电脑'}</span>
         </button>
-        <IconButton className={styles.iconButton} label={`从最近记录移除：${entry.name}`} title="移除最近" onMouseEnter={() => setTip(null)} onFocus={() => setTip(null)} onClick={() => { setTip(null); recent.remove(entry.path); }}><Icon name="trash" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></IconButton>
+        <IconButton className={styles.iconButton} label={`从最近记录移除：${entry.name}`} title="移除最近" onMouseEnter={() => setTip(null)} onFocus={() => setTip(null)} onClick={() => { setTip(null); recent.remove(entry.path, entry.source); }}><Icon name="trash" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></IconButton>
       </li>)}</ul>
     </section>
     <section role="tabpanel" id={`${tabId}-workspace`} aria-labelledby={`${tabId}-workspace-tab`} hidden={tab !== 'workspace'}>
@@ -109,7 +111,7 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
     </section>
     {active && tab === 'recent' && tip && hovered && createPortal(<div id={`${tabId}-file-tip`} role="tooltip" className={styles.fileTooltip}
       style={{ left: tip.left, top: tip.top, width: tip.width, transform: tip.above ? 'translateY(-100%)' : undefined }}>
-      <span className={styles.tipType}>文件</span>
+      <span className={styles.tipType}>{hovered.source === 'local' ? '本机文件' : '云电脑文件'}</span>
       <strong>{hovered.name}</strong>
       <span className={styles.tipTime}>最近打开 · <time dateTime={new Date(hovered.openedAt).toISOString()}>{new Date(hovered.openedAt).toLocaleString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}</time></span>
     </div>, document.body)}

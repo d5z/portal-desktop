@@ -181,8 +181,9 @@ export function App({ model }: { model: AppModel }) {
             </section>}
             </div>
           </div>
-          <AttachmentFileViewer key={`${app.chatSource}:${app.snapshot?.chatScene?.scene_id || ''}`} frame={frame}/>
-          <BeingInfo app={app} />
+          <AttachmentFileViewer scope={`${app.chatSource}:${app.snapshot?.chatScene?.scene_id || ''}`} frame={frame}>
+            <BeingInfo app={app} />
+          </AttachmentFileViewer>
           {app.subagentSettingsOpen && !app.settingsRoute && <SubagentModelSettings app={app} />}
           <Companion model={app.workspace} />
           {app.view === "chat" && (!app.subagentSettingsOpen || Boolean(app.settingsRoute)) && <PluginSidebar model={app.plugins} theme={app.colorScheme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />}

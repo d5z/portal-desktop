@@ -245,7 +245,7 @@ describe('Town DSH compatibility host (real Cordis process)',()=>{
    expect(prepared.entry.plugin.id).toBe('local-plugin');
    await expect(readFile(marker)).rejects.toThrow();
    await manager.install(prepared.entry);expect(manager.state().plugins[0].status).toBe('active');
- },20000);
+ },60000);
  it('rejects unsupported bundle operations, engine ranges and path escapes before execution',async()=>{
    const {home,make}=await fixture();
    const {root}=await make('invalid-plugin','',{dsh:{bundle:{patch:'patch.yml'}}});

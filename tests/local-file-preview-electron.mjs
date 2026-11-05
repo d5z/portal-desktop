@@ -15,6 +15,17 @@ async function bundle(name, contents, platform = 'browser') {
 try {
   const workspace = path.join(dir, 'portal-desktop Workspace', 'qimen-study'); await mkdir(workspace,{recursive:true});
   const file = path.join(workspace, '八字排盘工具.html');
+  const pdfFile = path.join(workspace, '本机 PDF 预览.pdf');
+  const objects = ['<< /Type /Catalog /Pages 2 0 R >>', '<< /Type /Pages /Kids [3 0 R] /Count 1 >>',
+    '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 200 200] /Resources << >> /Contents 4 0 R >>'];
+  const stream = '0 0 1 rg 0 0 200 200 re f\n';
+  objects.push(`<< /Length ${stream.length} >>\nstream\n${stream}endstream`);
+  let pdf = '%PDF-1.4\n'; const offsets = [0];
+  objects.forEach((object, i) => { offsets.push(pdf.length); pdf += `${i + 1} 0 obj\n${object}\nendobj\n`; });
+  const xref = pdf.length;
+  pdf += `xref\n0 5\n0000000000 65535 f \n${offsets.slice(1).map(offset => String(offset).padStart(10, '0') + ' 00000 n \n').join('')}trailer\n<< /Size 5 /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
+  await writeFile(pdfFile, pdf);
+  await writeFile(path.join(dir, 'pdf.worker.min.js'), await readFile('node_modules/pdfjs-dist/build/pdf.worker.min.mjs'));
   const document = heading => `<!doctype html><meta charset="utf-8"><link rel="stylesheet" href="style.css"><h1>${heading}</h1><button id="counter">0</button><p id="isolation"></p><script src="script.js"></script>`;
   await writeFile(file, document('当前对话生成的页面'));
   await mkdir(path.join(workspace,'Example.app'));
@@ -45,7 +56,7 @@ try {
     const entries = [newToolActivity([], {call_id:'file-write',name:'portal_file_write'}, 'entry', Date.now())];
     completeToolActivity(entries, {call_id:'file-write',path:${JSON.stringify(file)},is_error:false,summary:'文件已保存'});
     const toolRun = {kind:'run',id:'run',entries,start:Date.now(),end:Date.now(),label:'已完成',hint:'',arg:'',outcome:'done'};
-    createRoot(document.getElementById('root')).render(<LocalFileAction.Provider value={requestLocalFilePreview}><div className="chat-root" style={{padding:24}}><div className="message being"><div className="content">{${process.env.LOCAL_PREVIEW_TOOL_ACTIVITY === '1'} ? <ChatActivity run={toolRun}/> : <Markdown chat content={${JSON.stringify(`页面已生成，点击下面的文件即可在当前对话中预览。\n\n[预览页面](<${file}>)\n\n你可以继续告诉我需要修改的地方。`)}}/>}</div></div><Markdown chat content={${JSON.stringify(`[不存在](<${path.join(workspace, 'missing.html')}>)\n\n` + '`' + path.join(workspace, 'Example.app') + '` ' + '`' + path.join(workspace, '.portal-connection.url') + '`')}}/><textarea aria-label="继续修改" defaultValue="把标题改成蓝色"/><EditContextMenu appearance="chat" edit={async()=>true}/></div></LocalFileAction.Provider>);
+    createRoot(document.getElementById('root')).render(<LocalFileAction.Provider value={requestLocalFilePreview}><div className="chat-root" style={{padding:24}}><div className="message being"><div className="content">{${process.env.LOCAL_PREVIEW_TOOL_ACTIVITY === '1'} ? <ChatActivity run={toolRun}/> : <Markdown chat content={${JSON.stringify(`页面已生成，点击下面的文件即可在当前对话中预览。\n\n[预览页面](<${file}>)\n\n你可以继续告诉我需要修改的地方。`)}}/>}</div></div><Markdown chat content={${JSON.stringify(`[预览 PDF](<${pdfFile}>)`)}}/><Markdown chat content={${JSON.stringify(`[不存在](<${path.join(workspace, 'missing.html')}>)\n\n` + '`' + path.join(workspace, 'Example.app') + '` ' + '`' + path.join(workspace, '.portal-connection.url') + '`')}}/><textarea aria-label="继续修改" defaultValue="把标题改成蓝色"/><EditContextMenu appearance="chat" edit={async()=>true}/></div></LocalFileAction.Provider>);
   `);
   await bundle('main.cjs', `
     import {app,protocol,ipcMain} from 'electron';
@@ -110,7 +121,7 @@ try {
   await chat.getByRole('menuitem', {name:'预览文件'}).click();
   await preview.getByRole('heading', {name:'同一文件修改完成'}).waitFor();
   assert.equal(await chat.getByRole('button', {name:'预览文件：missing.html',exact:true}).count(),0);
-  assert.equal(await chat.locator('[data-local-file]').count(),1);
+  assert.equal(await chat.locator('[data-local-file]').count(),2);
   await chat.getByText('missing.html',{exact:true}).click({button:'right'});
   assert.equal(await chat.getByRole('menuitem',{name:'预览文件'}).count(),0);
   await page.keyboard.press('Escape');
@@ -132,8 +143,27 @@ try {
   await rm(path.join(workspace,'missing.html'));
   await page.getByRole('button',{name:'打开所在文件夹',exact:true}).click();
   await page.getByRole('alert').filter({hasText:'文件已移动或删除'}).waitFor();
+  await page.getByRole('button', { name: '关闭文件预览', exact: true }).click();
+  const pdfCard = chat.getByRole('button', { name: '预览文件：本机 PDF 预览.pdf', exact: true });
+  const renderedPdf = () => page.waitForFunction(() => {
+    const canvas = document.querySelector('canvas[aria-label="PDF 第 1 页"]');
+    if (!canvas?.width) return false;
+    const pixel = canvas.getContext('2d').getImageData(10, 10, 1, 1).data;
+    return pixel[2] === 255 && pixel[0] === 0 && pixel[3] === 255;
+  });
+  await pdfCard.click(); await renderedPdf();
+  await page.getByRole('button', { name: '关闭文件预览', exact: true }).click();
+  await page.reload();
+  await pdfCard.click(); await renderedPdf();
+  const history = await page.evaluate(() => JSON.parse(localStorage.getItem('beings:recent-local-files')).entries);
+  assert.equal(history.filter(entry => entry.path.endsWith('本机 PDF 预览.pdf')).length, 1);
+  assert.equal(history[0].source, 'local');
+  await page.getByRole('button', { name: '关闭文件预览', exact: true }).click();
+  await pdfCard.hover();
+  await mkdir('output/playwright', { recursive: true });
+  await pdfCard.locator('..').screenshot({ path: 'output/playwright/local-pdf-card.png' });
   assert.deepEqual(errors,[]);
-  console.log('PASS: local HTML availability, click, context menu, reveal folder, CSS/JS, isolation, refresh, same chat draft, missing/deleted files.');
+  console.log('PASS: local HTML availability, click, context menu, reveal folder, CSS/JS, isolation, refresh, same chat draft, missing/deleted files, native PDF card and preview after reload.');
 } finally {
   await application?.close();
   await rm(dir,{recursive:true,force:true});

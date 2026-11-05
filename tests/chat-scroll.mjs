@@ -148,16 +148,18 @@ try {
   }
   const readingAnchor = await messages.evaluate(el => {
     const top = el.getBoundingClientRect().top;
-    const node = [...el.querySelectorAll('.message')].find(node => node.getBoundingClientRect().bottom > top + 1);
-    return {id:node.dataset.messageId, offset:node.getBoundingClientRect().top - top};
+    const boundary = top + parseFloat(getComputedStyle(el).scrollPaddingTop) + 1;
+    const node = [...el.querySelectorAll('.message p')].find(node => node.getBoundingClientRect().bottom > boundary);
+    node.dataset.readingAnchor = 'true';
+    return {offset:node.getBoundingClientRect().top - top};
   });
   for (const width of [435, 1100]) {
     await page.setViewportSize({width,height:850});
-    const offset = await messages.evaluate(async (el, id) => {
+    const offset = await messages.evaluate(async el => {
       await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      return el.querySelector(`[data-message-id="${id}"]`).getBoundingClientRect().top - el.getBoundingClientRect().top;
-    }, readingAnchor.id);
-    assert.ok(Math.abs(offset - readingAnchor.offset) < 2, 'Reflow while reading preserves the visible bubble position');
+      return el.querySelector('[data-reading-anchor="true"]').getBoundingClientRect().top - el.getBoundingClientRect().top;
+    });
+    assert.ok(Math.abs(offset - readingAnchor.offset) < 2, 'Reflow while reading preserves the visible paragraph position');
   }
   await frame.locator('#chat-jump-latest').click();
   await child().waitForFunction(()=>{const el=document.querySelector('#messages');return el.scrollHeight-el.scrollTop-el.clientHeight<2;});

@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { FileCard } from './file-card';
 import { localFileReference } from '../../../shared/local-file';
 import { checkLocalFile } from '../services/local-file-availability';
 
@@ -45,15 +46,8 @@ export function LocalFileLink({ path, children, card = false, inlineCode = false
       if (ready===true) preview(path);
     } finally { if(opening.current===operation)opening.current=null; }
   };
-  if (card) return <button type="button" className="chat-local-file-card" data-local-file={path}
-    aria-label={`预览文件：${name}`} title={`在客户端预览：${path}`} onClick={() => void open()}>
-    <span className="chat-local-file-icon" aria-hidden="true">{'</>'}</span>
-    <span className="chat-local-file-details">
-      <span className="chat-local-file-name">{name}</span>
-      <span className="chat-local-file-description">HTML 页面 · 点击预览</span>
-    </span>
-    <span className="chat-local-file-chevron" aria-hidden="true">›</span>
-  </button>;
+  if (card) return <FileCard path={path} name={name} localPath={path} className="chat-local-file-card"
+    title={`在客户端预览：${path}`} onOpen={() => void open()} />;
   return <button type="button" className="chat-local-file-link" data-local-file={path}
     title={`在客户端预览：${path}`} onClick={() => void open()}>{children}<span aria-hidden="true"> ↗</span></button>;
 }

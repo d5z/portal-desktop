@@ -341,7 +341,7 @@ const MarkdownText = memo(function MarkdownText({
             target = onPlace ? placeFromURL(link.href) : null;
           const local = previewLocalFile ? localFileReference(unescapeText(link.href), true) : undefined;
           const homeFile = homeFileReference(unescapeText(link.href));
-          node = homeFile ? <HomeFileLink path={homeFile.path}>{render(link.tokens, false)}</HomeFileLink> : local ? <LocalFileLink path={local} card={/\.html?$/i.test(local)}>{render(link.tokens, false)}</LocalFileLink> : (
+          node = homeFile ? <HomeFileLink path={homeFile.path}>{render(link.tokens, false)}</HomeFileLink> : local ? <LocalFileLink path={local} card>{render(link.tokens, false)}</LocalFileLink> : (
             <a
               href={href}
               title={

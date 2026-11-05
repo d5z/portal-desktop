@@ -1,7 +1,7 @@
 {
   "name": "portal-desktop",
   "productName": "Portal Desktop",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "A desktop home for your Being, with Heart Portal built in.",
   "author": "Beings contributors",
   "license": "MIT",
@@ -55,7 +55,7 @@
     "test:attachments-ui": "npm run build:chat && node tests/attachments-electron.mjs",
     "test:chat-react": "npm run build:chat && node tests/chat-react.mjs",
     "test:chat-layout": "npm run build:chat && node tests/chat-layout.mjs",
-    "test:chat-scroll": "npm run build:chat && node tests/chat-scroll.mjs",
+    "test:chat-scroll": "npm run build:chat && node tests/chat-scroll.mjs && node tests/chat-preview-scroll.mjs",
     "test:local-file-preview": "node tests/local-file-preview-electron.mjs",
     "test:chat-context-menu": "npm run build:chat && node tests/chat-context-menu.mjs",
     "test:chat-send-queue": "npm run build:chat && node tests/chat-send-queue.mjs",

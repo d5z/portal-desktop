@@ -44,7 +44,7 @@ export function ChatActivity({ run, sceneLabel, showDetails = true, showProgress
       {attention && <span className="quiet-activity-notice">{run.hint || run.label}</span>}
     </div>}
     {artifacts.length > 0 && <div className="run-artifacts" aria-label="生成的文件">
-      {artifacts.map(path => <LocalFileLink key={path} path={path} card={/\.html?$/i.test(path)}>{path.split(/[\\/]/).pop() || path}</LocalFileLink>)}
+      {artifacts.map(path => <LocalFileLink key={path} path={path} card>{path.split(/[\\/]/).pop() || path}</LocalFileLink>)}
     </div>}
   </>;
 }
@@ -178,7 +178,7 @@ function DetailedChatActivity({
       </div></>}
     </details>
     {artifacts.length > 0 && <div className="run-artifacts" aria-label="生成的文件">
-      {artifacts.map(path => <LocalFileLink key={path} path={path} card={/\.html?$/i.test(path)}>{path.split(/[\\/]/).pop() || path}</LocalFileLink>)}
+      {artifacts.map(path => <LocalFileLink key={path} path={path} card>{path.split(/[\\/]/).pop() || path}</LocalFileLink>)}
     </div>}
     </>
   );

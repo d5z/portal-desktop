@@ -21,15 +21,27 @@ export function useMessageScroll(items: ChatItem[], container: RefObject<HTMLDiv
   }, [container]);
   const scrollLock = useRef(true), observedTop = useRef<number | null>(null), frame = useRef(0);
   const touchY = useRef(0);
-  const reading = useRef<{ node: HTMLDivElement; offset: number; scrollTop: number } | null>(null);
+  const reading = useRef<{ node: Element; offset: number; scrollTop: number; width: number } | null>(null);
   const remember = useCallback(() => {
     const el = container.current;
     if (!el) return;
     if (scrollLock.current) { reading.current = null; return; }
     const top = el.getBoundingClientRect().top;
-    const node = ordered.current[firstAfter(ordered.current.length, top + 1, index => ordered.current[index].getBoundingClientRect().bottom)];
+    const boundary = top + parseFloat(getComputedStyle(el).scrollPaddingTop) + 1;
+    let node: Element | undefined = ordered.current[firstAfter(ordered.current.length, boundary, index => ordered.current[index].getBoundingClientRect().bottom)];
+    // Anchor the visible block inside a long reply, not its offscreen beginning.
+    if (node && node.getBoundingClientRect().top < boundary) {
+      let anchor: Element = node.querySelector('.message-bubble-body') || node;
+      while (anchor.children.length && !anchor.matches('p,pre,li,h1,h2,h3,h4,h5,h6,button,img,video,canvas')) {
+        const children: HTMLCollection = anchor.children;
+        const child: Element | undefined = children[firstAfter(children.length, boundary, index => children[index].getBoundingClientRect().bottom)];
+        if (!child) break;
+        anchor = child;
+      }
+      node = anchor;
+    }
     const offset = node ? node.getBoundingClientRect().top - top : el.clientHeight;
-    reading.current = node && offset < el.clientHeight ? { node, offset, scrollTop: el.scrollTop } : null;
+    reading.current = node && offset < el.clientHeight ? { node, offset, scrollTop: el.scrollTop, width: el.clientWidth } : null;
   }, [container]);
   const currentItems = useRef(items); currentItems.current = items;
   const releaseAnchor = useCallback(() => {
@@ -45,16 +57,22 @@ export function useMessageScroll(items: ChatItem[], container: RefObject<HTMLDiv
     // Like Harness, record our writes separately from reader movement. Browser
     // clamping after shrink and delayed scroll events must not cancel following.
     const moved = observedTop.current !== null && Math.abs(el.scrollTop - Math.min(observedTop.current, floor)) > 0.5;
-    if (moved) {
+    const saved = reading.current;
+    const reflow = saved && saved.width !== el.clientWidth;
+    if (moved && !reflow) {
       scrollLock.current = floor - el.scrollTop <= 2;
     }
-    const saved = reading.current;
     if (scrollLock.current) {
       if (follow || !moved) el.scrollTop = floor;
     } else if (saved?.node.isConnected) {
       // Content-space movement excludes concurrent user scrolling. Native
       // overflow anchoring is disabled so this shift is applied exactly once.
-      const shift = saved.node.getBoundingClientRect().top - el.getBoundingClientRect().top - saved.offset + el.scrollTop - saved.scrollTop;
+      // A wider chat can clamp scrollTop before ResizeObserver runs. In that
+      // case restore the screen offset directly instead of counting the clamp
+      // as reader movement and applying the layout delta a second time.
+      const clamped = observedTop.current !== null && observedTop.current > floor && Math.abs(el.scrollTop - floor) < 1;
+      const shift = saved.node.getBoundingClientRect().top - el.getBoundingClientRect().top - saved.offset +
+        (reflow || clamped ? 0 : el.scrollTop - saved.scrollTop);
       if (Math.abs(shift) > 0.5) el.scrollTop += shift;
     }
     observedTop.current = el.scrollTop;

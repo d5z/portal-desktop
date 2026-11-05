@@ -13,9 +13,11 @@ const bundle = await build({
     builder.onLoad({ filter: /home-file-preview\.tsx$/ }, async args => ({ loader: 'tsx', contents: (await readFile(args.path, 'utf8')).replace('beings://preview/runtime.html', '/runtime.html') }));
   } }], stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
   import { createRoot } from 'react-dom/client';
-  import { useState, useRef } from 'react';
+  import { useState, useRef, useContext } from 'react';
   import { HomeFileViewer } from './desktop/renderer/app/components/home-file-viewer';
   import { HomeFileLink } from './desktop/renderer/shared/components/being-files';
+  import { AttachmentFileViewer } from './desktop/renderer/app/components/attachment-file-viewer';
+  import { LocalFileAction } from './desktop/renderer/shared/components/local-file-link';
   import { BeingLibrary } from './desktop/renderer/app/components/home-library';
   import './desktop/renderer/app/styles.scss';
   const listeners = new Set(); window.calls = []; window.downloads = []; window.blocked = false;
@@ -44,16 +46,23 @@ const bundle = await build({
       download:async path=>{window.downloads.push(path);return true;},
     }
   };
+  window.localOpens = []; window.missingLocal = false;
+  window.beings = {
+    checkLocalFiles: async paths => paths.map(() => !window.missingLocal),
+    previewLocalFile: async path => {window.localOpens.push(path);return {id:String(window.localOpens.length),path,name:path.split('/').pop(),extension:'txt',text:'本机文件预览内容'};},
+    releaseLocalFilePreview: async () => {},
+  };
+  function LocalOpen(){const open=useContext(LocalFileAction);return <button style={{position:'fixed',left:80,top:50}} id="open-local" onClick={()=>open('/Users/fixture/本机笔记.txt')}>打开本机文件</button>;}
   function Fixture(){
     const [context,setContext]=useState('one'),[visible,setVisible]=useState(true),frame=useRef(null);
-    return <HomeFileViewer api={api} frame={frame} scope={context}><div style={{position:'fixed',left:80,top:10,zIndex:30}}><button id="switch" onClick={()=>setContext('two')}>切换 Being（测试）</button><button id="toggle" onClick={()=>setVisible(v=>!v)}>切换资料栏（测试）</button><HomeFileLink path="artifacts/云电脑生成说明.txt">打开对话里的云文件</HomeFileLink></div>
+    return <HomeFileViewer api={api} frame={frame} scope={context}><div style={{position:'fixed',left:80,top:10,zIndex:30,maxWidth:400}}><button id="switch" onClick={()=>setContext('two')}>切换 Being（测试）</button><button id="toggle" onClick={()=>setVisible(v=>!v)}>切换资料栏（测试）</button><HomeFileLink path="artifacts/云电脑生成说明.txt">打开对话里的云文件</HomeFileLink></div>
       <main id="client-main"><div className="workspace-body" style={{height:'100vh'}}>
         <nav className="workspace-rail"/><div className="workspace-stage" style={{padding:80}}><h2>资料库交互测试</h2><p>此页面使用合成文件，不连接生产账号。</p></div>
-        <aside id="being-info" className="being-info" style={{width:320,flexBasis:320}}>
+        <AttachmentFileViewer frame={frame} scope={context}><LocalOpen/><aside id="being-info" className="being-info" style={{width:320,flexBasis:320}}>
           <div className="being-overview"><div className="being-profile"><div className="being-avatar">W</div><h2>Willow</h2></div>
           <div className="being-tabs"><button>详情</button><button>动态</button><button aria-selected="true">资料库</button><button>电脑</button></div>
           <div className="being-info-content">{visible && <BeingLibrary key={context} api={api} onConnect={()=>window.connected=true}/>}</div></div>
-        </aside>
+        </aside></AttachmentFileViewer>
       </div></main></HomeFileViewer>;
   }
   createRoot(document.querySelector('#root')).render(<Fixture/>);
@@ -111,12 +120,32 @@ try {
   await page.getByRole('complementary', { name: '文件预览：云电脑生成说明.txt' }).locator('pre').waitFor();
   await page.getByRole('button', { name: '关闭文件预览' }).click();
   assert.equal(await recent.locator('li').first().getByText('云电脑生成说明.txt').count(), 1);
+  await page.getByRole('button', { name: '打开本机文件', exact: true }).click();
+  const localPreview = page.getByRole('complementary', { name: '文件预览：本机笔记.txt' });
+  await localPreview.getByText('本机文件预览内容', { exact: true }).waitFor();
+  await localPreview.getByRole('button', { name: '关闭文件预览' }).click();
+  assert.equal(await recent.locator('li').first().getByText('本机', { exact: true }).count(), 1);
+  assert.equal(await recent.getByText('云电脑', { exact: true }).count(), 7);
+  await page.reload();
+  await recent.getByRole('button', { name: '本机笔记.txt 本机', exact: true }).click();
+  await localPreview.getByText('本机文件预览内容', { exact: true }).waitFor();
+  assert.deepEqual(await page.evaluate(() => window.localOpens), ['/Users/fixture/本机笔记.txt']);
+  await localPreview.getByRole('button', { name: '关闭文件预览' }).click();
   await page.screenshot({ animations: 'disabled', path: 'output/playwright/home-library-recent-light.png' });
   await workspaceTab.hover();
   await page.locator('#being-info').screenshot({ animations: 'disabled', path: 'output/playwright/home-library-tab-hover.png' });
   assert.equal(await workspaceTab.evaluate(el => getComputedStyle(el).borderRadius), '16px');
   const row = recent.locator('li').first();
+  await workspaceTab.hover();
+  await workspaceTab.focus();
+  const sourceTag = row.getByText('本机', { exact: true });
+  assert.equal(await sourceTag.evaluate(el => getComputedStyle(el).opacity), '0');
+  await row.getByRole('button').first().focus();
+  assert.equal(await sourceTag.evaluate(el => getComputedStyle(el).opacity), '1');
+  await workspaceTab.focus();
   await row.getByRole('button').first().hover();
+  assert.equal(await sourceTag.evaluate(el => getComputedStyle(el).opacity), '1');
+  assert.equal(await sourceTag.evaluate(el => getComputedStyle(el).borderRadius), '5px');
   assert.equal(await row.getByRole('button').first().evaluate(el => getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)');
   await page.getByRole('tooltip').waitFor();
   assert((await page.getByRole('tooltip').innerText()).includes('最近打开 ·'));
@@ -187,13 +216,15 @@ try {
   await files.getByRole('button', { name: 'notes.txt 5 B' }).waitFor();
   await page.evaluate(() => window.setHome({ authenticated: false, username: undefined, binding: undefined }));
   await page.getByText('请先在电脑栏连接 Being Home。', { exact: true }).waitFor();
-  assert.equal(await recent.locator('li').count(), 0);
+  assert.equal(await recent.locator('li').count(), 1);
+  assert.equal(await recent.getByText('本机', { exact: true }).count(), 1);
   assert.equal(await files.locator('li').count(), 0);
   await page.getByRole('button', { name: '前往电脑栏' }).click();
   assert.equal(await page.evaluate(() => window.connected), true);
   await page.evaluate(() => window.setHome({ authenticated: true, username: 'other', binding: 'matched' }));
   await files.getByRole('button', { name: 'notes.txt 5 B' }).waitFor();
-  assert.equal(await recent.locator('li').count(), 0);
+  assert.equal(await recent.locator('li').count(), 1);
+  assert.equal(await recent.getByText('本机', { exact: true }).count(), 1);
   await page.evaluate(() => window.setHome({ username: 'fixture' }));
   await recentTab.click();
   await recent.locator('li').first().waitFor();
@@ -202,6 +233,13 @@ try {
   await page.screenshot({ animations: 'disabled', path: 'output/playwright/home-library-narrow-dark.png' });
   const overflows = await page.locator('#being-info').evaluate(el => el.scrollWidth > el.clientWidth);
   assert.equal(overflows, false, 'narrow library must not overflow');
+  await page.evaluate(() => { window.missingLocal = true; });
+  await recent.getByRole('button', { name: '本机笔记.txt 本机', exact: true }).click();
+  await localPreview.getByRole('alert').waitFor();
+  await localPreview.getByRole('button', { name: '关闭文件预览' }).click();
+  await recent.getByRole('button', { name: '从最近记录移除：本机笔记.txt', exact: true }).click();
+  assert.equal(await recent.getByText('本机笔记.txt', { exact: true }).count(), 0);
+  assert.deepEqual(await page.evaluate(() => window.downloads), ['项目资料/报告 #%.txt']);
   assert.deepEqual(errors, []);
   console.log('Home library UI passed: secondary tabs/keyboard, chat preview history, persisted removal, account isolation, directory/search, read-only list/download, interactive isolated HTML/source, focus/Escape, delayed preview, retry, account change, narrow/dark.');
 } finally { await browser.close(); server.close(); }

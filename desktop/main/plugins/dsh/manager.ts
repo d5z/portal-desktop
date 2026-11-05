@@ -250,7 +250,10 @@ export class DshPluginManager {
     if (!child || child.exitCode !== null || child.signalCode !== null) return;
     await new Promise<void>(resolve => {
       const timer = setTimeout(() => child.kill('SIGKILL'), 1500);
-      child.once('exit', () => { clearTimeout(timer); resolve(); }); child.kill('SIGTERM');
+      child.once('exit', () => { clearTimeout(timer); resolve(); });
+      // Windows SIGTERM kills immediately, bypassing the worker's disposers.
+      if (child.connected) child.send({ type: 'shutdown' }, error => { if (error) child.kill('SIGTERM'); });
+      else child.kill('SIGTERM');
     });
   }
 }

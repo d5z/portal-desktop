@@ -203,4 +203,5 @@ async function shutdown() {
   try { await Promise.allSettled(hostFibers.map(fiber => fiber.dispose())); } finally { process.exit(0); }
 }
 process.on('SIGTERM', () => { void shutdown(); });
+process.on('message', (message: { type?: string }) => { if (message.type === 'shutdown') void shutdown(); });
 process.on('disconnect', () => { void shutdown(); });

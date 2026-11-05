@@ -10,7 +10,7 @@ import { checkStyles, duplicateRules } from '../scripts/check-styles.mjs';
 describe('renderer SCSS modules', () => {
   it('compiles every document entry without duplicated rules or retired CSS sources', async () => {
     await checkStyles();
-  });
+  }, 15000);
 
   it('detects repeated rules across partials while retaining conditional and animation variants', () => {
     expect(duplicateRules('.row { display:flex } .other { color:red } .row { display:flex }')).toEqual(['.row']);

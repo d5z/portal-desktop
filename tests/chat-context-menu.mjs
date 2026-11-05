@@ -1,4 +1,5 @@
 import { readShellStyles } from './support/shell-styles.mjs';
+import { browserAssets } from './support/browser-assets.mjs';
 // Exercise the styled menu through the real chat iframe, shell bridge and Electron clipboard.
 import assert from 'node:assert/strict';
 import { build } from '../scripts/renderer-build.mjs';
@@ -15,6 +16,8 @@ async function bundle(name, contents, platform = 'node') {
   const result = await build({ stdin: { contents, resolveDir: process.cwd(), loader: 'tsx' },
     bundle: true, write: false, outfile: path.join(dir, name), platform, format: platform === 'node' ? 'cjs' : 'iife',
     external: platform === 'node' ? ['electron'] : [], jsx: 'automatic',
+    loader: { '.woff2': 'dataurl', '.woff': 'dataurl', '.ttf': 'dataurl' },
+    plugins: platform === 'browser' ? [browserAssets()] : [],
     define: { 'process.env.NODE_ENV': '"production"' } });
   for (const file of result.outputFiles) await writeFile(file.path, file.contents);
 }

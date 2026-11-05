@@ -1,3 +1,5 @@
+import { LocalFileAction } from '../../shared/components/local-file-link';
+import { homeRecentFiles } from '../models/home-recent-files';
 import { IconButton } from '../../shared/components/icon-button';
 import { Icon } from '../../shared/icons/icon';
 import { localFileReference } from '../../../shared/local-file';
@@ -7,14 +9,14 @@ import { FilePreviewPanel, FilePreviewModes } from './file-preview-panel';
 import {attachmentPreviewRequest} from '../services/attachment-preview-request';
 import {XlsxPreview} from './xlsx-preview';
 import {PdfPreview} from './pdf-preview';
-import {useEffect,useState,useCallback,useRef,type RefObject} from 'react';
+import {useEffect,useState,useCallback,useRef,type RefObject,type ReactNode} from 'react';
 import {PptxPreview} from './pptx-preview';
 import {AttachmentDownload} from '../../chat/components/attachment-download';
 import {Markdown} from '../../shared/components/markdown';
 import {validFilePreview} from '../lib/file-preview-data';
 import { TextFile, FileImage } from './file-preview-content';
 type FileView={id:string;name:string;extension:string;blob?:Blob;text?:string;segments?:{label:string;text:string}[];endpoint:string;path?:string;url?:string};
-export function AttachmentFileViewer({frame}:{frame:RefObject<HTMLIFrameElement|null>}) {
+export function AttachmentFileViewer({frame,children,scope}:{frame:RefObject<HTMLIFrameElement|null>;children?:ReactNode;scope?:string}) {
   const [file,setFile]=useState<FileView|null>(null);
   const [localPath,setLocalPath]=useState<string|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[source,setSource]=useState(false);
   const [revealError,setRevealError]=useState('');
@@ -24,7 +26,7 @@ export function AttachmentFileViewer({frame}:{frame:RefObject<HTMLIFrameElement|
     const available=await checkLocalFiles(window.beings,[path]);
     if(ticket!==sequence.current)return;
     if(available?.[0]!==true){
-      setFile(null);setLocalPath(null);setBusy(false);setError('');
+      setFile(null);setLocalPath(path);setBusy(false);setError('文件已不存在或无法读取。');
       const target=frame.current;
       if(available[0]===false && target?.src)target.contentWindow?.postMessage({type:'beings:local-file-unavailable',path,revision:new URL(target.src).searchParams.get('revision')},'beings://chat');
       return;
@@ -37,9 +39,11 @@ export function AttachmentFileViewer({frame}:{frame:RefObject<HTMLIFrameElement|
       if(ticket!==sequence.current){void window.beings.releaseLocalFilePreview?.(result.id);return;}
       setFile({...result,endpoint:'',blob:result.bytes ? new Blob([new Uint8Array(result.bytes)],{type:result.mime}) : undefined});
       setLocalPath(result.path);
+      homeRecentFiles.recordLocal(result);
     }catch{if(ticket===sequence.current)setError('文件已不存在、无法读取或不支持预览。');}
     finally{if(ticket===sequence.current)setBusy(false);}
   },[frame]);
+  useEffect(()=>{sequence.current++;setFile(null);setLocalPath(null);setBusy(false);setError('');},[scope]);
   useEffect(()=>()=>{sequence.current++;},[]);
   useEffect(()=>{if(!file?.path)return;const id=file.id;return()=>{void window.beings.releaseLocalFilePreview?.(id);};},[file?.id,file?.path]);
   const close=useCallback(()=>{sequence.current++;setFile(null);setLocalPath(null);setBusy(false);setError('');frame.current?.focus();},[frame]);
@@ -77,7 +81,7 @@ export function AttachmentFileViewer({frame}:{frame:RefObject<HTMLIFrameElement|
     const message=await revealLocalFile(window.beings,localPath);
     if(ticket===sequence.current)setRevealError(message);
   };
-  return (file || localPath) && <FilePreviewPanel key={localPath || file?.id} name={name} path={localPath || undefined} onClose={close}
+  return <LocalFileAction.Provider value={loadLocal}>{(file || localPath) && <FilePreviewPanel key={localPath || file?.id} name={name} path={localPath || undefined} onClose={close}
     actions={localPath ? <>
       {html && <FilePreviewModes source={source} onChange={setSource} />}
       <IconButton className="file-preview-icon" label="刷新" disabled={busy} onClick={()=>void loadLocal(localPath)}><Icon name="refresh-library" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" /></IconButton>
@@ -90,5 +94,5 @@ export function AttachmentFileViewer({frame}:{frame:RefObject<HTMLIFrameElement|
     {file && (html && !source ? <iframe key={file.id} title="HTML 文件预览" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads" referrerPolicy="no-referrer" src={file.url}/> :
       file.blob?.type.startsWith('image/') ? <FileImage blob={file.blob} name={file.name}/> :
       file.extension==='xlsx'?<XlsxPreview key={file.id} blob={file.blob!}/>:file.extension==='pptx'?<PptxPreview key={file.id} blob={file.blob!}/>:file.extension==='pdf'?<PdfPreview key={file.id} blob={file.blob!}/>:<div className="client-file-body">{file.segments?file.segments.map((s,i)=><section key={i}>{s.label && <h3>{s.label}</h3>}<Markdown content={s.text} intelligentUI={false}/></section>):<TextFile extension={file.extension} text={file.text || ''}/>}</div>)}
-  </FilePreviewPanel>;
+  </FilePreviewPanel>}{children}</LocalFileAction.Provider>;
 }
