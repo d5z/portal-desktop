@@ -16,7 +16,7 @@ const parents: ChildProcess[] = [];
 const children: number[] = [];
 afterEach(async () => {
   for (const parent of parents.splice(0)) if (parent.exitCode === null && parent.signalCode === null) parent.kill('SIGKILL');
-  for (const pid of children.splice(0)) { try { process.kill(pid, 'SIGTERM'); } catch { /* Already recovered. */ } }
+  for (const pid of children.splice(0)) { try { process.kill(pid, 'SIGKILL'); } catch { /* Already recovered. */ } }
   for (const root of roots.splice(0)) await rm(root, { recursive: true, force: true });
 });
 
@@ -76,4 +76,28 @@ it.skipIf(process.platform !== 'darwin')('recovers a real detached child after i
     expect(replacement.state).toMatchObject({ managed: true, portalName: 'recovered', conflict: false });
     expect(replacement.state.pid).not.toBe(pid);
   } finally { await replacement.stop(); }
+}, 25_000);
+
+it.skipIf(process.platform !== 'darwin')('forces a verified orphan to exit when it ignores graceful termination', async () => {
+  const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'portal-stuck-orphan-'))); roots.push(root);
+  const binary = await realpath(process.execPath);
+  const parent = spawn(process.execPath, ['-e', `
+    const { spawn } = require('node:child_process');
+    const child = spawn(process.execPath, ['-e', "process.on('SIGTERM',()=>{});console.log('ready');setInterval(()=>{},1000)"],
+      { detached: true, stdio: ['ignore','pipe','ignore'] });
+    child.stdout.once('data',()=>console.log(child.pid));
+    setInterval(()=>{},1000);
+  `], { stdio: ['ignore', 'pipe', 'pipe'], env: { ...process.env,
+    HEART_PORTAL_CLIENT_MANAGED: '1', HEART_PORTAL_SUPERVISED: '1', HEART_PORTAL_STATUS_NONCE: 'stuck-orphan-test',
+    HEART_PORTAL_CLIENT_FILE: path.join(root, '.portal-client.json'),
+    HEART_PORTAL_STATUS_FILE: path.join(root, '.portal-connection-status.json'), PORTAL_CONNECT_LINK: connection.link } });
+  parents.push(parent);
+  const [output] = await once(parent.stdout!, 'data');
+  const pid = Number(String(output).trim()); children.push(pid);
+  const exited = once(parent, 'exit'); parent.kill('SIGKILL'); await exited;
+  const inspected = JSON.parse(await command('/usr/bin/python3', ['-c', macLaunch, String(pid), binary, root, 'inspect']));
+  const target = { id: inspected.proof, root, label: 'fixture', pid, orphan: { binary, proof: inspected.proof } };
+  await new OrphanPortalRecovery(root).stop(target);
+  expect(() => process.kill(pid, 0)).toThrow();
+  children.splice(children.indexOf(pid), 1);
 }, 25_000);

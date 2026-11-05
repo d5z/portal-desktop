@@ -21,6 +21,7 @@ try {
   await page.screenshot({ path: 'output/playwright/client-version-menu.png' });
   await page.locator('#client-settings-button').click();
   await page.locator('#settings-tab-general').click();
+  await page.getByRole('button',{name:'通知设置 桌面通知、私信、围炉与场景提醒',exact:true}).click();
   assert.equal(await page.locator('#notification-test').count(), 0);
   await assert.rejects(page.evaluate(() => window.beings.testNotification()), /No handler registered/);
   assert.equal(await page.locator('#notification-enabled').isChecked(), false);
@@ -106,6 +107,7 @@ try {
   await page.locator('#options-trigger').click();
   await page.locator('#client-settings-button').click();
   await page.locator('#settings-tab-general').click();
+  await page.locator('#notification-enabled').waitFor({state:'visible'});
   await mkdir('output/playwright', { recursive: true });
   await page.screenshot({ path: 'output/playwright/notifications-electron.png' });
   assert.deepEqual(errors, []);

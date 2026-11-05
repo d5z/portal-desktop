@@ -236,7 +236,7 @@ try {
   await until(async () => (await state()).phase === 'connected');
   for (const enabled of [true, false]) {
     await openPortal();
-    await page.locator('.settings-disclosure > summary').filter({hasText:'本机配置'}).click();
+    await page.getByRole('button',{name:'本机配置 名称、工作目录、后台常驻与工具权限',exact:true}).click();
     assert.equal(await page.locator('#screenshot-input').count(), 0);
     assert.equal(await page.locator('#exec-input').isEnabled(), true);
     assert.equal(await page.locator('#kits-input').isEnabled(), true);

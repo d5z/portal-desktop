@@ -15,7 +15,12 @@
 }
 
 .handle.right {
-  right: -10px;
+  right: 0;
+
+  &::before {
+    left: auto;
+    right: 0;
+  }
 }
 
 .handle[data-resizing='true']::after {

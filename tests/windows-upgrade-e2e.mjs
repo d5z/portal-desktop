@@ -94,8 +94,11 @@ function rpc(method, params = {}) {
 async function clients() {
   return JSON.parse(await powershell(`
     $root=${psQuote(installation.installedRoot + path.sep)};
-    $items=@(Get-CimInstance Win32_Process -Filter "Name='portal-desktop.exe'" | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($root,[StringComparison]::OrdinalIgnoreCase) -and $_.CommandLine -notmatch '--type=' } | Select-Object ProcessId,ExecutablePath,@{Name='MainWindowHandle';Expression={$p=Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue; if ($p) { $p.MainWindowHandle.ToInt64() } else { 0 }}});
-    ConvertTo-Json -InputObject $items -Compress
+    $items=@(Get-CimInstance Win32_Process -Filter "Name='portal-desktop.exe'" | Where-Object { $_.ExecutablePath -and $_.ExecutablePath.StartsWith($root,[StringComparison]::OrdinalIgnoreCase) -and $_.CommandLine -notmatch '--type=' } | Select-Object ProcessId,ParentProcessId,ExecutablePath,CommandLine,@{Name='MainWindowHandle';Expression={$p=Get-Process -Id $_.ProcessId -ErrorAction SilentlyContinue; if ($p) { $p.MainWindowHandle.ToInt64() } else { 0 }}});
+    # Electron also runs the client's Node plugin worker, without a --type flag.
+    # Count root client processes; retain orphan workers as failures.
+    $mains=@($items | Where-Object { $_.ParentProcessId -notin $items.ProcessId });
+    ConvertTo-Json -InputObject $mains -Compress
   `));
 }
 try {
@@ -243,6 +246,7 @@ try {
   await upgradedPage.locator('#options-trigger').click();
   await upgradedPage.locator('#client-settings-button').click();
   await upgradedPage.locator('#settings-tab-general').click();
+  await upgradedPage.getByRole('button',{name:'通知设置 桌面通知、私信、围炉与场景提醒',exact:true}).click();
   await upgradedPage.locator('#notification-enabled').check();
   assert.equal(await upgradedPage.locator('#notification-test').count(), 0);
   await assert.rejects(upgradedPage.evaluate(() => window.beings.testNotification()), /No handler registered/);

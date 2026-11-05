@@ -117,9 +117,18 @@ else:
             raise RuntimeError('Portal identity changed before recovery')
         os.kill(identity['pid'], signal.SIGTERM)
         deadline = time.monotonic() + 12
+        forced = False
         while identity_alive(identity):
             if time.monotonic() >= deadline:
-                raise RuntimeError('Orphan Portal did not stop; replacement was not started')
+                if forced:
+                    raise RuntimeError('Orphan Portal did not stop; replacement was not started')
+                # Match foreground shutdown: a stuck engine gets a bounded
+                # forced exit, only after revalidating this exact orphan.
+                if orphan_proof()[1] != proof:
+                    raise RuntimeError('Portal identity changed before forced recovery')
+                os.kill(identity['pid'], signal.SIGKILL)
+                forced = True
+                deadline = time.monotonic() + 3
             time.sleep(0.1)
         print('{}')
     else:

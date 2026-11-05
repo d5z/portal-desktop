@@ -133,7 +133,7 @@ async function openOptions(page) {
 async function toolWithApproval(page, name, args, allow) {
   const [result] = await Promise.all([
     rpc('tools/call', { name, arguments: args }),
-    page.getByRole('dialog', { name: '此操作需要你的允许' }).getByRole('button', { name: allow ? '允许这一次' : '拒绝', exact: true }).click(),
+    page.getByRole('dialog', { name: '此操作需要你的允许' }).getByRole('button', { name: allow ? /^允许(这一次|并记住)$/ : '拒绝', exact: true }).click(),
   ]);
   await page.getByRole('dialog', { name: '此操作需要你的允许' }).waitFor({ state: 'hidden' });
   return result;
@@ -187,7 +187,7 @@ try {
   await page.getByRole('button', { name: '连接我的 Being' }).click();
   await page.locator('#connection-link').fill(`http://127.0.0.1:${port}/willow/?token=${token}`);
   await page.getByRole('tab',{name:'Portal',exact:true}).click();
-  await page.locator('.settings-disclosure > summary').filter({hasText:'本机配置'}).click();
+  await page.getByRole('button',{name:'本机配置 名称、工作目录、后台常驻与工具权限',exact:true}).click();
   await page.locator('#portal-name-input').fill('react-smoke');
   await page.locator('#workspace-input').fill(path.join(dir, '工作目录'));
   await page.locator('#background-input').uncheck();
@@ -437,7 +437,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
     pid = reattached.portal.pid;
     await openPlace(reopened, 'portal');
     await reopened.screenshot({ path: 'test-results/background-portal.png' });
-    await reopened.locator('.settings-disclosure > summary').filter({hasText:'本机配置'}).click();
+    await reopened.getByRole('button',{name:'本机配置 名称、工作目录、后台常驻与工具权限',exact:true}).click();
     assert.equal(await reopened.locator('#background-input').isChecked(), true);
     assert.match(await reopened.locator('#portal-startup-help').textContent(), /打开客户端时自动启动 Portal/);
     await reopened.screenshot({ path: 'test-results/background-settings.png' });

@@ -193,6 +193,7 @@ export function useChatBridge(
       }
       if (
         message.type === "beings:open-settings" &&
+        app.startup === 'ready' &&
         !document.querySelector("dialog[open]")
       ) {
         void app.openClientSettings();

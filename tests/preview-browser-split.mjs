@@ -49,7 +49,7 @@ try {
   const native=()=>application.evaluate(()=>{const view=globalThis.fixtureWindow.contentView.children.find(view=>view.webContents);return view?{bounds:view.getBounds(),visible:view.getVisible()}:null});
   await page.getByRole('button',{name:'打开文件',exact:true}).click();
   await page.getByRole('button',{name:'展开全部',exact:true}).click();
-  await page.frameLocator('iframe[title="云端 HTML 预览"]').getByRole('link',{name:'访问链接'}).click();
+  await page.frameLocator('iframe[title="云端 HTML 预览"]').getByRole('link',{name:'访问链接'}).click({noWaitAfter:true});
   await page.locator('.client-file-viewer').waitFor({state:'detached'});
   await page.locator('#browser-title').filter({hasText:'链接目标页'}).waitFor();
   await page.waitForFunction(async()=>!(await window.beings.browserState()).loading);
@@ -80,7 +80,7 @@ try {
   await page.locator('#browser-panel').waitFor({state:'hidden'});
   await page.frameLocator('iframe[title="云端 HTML 预览"]').getByRole('heading',{name:'index.html'}).waitFor();
   assert.equal(await native(),null,'Opening a file releases the native browser');
-  await page.frameLocator('iframe[title="云端 HTML 预览"]').getByRole('link',{name:'访问链接'}).click();
+  await page.frameLocator('iframe[title="云端 HTML 预览"]').getByRole('link',{name:'访问链接'}).click({noWaitAfter:true});
   await page.locator('.client-file-viewer').waitFor({state:'detached'});
   await application.evaluate(()=>globalThis.fixtureWindow.setContentSize(920,680));
   await page.waitForFunction(()=>document.querySelector('#browser-panel').getBoundingClientRect().right<=innerWidth+1);

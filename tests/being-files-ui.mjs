@@ -44,7 +44,7 @@ const server=createServer((req,res)=>{
   if(req.url==='/runtime.html'){res.setHeader('Content-Type','text/html');res.setHeader('Content-Security-Policy',htmlPreviewPolicy());res.end(HTML_PREVIEW_RUNTIME);return;}
   if(req.url.startsWith('/empty')){res.setHeader('Content-Type','text/html');res.end('<!doctype html>');return;}
   if(req.url==='/chat-card'){res.setHeader('Content-Type','text/html');res.end('<!doctype html><link rel="stylesheet" href="/chat-fixture/stdin.css"><div id="root"></div><script type="module" src="/chat-fixture/stdin.js"></script>');return;}
-  const file=req.url.startsWith('/chat-fixture/')?chatBundle.outputFiles.find(f=>f.path===req.url):bundle.outputFiles.find(f=>f.path.endsWith(req.url));
+  const file=req.url.startsWith('/chat-fixture/')?chatBundle.outputFiles.find(f=>f.path.replaceAll('\\','/').endsWith(req.url)):bundle.outputFiles.find(f=>f.path.replaceAll('\\','/').endsWith(req.url));
   res.setHeader('Content-Type',file?req.url.endsWith('.css')?'text/css':'text/javascript':'text/html; charset=utf-8');
   res.end(file?file.contents:'<!doctype html><link rel="stylesheet" href="/stdin.css"><div id="root"></div><script type="module" src="/stdin.js"></script>');
 });

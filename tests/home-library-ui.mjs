@@ -73,7 +73,7 @@ const server = createServer((request, response) => {
     response.setHeader('Content-Security-Policy', htmlPreviewPolicy());
     return response.end(HTML_PREVIEW_RUNTIME);
   }
-  const file = bundle.outputFiles.find(f => f.path.endsWith(request.url));
+  const file = bundle.outputFiles.find(f => f.path.replaceAll('\\', '/').endsWith(request.url));
   response.setHeader('Content-Type', file ? request.url.endsWith('.css') ? 'text/css' : 'text/javascript' : 'text/html; charset=utf-8');
   response.end(file ? file.contents : `<!doctype html><head>${csp}<link rel="stylesheet" href="/stdin.css"></head><div id="root"></div><script type="module" src="/stdin.js"></script>`);
 });
