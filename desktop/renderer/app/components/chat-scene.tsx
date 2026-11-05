@@ -115,25 +115,26 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
         </button>
       </div>
       {scenePresent && <aside ref={panel} style={{ width }} id="chat-session-panel" className="chat-session-panel" data-open={visible && expanded} inert={!visible || !expanded} aria-hidden={!visible || !expanded} data-pinned={pinned} aria-label="场景列表"
-        onKeyDown={event => { if (event.key === "Escape" && !editing && !open && !deleting && !menu) { event.preventDefault(); collapse(); } }}>
+        onKeyDown={event => { if (event.key === "Escape" && !editing && !open && !deleting && !menu) { event.preventDefault(); if (options.current?.open) { options.current.open = false; options.current.querySelector("summary")?.focus(); } else collapse(); } }}>
         <PanelResizeHandle panel={panel} label="调整场景列表宽度" width={width} onResize={setWidth} initial={320} min={240} max={480} reserve={48} edge="right" />
         <div className="chat-session-panel-heading">
           <label className="chat-session-search">
             <Icon name="search-20" />
             <input ref={search} type="search" aria-label="搜索场景" placeholder="搜索" value={query} onChange={event => setQuery(event.target.value)} />
           </label>
-          <button type="button" aria-label="收起场景列表" title="收起场景列表" onClick={collapse}>×</button>
-          <details ref={options} className="chat-session-options">
-            <summary aria-label="场景列表选项" title="场景列表选项">···</summary>
+          <details ref={options} className="chat-session-options" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false; }}>
+            <summary aria-label="场景列表选项" title="场景列表选项"><Icon name="more-filled" /></summary>
             <div className="chat-session-options-popover">
-              <button type="button" aria-pressed={pinned} onClick={() => { const next = !pinned; setPinned(next); try { localStorage.setItem("beings:scenes-pinned", String(next)); } catch {} options.current?.removeAttribute("open"); }}>保持显示聊天面板 <span aria-hidden="true">{pinned ? "✓" : ""}</span></button>
-              <button type="button" disabled={!scene} onClick={() => { options.current?.removeAttribute("open"); setOpen(true); }}>场景详情</button>
-              <button type="button" disabled={!connected || busy || !sessions.length} onClick={() => { options.current?.removeAttribute("open"); edit("bind"); }}>绑定已有场景</button>
-              <button type="button" aria-label="关闭场景列表" onClick={collapse}>收起列表</button>
+              <button type="button" aria-pressed={pinned} onClick={() => { const next = !pinned; setPinned(next); try { localStorage.setItem("beings:scenes-pinned", String(next)); } catch {} options.current?.removeAttribute("open"); }}><Icon name="split-panel" /><span>保持显示聊天面板</span>{pinned && <Icon name="check-16" className="chat-session-option-check" />}</button>
+              <hr />
+              <button type="button" disabled={!scene} onClick={() => { options.current?.removeAttribute("open"); setOpen(true); }}><Icon name="web-info" /><span>场景详情</span></button>
+              <button type="button" disabled={!connected || busy || !sessions.length} onClick={() => { options.current?.removeAttribute("open"); edit("bind"); }}><Icon name="web-link" /><span>绑定已有场景</span></button>
+              <hr />
+              <button type="button" aria-label="关闭场景列表" onClick={collapse}><Icon name="chevron-left-20" /><span>收起列表</span><kbd>Esc</kbd></button>
             </div>
           </details>
         </div>
-        <div className="chat-session-group"><span>场景对话</span><button id="new-chat-session" type="button" aria-label="新建场景" title="新建场景" disabled={!connected || busy || !sessions.length} onClick={() => edit("create")}>＋</button></div>
+        <div className="chat-session-group"><span>场景对话</span><button id="new-chat-session" type="button" aria-label="新建场景" title="新建场景" disabled={!connected || busy || !sessions.length} onClick={() => edit("create")}><Icon name="plus" /></button></div>
         <nav className="chat-session-list" aria-label="切换场景">
           {sessions.map(session => <Fragment key={session.scene_id}>
 
@@ -153,7 +154,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
               title={CHAT_SCENE_ACTIVITY_LABELS[activity[session.scene_id]]}>
               <span className="chat-session-activity-icon" aria-hidden="true" />
               {CHAT_SCENE_ACTIVITY_LABELS[activity[session.scene_id]]}
-            </span> : scene?.scene_id === session.scene_id && <span className="chat-session-current" aria-hidden="true">•</span>}
+            </span> : scene?.scene_id === session.scene_id && <span className="chat-session-current" aria-hidden="true" />}
           </button>}</Fragment>)}
 
           {!!sessions.length && !sessions.some(matches) && <p className="chat-session-caption" role="status">没有找到匹配的对话</p>}

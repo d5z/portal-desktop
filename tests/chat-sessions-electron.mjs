@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { build } from '../scripts/renderer-build.mjs';
+import { browserAssets } from './support/browser-assets.mjs';
 import { mkdtemp, mkdir, copyFile, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -11,7 +12,7 @@ let application;
 try {
   for (const file of ['loom.html', 'chat.js', 'chat.css', 'highlight.css']) await copyFile(path.resolve('desktop/generated', file), path.join(directory, file));
   await writeFile(path.join(directory, 'index.html'), '<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="shell.css"></head><body><div id="root"></div><script src="shell.js"></script></body></html>');
-  await build({ stdin: { loader: 'tsx', resolveDir: process.cwd(), contents: `
+  await build({ plugins: [browserAssets()], stdin: { loader: 'tsx', resolveDir: process.cwd(), contents: `
     import React, {useRef, useEffect, useSyncExternalStore} from 'react';
     import {createRoot} from 'react-dom/client';
     import {AppModel} from './desktop/renderer/app/models/app';
@@ -152,7 +153,7 @@ try {
   await page.getByRole('button',{name:'展开场景列表',exact:true}).click();
   await page.getByLabel('场景列表选项',{exact:true}).click();
   await page.getByRole('button',{name:'保持显示聊天面板',exact:true}).click();
-  const sbsVisibility = page.locator('[role="dialog"][aria-labelledby] input').first();
+  const sbsVisibility = page.locator('[role="dialog"][aria-labelledby][data-open="true"] input').first();
   const visibilityState = async (method) => {
     if (!await sbsVisibility.isVisible()) await page.getByLabel('SBS 状态与显示设置',{exact:true}).click();
     const result = await sbsVisibility[method]();
@@ -221,6 +222,8 @@ try {
   await page.getByRole('button',{name:'切换到场景：技术方案'}).click();
   await chat.locator('#input:not(:disabled)').waitFor();
   assert.equal(await chat.locator('#input').evaluate(el => el.value ?? el.editor.getMarkdown()),'方案草稿');
+  assert.equal(await page.getByRole('checkbox',{name:'显示全部场景上下文',exact:true}).isChecked(),true, 'Selecting the same scene retains its saved history scope');
+  await page.getByRole('checkbox',{name:'显示全部场景上下文',exact:true}).uncheck();
   await chat.getByText('SBS 全局测试消息',{exact:true}).waitFor({state:'hidden'});
   assert.equal(await visibilityState('isChecked'),false, 'All-scenes view must preserve the scene preference');
   assert.equal((await application.evaluate(() => globalThis.fixture.requests))[0].scene_id,discussion);
@@ -235,6 +238,7 @@ try {
   await page.screenshot({animations:'disabled',path:'test-results/chat-sessions-panel.png'});
   await page.getByLabel('场景列表选项',{exact:true}).click();
   await page.getByRole('button',{name:'关闭场景列表',exact:true}).click();
+  await panel.waitFor({state:'hidden'});
   assert.equal(await panel.count(),0);
   await page.getByRole('button',{name:'展开场景列表',exact:true}).click();
   assert.equal(await panel.isVisible(),true);

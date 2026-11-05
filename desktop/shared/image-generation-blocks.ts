@@ -30,6 +30,7 @@ function isReceipt(source:string) {
  * Exact receipt validation remains separate from this presentation-only extraction.
  */
 export function imageGenerationBlocks(text:string): ImageGenerationBlock[] {
+  if (!text.includes('being.image-generation')) return text ? [{kind:'text',id:'text-0',text}] : [];
   const blocks:ImageGenerationBlock[]=[];
   let cursor=0, plainStart=0;
   function receipt(start:number,end:number,source:string) {

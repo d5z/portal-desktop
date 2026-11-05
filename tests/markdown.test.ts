@@ -118,3 +118,23 @@ it('keeps streaming code readable without repeated highlighting, then highlights
   expect(done).toContain('hljs-keyword');
   expect(done).toContain('result');
 });
+
+
+it('defers JSON formatting work until the streamed code is complete', () => {
+  const source = JSON.stringify({performance: Array.from({length:200}, (_, i) => ({id:i, text:'流式数据'}))});
+  const parse = vi.spyOn(JSON, 'parse');
+  for (const text of [source.slice(0,100), source.slice(0,source.length/2), source]) {
+    const html = renderToStaticMarkup(createElement(Markdown, {
+      content: '```json\n' + text + '\n```', chat:true, streaming:true,
+    }));
+    expectCompleteCode(html, text);
+    expect(html).not.toContain('格式化');
+    expect(parse.mock.calls.some(([value]) => value === text)).toBe(false);
+  }
+  const html = renderToStaticMarkup(createElement(Markdown, {
+    content: '```json\n' + source + '\n```', chat:true, streaming:false,
+  }));
+  expectCompleteCode(html, source);
+  expect(html).toContain('格式化');
+  expect(parse.mock.calls.some(([value]) => value === source)).toBe(true);
+});

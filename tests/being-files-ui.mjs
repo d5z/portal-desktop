@@ -65,10 +65,10 @@ try {
   await mkdir('output/playwright',{recursive:true});
   await page.screenshot({animations:'disabled',path:'output/playwright/being-files-desktop.png'});
   const initialBackground=await card.evaluate(el=>getComputedStyle(el.parentElement).backgroundColor);
-  await card.getByText('云电脑生成 · 自包含 · 无外链',{exact:true}).hover();
+  await card.getByText('文件交付链路测试',{exact:true}).hover();
   await page.screenshot({animations:'disabled',path:'output/playwright/being-files-hover.png'});
   assert.notEqual(await card.evaluate(el=>getComputedStyle(el.parentElement).backgroundColor),initialBackground);
-  assert.equal(await card.getByText('云电脑生成 · 自包含 · 无外链',{exact:true}).evaluate(el=>el.closest('button')?.matches(':hover')),true);
+  assert.equal(await card.getByText('文件交付链路测试',{exact:true}).evaluate(el=>el.closest('button')?.matches(':hover')),true);
   assert.equal(await download.evaluate(el=>getComputedStyle(el).opacity),'1');
   const cardHoverBackground=await card.evaluate(el=>getComputedStyle(el.parentElement).backgroundColor);
   await download.hover();
@@ -99,7 +99,7 @@ try {
   await page.screenshot({animations:'disabled',path:'output/playwright/being-files-dark.png'});
   assert.equal(await card.evaluate(el=>getComputedStyle(el).color), 'rgb(236, 238, 241)');
   await page.evaluate(()=>document.documentElement.dataset.theme='light');
-  await card.getByText('云电脑生成 · 自包含 · 无外链',{exact:true}).click();
+  await card.getByText('文件交付链路测试',{exact:true}).click();
   const dialog=page.getByRole('complementary',{name:'文件预览：index.html'});
   assert.equal(await page.locator('dialog[open]').count(),0);
   await page.frameLocator('iframe[title="云端 HTML 预览"]').getByRole('heading',{name:'文件交付链路测试'}).waitFor();
@@ -186,7 +186,7 @@ try {
   const chatDownload=chat.getByRole('button',{name:'下载文件：文件交付链路测试',exact:true});
   for(const theme of ['light','dark']){
     await chat.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
-    await chatCard.getByText('云电脑生成 · 自包含 · 无外链',{exact:true}).hover();
+    await chatCard.getByText('文件交付链路测试',{exact:true}).hover();
     await chat.screenshot({animations:'disabled',path:`output/playwright/being-files-chat-${theme}-hover.png`});
     const background=await chatCard.evaluate(el=>getComputedStyle(el.parentElement).backgroundColor);
     await chatDownload.hover();
@@ -199,6 +199,26 @@ try {
   }
   assert.equal(await chat.locator('.client-file-viewer').count(),0);
   assert.equal(await chat.evaluate(()=>window.downloads.length),2);
+  await chat.evaluate(()=>window.setSource(JSON.stringify({...window.receipt,files:[
+    ['pptx','Being 介绍',50443],['xlsx','季度计划与预算',18420],['pdf','产品使用手册',309200],
+    ['docx','项目讨论纪要',7200],['svg','品牌图标',2430],['html','交互演示页面',10240],
+    ['bin','很长的文件标题用于检查窄屏下换行是否正常而且不会覆盖右侧下载按钮',1024]
+  ].map(([extension,name,size])=>({path:'artifacts/example.'+extension,url:'https://home.beings.town/v1/me/files/content?path=artifacts/example.'+extension,name,size}))})));
+  await chat.getByRole('button',{name:'预览文件：Being 介绍',exact:true}).waitFor();
+  assert.equal(await chat.locator('img').count(),0,'file cards never load cover images or thumbnails');
+  await chat.getByText('PPTX · 49.3 KiB',{exact:true}).waitFor();
+  assert.equal(await chat.getByText('仅自己可访问 · 支持下载',{exact:true}).count(),0);
+  await chat.setViewportSize({width:520,height:820});
+  for(const theme of ['light','dark']){
+    await chat.evaluate(theme=>document.documentElement.dataset.theme=theme,theme);
+    await chat.mouse.move(0,0);
+    await chat.screenshot({animations:'disabled',path:`output/playwright/being-files-types-${theme}.png`});
+  }
+  await chat.setViewportSize({width:360,height:820});
+  const longCard=chat.getByRole('button',{name:'预览文件：很长的文件标题用于检查窄屏下换行是否正常而且不会覆盖右侧下载按钮'});
+  await longCard.hover();
+  assert(await longCard.evaluate(el=>el.scrollWidth<=el.clientWidth && el.getBoundingClientRect().right<=innerWidth));
+  await chat.screenshot({animations:'disabled',path:'output/playwright/being-files-types-narrow.png'});
   await chat.close();
   const touch=await browser.newPage({viewport:{width:360,height:760},hasTouch:true,isMobile:true});
   await touch.goto('http://127.0.0.1:'+server.address().port);

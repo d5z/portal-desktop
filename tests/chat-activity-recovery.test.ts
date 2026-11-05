@@ -460,6 +460,7 @@ it('keeps a server-confirmed running stream through idle checks and omits bodies
     expect(logs).toContain('"status":200');
     expect(logs).not.toContain('PRIVATE_MESSAGE_SENTINEL');
     expect(logs).not.toContain('PRIVATE_RESPONSE_SENTINEL');
+    expect(logs).not.toContain('content_block_delta');
   } finally {f.runtime.dispose();}
 });
 
@@ -615,4 +616,116 @@ it('does not drop unrelated durable replies from the same room during a newer li
     expect(f.state.items.some(item => item.kind === 'message' && item.historySeq === 2 && item.text === 'older durable reply')).toBe(true);
     expect(f.state.items.some(item => item.kind === 'message' && item.text === 'new live reply' && item.streaming)).toBe(true);
   } finally { f.runtime.dispose(); }
+});
+
+it('keeps a scene wait deadline and progress independent of another scene on the shared SSE', async () => {
+  const f = await fixture();
+  try {
+    await f.runtime.send('finish this scene');
+    await vi.advanceTimersByTimeAsync(20);
+    f.emit('content_block_delta', {scene_id:'room',delta:{text:'stage reply'}});
+    f.emit('meta', {scene_id:'room',persisted:{kind:'self',seq:10,from:'partial',stream_id:'human-1'}});
+    f.emit('message_stop', {scene_id:'room'});
+    await vi.advanceTimersByTimeAsync(20);
+    const run = f.state.items.find(i=>i.kind==='run' && i.sceneId==='room')!;
+    const waits = () => vi.mocked(console.info).mock.calls.filter(call=>call[0]==='[chat-reply-wait]')
+      .map(call=>JSON.parse(call[1])).filter(e=>e.sceneId==='room');
+    const initial = waits().find(e=>e.event==='started');
+    expect(run).toMatchObject({status:'waiting'});
+    await vi.advanceTimersByTimeAsync(60000);
+    f.emit('content_block_delta', {scene_id:'other',delta:{text:'another scene answer'}});
+    f.emit('meta', {scene_id:'other',persisted:{kind:'self',seq:11,from:'final',stream_id:'human-1'}});
+    f.emit('message_stop', {scene_id:'other'});
+    f.closeStream(); f.setActive(null);
+    await vi.advanceTimersByTimeAsync(20);
+    expect(run).toMatchObject({status:'waiting'});
+    expect(waits().at(-1).lastProgressAt).toBe(initial.lastProgressAt);
+    expect(waits().at(-1).waitDeadline).toBe(initial.waitDeadline);
+    await vi.advanceTimersByTimeAsync(240000);
+    expect(run).toMatchObject({outcome:'timeout',waitingForReply:false});
+    expect(f.state.items.find(i=>i.kind==='message' && i.text==='another scene answer')).toMatchObject({sceneId:'other'});
+    expect(f.fetcher.mock.calls.some(([url])=>new URL(url).pathname==='/api/stop')).toBe(false);
+  } finally {f.runtime.dispose();}
+});
+
+it('starts a fresh wait when its own scene resumes processing', async () => {
+  const f = await fixture();
+  try {
+    await f.runtime.send('resume later');
+    await vi.advanceTimersByTimeAsync(20);
+    f.emit('reasoning', {scene_id:'room',text:'first phase'});
+    f.emit('message_stop', {scene_id:'room'});
+    await vi.advanceTimersByTimeAsync(60000);
+    f.emit('tool_use', {scene_id:'room',id:'t',name:'read'});
+    f.emit('tool_result', {scene_id:'room',tool_use_id:'t',content:'done'});
+    f.emit('message_stop', {scene_id:'room'});
+    f.closeStream(); f.setActive(null);
+    await vi.advanceTimersByTimeAsync(240020);
+    const run = f.state.items.find(i=>i.kind==='run')!;
+    expect(run).toMatchObject({status:'waiting'});
+    await vi.advanceTimersByTimeAsync(60000);
+    expect(run).toMatchObject({outcome:'timeout'});
+  } finally {f.runtime.dispose();}
+});
+
+it.each(['ack', 'history'])('recognizes a final %s for speech already split off before a tool', async source => {
+  const f = await fixture();
+  try {
+    await f.runtime.send('read and answer');
+    await vi.advanceTimersByTimeAsync(20);
+    f.emit('content_block_delta', {scene_id:'room',delta:{text:'the answer'}});
+    f.emit('tool_use', {scene_id:'room',id:'t',name:'read'});
+    f.emit('tool_result', {scene_id:'room',tool_use_id:'t',content:'done'});
+    await vi.advanceTimersByTimeAsync(20);
+    const message = f.state.items.find(i=>i.kind==='message' && i.text==='the answer')!;
+    expect(message).toMatchObject({interim:true});
+    if (source === 'ack') f.emit('meta', {scene_id:'room',persisted:{kind:'self',seq:10,from:'final',stream_id:'human-1'}});
+    else {
+      f.history.push({seq:10,role:'being',from:'final',scene_id:'room',content:'the answer',at:new Date().toISOString()});
+      await f.runtime.refreshHistory();
+    }
+    f.emit('message_stop', {scene_id:'room'});
+    f.closeStream(); f.setActive(null);
+    await vi.advanceTimersByTimeAsync(10020);
+    expect(message).toMatchObject({interim:false,historySeq:10});
+    expect(f.state.items.find(i=>i.kind==='run')).toMatchObject({outcome:'done',label:'已回复'});
+    expect(f.state.items.filter(i=>i.kind==='message' && i.text==='the answer')).toHaveLength(1);
+  } finally {f.runtime.dispose();}
+});
+
+it('reconciles a timed-out scene when its final reply arrives in history, without resending', async () => {
+  const f = await fixture();
+  try {
+    f.setPost(()=>new Response(''));
+    await f.runtime.send('late result');
+    await vi.advanceTimersByTimeAsync(300100);
+    const run = f.state.items.find(i=>i.kind==='run')!;
+    expect(run).toMatchObject({outcome:'timeout'});
+    f.history.push({seq:1,role:'being',from:'final',scene_id:'other',content:'other result',at:new Date().toISOString()},
+      {seq:2,role:'being',from:'partial',scene_id:'room',content:'still working',at:new Date().toISOString()});
+    await f.runtime.refreshHistory();
+    expect(run).toMatchObject({outcome:'timeout'});
+    f.history.push({seq:3,role:'being',from:'final',scene_id:'room',content:'late final result',at:new Date().toISOString()});
+    await f.runtime.selectScene({sceneId:'other',strict:true});
+    await f.runtime.refreshHistory();
+    expect(run).toMatchObject({outcome:'done',status:'done',label:'已回复',hint:'',waitingForReply:false});
+    expect(f.posts).toHaveLength(1);
+    expect(f.fetcher.mock.calls.some(([url])=>new URL(url).pathname==='/api/stop')).toBe(false);
+  } finally {f.runtime.dispose();}
+});
+
+it('does not let a newer request answer overwrite an older timeout in the same scene', async () => {
+  const f = await fixture();
+  try {
+    f.setPost(()=>new Response(''));
+    await f.runtime.send('old request');
+    await vi.advanceTimersByTimeAsync(300100);
+    const old = f.state.items.find(i=>i.kind==='run')!;
+    await f.runtime.send('new request');
+    await vi.advanceTimersByTimeAsync(20);
+    f.history.push({seq:1,role:'being',from:'final',scene_id:'room',content:'new answer',at:new Date().toISOString()});
+    await f.runtime.refreshHistory();
+    expect(old).toMatchObject({outcome:'timeout'});
+    expect(f.state.items.filter(i=>i.kind==='run').at(-1)).toMatchObject({outcome:'done',label:'已回复'});
+  } finally {f.runtime.dispose();}
 });

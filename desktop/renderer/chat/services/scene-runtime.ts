@@ -373,9 +373,9 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
     const currentTasks = tasks.filter((t: any) => !session.submittedAt || t.createdAt >= session.submittedAt);
     const repliedAt = session.runtime?.replyCompletedAt?.() || 0;
     if (!['thinking','replying'].includes(status)) {
-      if (session.submittedAt && currentTasks.some((t: any) => t.status === 'done' && t.endedAt > repliedAt)) return 'waiting';
       if (currentTasks.some((t: any) => ['failed','interrupted','budget_exhausted','timeout'].includes(t.status) &&
           (!t.endedAt || t.endedAt > repliedAt))) return 'error';
+      if (session.submittedAt && currentTasks.some((t: any) => t.status === 'done' && t.endedAt > repliedAt)) return 'waiting';
     }
     return status && ["queued", "thinking", "replying", "working", "waiting", "reconnecting"].includes(status) ? status :
       queued ? "queued" : failed ? "error" : status;
@@ -640,7 +640,10 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
       historyRefreshes++;
       state.historyRefreshing = true;
       state.changed();
-      try { await owner.runtime.refreshHistory(); }
+      try {
+        await owner.runtime.refreshHistory();
+        if (!disposed) for (const session of sessions.values()) session.runtime.settleHistoryReply?.();
+      }
       finally {
         historyRefreshes--;
         if (!disposed) { state.historyRefreshing = historyRefreshes > 0; state.changed(); }

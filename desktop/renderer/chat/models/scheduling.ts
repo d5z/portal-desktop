@@ -42,11 +42,12 @@ export function withScheduling(items: ChatItem[], tasks: SceneTask[]): ChatItem[
     const { user, tasks: assigned } = group;
     const lastEnd = Math.max(0, ...assigned.map(task => task.endedAt || 0));
     const replied = lastEnd > 0 && items.some(item => item.kind === 'message' && item.role === 'being'
+      && !item.streaming && !item.interim
       && item.sceneId === user.sceneId && (item.createdAt || 0) >= lastEnd
       && owner(item.sceneId, item.createdAt || 0)?.id === user.id);
     const active = assigned.some(task => task.status === 'running' || task.status === 'queued');
-    const waiting = !active && !replied && assigned.some(task => task.status === 'done');
-    const failed = !active && !waiting && !replied && assigned.some(task => task.status !== 'done');
+    const failed = !active && !replied && assigned.some(task => ['failed', 'interrupted', 'budget_exhausted', 'timeout'].includes(task.status));
+    const waiting = !active && !failed && !replied && assigned.some(task => task.status === 'done');
     const run: Run = group.run ? { ...group.run } : {
       kind: 'run', id: `scheduling-${user.id}`, sceneId: user.sceneId, sceneLabel: user.sceneLabel,
       entries: [], start: user.createdAt || 0, end: lastEnd || user.createdAt || 1,

@@ -165,8 +165,9 @@ function ChatView({
     const frame = requestAnimationFrame(() => composer.current?.focus());
     return () => cancelAnimationFrame(frame);
   }, [editingQueued]);
+  const historyEndpoint = useMemo(() => new URLSearchParams(location.search).get('history_scope') || '', []);
   const surfaceTimeline = useRef(new SurfaceTimeline());
-  const surfaceScope = (sceneId?: string) => JSON.stringify([new URLSearchParams(location.search).get('history_scope') || location.origin, state.soul.being_id || state.name, sceneId || 'global']);
+  const surfaceScope = (sceneId?: string) => JSON.stringify([historyEndpoint || location.origin, state.soul.being_id || state.name, sceneId || 'global']);
   const surfaceBlocks = surfaceTimeline.current.build(visibleItems.filter((item): item is Message => item.kind === 'message' && item.role === 'being').map(item => ({
     id: item.id, identity: String(item.historySeq ?? item.id), scope: surfaceScope(item.sceneId), text: splitSchedulingHint(item.text).text, streaming: item.streaming,
   })));
@@ -444,6 +445,7 @@ function ChatView({
           aria-label="对话消息"
           aria-busy={state.historyLoading || state.historyRefreshing}
           onWheel={reader.onWheel}
+          onTouchStart={reader.onTouchStart}
           onTouchMove={reader.onTouchMove}
           onScroll={() => { reader.onScroll(); setSelection(null); if(!state.historyLoading && messages.current && messages.current.scrollTop<Math.max(800,messages.current.clientHeight*1.5) && !scrollLock.current && historyWindow.hasMore)void historyWindow.more(); }}
         >
@@ -505,7 +507,7 @@ function ChatView({
                     {hasAttachmentMessage(item) ? <AttachmentMessageContent message={item} /> : <ImageGenerationAnswer
                       text={item.role === 'being' ? item.text : ''}
                       streaming={item.streaming}
-                      endpoint={new URLSearchParams(location.search).get('history_scope') || ''}
+                      endpoint={historyEndpoint}
                       scope={JSON.stringify([item.sceneId || 'global', item.historySeq ?? item.id])}
                       enabled={!mobileWeb}
                     >{(text, blockId) => <ScheduledMessage
@@ -513,7 +515,7 @@ function ChatView({
                       messageId={item.id}
                       intelligentUI={item.role === "being"}
                       commandLabels={item.role === 'user'}
-                      storageKey={JSON.stringify([new URLSearchParams(location.search).get('history_scope') || location.origin, state.soul.being_id || state.name, item.sceneId || 'global', item.historySeq ?? item.id]) + (blockId ? `:${blockId}` : '')}
+                      storageKey={JSON.stringify([historyEndpoint || location.origin, state.soul.being_id || state.name, item.sceneId || 'global', item.historySeq ?? item.id]) + (blockId ? `:${blockId}` : '')}
                       onContinue={text => { state.draft = [state.draft.trim(), text].filter(Boolean).join('\n\n'); state.changed(); composer.current?.focus(); }}
                       onEdit={inCurrentScene(item, state.currentScene) ? () => {
                         state.setIntelligentUIEnabled(true);

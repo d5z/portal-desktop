@@ -57,7 +57,7 @@ export class SurfaceTimeline {
   private previous: { id: string; identity: string; scope: string; text: string; streaming: boolean }[] = [];
   private result = new Map<string, SurfaceBlock>();
   private cache = new Map<string, { text: string; blocks: AnswerBlock[] }>();
-  private parsed = new Map<string, { source: string; streaming: boolean; base?: UIDocument; result: ReturnType<UIStream['update']> }>();
+  private parsed = new Map<string, { source: string; streaming: boolean; base?: UIDocument; parser: UIStream; result: ReturnType<UIStream['update']> }>();
   build(messages: { id: string; identity: string; scope: string; text: string; streaming: boolean }[]) {
     // Ordinary prose cannot define a surface. Keep the context identity stable
     // while typing or streaming unrelated prose so saved controls do not rerender.
@@ -98,8 +98,11 @@ export class SurfaceTimeline {
         parsedAlive.add(entryKey);
         let parsed = this.parsed.get(entryKey);
         if (!parsed || parsed.source !== block.content || parsed.streaming !== message.streaming || parsed.base !== baseDoc) {
-          parsed = { source: block.content, streaming: message.streaming, base: baseDoc,
-            result: new UIStream(baseDoc).update(block.content, message.streaming) };
+          // The decoder already tracks its consumed prefix. Keep it for the
+          // active stream instead of replaying all prior JSON events per chunk.
+          const parser = parsed?.streaming && parsed.base === baseDoc ? parsed.parser : new UIStream(baseDoc);
+          parsed = { source: block.content, streaming: message.streaming, base: baseDoc, parser,
+            result: parser.update(block.content, message.streaming) };
           this.parsed.set(entryKey, parsed);
         }
         error ||= parsed.result.error;

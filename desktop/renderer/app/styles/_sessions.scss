@@ -169,8 +169,8 @@
   width: 320px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 16px;
+  gap: 8px;
+  padding: 16px 12px;
   border-right: 1px solid var(--line);
   background: var(--bg);
   box-shadow: 12px 0 32px #0000000b;
@@ -182,8 +182,10 @@
 .chat-session-panel-heading {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 0 4px;
+  position: relative;
+  gap: 8px;
+  flex-shrink: 0;
+  margin: 0 4px 10px;
 }
 
 .chat-session-panel svg {
@@ -195,6 +197,158 @@
   stroke-linecap: round;
   stroke-linejoin: round;
   flex-shrink: 0;
+}
+
+.chat-session-search {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  min-width: 0;
+  height: 42px;
+  padding: 0 14px;
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--bg);
+}
+
+.chat-session-search:focus-within {
+  border-color: var(--secondary);
+}
+
+.chat-session-search svg {
+  width: 20px;
+  height: 20px;
+  color: var(--secondary);
+}
+
+.chat-session-search input {
+  min-width: 0;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  outline: none;
+  background: transparent;
+  color: var(--text);
+  font: 14px/1.5 var(--font-sans);
+}
+
+.chat-session-search input::placeholder {
+  color: var(--secondary);
+  opacity: 1;
+}
+
+.chat-session-options {
+  flex-shrink: 0;
+}
+
+.chat-session-options summary {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  list-style: none;
+  cursor: pointer;
+  color: var(--secondary);
+  border-radius: 10px;
+}
+
+.chat-session-options summary svg {
+  width: 20px;
+  height: 20px;
+  fill: currentcolor;
+  stroke: none;
+}
+
+.chat-session-options summary::-webkit-details-marker {
+  display: none;
+}
+
+.chat-session-options summary:hover,
+.chat-session-options[open] summary {
+  background: var(--surface);
+  color: var(--text);
+}
+
+.chat-session-options summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.chat-session-options-popover {
+  position: absolute;
+  z-index: 2;
+  inset: calc(100% + 8px) 0 auto;
+  padding: 8px;
+  border-radius: 18px;
+  box-shadow: 0 12px 36px #00000026;
+  background: var(--control);
+}
+
+.chat-session-options-popover button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 42px;
+  padding: 10px;
+  color: var(--text);
+  text-align: left;
+  font: 13px/1.5 var(--font-sans);
+  border-radius: 11px;
+}
+
+.chat-session-options-popover button[aria-pressed='true'] {
+  background: var(--surface);
+}
+
+.chat-session-options-popover button > span {
+  flex: 1;
+}
+
+.chat-session-options-popover svg {
+  width: 18px;
+  height: 18px;
+}
+
+.chat-session-options-popover .chat-session-option-check {
+  width: 14px;
+  height: 14px;
+}
+
+.chat-session-options-popover kbd {
+  color: var(--secondary);
+  font: 11px/1 var(--font-sans);
+}
+
+.chat-session-options-popover hr {
+  margin: 6px 10px;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.chat-session-group {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-shrink: 0;
+  padding: 0 6px 0 14px;
+  color: var(--secondary);
+  font-size: 12px;
+}
+
+.chat-session-group button {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  color: var(--secondary);
+}
+
+.chat-session-group svg {
+  width: 20px;
+  height: 20px;
 }
 
 .chat-session-caption {
@@ -221,14 +375,14 @@
   flex-shrink: 0;
   box-sizing: border-box;
   width: 100%;
-  height: 40px;
-  min-height: 40px;
-  padding: 10px;
+  height: 44px;
+  min-height: 44px;
+  padding: 10px 14px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 12px;
   background: transparent;
-  color: var(--secondary);
-  font: 12px/1.5 var(--font-sans);
+  color: var(--text);
+  font: 14px/1.5 var(--font-sans);
   text-align: left;
 }
 
@@ -243,19 +397,16 @@
 .chat-session-list > button[aria-current='true'] {
   background: var(--selected);
   color: var(--text);
-  font-weight: 550;
+  font-weight: 500;
 }
 
 .chat-session-current {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
   flex-shrink: 0;
-  width: 12px;
-  height: 18px;
-  color: var(--green);
-  font-size: 16px;
-  line-height: 1;
+  width: 6px;
+  height: 6px;
+  margin: 0 3px;
+  border-radius: 50%;
+  background: var(--green);
 }
 
 .chat-session-activity {

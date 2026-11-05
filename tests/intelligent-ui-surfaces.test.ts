@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { SurfaceTimeline, blockKey, surfaceRepairPrompt, type UIInteraction } from '../desktop/renderer/shared/intelligent-ui/surfaces';
 import { UIStream } from '../desktop/renderer/shared/intelligent-ui/stream';
 import { reconcileState, reconcileUpdatedState } from '../desktop/renderer/shared/intelligent-ui/runtime';
@@ -159,4 +159,27 @@ it('keeps surface identity stable while ordinary prose streams and rebuilds only
   const updated = timeline.build([artifact, message('update', patch)]);
   expect(updated.get(blockKey('surface', 'ui-0'))?.surface.versions).toHaveLength(2);
   expect(timeline.build([]).size).toBe(0);
+});
+
+
+it('decodes each streamed UI node once and matches a fresh rebuild after completion', () => {
+  const timeline = new SurfaceTimeline();
+  const records = [{op:'begin',version:2,surfaceId:'perf',title:'增量界面'},
+    ...Array.from({length:120}, (_, i) => ({op:'node',node:{id:'text-'+i,type:'text',value:'内容 '+i}})),
+    {op:'commit'}];
+  let text = '';
+  const parse = vi.spyOn(JSON, 'parse');
+  try {
+    for (const record of records) {
+      text += JSON.stringify(record) + '\n';
+      timeline.build([message('live', text, 'scene-a', true)]);
+    }
+    const decodedNodes = parse.mock.calls.filter(([value]) => typeof value === 'string' && value.startsWith('{"op":"node"')).length;
+    expect(decodedNodes).toBe(120);
+    const finished = timeline.build([message('live', text)]);
+    expect(finished).toEqual(new SurfaceTimeline().build([message('live', text)]));
+    expect(finished.get(blockKey('live','ui-0'))?.surface.versions[0].doc.body).toHaveLength(120);
+    // The same message can be replaced by recovered history; discard old decoder state.
+    expect(timeline.build([message('live',initial)])).toEqual(new SurfaceTimeline().build([message('live',initial)]));
+  } finally { parse.mockRestore(); }
 });

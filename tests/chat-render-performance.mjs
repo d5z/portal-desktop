@@ -39,6 +39,8 @@ try {
   browser=await chromium.launch({headless:true,channel:'chrome'});
   const page=await browser.newPage({viewport:{width:1100,height:850}});page.setDefaultTimeout(15000);
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
+  let tokenLogs=0;
+  page.on('console', message => { if (message.text().includes('[chat-network]') && message.text().includes('content_block_delta')) tokenLogs++; });
   const origin='http://127.0.0.1:'+server.address().port;
   await page.addInitScript(()=>{const original=window.fetch;window.fetch=(input,init)=>original(typeof input==='string'&&input.startsWith('beings://chat/')?location.origin+input.slice('beings://chat'.length):input,init);});
 
@@ -116,11 +118,14 @@ try {
   const cpuAfter = (await performanceSession.send('Performance.getMetrics')).metrics.find(metric => metric.name === 'TaskDuration').value;
   metrics.mainThreadMs = Math.round((cpuAfter - cpuBefore) * 1000);
   metrics.paragraphs = paragraphs;
+  metrics.tokenLogs = tokenLogs;
   metrics.idleP95FrameMs=idleP95FrameMs;
   metrics.frameBudgetMs=Math.max(100,idleP95FrameMs+50);
   await mkdir('test-results',{recursive:true});await writeFile('test-results/chat-render-performance.json',JSON.stringify(metrics,null,2));
   console.log('Rendering metrics: '+JSON.stringify(metrics));
   assert.ok(metrics.frames>=20,'Stream must paint incrementally');
+  assert.ok(metrics.messageLayoutReads <= 20, 'Following the tail must not measure historical bubbles on every frame');
+  assert.equal(tokenLogs, 0, 'Ordinary text deltas must not serialize and send console messages');
   // Frame timestamps are quantized; ignore floating-point subtraction noise
   // at the inclusive budget boundary, while retaining millisecond precision.
   assert.ok(Math.round(metrics.p95FrameMs)<=Math.round(metrics.frameBudgetMs),'Streaming must not repeatedly stall beyond the idle frame cadence');

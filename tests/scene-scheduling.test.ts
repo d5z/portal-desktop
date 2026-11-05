@@ -249,3 +249,31 @@ it.each(['running', 'done'] as const)('does not block a new scene on a %s ledger
     expect(sent.mock.calls.map(call=>call[0])).toEqual(['A','B']);
   } finally { runtime.dispose(); }
 });
+
+it.each([{interim:true}, {streaming:true}])('does not finish delegated work on an unfinished reply (%j)', flags => {
+  const input:any[] = [
+    {kind:'message',role:'user',id:'u',sceneId:'a',createdAt:10,text:'task'},
+    {kind:'message',role:'being',id:'a',sceneId:'a',createdAt:40,text:'stage',...flags},
+  ];
+  const output:any[] = withScheduling(input,[{id:'t',sceneId:'a',createdAt:20,endedAt:30,status:'done'}]);
+  expect(output[1]).toMatchObject({status:'waiting',waitingForReply:true});
+});
+
+it('shows failed delegated work even when another task completed', async () => {
+  const state:any={currentScene:{sceneId:'a'},draft:'',sceneTasks:[],changed:vi.fn()};
+  const activity=vi.fn();
+  const runtime=createSceneRuntime(state,{onSceneActivity:activity},(_state:any,options:any)=>({
+    sceneActivity:()=> 'done', syncConnection:()=>{}, waitForPendingFiles:async()=>{}, refreshHistory:async()=>{},
+    send:(text:string)=>options.prepareMessage(text),dispose:()=>{},
+  }));
+  try {
+    await runtime.send('two tasks');
+    const at=Date.now();
+    const tasks:any[]=[{id:'ok',sceneId:'a',createdAt:at,endedAt:at+10,status:'done'},
+      {id:'bad',sceneId:'a',createdAt:at,endedAt:at+20,status:'failed'}];
+    runtime.updateSceneTasks(tasks);
+    expect(activity.mock.lastCall?.[0].a).toBe('error');
+    const input:any[]=[{kind:'message',role:'user',id:'u',sceneId:'a',createdAt:at-1,text:'two tasks'}];
+    expect(withScheduling(input,tasks)[1]).toMatchObject({status:'error',label:'后台任务异常'});
+  } finally {runtime.dispose();}
+});

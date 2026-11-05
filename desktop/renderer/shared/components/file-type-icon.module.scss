@@ -1,0 +1,52 @@
+.fileIcon {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 40px;
+  height: 44px;
+  border-radius: 8px;
+  background: color-mix(in srgb, currentcolor 10%, transparent);
+}
+
+.slides {
+  color: #c65b30;
+}
+.sheet {
+  color: #31835e;
+}
+.pdf {
+  color: #c34e52;
+}
+.document {
+  color: #467ebc;
+}
+.image {
+  color: #33868b;
+}
+.code {
+  color: #7a67b0;
+}
+.generic {
+  color: var(--secondary, var(--text-muted));
+}
+
+:global(:root[data-theme='dark']) {
+  .slides {
+    color: #efa079;
+  }
+  .sheet {
+    color: #82c7a1;
+  }
+  .pdf {
+    color: #ec9699;
+  }
+  .document {
+    color: #93b9ea;
+  }
+  .image {
+    color: #83c4c8;
+  }
+  .code {
+    color: #bca7e7;
+  }
+}

@@ -1,6 +1,6 @@
 .files {
   width: 100%;
-  max-width: 560px;
+  max-width: 380px;
   margin-block: 8px;
 }
 
@@ -24,8 +24,9 @@
 
 .files .open {
   display: flex;
-  flex-direction: column;
-  align-items: stretch;
+  align-items: center;
+  gap: 12px;
+  min-height: 76px;
   width: 100%;
   padding: 16px 52px 16px 16px;
   border: 0;
@@ -47,7 +48,8 @@
 
 .download {
   position: absolute;
-  top: 22px;
+  top: 50%;
+  transform: translateY(-50%);
   right: 12px;
   display: grid;
   place-items: center;
@@ -81,25 +83,18 @@
   }
 }
 
-.summary {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-
-  > svg {
-    flex: none;
-    color: var(--secondary, var(--text-muted));
-  }
-}
-
 .details {
   display: grid;
   flex: 1;
   min-width: 0;
   gap: 4px;
-  overflow-wrap: anywhere;
 
   strong {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    overflow: hidden;
+    overflow-wrap: anywhere;
     font-size: 14px;
     font-weight: 550;
     line-height: 1.5;
@@ -107,31 +102,21 @@
 }
 
 .metadata,
-.files .caption,
-.files .privacy {
+.files .unavailable {
   color: var(--secondary, var(--text-muted));
   font-size: 12px;
   line-height: 1.6;
 }
 
 .metadata {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
 }
 
-.files .caption {
-  margin: 0;
-  padding-top: 12px;
-  overflow-wrap: anywhere;
-}
-
-.files .privacy {
+.files .unavailable {
   margin: 8px 0 0;
-}
-
-.action {
-  flex: none;
-  color: var(--accent);
-  font-size: 12px;
 }
 
 .link {

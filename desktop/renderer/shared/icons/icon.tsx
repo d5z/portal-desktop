@@ -1,6 +1,7 @@
 import type { ComponentProps } from 'react';
 
 const glyphs = {
+  'trash': { viewBox: '0 0 24 24', content: (<><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7m4-7v7" /></>) },
   'panel-expand': { viewBox: '0 0 24 24', content: (<><rect x="3" y="4" width="18" height="16" rx="4"/><path d="M8 8v8" strokeWidth="3" strokeLinecap="round"/></>) },
   'close': { viewBox: '0 0 24 24', content: (<><path d="m6 6 12 12M18 6 6 18"/></>) },
   'edit': { viewBox: '0 0 24 24', content: (<><path d="m15 4 5 5M4 20l5-1L20 8a2 2 0 0 0-5-5L4 14l-1 7Z" /></>) },
@@ -79,6 +80,8 @@ const glyphs = {
   'download-wide': { viewBox: '0 0 24 24', content: (<><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4" /></>) },
   'refresh-library': { viewBox: '0 0 24 24', content: (<><path d="M20 10a8 8 0 1 0-2 8M20 4v6h-6" /></>) },
   'file': { viewBox: '0 0 24 24', content: (<><path d="M14 3H5v18h14V8l-5-5Zm0 0v6h5M8 13h8m-8 4h5" /></>) },
+  'file-slides': { viewBox: '0 0 24 24', content: (<><path d="M14 3H5v18h14V8l-5-5Zm0 0v6h5"/><rect x="8" y="12" width="8" height="5" rx=".5"/><path d="M12 17v2m-2 0h4"/></>) },
+  'file-sheet': { viewBox: '0 0 24 24', content: (<><path d="M14 3H5v18h14V8l-5-5Zm0 0v6h5"/><path d="M8 12h8v6H8zM8 15h8m-4-3v6"/></>) },
   'composer-file': { viewBox: '0 0 24 24', content: (<path d="m8 13 7-7a3 3 0 0 1 4 4l-9 9a5 5 0 0 1-7-7l10-10M6 15l9-9"/>) },
   'composer-ui': { viewBox: '0 0 24 24', content: (<><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M3 10h18M10 10v10"/></>) },
   'composer-image': { viewBox: '0 0 24 24', content: (<><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8" cy="8" r="1.5"/><path d="m3 17 5-5 4 4 4-6 5 7"/></>) },

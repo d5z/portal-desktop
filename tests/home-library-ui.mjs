@@ -13,7 +13,9 @@ const bundle = await build({
     builder.onLoad({ filter: /home-file-preview\.tsx$/ }, async args => ({ loader: 'tsx', contents: (await readFile(args.path, 'utf8')).replace('beings://preview/runtime.html', '/runtime.html') }));
   } }], stdin: { resolveDir: process.cwd(), loader: 'tsx', contents: `
   import { createRoot } from 'react-dom/client';
-  import { useState } from 'react';
+  import { useState, useRef } from 'react';
+  import { HomeFileViewer } from './desktop/renderer/app/components/home-file-viewer';
+  import { HomeFileLink } from './desktop/renderer/shared/components/being-files';
   import { BeingLibrary } from './desktop/renderer/app/components/home-library';
   import './desktop/renderer/app/styles.scss';
   const listeners = new Set(); window.calls = []; window.downloads = []; window.blocked = false;
@@ -43,8 +45,8 @@ const bundle = await build({
     }
   };
   function Fixture(){
-    const [context,setContext]=useState('one'),[visible,setVisible]=useState(true);
-    return <><div style={{position:'fixed',left:80,top:10,zIndex:30}}><button id="switch" onClick={()=>setContext('two')}>切换 Being（测试）</button><button id="toggle" onClick={()=>setVisible(v=>!v)}>切换资料栏（测试）</button></div>
+    const [context,setContext]=useState('one'),[visible,setVisible]=useState(true),frame=useRef(null);
+    return <HomeFileViewer api={api} frame={frame} scope={context}><div style={{position:'fixed',left:80,top:10,zIndex:30}}><button id="switch" onClick={()=>setContext('two')}>切换 Being（测试）</button><button id="toggle" onClick={()=>setVisible(v=>!v)}>切换资料栏（测试）</button><HomeFileLink path="artifacts/云电脑生成说明.txt">打开对话里的云文件</HomeFileLink></div>
       <main id="client-main"><div className="workspace-body" style={{height:'100vh'}}>
         <nav className="workspace-rail"/><div className="workspace-stage" style={{padding:80}}><h2>资料库交互测试</h2><p>此页面使用合成文件，不连接生产账号。</p></div>
         <aside id="being-info" className="being-info" style={{width:320,flexBasis:320}}>
@@ -52,10 +54,10 @@ const bundle = await build({
           <div className="being-tabs"><button>详情</button><button>动态</button><button aria-selected="true">资料库</button><button>电脑</button></div>
           <div className="being-info-content">{visible && <BeingLibrary key={context} api={api} onConnect={()=>window.connected=true}/>}</div></div>
         </aside>
-      </div></main></>;
+      </div></main></HomeFileViewer>;
   }
   createRoot(document.querySelector('#root')).render(<Fixture/>);
-` }, bundle: true, format: 'esm', write: false, outdir: '/fixture', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' } });
+` }, bundle: true, loader: { '.woff2': 'dataurl', '.woff': 'dataurl', '.ttf': 'dataurl' }, format: 'esm', write: false, outdir: '/fixture', jsx: 'automatic', define: { 'process.env.NODE_ENV': '"production"' } });
 const server = createServer((request, response) => {
   if (request.url === '/runtime.html') {
     response.setHeader('Content-Type', 'text/html');
@@ -75,11 +77,60 @@ try {
   const errors = []; page.on('pageerror', error => errors.push(error.message));
   let external = 0; page.on('request', request => { if (request.url().includes('example.invalid')) external++; });
   await page.route('https://example.invalid/**', route => route.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg"/>' }));
+  await page.addInitScript(() => {
+    if (window !== window.top) return;
+    if (localStorage.getItem('beings:recent-home-files:fixture')) return;
+    const names = ['Being-Intro.pptx', 'notes.txt', '小镇介绍.pdf', '一周计划.xlsx', '设计说明.md', '昨天的方案.docx', '界面预览.html'];
+    localStorage.setItem('beings:recent-home-files:fixture', JSON.stringify({hidden:false,entries:names.map((name,index)=>({name,path:index===1 ? name : 'artifacts/'+name,type:'file',size:2048,openedAt:Date.now()-(index < 5 ? 0 : index === 5 ? 86400000 : 172800000)}))}));
+  });
   await page.goto(url);
   const files = page.getByRole('list', { name: '工作区文件' });
-  await files.getByRole('button', { name: '项目资料' }).waitFor();
+  const recent = page.locator('[role="tabpanel"][id$="-recent"]');
+  const recentTab = page.getByRole('tab', { name: '最近', exact: true });
+  const workspaceTab = page.getByRole('tab', { name: '工作区', exact: true });
+  await recent.locator('li').first().waitFor();
   await mkdir('output/playwright', { recursive: true });
+  assert.equal(await recentTab.getAttribute('aria-selected'), 'true');
+  assert.equal(await files.isVisible(), false);
+  assert.equal(await page.getByRole('button', { name: /隐藏最近|显示最近/ }).count(), 0);
+  assert.equal(await recent.locator('li').count(), 7);
+  await recent.getByRole('button', { name: '从最近记录移除：notes.txt', exact: true }).click();
+  assert.equal(await recent.getByText('notes.txt', { exact: true }).count(), 0);
+  await recentTab.focus(); await page.keyboard.press('ArrowRight');
+  assert.equal(await workspaceTab.getAttribute('aria-selected'), 'true');
+  assert.equal(await recent.isVisible(), false);
+  assert.equal(await files.getByRole('button', { name: 'notes.txt 5 B', exact: true }).count(), 1);
+  assert.deepEqual(await page.evaluate(() => window.downloads), []);
   await page.screenshot({ animations: 'disabled', path: 'output/playwright/home-library-desktop.png' });
+  await page.keyboard.press('ArrowLeft');
+  assert.equal(await recentTab.getAttribute('aria-selected'), 'true');
+  await page.reload();
+  await recent.locator('li').first().waitFor();
+  assert.equal(await recent.getByText('notes.txt', { exact: true }).count(), 0);
+  await page.getByRole('button', { name: '打开对话里的云文件' }).click();
+  await page.getByRole('complementary', { name: '文件预览：云电脑生成说明.txt' }).locator('pre').waitFor();
+  await page.getByRole('button', { name: '关闭文件预览' }).click();
+  assert.equal(await recent.locator('li').first().getByText('云电脑生成说明.txt').count(), 1);
+  await page.screenshot({ animations: 'disabled', path: 'output/playwright/home-library-recent-light.png' });
+  await workspaceTab.hover();
+  await page.locator('#being-info').screenshot({ animations: 'disabled', path: 'output/playwright/home-library-tab-hover.png' });
+  assert.equal(await workspaceTab.evaluate(el => getComputedStyle(el).borderRadius), '16px');
+  const row = recent.locator('li').first();
+  await row.getByRole('button').first().hover();
+  assert.equal(await row.getByRole('button').first().evaluate(el => getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)');
+  await page.getByRole('tooltip').waitFor();
+  assert((await page.getByRole('tooltip').innerText()).includes('最近打开 ·'));
+  await page.locator('#being-info').screenshot({ animations: 'disabled', path: 'output/playwright/home-library-file-tooltip.png' });
+  const rowColor = await row.evaluate(el => getComputedStyle(el).backgroundColor);
+  await row.getByRole('button', { name: /从最近记录移除/ }).hover();
+  assert.equal(await page.getByRole('tooltip').count(), 0);
+  assert.equal(await row.getByRole('button', { name: /从最近记录移除/ }).getAttribute('title'), '移除最近');
+  assert.equal(await row.evaluate(el => getComputedStyle(el).backgroundColor), rowColor);
+  await page.locator('#being-info').screenshot({ animations: 'disabled', path: 'output/playwright/home-library-remove-hover.png' });
+  await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
+  await page.screenshot({ animations: 'disabled', path: 'output/playwright/home-library-recent-dark.png' });
+  await page.evaluate(() => { document.documentElement.dataset.theme = 'light'; });
+  await workspaceTab.click();
   await page.getByRole('searchbox').fill('notes');
   assert.equal(await files.locator('li').count(), 1);
   await page.getByRole('searchbox').fill('不存在');
@@ -136,16 +187,21 @@ try {
   await files.getByRole('button', { name: 'notes.txt 5 B' }).waitFor();
   await page.evaluate(() => window.setHome({ authenticated: false, username: undefined, binding: undefined }));
   await page.getByText('请先在电脑栏连接 Being Home。', { exact: true }).waitFor();
+  assert.equal(await recent.locator('li').count(), 0);
   assert.equal(await files.locator('li').count(), 0);
   await page.getByRole('button', { name: '前往电脑栏' }).click();
   assert.equal(await page.evaluate(() => window.connected), true);
   await page.evaluate(() => window.setHome({ authenticated: true, username: 'other', binding: 'matched' }));
   await files.getByRole('button', { name: 'notes.txt 5 B' }).waitFor();
+  assert.equal(await recent.locator('li').count(), 0);
+  await page.evaluate(() => window.setHome({ username: 'fixture' }));
+  await recentTab.click();
+  await recent.locator('li').first().waitFor();
   await page.setViewportSize({ width: 800, height: 700 });
   await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
   await page.screenshot({ animations: 'disabled', path: 'output/playwright/home-library-narrow-dark.png' });
   const overflows = await page.locator('#being-info').evaluate(el => el.scrollWidth > el.clientWidth);
   assert.equal(overflows, false, 'narrow library must not overflow');
   assert.deepEqual(errors, []);
-  console.log('Home library UI passed: directory/search, read-only list/download, interactive isolated HTML/source, focus/Escape, delayed preview, retry, account change, narrow/dark.');
+  console.log('Home library UI passed: secondary tabs/keyboard, chat preview history, persisted removal, account isolation, directory/search, read-only list/download, interactive isolated HTML/source, focus/Escape, delayed preview, retry, account change, narrow/dark.');
 } finally { await browser.close(); server.close(); }

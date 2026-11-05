@@ -1,5 +1,6 @@
 import { MAX_HOME_PREVIEW, type HomeFilesAPI, type HomeFileEntry, type HomeFilePreview } from '../../../shared/home';
 import { Store, errorText } from '../../shared/models/store';
+import { homeRecentFiles } from './home-recent-files';
 
 const nameOrder = new Intl.Collator('zh-CN', { numeric: true });
 
@@ -46,10 +47,13 @@ export class HomeLibrary extends Store {
     const ticket = ++this.previewRequest;
     this.notice = ''; this.error = '';
     this.selected = entry; this.preview = null; this.previewError = ''; this.previewLoading = entry.size <= MAX_HOME_PREVIEW; this.changed();
-    if (!this.previewLoading) return;
+    if (!this.previewLoading) { homeRecentFiles.record(entry); return; }
     try {
       const result = await this.api.preview(entry.path);
-      if (ticket === this.previewRequest) this.preview = result;
+      if (ticket === this.previewRequest) {
+        this.preview = result;
+        homeRecentFiles.record({ ...entry, name: result.name, size: result.bytes.byteLength });
+      }
     } catch (error) { if (ticket === this.previewRequest) this.previewError = errorText(error); }
     finally { if (ticket === this.previewRequest) { this.previewLoading = false; this.changed(); } }
   }

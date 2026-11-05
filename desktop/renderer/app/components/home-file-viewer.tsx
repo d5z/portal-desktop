@@ -3,6 +3,7 @@ import type { HomeAPI } from '../../../shared/home';
 import { workspacePath } from '../../../shared/being-files';
 import { HomeFileAction } from '../../shared/components/being-files';
 import { HomeLibrary } from '../models/home-library';
+import { homeRecentFiles } from '../models/home-recent-files';
 import { HomeFilePanel } from './home-file-panel';
 
 export function HomeFileViewer({ api, frame, scope, children, onNotice }: {
@@ -29,6 +30,7 @@ export function HomeFileViewer({ api, frame, scope, children, onNotice }: {
     let identity: string | undefined, disposed = false, received = false;
     const receive = (state: Awaited<ReturnType<HomeAPI['state']>>) => {
       if (disposed) return;
+      homeRecentFiles.setIdentity(state);
       const next = JSON.stringify([state.authenticated, state.authenticating, state.username, state.binding]);
       if (identity !== undefined && identity !== next) store.reset();
       identity = next;

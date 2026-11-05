@@ -1,4 +1,4 @@
-import { Fragment, type ComponentProps } from 'react';
+import { Fragment, memo, type ComponentProps } from 'react';
 import { Markdown } from '../../shared/components/markdown';
 import { composerCommands, parseComposerCommands } from '../models/composer-commands';
 import { stripClientMessageContext } from '../services/local-file-context';
@@ -17,10 +17,10 @@ function commandContent(text: string) {
   return { labels, text: labels ? parsed.rest : clean };
 }
 
-export function CommandMessageMarkdown({ content, ...props }: ComponentProps<typeof Markdown>) {
+export const CommandMessageMarkdown = memo(function CommandMessageMarkdown({ content, ...props }: ComponentProps<typeof Markdown>) {
   const message = commandContent(content);
   return <Markdown {...props} content={message.text} leadingContent={message.labels}/>;
-}
+});
 
 /** Attachment captions stay plain text, with the same command labels as normal bubbles. */
 export function CommandMessageText({ text }: { text: string }) {

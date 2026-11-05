@@ -10,8 +10,7 @@
     var(--selection-shadow);
 }
 
-#place-panel :is(.catalog-item, .fireside-room).selected,
-.chat-session-list > button[aria-current='true'] {
+#place-panel :is(.catalog-item, .fireside-room).selected {
   background: var(--selection-row);
   color: var(--text);
   box-shadow:

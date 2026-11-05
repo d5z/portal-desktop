@@ -201,7 +201,7 @@ const MarkdownText = memo(function MarkdownText({
       }
     }
   }
-  collect(tokens);
+  if (onPlace) collect(tokens);
   function words(value: string, decorate: boolean): ReactNode {
     const text = unescapeText(value);
     const plain = (value: string) => decorate && renderText ? renderText(value) : value;
@@ -258,7 +258,7 @@ const MarkdownText = memo(function MarkdownText({
   }
   function render(list: Token[], decorate = true, topLevel = false): ReactNode {
     return list.map((token, index) => {
-      const before = topLevel ? [...linked].sort().join(',') : '';
+      const before = topLevel && onPlace ? [...linked].sort().join(',') : '';
       const cached = topLevel ? blockCache.get(token) : undefined;
       if (cached && cached.before === before) {
         cached.after.forEach(view => linked.add(view));
@@ -513,7 +513,8 @@ function ChatCodeBlock({ text, language, streaming }: { text: string; language: 
   const inferred = useMemo(() => !language ? detectStructuredText(text) : undefined, [text, language]);
   const lang = (language || inferred || 'text').toLowerCase();
   const json = ['json', 'jsonl', 'ndjson'].includes(lang);
-  const formatted = useMemo(() => lang === 'json' ? formatJSON(text) : undefined, [text, lang]);
+  // Incomplete JSON is normal while streaming; don't parse/format it per delta.
+  const formatted = useMemo(() => !streaming && lang === 'json' ? formatJSON(text) : undefined, [text, lang, streaming]);
   const [pretty, setPretty] = useState(false);
   const display = pretty && formatted !== undefined ? formatted : text;
   return <div className="code-block rich-code-block">

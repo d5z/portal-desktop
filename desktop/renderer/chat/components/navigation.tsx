@@ -66,10 +66,14 @@ export function ChatIndex({
   const updateActive = useMemoizedFn(() => {
     const messages = container.current;
     if (!messages) return;
+    // Following the live tail already identifies the active turn. Avoid
+    // forcing layout for historical bubbles on every streamed scroll frame.
+    if (scrollLock.current || messages.scrollHeight - messages.scrollTop - messages.clientHeight < 8) {
+      setActive(turns.length - 1);
+      return;
+    }
     const top = messages.getBoundingClientRect().top + 44;
-    let next=Math.max(0,firstAfter(turns.length,top,index=>elements.current.get(turns[index].messageId)?.getBoundingClientRect().top??Infinity)-1);
-    if (messages.scrollHeight - messages.scrollTop - messages.clientHeight < 8)
-      next = turns.length - 1;
+    const next=Math.max(0,firstAfter(turns.length,top,index=>elements.current.get(turns[index].messageId)?.getBoundingClientRect().top??Infinity)-1);
     setActive(next);
   });
   function jump(id: string) {

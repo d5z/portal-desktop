@@ -4,8 +4,9 @@ export function startsTimeGroup(current?:number,previous?:number) {
   if(previous===undefined||!Number.isFinite(new Date(previous).getTime()))return true;
   return Math.abs(current-previous)>=5*60*1000 || new Date(current).toDateString()!==new Date(previous).toDateString();
 }
+const timelineTimeFormat = new Intl.DateTimeFormat('zh-CN',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
 export function messageTimeLabel(time:number) {
-  return new Date(time).toLocaleString('zh-CN',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
+  return timelineTimeFormat.format(time);
 }
 /** Append text without replacing the user's existing draft or sending it. */
 export function appendChatText(draft:string,text:string) {
