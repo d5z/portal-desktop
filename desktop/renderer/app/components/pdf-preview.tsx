@@ -26,7 +26,7 @@ export function PdfPreview({blob}:{blob:Blob}) {
     void Promise.all([import('pdfjs-dist'),blob.arrayBuffer()]).then(([{getDocument,GlobalWorkerOptions},data])=>{
       if(disposed)return;
       GlobalWorkerOptions.workerSrc=new URL('pdf.worker.min.js',location.href).href;
-      task=getDocument({data:new Uint8Array(data),useWasm:false,cMapUrl:new URL('pdf-cmaps/',location.href).href,cMapPacked:true,standardFontDataUrl:new URL('pdf-fonts/',location.href).href});
+      task=getDocument({data:new Uint8Array(data),useWasm:false,wasmUrl:new URL('pdf-decoders/',location.href).href,cMapUrl:new URL('pdf-cmaps/',location.href).href,cMapPacked:true,standardFontDataUrl:new URL('pdf-fonts/',location.href).href});
       return task.promise.then(doc=>{if(!disposed)setPdf(doc);});
     }).catch(()=>{if(!disposed)setError('PDF 无法预览（文件可能加密或损坏），请打开原文件。');});
     return()=>{disposed=true;void task?.destroy();};

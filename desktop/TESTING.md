@@ -8,6 +8,8 @@
 
 ## 覆盖与边界
 
+`node tests/packaged-resources.mjs` 在真实安装包、独立临时配置和工作目录中检查资源链接、云电脑首帧，以及 CCITT、JBIG2、JPEG 2000 三类 PDF 图片预览。PDF 回归使用仓库内的合成文件，通过正式附件预览入口加载并检查画布的黑白像素，防止解码失败后仅显示空白页却被判定成功；截图位于 `test-results/packaged-pdf/`。此测试已接入 `test:all` 和三平台发布构建，夹具生成方式见 `tests/fixtures/pdf-decoders/README.md`。
+
 `npm run test:chat-history-recovery` 使用隔离浏览器的真实 IndexedDB 和生成的 React 对话包，验证无场景 SBS 工具流运行时，旧场景问题与回复都能恢复、增量补齐、切换隔离、刷新及离线重载；同时验证全局缓存先到、场景缓存后到时首屏补齐，以及上翻历史和滚动位置稳定。`tests/chat-scene-cache.test.ts`、`tests/chat-activity-recovery.test.ts` 和 `tests/history-window.test.ts` 覆盖对应回归。不会读取、清空或改写用户的 IndexedDB，也不会向真实 Being 发送消息。 `tests/history-cache.mjs` 直接验证真实 IndexedDB 的 seq 合并、重复/缺少场景元数据的接口记录不会抹掉场景索引、并发写入及游标不倒退、重开数据库后全部 260 条记录仍在、旧场景 220 条消息可分页读完。运行时回归还覆盖慢网络前先显示本地场景、乱序/重复接口记录、游标以下缺口补齐及分页中途断网后的恢复。
 
 场景动态的最近消息由 `tests/recent-chat-history.test.ts` 验证跨全部场景分页收集最近 100 条有效提问、增量刷新、内部标记过滤、降序去重、异常响应、连接隔离与摘要清理；`npm run test:recent-history` 使用本地浏览器 fixture 验证仅提问列表、日期分组、长标题单行省略、本地场景跳转、本地场景列表为空时仍展示全部提问、不可跳转条目、失败重试、切换 Being 的迟到响应，以及顶部名称和绿色 SBS 状态入口。截图输出到 `test-results/scene-recent-history-*.png`，不向真实 Being 发送消息。

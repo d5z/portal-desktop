@@ -132,7 +132,7 @@ jobs:
           PORTAL_DESKTOP_NATIVE_UPGRADE_TESTS: '1'
         run: npx vitest run tests/runtime-update-native.test.ts
       - run: npm run make
-      - name: Verify packaged resource links and paint a cloud computer frame
+      - name: Verify packaged resources, PDF image decoders and cloud computer frame
         run: node tests/packaged-resources.mjs
       - name: Verify interrupted upgrade recovery and installer retry
         run: node tests/update-recovery-electron.mjs

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { createServer } from 'node:https';
 import { X509Certificate } from 'node:crypto';
@@ -85,6 +85,41 @@ try {
     )));
   }, { host, port, cert, fingerprint: new X509Certificate(cert).fingerprint256 });
   await page.frameLocator('#chat-frame').locator('#input').waitFor({ state: 'attached' });
+  // Exercise the shipped PdfPreview, worker and dynamically imported decoders.
+  // A canvas can render successfully while PDF.js silently omits failed images,
+  // so require the fixture's white/black pixels, not just a visible preview.
+  const pdfErrors = [];
+  page.on('console', message => {
+    if (/Unable to decode image|#getJsModule|failed to initialize|Content Security Policy/i.test(message.text())) {
+      pdfErrors.push(message.text()); console.error('Packaged PDF:', message.text());
+    }
+  });
+  const chat = page.frames().find(frame => frame.url().startsWith('beings://chat/'));
+  const screenshots = path.resolve('test-results/packaged-pdf');
+  await mkdir(screenshots, { recursive: true });
+  for (const name of ['ccitt', 'jbig2', 'jpeg2000']) {
+    const bytes = [...await readFile(new URL(`./fixtures/pdf-decoders/${name}.pdf`, import.meta.url))];
+    await chat.evaluate(({ name, bytes }) => parent.postMessage({
+      type: 'beings:file-preview', id: name, name: name + '.pdf', extension: 'pdf',
+      blob: new Blob([new Uint8Array(bytes)], { type: 'application/pdf' }),
+      revision: new URLSearchParams(location.search).get('revision'),
+    }, 'beings://desktop'), { name, bytes });
+    await page.getByRole('complementary', { name: `文件预览：${name}.pdf`, exact: true }).waitFor();
+    await page.waitForFunction(() => {
+      const canvas = document.querySelector('.pdf-page canvas');
+      if (!canvas?.width || !canvas.height) return false;
+      const context = canvas.getContext('2d');
+      const white = context.getImageData(Math.floor(canvas.width / 4), Math.floor(canvas.height / 2), 1, 1).data;
+      const black = context.getImageData(Math.floor(canvas.width * 3 / 4), Math.floor(canvas.height / 2), 1, 1).data;
+      return white[0] > 245 && white[1] > 245 && white[2] > 245 && white[3] === 255 &&
+        black[0] < 10 && black[1] < 10 && black[2] < 10 && black[3] === 255;
+    }, null, { timeout: 15000 });
+    assert.deepEqual(pdfErrors, [], `${name}: PDF decoding must not emit errors`);
+    await page.locator('.client-file-viewer').screenshot({ path: path.join(screenshots, name + '.png'), animations: 'disabled' });
+    await page.getByRole('button', { name: '关闭文件预览', exact: true }).click();
+    await page.locator('.client-file-viewer').waitFor({ state: 'detached' });
+    console.log(`PASS packaged PDF ${name}: production preview and decoded image pixels.`);
+  }
   await page.evaluate(() => { window.viewerPhase = 'closed'; window.beings.home.subscribe(state => { window.viewerPhase = state.viewer; }); });
   const opened = await page.evaluate(() => window.beings.home.action('open'));
   assert(!opened.error, opened.error);

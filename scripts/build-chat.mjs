@@ -8,6 +8,12 @@ await mkdir(output, { recursive: true });
 await copyFile('node_modules/pdfjs-dist/build/pdf.worker.min.mjs',path.join(output,'pdf.worker.min.js'));
 await cp('node_modules/pdfjs-dist/cmaps',path.join(output,'pdf-cmaps'),{recursive:true});
 await cp('node_modules/pdfjs-dist/standard_fonts',path.join(output,'pdf-fonts'),{recursive:true});
+// useWasm:false still loads these JS image decoders dynamically from wasmUrl.
+await mkdir(path.join(output,'pdf-decoders'),{recursive:true});
+for (const file of ['jbig2_nowasm_fallback.js', 'openjpeg_nowasm_fallback.js',
+  'LICENSE_JBIG2', 'LICENSE_PDFJS_JBIG2', 'LICENSE_OPENJPEG', 'LICENSE_PDFJS_OPENJPEG']) {
+  await copyFile(path.join('node_modules/pdfjs-dist/wasm',file),path.join(output,'pdf-decoders',file));
+}
 const pptxBuild=await build({entryPoints:['desktop/renderer/preview/pptx-runtime.ts'],bundle:true,format:'iife',platform:'browser',minify:true,metafile:true,outfile:path.join(output,'pptx-preview.js')});
 await copyFile('desktop/renderer/preview/pptx-preview.html',path.join(output,'pptx-preview.html'));
 // All chat UI is compiled from React; the HTML file is only its document entry.
