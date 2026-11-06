@@ -8,7 +8,7 @@ import { createServer } from 'node:http';
 import { access, cp, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
-import { promisify } from 'node:util';
+import { isDeepStrictEqual, promisify } from 'node:util';
 import * as asar from '@electron/asar';
 import { buildWindowsInstaller } from '../scripts/build-windows-installer.mjs';
 import { WebSocketServer } from 'ws';
@@ -57,7 +57,7 @@ const sums = `${sha(await readFile(setup))}  ${asset}\n`;
 const installation = await isolateWindowsInstallation(root);
 const env = { ...installation.environment, PORTAL_DESKTOP_USER_DATA: profile };
 const installed = () => path.join(installation.installedRoot, 'portal-desktop.exe');
-const ownedPids = new Set(), pending = new Map();
+const ownedProcesses = new Map(), pending = new Map();
 let app, upgradedPid, relay, nextId = 0, passed = false;
 const token = 'local-windows-upgrade-fixture';
 const server = createServer((request, response) => {
@@ -100,6 +100,18 @@ async function clients() {
     $mains=@($items | Where-Object { $_.ParentProcessId -notin $items.ProcessId });
     ConvertTo-Json -InputObject $mains -Compress
   `));
+}
+async function processIdentity(pid) {
+  return JSON.parse(await powershell(`
+    $item=Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}';
+    if ($item) { @{pid=$item.ProcessId; created=$item.CreationDate.ToUniversalTime().Ticks.ToString(); executable=$item.ExecutablePath} | ConvertTo-Json -Compress } else { 'null' }
+  `));
+}
+async function rememberPortal(pid) {
+  const identity = await processIdentity(pid);
+  assert(identity, 'The connected Portal process must be running');
+  ownedProcesses.set(pid, identity);
+  return identity;
 }
 try {
   await Promise.all([mkdir(workspace), mkdir(kits)]);
@@ -151,7 +163,7 @@ try {
   const before = await page.evaluate(() => window.beings.snapshot());
   await page.evaluate(() => window.beings.appearance('dark'));
   const oldClientPid = await app.evaluate(() => process.pid);
-  ownedPids.add(before.portal.pid);
+  const oldPortal = await rememberPortal(before.portal.pid);
   const oldTools = (await rpc('tools/list')).tools.map(tool => tool.name).sort();
   assert(oldTools.includes('portal_exec'));
   await writeFile(path.join(profile, 'retained.txt'), 'Keep user profile');
@@ -186,7 +198,7 @@ try {
     const service = await json(path.join(profile, 'portal-service.json')).catch(() => null);
     if (service?.bundleId !== bundle.id) return false;
     const sample = await json(path.join(service.root, '.portal-connection-status.json')).catch(() => null);
-    if (sample?.state === 'connected' && sample.pid !== before.portal.pid) { ownedPids.add(sample.pid); return sample; }
+    if (sample?.state === 'connected' && !isDeepStrictEqual(await rememberPortal(sample.pid), oldPortal)) return sample;
   });
   await until('installation transaction commits', async () => !(await readdir(profile)).includes('client-install.json'));
   const after = await json(path.join(profile, 'connection.json')), service = await json(path.join(profile, 'portal-service.json'));
@@ -194,7 +206,10 @@ try {
   assert.equal(sha(await readFile(path.join(service.root, 'heart-portal.exe'))), bundle.sha256);
   const actualBinary = await powershell(`(Get-CimInstance Win32_Process -Filter 'ProcessId=${state.pid}').ExecutablePath`);
   assert.equal(actualBinary.toLowerCase(), path.join(service.root, 'heart-portal.exe').toLowerCase());
-  assert.throws(() => process.kill(before.portal.pid, 0));
+  // Installers spawn many short-lived processes. A reused PID is not the old engine.
+  const formerPortal = await processIdentity(before.portal.pid);
+  console.log('Original Portal exit check:', { before: oldPortal, after: formerPortal });
+  assert.notDeepEqual(formerPortal, oldPortal, 'The original Portal process is still running after upgrade');
   assert.equal(await readFile(configPath, 'utf8'), config);
   assert.equal(await readFile(path.join(workspace, 'retained.txt'), 'utf8'), '原工作文件');
   assert.equal(await readFile(path.join(kits, 'retained.txt'), 'utf8'), 'Existing Kit files');
@@ -216,15 +231,17 @@ try {
   // A user can also open Setup while the client is still running. Exercise
   // NSIS's graceful prepare hook, not just the already-stopped update path.
   const priorClient = upgradedPid, priorPortal = state.pid;
+  const priorClientIdentity = await processIdentity(priorClient), priorPortalIdentity = ownedProcesses.get(priorPortal);
+  assert(priorClientIdentity && priorPortalIdentity, 'Reinstall must begin with the client and Portal running');
   await runProcess(setup, [], env);
   upgradedPid = await until('manual reinstall starts a new client', async () => (await clients()).find(p => p.ProcessId !== priorClient)?.ProcessId);
   await until('manual reinstall resumes Portal', async () => {
     const current = await json(path.join(service.root, '.portal-connection-status.json')).catch(() => null);
-    if (current?.state === 'connected' && current.pid !== priorPortal) { ownedPids.add(current.pid); return current; }
+    if (current?.state === 'connected' && !isDeepStrictEqual(await rememberPortal(current.pid), priorPortalIdentity)) return current;
   });
   await until('manual reinstall commits recovery', async () => !(await readdir(profile)).includes('client-install.json'));
-  assert.throws(() => process.kill(priorClient, 0));
-  assert.throws(() => process.kill(priorPortal, 0));
+  assert.notDeepEqual(await processIdentity(priorClient), priorClientIdentity, 'The original client process is still running after reinstall');
+  assert.notDeepEqual(await processIdentity(priorPortal), priorPortalIdentity, 'The original Portal process is still running after reinstall');
   assert.equal(await readFile(configPath, 'utf8'), config);
   assert.equal(await readFile(path.join(profile, 'retained.txt'), 'utf8'), 'Keep user profile');
   await assertSingleClientWindow(upgradedPid);
@@ -267,6 +284,7 @@ try {
   await writeFile(path.join(diagnostics, 'failure.json'), JSON.stringify({
     root, profile, error: { message: error.message, stack: error.stack, code: error.code, signal: error.signal, killed: error.killed },
     clients: await clients().catch(failure => ({ error: String(failure) })),
+    portals: await Promise.all([...ownedProcesses.values()].map(async before => ({ before, after: await processIdentity(before.pid) }))),
     profileCreated: await access(profile).then(() => true, () => false),
   }, null, 2));
   throw error;
@@ -277,9 +295,14 @@ try {
   for (const client of await clients()) await execute('taskkill', ['/PID', String(client.ProcessId), '/T', '/F'], { windowsHide: true }).catch(() => {});
   if (service?.root && service.root.startsWith(profile + path.sep)) {
     const status = await json(path.join(service.root, '.portal-connection-status.json')).catch(() => null);
-    if (status?.pid) ownedPids.add(status.pid);
+    if (status?.pid) {
+      const identity = await processIdentity(status.pid);
+      if (identity?.executable?.toLowerCase().startsWith((profile + path.sep).toLowerCase())) ownedProcesses.set(status.pid, identity);
+    }
   }
-  for (const pid of ownedPids) await execute('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }).catch(() => {});
+  for (const [pid, identity] of ownedProcesses) {
+    if (isDeepStrictEqual(await processIdentity(pid), identity)) await execute('taskkill', ['/PID', String(pid), '/T', '/F'], { windowsHide: true }).catch(() => {});
+  }
   for (const waiter of pending.values()) clearTimeout(waiter.timer);
   for (const socket of wss.clients) socket.terminate();
   wss.close(); server.closeAllConnections(); if (server.listening) await new Promise(resolve => server.close(resolve));
