@@ -95,6 +95,7 @@ try {
   if (!flags.has('--reuse-package')) {
     await npm('package', ['run', 'package']);
   }
+  await step('packaged-resources', process.execPath, ['tests/packaged-resources.mjs']);
   await npm('model-catalog', ['run', 'test:model-catalog']);
   await npm('chat-react', ['run', 'test:chat-react']);
   await npm('chat-surface-interaction', ['run', 'test:chat-surface-interaction']);

@@ -186,7 +186,7 @@ export function createDesktopApplication(options: DesktopOptions) {
       window: () => lifecycle.window, shellURL, isQuitting: () => lifecycle.quitting,
       recoveryBlocked: () => portalController.recoveryBlocked, errorLog
     });
-    home = await createDesktopHome({ directory, secretStorage, store, window: () => lifecycle.window, handle });
+    home = await createDesktopHome({ directory, assets, secretStorage, store, window: () => lifecycle.window, handle });
     registerShellIpc({
       handle, exclusive, directory, store, localFiles, attachmentDownloads, approvalDialogs,
       window: () => lifecycle.window, browser: () => lifecycle.browser

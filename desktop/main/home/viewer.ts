@@ -16,7 +16,7 @@ export class HomeViewer {
   private current = 0;
   private removeIpc?: () => void;
   constructor(private window: () => BrowserWindow | null, private publish: (phase: HomeState['viewer']) => void,
-    private assets = path.resolve(__dirname, '../../desktop/generated')) {}
+    private assets: string) {}
   open(url: string, computerId: string) {
     this.close();
     const owner = this.window();

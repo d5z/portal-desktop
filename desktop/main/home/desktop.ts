@@ -8,12 +8,12 @@ import { registerHomeIpc } from './ipc';
 import { HomeService } from './service';
 import { HomeViewer } from './viewer';
 export async function createDesktopHome(options: {
-  directory: string; secretStorage: SecretStorage; store: SettingsStore;
+  directory: string; assets: string; secretStorage: SecretStorage; store: SettingsStore;
   window(): BrowserWindow | null; handle: RegisterHandler;
 }) {
   const { directory, secretStorage, store, window: getWindow, handle } = options;
   const homeClient = new HomeClient(directory, secretStorage, url => shell.openExternal(url));
-  const homeViewer = new HomeViewer(getWindow, viewer => home?.update({ viewer }));
+  const homeViewer = new HomeViewer(getWindow, viewer => home?.update({ viewer }), options.assets);
   const home = new HomeService(homeClient, homeViewer, () => store.connection, state => {
     const window = getWindow();
     if (window && !window.isDestroyed()) window.webContents.send('beings:home-state', state);
