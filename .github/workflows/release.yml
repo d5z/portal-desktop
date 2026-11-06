@@ -2,6 +2,12 @@ name: Build paired client release
 on:
   push:
     tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      source_run:
+        description: 'Retry an unpublished tag using its original, preflight-verified push run ID'
+        required: true
+        type: string
 permissions:
   contents: read
 jobs:
@@ -9,32 +15,60 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
+      actions: read
+    outputs:
+      tag: ${{ steps.source.outputs.tag }}
+      commit: ${{ steps.source.outputs.commit }}
     steps:
+      - name: Resolve the original release commit
+        id: source
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          SOURCE_RUN: ${{ inputs.source_run }}
+        run: |
+          set -euo pipefail
+          tag=$GITHUB_REF_NAME
+          commit=$GITHUB_SHA
+          if [[ "$GITHUB_EVENT_NAME" == workflow_dispatch ]]; then
+            [[ "$SOURCE_RUN" =~ ^[0-9]+$ ]]
+            gh run view "$SOURCE_RUN" --json headBranch,headSha,workflowName,event,jobs > "$RUNNER_TEMP/source.json"
+            jq -e '.event == "push" and .workflowName == "Build paired client release" and any(.jobs[]; .name == "preflight" and .conclusion == "success")' "$RUNNER_TEMP/source.json" >/dev/null
+            tag=$(jq -r .headBranch "$RUNNER_TEMP/source.json")
+            commit=$(jq -r .headSha "$RUNNER_TEMP/source.json")
+          fi
+          [[ "$tag" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "commit=$commit" >> "$GITHUB_OUTPUT"
       - uses: actions/checkout@v4
         with:
+          ref: refs/tags/${{ steps.source.outputs.tag }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Validate a new unique version tag
+      - name: Validate the version and refuse published or moved tags
         env:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ steps.source.outputs.tag }}
+          EXPECTED_COMMIT: ${{ steps.source.outputs.commit }}
           TAG_CREATED: ${{ github.event.created }}
           TAG_FORCED: ${{ github.event.forced }}
         run: |
           set -euo pipefail
           EXPECTED_TAG="v$(node -p 'require("./package.json").version')"
-          if [[ "$GITHUB_REF_NAME" != "$EXPECTED_TAG" ]]; then
-            echo "::error title=Version tag mismatch::Expected $EXPECTED_TAG from package.json, received $GITHUB_REF_NAME"
+          if [[ "$RELEASE_TAG" != "$EXPECTED_TAG" ]]; then
+            echo "::error title=Version tag mismatch::Expected $EXPECTED_TAG from package.json, received $RELEASE_TAG"
             exit 1
           fi
-          if [[ "$TAG_CREATED" != "true" || "$TAG_FORCED" == "true" ]]; then
-            echo "::error title=Reused version tag::$GITHUB_REF_NAME must be a newly created tag; publish a new version instead of moving an existing tag"
+          [[ "$(git rev-parse HEAD)" == "$EXPECTED_COMMIT" ]]
+          if [[ "$GITHUB_EVENT_NAME" == push && ( "$TAG_CREATED" != "true" || "$TAG_FORCED" == "true" ) ]]; then
+            echo "::error title=Reused version tag::$RELEASE_TAG must be a newly created tag; publish a new version instead of moving an existing tag"
             exit 1
           fi
-          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
-            echo "::error title=Duplicate release::$GITHUB_REF_NAME already has a GitHub Release; publish a new version instead"
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "::error title=Duplicate release::$RELEASE_TAG already has a GitHub Release; publish a new version instead"
             exit 1
           fi
   build:
@@ -43,13 +77,15 @@ jobs:
       fail-fast: false
       matrix:
         os: [macos-14, macos-15-intel, windows-latest]
-    runs-on: ${{ matrix.os }}
+    # Keep the original job/artifact IDs used by staging and publication retries.
+    runs-on: ${{ matrix.os == 'macos-14' && 'macos-15' || matrix.os }}
     timeout-minutes: 45
     env:
       PORTAL_DESKTOP_UPDATE_REPOSITORY: ${{ vars.PORTAL_DESKTOP_UPDATE_REPOSITORY || github.repository }}
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ needs.preflight.outputs.commit }}
           persist-credentials: false
           submodules: recursive
       - uses: actions/setup-node@v4
@@ -140,13 +176,14 @@ jobs:
           if-no-files-found: error
           retention-days: 30
   publish:
-    needs: build
+    needs: [preflight, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v4
         with:
+          ref: ${{ needs.preflight.outputs.commit }}
           persist-credentials: false
           submodules: recursive
       - uses: actions/setup-node@v4
@@ -158,13 +195,13 @@ jobs:
       - name: Validate all three platform packages and stage checksums
         run: node scripts/stage-release.mjs artifacts release "$(node -p 'require("./package.json").version')"
       - name: Publish the complete paired release
-        if: startsWith(github.ref, 'refs/tags/')
         env:
+          RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --verify-tag --draft --title "Portal Desktop $GITHUB_REF_NAME" --notes-file desktop/RELEASE_NOTES.md
-          gh release upload "$GITHUB_REF_NAME" release/*
-          gh release edit "$GITHUB_REF_NAME" --draft=false --latest
-# Only a matching version tag builds and publishes. Publication waits for all three
+          gh release create "$RELEASE_TAG" --verify-tag --draft --title "Portal Desktop $RELEASE_TAG" --notes-file desktop/RELEASE_NOTES.md
+          gh release upload "$RELEASE_TAG" release/*
+          gh release edit "$RELEASE_TAG" --draft=false --latest
+# Only a verified tag builds and publishes. Publication waits for all three
 # native builds; the release stays a draft if asset upload fails.
