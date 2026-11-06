@@ -16,6 +16,7 @@ import { desktopExecutable, waitForChatReady } from './support/desktop.mjs';
 import { launchDesktop } from './support/electron-lifecycle.mjs';
 import { isolateWindowsInstallation, powershell, psQuote } from './support/windows-installation.mjs';
 import { assertSingleClientWindow } from './support/windows-client-windows.mjs';
+import { processIdentity, replacementProcess } from './support/windows-processes.mjs';
 
 if (process.platform !== 'win32') throw new Error('Run this test on Windows.');
 const execute = promisify(execFile), sha = bytes => createHash('sha256').update(bytes).digest('hex');
@@ -99,12 +100,6 @@ async function clients() {
     # Count root client processes; retain orphan workers as failures.
     $mains=@($items | Where-Object { $_.ParentProcessId -notin $items.ProcessId });
     ConvertTo-Json -InputObject $mains -Compress
-  `));
-}
-async function processIdentity(pid) {
-  return JSON.parse(await powershell(`
-    $item=Get-CimInstance Win32_Process -Filter 'ProcessId=${pid}';
-    if ($item) { @{pid=$item.ProcessId; created=$item.CreationDate.ToUniversalTime().Ticks.ToString(); executable=$item.ExecutablePath} | ConvertTo-Json -Compress } else { 'null' }
   `));
 }
 async function rememberPortal(pid) {
@@ -198,7 +193,11 @@ try {
     const service = await json(path.join(profile, 'portal-service.json')).catch(() => null);
     if (service?.bundleId !== bundle.id) return false;
     const sample = await json(path.join(service.root, '.portal-connection-status.json')).catch(() => null);
-    if (sample?.state === 'connected' && !isDeepStrictEqual(await rememberPortal(sample.pid), oldPortal)) return sample;
+    if (sample?.state !== 'connected') return false;
+    const identity = await replacementProcess(sample.pid, oldPortal);
+    if (!identity) return false;
+    ownedProcesses.set(identity.pid, identity);
+    return sample;
   });
   await until('installation transaction commits', async () => !(await readdir(profile)).includes('client-install.json'));
   const after = await json(path.join(profile, 'connection.json')), service = await json(path.join(profile, 'portal-service.json'));
@@ -237,7 +236,11 @@ try {
   upgradedPid = await until('manual reinstall starts a new client', async () => (await clients()).find(p => p.ProcessId !== priorClient)?.ProcessId);
   await until('manual reinstall resumes Portal', async () => {
     const current = await json(path.join(service.root, '.portal-connection-status.json')).catch(() => null);
-    if (current?.state === 'connected' && !isDeepStrictEqual(await rememberPortal(current.pid), priorPortalIdentity)) return current;
+    if (current?.state !== 'connected') return false;
+    const identity = await replacementProcess(current.pid, priorPortalIdentity);
+    if (!identity) return false;
+    ownedProcesses.set(identity.pid, identity);
+    return current;
   });
   await until('manual reinstall commits recovery', async () => !(await readdir(profile)).includes('client-install.json'));
   assert.notDeepEqual(await processIdentity(priorClient), priorClientIdentity, 'The original client process is still running after reinstall');

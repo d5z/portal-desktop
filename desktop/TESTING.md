@@ -60,6 +60,8 @@ Town 正文提及显示由 `tests/town-mentions.test.ts` 与 `test:town-names` �
 
 `test:all` 包含私信名称、Seed Garden、SBS 刷新和内置浏览器回归。Windows 安装升级测试单独执行，需要交互式桌面会话和已构建的 Setup。测试使用临时安装目录、独立 profile、本地模拟 Being 和真实计划任务；NSIS 的用户级快捷方式、缓存和卸载登记会在结束时恢复。如果该 Windows 账户已有日常 NSIS 安装，测试会拒绝运行，应换测试账户。旧版本由当前包构造，不代表覆盖所有历史发布版。失败时保留临时目录和 `installation-metadata.json` 供排查。
 
+`tests/windows-processes-native.test.ts` 用真实 Windows 子进程复现升级期间状态文件仍记录旧 `connected` PID 的时序：原进程仍在运行、原进程退出、新进程出现，以及相同 PID 的创建时间不同。升级和运行中重装共用同一个进程等待判定；已退出的 PID 返回未就绪，由原有超时约束继续等待，只有存活且身份不同的进程才通过。该测试由 `npm test` 自动执行，不修改日常安装登记。
+
 Windows 的离线升级、坏引擎回滚与独立 Portal 接管另用 PowerShell 执行：`$env:PORTAL_DESKTOP_NATIVE_UPGRADE_TESTS='1'; npx vitest run tests/background-native.test.ts tests/runtime-update-native.test.ts --maxWorkers=1`。这些检查需要真实计划任务权限，不能以普通单元测试中的跳过结果代替。
 
 ## 对话工具与停止回执回归（2026-10-22）
