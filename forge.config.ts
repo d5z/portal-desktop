@@ -12,6 +12,8 @@ import { macDmgIdentifier, verifyMacSignature } from './desktop/main/updates/mac
 import pkg from './package.json';
 
 const binary = path.resolve('resources', process.platform === 'win32' ? 'heart-portal.exe' : 'heart-portal');
+const extraResource = [binary, path.resolve('resources/HEART-PORTAL-LICENSE'), path.resolve('resources/branding'), path.resolve('resources/runtime-bundle.json'), path.resolve('node_modules/npm'), path.resolve('resources/node-bin')];
+const rendererName = 'main_window';
 const macLocalTest = process.env.PORTAL_DESKTOP_MAC_LOCAL_TEST === '1';
 const macIdentity = macLocalTest ? '-' : signing.identity;
 if (process.platform === 'darwin' && macLocalTest && process.env.GITHUB_REF?.startsWith('refs/tags/')) {
@@ -43,14 +45,24 @@ const config: ForgeConfig = {
       // notarization is deliberately deferred, with no automatic submission.
     } : {}),
     icon: path.resolve('resources/branding/app'),
-    extraResource: [binary, path.resolve('resources/HEART-PORTAL-LICENSE'), path.resolve('resources/branding'), path.resolve('resources/runtime-bundle.json'), path.resolve('node_modules/npm')],
+    extraResource,
   },
   hooks: {
+    preStart: async () => {
+      execFileSync(process.execPath, ['scripts/check-desktop-dependencies.mjs'], { stdio: 'inherit' });
+    },
     prePackage: async () => {
+      execFileSync(process.execPath, ['scripts/check-desktop-dependencies.mjs'], { stdio: 'inherit' });
       if (!existsSync(binary)) throw new Error('Portal binary missing. Run npm run build:portal first.');
       if (process.platform === 'darwin') execFileSync(process.execPath, ['scripts/sign-macos-runtime.mjs'], { stdio: 'inherit' });
     },
     postPackage: async (_forgeConfig, result) => {
+      for (const output of result.outputPaths) {
+        const resources = result.platform === 'darwin' ? path.join(output, `${pkg.productName}.app/Contents/Resources`) : path.join(output, 'resources');
+        // Electron's built-in fs can read the finished ASAR without extracting it.
+        execFileSync(require('electron'), ['scripts/check-packaged-resources.cjs', resources, rendererName, ...extraResource],
+          { env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' }, stdio: 'inherit' });
+      }
       if (result.platform === 'darwin' && !macLocalTest) {
         for (const output of result.outputPaths) {
           const app = path.join(output, `${pkg.productName}.app`);
@@ -80,7 +92,7 @@ const config: ForgeConfig = {
       { entry: 'desktop/main/main.ts', config: 'vite.main.config.ts', target: 'main' },
       { entry: 'desktop/preload/preload.ts', config: 'vite.preload.config.ts', target: 'preload' },
     ],
-    renderer: [{ name: 'main_window', config: 'vite.renderer.config.ts' }],
+    renderer: [{ name: rendererName, config: 'vite.renderer.config.ts' }],
   })],
 };
 export default config;

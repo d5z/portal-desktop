@@ -8,6 +8,7 @@ import { handleInstallerEvent, installerEvent, installerTarget } from './updates
 
 declare const MAIN_WINDOW_VITE_DEV_SERVER_URL: string | undefined;
 declare const MAIN_WINDOW_VITE_NAME: string;
+declare const PORTAL_DESKTOP_DEV_ASSETS: string | null;
 declare const PORTAL_DESKTOP_UPDATE_REPOSITORY: string;
 declare const PORTAL_DESKTOP_BUILD: string;
 const startedAt = new Date().toISOString();
@@ -36,7 +37,7 @@ try {
 const desktop = createDesktopApplication({
   userData, clientName: CLIENT_NAME, startedAt,
   shellURL: () => new URL(MAIN_WINDOW_VITE_DEV_SERVER_URL || 'beings://desktop/').href,
-  get assets() { return app.isPackaged ? path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}`) : path.resolve('desktop/generated'); },
+  get assets() { return PORTAL_DESKTOP_DEV_ASSETS ?? path.join(__dirname, `../renderer/${MAIN_WINDOW_VITE_NAME}`); },
   get development() { return Boolean(MAIN_WINDOW_VITE_DEV_SERVER_URL); },
   get build() { return PORTAL_DESKTOP_BUILD; },
   get updateRepository() { return PORTAL_DESKTOP_UPDATE_REPOSITORY; },

@@ -30,7 +30,7 @@ export class DshPluginManager {
   private modelCompatibility?: DshModelCompatibility;
   private modelNoticeAt = 0;
   private services = { ...DEFAULT_DSH_SERVICE_CONFIG };
-  constructor(readonly home: string, readonly worker: string, readonly npmCLI: string, readonly shellOrigin: string) {}
+  constructor(readonly home: string, readonly worker: string, readonly npmCLI: string, readonly shellOrigin: string, readonly nodeBin: string) {}
   private serial<T>(operation: () => Promise<T>): Promise<T> {
     const result = this.pending.then(operation); this.pending = result.catch(() => {}); return result;
   }
@@ -67,11 +67,17 @@ export class DshPluginManager {
     if (typeof source !== 'string' || !source.trim() || source.length > 4096 || source.startsWith('-') || /[\r\n\0]/.test(source)) throw new Error('请输入 npm 包名、Git URL、本地目录或压缩包路径。');
     const packages = path.join(this.home, 'packages'); await mkdir(packages, { recursive: true });
     const stage = await mkdtemp(path.join(packages, 'package-'));
+    // Package scripts must use our Electron Node runtime, even without system Node.
+    // Windows environment keys are case-insensitive; keep only one PATH key.
+    const environment = Object.fromEntries(Object.entries(process.env).filter(([key]) => key.toUpperCase() !== 'PATH'));
+    const searchPath = Object.entries(process.env).find(([key]) => key.toUpperCase() === 'PATH')?.[1] ?? '';
+    const env = { ...environment, PATH: this.nodeBin + path.delimiter + searchPath,
+      PORTAL_DESKTOP_NODE_EXECUTABLE: process.execPath, ELECTRON_RUN_AS_NODE: '1', npm_config_update_notifier: 'false' };
     try {
       const hostLibraries = { '@deepseek-ai/cordis': '4.0.5', '@deepseek-ai/dsh-typert-protocol': '0.2.1-rc.5', '@deepseek-ai/dsh-settings': '0.2.1-rc.5', '@deepseek-ai/dsh-home-paths': '0.2.1-rc.5', '@deepseek-ai/dsh-credentials': '0.2.1-rc.5', '@deepseek-ai/dsh-llm': '0.2.1-rc.5' };
       await writeFile(path.join(stage, 'package.json'), JSON.stringify({ name: 'town-third-party-install', private: true, dependencies: hostLibraries }));
       await execute(process.execPath, [this.npmCLI, 'install', '--prefix', stage, '--ignore-scripts', '--legacy-peer-deps', '--no-audit', '--no-fund', '--install-links', '--save-exact', '--', source], {
-        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', npm_config_update_notifier: 'false' }, timeout: 180000, maxBuffer: 2 * 1024 * 1024, windowsHide: true,
+        env, timeout: 180000, maxBuffer: 2 * 1024 * 1024, windowsHide: true,
       });
       const manifest = JSON.parse(await readFile(path.join(stage, 'package.json'), 'utf8'));
       const names = Object.keys(manifest.dependencies || {}).filter(name => !(name in hostLibraries));
@@ -83,7 +89,7 @@ export class DshPluginManager {
         enabled: true, installedAt: new Date().toISOString(), status: 'disabled' };
       return { entry: { root, plugin } as Entry, build: async () => {
         await execute(process.execPath, [this.npmCLI, 'rebuild', '--prefix', stage, '--foreground-scripts'], {
-          env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', npm_config_update_notifier: 'false' }, timeout: 180000, maxBuffer: 2 * 1024 * 1024, windowsHide: true,
+          env, timeout: 180000, maxBuffer: 2 * 1024 * 1024, windowsHide: true,
         });
         await readDshPackage(root);
       }, discard: () => rm(stage, { recursive: true, force: true }) };

@@ -33,7 +33,7 @@ afterEach(() => {
 it('follows the Windows taskbar theme even when the app theme is opposite', async () => {
   vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
   Object.assign(nativeTheme, { shouldUseDarkColors: true, shouldUseDarkColorsForSystemIntegratedUI: false });
-  const tray = createApplicationTray(vi.fn(), false);
+  const tray = createApplicationTray(vi.fn());
   await vi.waitFor(() => expect(nativeImage.createFromPath).toHaveBeenLastCalledWith(expect.stringMatching(/tray-black\.png$/)));
   vi.mocked(tray.setImage).mockClear();
   shellTheme.light = 0;
@@ -49,7 +49,7 @@ it('follows the Windows taskbar theme even when the app theme is opposite', asyn
 
 it('lets macOS color the template icon instead of imposing the app theme', () => {
   vi.spyOn(process, 'platform', 'get').mockReturnValue('darwin');
-  createApplicationTray(vi.fn(), false);
+  createApplicationTray(vi.fn());
   expect(nativeImage.createFromPath).toHaveBeenCalledWith(expect.stringMatching(/trayTemplate\.png$/));
   const icon = vi.mocked(nativeImage.createFromPath).mock.results[0].value;
   expect(icon.setTemplateImage).toHaveBeenCalledWith(true);
@@ -59,7 +59,7 @@ it('lets macOS color the template icon instead of imposing the app theme', () =>
 
 it('does not update a destroyed tray', () => {
   vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
-  const tray = createApplicationTray(vi.fn(), false);
+  const tray = createApplicationTray(vi.fn());
   vi.mocked(tray.isDestroyed).mockReturnValue(true);
   nativeTheme.emit('updated');
   expect(tray.setImage).not.toHaveBeenCalled();

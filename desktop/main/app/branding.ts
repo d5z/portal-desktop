@@ -1,10 +1,6 @@
-import { app } from 'electron';
-import path from 'node:path';
+import { nativeResource } from './resources';
 
-export function brandingPath(file: string) {
-  return path.join(app.isPackaged ? process.resourcesPath : app.getAppPath(),
-    app.isPackaged ? 'branding' : 'resources/branding', file);
-}
+export function brandingPath(file: string) { return nativeResource('branding', file); }
 
 export function systemIcon(dark = true) {
   return brandingPath(process.platform === 'win32' ? dark ? 'logo-white.png' : 'logo.png'

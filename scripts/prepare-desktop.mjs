@@ -1,11 +1,12 @@
 import { writeRuntimeBundle } from './runtime-bundle.mjs';
-import { mkdir, copyFile, access, chmod } from 'node:fs/promises';
+import { mkdir, copyFile, access, chmod, rm } from 'node:fs/promises';
 import path from 'node:path';
-import './build-chat.mjs';
-import './build-home-viewer.mjs';
-import './build-dsh-host.mjs';
 import { portalSource } from './portal-source.mjs';
 import { checkPortalCapabilities } from './portal-capabilities.mjs';
+
+// Development and packaging start from the same freshly generated public files.
+await rm('desktop/generated', { recursive: true, force: true });
+await Promise.all([import('./build-chat.mjs'), import('./build-home-viewer.mjs'), import('./build-dsh-host.mjs')]);
 
 const binaryName = process.platform === 'win32' ? 'heart-portal.exe' : 'heart-portal';
 const destination = path.resolve('resources', binaryName);

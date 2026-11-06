@@ -2,6 +2,7 @@
 import { build } from 'esbuild';
 import { createServer } from 'vite';
 import electron from 'electron';
+import { desktopFixtureBanner } from './support/desktop.mjs';
 import { launchDesktop } from './support/electron-lifecycle.mjs';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -21,8 +22,8 @@ try {
   server = await createServer({ configFile: path.join(root, 'vite.renderer.config.ts'), server: { host: '127.0.0.1', port: 0 } });
   await server.listen();
   const buildDirectory = path.join(temporary, 'build');
-  await build({ entryPoints: ['desktop/main/main.ts'], outfile: path.join(buildDirectory, 'main.js'), bundle: true, platform: 'node', format: 'cjs', external: ['electron'], loader: { '.py': 'text', '.ps1': 'text' }, define: {
-    MAIN_WINDOW_VITE_DEV_SERVER_URL: JSON.stringify(`http://127.0.0.1:${server.httpServer.address().port}/`), MAIN_WINDOW_VITE_NAME: '"main_window"',
+  await build({ entryPoints: ['desktop/main/main.ts'], outfile: path.join(buildDirectory, 'main.js'), bundle: true, platform: 'node', format: 'cjs', external: ['electron'], loader: { '.py': 'text', '.ps1': 'text' }, banner: desktopFixtureBanner, define: {
+    PORTAL_DESKTOP_DEV_ASSETS: JSON.stringify(path.resolve('desktop/generated')), MAIN_WINDOW_VITE_DEV_SERVER_URL: JSON.stringify(`http://127.0.0.1:${server.httpServer.address().port}/`), MAIN_WINDOW_VITE_NAME: '"main_window"',
     PORTAL_DESKTOP_BUILD: '"plugin-icons-test"', PORTAL_DESKTOP_UPDATE_REPOSITORY: '"fixture/repo"',
   } });
   await build({ entryPoints: ['desktop/preload/preload.ts'], outfile: path.join(buildDirectory, 'preload.js'), bundle: true, platform: 'node', format: 'cjs', external: ['electron'] });
@@ -40,6 +41,7 @@ try {
   await page.getByRole('tab', { name: 'Plugin', exact: true }).click();
   await page.getByRole('button', { name: '导入插件目录' }).click();
   await page.locator('.plugin-card').waitFor();
+  await page.getByText('显示位置与图标', { exact: true }).click();
   await page.getByLabel('图标看板显示位置').selectOption('navigation');
   await page.getByRole('button', { name: '更多功能', exact: true }).click();
   const destination = page.locator('.rail-more-destination[data-plugin-navigation]');
@@ -62,6 +64,7 @@ try {
   await page.getByRole('button', { name: '更多功能', exact: true }).click();
   await page.getByRole('button', { name: '工具库', exact: true }).click();
   await page.getByRole('tab', { name: 'Plugin', exact: true }).click();
+  if (!await edit.isVisible()) await page.getByText('显示位置与图标', { exact: true }).click();
   await edit.click();
   await dialog.getByLabel('上传图标图片').setInputFiles({ name: 'invalid.png', mimeType: 'image/png', buffer: Buffer.from('not an image') });
   await dialog.getByRole('alert').filter({ hasText: '图片无法读取' }).waitFor();

@@ -13,7 +13,7 @@ const temp = await mkdtemp(path.join(os.tmpdir(), 'town-pet-host-'));
 await build({entryPoints:['desktop/main/plugins/dsh/manager.ts'],outfile:path.join(temp,'manager.cjs'),bundle:true,platform:'node',format:'cjs'});
 await build({entryPoints:['desktop/main/plugins/dsh/worker.ts'],outfile:path.join(temp,'host.cjs'),bundle:true,platform:'node',format:'cjs',banner:{js:"const __townModuleURL = require('node:url').pathToFileURL(__filename).href;"},define:{'import.meta.url':'__townModuleURL'}});
 const { DshPluginManager } = await import(pathToFileURL(path.join(temp,'manager.cjs')).href);
-let manager = new DshPluginManager(temp, path.join(temp,'host.cjs'),path.resolve('node_modules/npm/bin/npm-cli.js'),'beings://desktop');
+let manager = new DshPluginManager(temp, path.join(temp,'host.cjs'),path.resolve('node_modules/npm/bin/npm-cli.js'),'beings://desktop', path.resolve('resources/node-bin'));
 await build({entryPoints:['desktop/main/plugins/dsh/subagent-model.ts'],outfile:path.join(temp,'subagent.cjs'),bundle:true,platform:'node',format:'cjs'});
 const { resolveSubagentModel } = await import(pathToFileURL(path.join(temp,'subagent.cjs')).href);
 const resolveModel = () => resolveSubagentModel(temp,{},{});
@@ -148,7 +148,7 @@ api_key = "fixture-key"
   assert.ok((await json('/dsh-pet-7340/todos')).todos.some(todo=>todo.id===created.todo.id && todo.done));
   assert.ok((await json('/dsh-pet-7340/chat?pet=main')).messages.some(message=>message.content.includes('失败后恢复')),'history must survive worker restart');
   await manager.stop();
-  manager = new DshPluginManager(temp, path.join(temp,'host.cjs'),path.resolve('node_modules/npm/bin/npm-cli.js'),'beings://desktop');
+  manager = new DshPluginManager(temp, path.join(temp,'host.cjs'),path.resolve('node_modules/npm/bin/npm-cli.js'),'beings://desktop', path.resolve('resources/node-bin'));
   manager.resolveModel = resolveModel;
   await manager.initialize();
   assert.equal(manager.state().plugins[0].status,'active');

@@ -2,6 +2,7 @@
 import { build } from 'esbuild';
 import { createServer, build as buildRenderer } from 'vite';
 import electron from 'electron';
+import { desktopFixtureBanner } from './support/desktop.mjs';
 import { launchDesktop } from './support/electron-lifecycle.mjs';
 import { mkdtemp, mkdir, rm, writeFile, readFile } from 'node:fs/promises';
 import { c as archive } from 'tar';
@@ -33,18 +34,14 @@ try {
   }
   const buildDirectory = path.join(temporary, 'build');
   await build({ entryPoints: ['desktop/main/main.ts'], outfile: path.join(buildDirectory, 'main.js'), bundle: true, platform: 'node', format: 'cjs', external: ['electron'], loader: { '.py': 'text', '.ps1': 'text' }, plugins: [{ name: 'offline-fixture-store', setup(build) {
-    build.onLoad({ filter: /desktop[\\/]main[\\/]main\.ts$/ }, async args => {
-      let source = await readFile(args.path, 'utf8');
-      if (packaged) source = source.replace("path.resolve('desktop/generated')", JSON.stringify(rendererAssets));
-      return { contents: source, loader: 'ts' };
-    });
     build.onLoad({ filter: /desktop[\\/]main[\\/]app[\\/]configuration\.ts$/ }, async args => {
       const source = await readFile(args.path, 'utf8');
       const anchor = 'const store = new SettingsStore(directory, secretStorage, binary);';
       assert(source.includes(anchor));
       return { contents: source.replace(anchor, `${anchor}\n(globalThis as any).pluginFixtureStore = store;`), loader: 'ts' };
     });
-  } }], define: {
+  } }], banner: desktopFixtureBanner, define: {
+    PORTAL_DESKTOP_DEV_ASSETS: JSON.stringify(packaged ? rendererAssets : path.resolve('desktop/generated')),
     MAIN_WINDOW_VITE_DEV_SERVER_URL: JSON.stringify(url), MAIN_WINDOW_VITE_NAME: '"main_window"',
     PORTAL_DESKTOP_BUILD: '"plugins-test"', PORTAL_DESKTOP_UPDATE_REPOSITORY: '"fixture/repo"',
   } });

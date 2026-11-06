@@ -1,8 +1,9 @@
 import { build } from 'esbuild';
 import { build as buildRenderer } from 'vite';
 import electron from 'electron';
+import { desktopFixtureBanner } from './support/desktop.mjs';
 import { launchDesktop } from './support/electron-lifecycle.mjs';
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import assert from 'node:assert/strict';
@@ -17,7 +18,7 @@ if (!reused) {
   if (!process.env.DSH_THEME_PLUGIN_DIR) throw new Error('Set DSH_THEME_PLUGIN_DIR to the unmodified dsh-vscode-themes2 package directory.');
   await mkdir(path.join(temp, 'build'), {recursive:true});
   await buildRenderer({configFile:path.join(root,'vite.renderer.config.ts'),logLevel:'warn',build:{outDir:assets}});
-  await build({entryPoints:['desktop/main/main.ts'],outfile:path.join(temp,'build/main.js'),bundle:true,platform:'node',format:'cjs',external:['electron'],loader:{'.py':'text','.ps1':'text'},plugins:[{name:'isolated-assets',setup(b){b.onLoad({filter:/main\/main\.ts$/},async args=>({loader:'ts',contents:(await readFile(args.path,'utf8')).replace("path.resolve('desktop/generated')",JSON.stringify(assets))}));}}],define:{MAIN_WINDOW_VITE_DEV_SERVER_URL:'""',MAIN_WINDOW_VITE_NAME:'"main_window"',PORTAL_DESKTOP_BUILD:'"theme-test"',PORTAL_DESKTOP_UPDATE_REPOSITORY:'"fixture/repo"'}});
+  await build({entryPoints:['desktop/main/main.ts'],outfile:path.join(temp,'build/main.js'),bundle:true,platform:'node',format:'cjs',external:['electron'],loader:{'.py':'text','.ps1':'text'},banner:desktopFixtureBanner,define:{PORTAL_DESKTOP_DEV_ASSETS:JSON.stringify(assets),MAIN_WINDOW_VITE_DEV_SERVER_URL:'""',MAIN_WINDOW_VITE_NAME:'"main_window"',PORTAL_DESKTOP_BUILD:'"theme-test"',PORTAL_DESKTOP_UPDATE_REPOSITORY:'"fixture/repo"'}});
   await build({entryPoints:['desktop/preload/preload.ts'],outfile:path.join(temp,'build/preload.js'),bundle:true,platform:'node',format:'cjs',external:['electron']});
 }
 await writeFile(path.join(output,'profile.json'), JSON.stringify({temp,profile},null,2));

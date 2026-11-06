@@ -21,7 +21,7 @@ afterAll(async () => { if (workerDirectory) await rm(workerDirectory, { recursiv
 afterEach(async () => { for (const m of managers.splice(0)) await m.stop(); for (const root of roots.splice(0)) await rm(root, {recursive:true,force:true}); });
 async function fixture() {
   const home = await mkdtemp(path.join(os.tmpdir(), 'town-dsh-contract-')); roots.push(home);
-  const manager = new DshPluginManager(home, worker, path.resolve('node_modules/npm/bin/npm-cli.js'), 'beings://desktop'); managers.push(manager);
+  const manager = new DshPluginManager(home, worker, path.resolve('node_modules/npm/bin/npm-cli.js'), 'beings://desktop', path.resolve('resources/node-bin')); managers.push(manager);
   await manager.initialize();
   const make = async (name: string, source: string, extra = {}) => {
     const root = path.join(home, 'packages', name); await mkdir(root, {recursive:true});
@@ -140,7 +140,7 @@ describe('Town DSH compatibility host (real Cordis process)',()=>{
  });
  it('does not launch a late plugin host when Town quits during initialization',async()=>{
    const home=await mkdtemp(path.join(os.tmpdir(),'town-dsh-quit-'));roots.push(home);
-   const manager=new DshPluginManager(home,worker,path.resolve('node_modules/npm/bin/npm-cli.js'),'beings://desktop');managers.push(manager);
+   const manager=new DshPluginManager(home,worker,path.resolve('node_modules/npm/bin/npm-cli.js'),'beings://desktop', path.resolve('resources/node-bin'));managers.push(manager);
    const starting=manager.initialize();
    await manager.shutdown();await starting;
    expect((await manager.resource(new Request('beings://desktop/@town-dsh/rpc'))).status).toBe(503);
@@ -166,7 +166,7 @@ describe('Town DSH compatibility host (real Cordis process)',()=>{
    await manager.configure('route-plugin',{value:'saved'});
    expect(await (await manager.resource(new Request('beings://desktop/fixture'))).json()).toEqual({value:'saved'});
    await manager.stop();
-   const second=new DshPluginManager(home,manager.worker,manager.npmCLI,manager.shellOrigin);managers.push(second);await second.initialize();
+   const second=new DshPluginManager(home,manager.worker,manager.npmCLI,manager.shellOrigin,manager.nodeBin);managers.push(second);await second.initialize();
    expect(await (await second.resource(new Request('beings://desktop/fixture'))).json()).toEqual({value:'saved'});
    await second.enable('route-plugin',false);
    expect(second.matches('/fixture')).toBe(false);expect(second.state().plugins[0].status).toBe('disabled');
@@ -182,7 +182,7 @@ describe('Town DSH compatibility host (real Cordis process)',()=>{
    await expect(manager.enable('agent-plugin',true)).rejects.toThrow('已停用');
    expect(manager.state().plugins[0]).toMatchObject(disabled);
    await manager.stop();
-   const restarted = new DshPluginManager(manager.home, worker, manager.npmCLI, manager.shellOrigin);
+   const restarted = new DshPluginManager(manager.home, worker, manager.npmCLI, manager.shellOrigin, manager.nodeBin);
    managers.push(restarted); await restarted.initialize();
    expect(restarted.state().plugins[0]).toMatchObject(disabled);
    expect(startupPluginNotice(restarted.state().plugins, {})).toBeUndefined();
@@ -308,14 +308,17 @@ describe('Town DSH compatibility host (real Cordis process)',()=>{
    expect((await rpc('describe')).value.namespaces[0].value).toEqual({color:'blue'});
  });
 
- it('executes build scripts only through the explicit prepared build operation',async()=>{
+ it('executes authorized build scripts with the private Node launcher on a restricted PATH',async()=>{
    const {manager,make}=await fixture();
    const entry=await make('buildable',`export function apply(){}`,{scripts:{postinstall:'node build.cjs'}});
-   await writeFile(path.join(entry.root,'build.cjs'),`require('fs').writeFileSync('built.txt','ready')`);
-   const prepared=await manager.prepare(entry.root);
-   await expect(readFile(path.join(prepared.entry.root,'built.txt'))).rejects.toThrow();
-   await prepared.build();
-   expect(await readFile(path.join(prepared.entry.root,'built.txt'),'utf8')).toBe('ready');
+   await writeFile(path.join(entry.root,'build.cjs'),`require('fs').writeFileSync('built.txt',process.execPath)`);
+   vi.stubEnv('PATH', process.platform === 'win32' ? path.join(process.env.SystemRoot!, 'System32') : '/usr/bin:/bin');
+   try {
+     const prepared=await manager.prepare(entry.root);
+     await expect(readFile(path.join(prepared.entry.root,'built.txt'))).rejects.toThrow();
+     await prepared.build();
+     expect(await readFile(path.join(prepared.entry.root,'built.txt'),'utf8')).toBe(process.execPath);
+   } finally { vi.unstubAllEnvs(); }
  },20000);
  it('executes nested HTML scripts and preserves module type and inert JSON',async()=>{
    const {manager,make}=await fixture();

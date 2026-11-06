@@ -8,6 +8,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { build } from 'esbuild';
 import electron from 'electron';
+import { desktopFixtureBanner } from './support/desktop.mjs';
 import { launchDesktop } from './support/electron-lifecycle.mjs';
 
 const root = await mkdtemp(path.join(os.tmpdir(), 'town-update-recovery-'));
@@ -50,7 +51,8 @@ try {
     BackgroundPortal.prototype.unload = async function(service) { globalThis.stoppedCandidates.push(service.root); };
     require('./desktop/main/main');
   ` }, bundle: true, platform: 'node', format: 'cjs', external: ['electron', 'bufferutil', 'utf-8-validate'],
-    define: { MAIN_WINDOW_VITE_DEV_SERVER_URL: JSON.stringify(shell), MAIN_WINDOW_VITE_NAME: '"main_window"',
+    banner: desktopFixtureBanner,
+    define: { PORTAL_DESKTOP_DEV_ASSETS: JSON.stringify(path.resolve('desktop/generated')), MAIN_WINDOW_VITE_DEV_SERVER_URL: JSON.stringify(shell), MAIN_WINDOW_VITE_NAME: '"main_window"',
       PORTAL_DESKTOP_BUILD: '"recovery-test"', PORTAL_DESKTOP_UPDATE_REPOSITORY: '"fixture/releases"' },
     plugins: [{ name: 'installer-boundary-fixture', setup(build) {
       // Replace only main's staging boundary. The production update checker,

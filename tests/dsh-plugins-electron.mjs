@@ -2,8 +2,9 @@
 import { build } from 'esbuild';
 import { build as buildRenderer, createServer } from 'vite';
 import electron from 'electron';
+import { desktopFixtureBanner } from './support/desktop.mjs';
 import { launchDesktop } from './support/electron-lifecycle.mjs';
-import { mkdtemp, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import assert from 'node:assert/strict';
@@ -17,7 +18,7 @@ let server, url = '';
 if (dev) { server = await createServer({configFile:path.join(root,'vite.renderer.config.ts'),server:{host:'127.0.0.1',port:0}}); await server.listen(); url='http://127.0.0.1:'+server.httpServer.address().port+'/'; }
 await mkdir(path.join(temp, 'build'), {recursive:true});
 if (!dev) await buildRenderer({configFile:path.join(root,'vite.renderer.config.ts'),build:{outDir:assets}});
-await build({entryPoints:['desktop/main/main.ts'],outfile:path.join(temp,'build/main.js'),bundle:true,platform:'node',format:'cjs',external:['electron'],loader:{'.py':'text','.ps1':'text'},plugins:[{name:'isolated-assets',setup(b){b.onLoad({filter:/main\/main\.ts$/},async args=>({loader:'ts',contents:(await readFile(args.path,'utf8')).replace("path.resolve('desktop/generated')",JSON.stringify(assets))}));}}],define:{MAIN_WINDOW_VITE_DEV_SERVER_URL:JSON.stringify(url),MAIN_WINDOW_VITE_NAME:'"main_window"',PORTAL_DESKTOP_BUILD:'"dsh-compat-test"',PORTAL_DESKTOP_UPDATE_REPOSITORY:'"fixture/repo"'}});
+await build({entryPoints:['desktop/main/main.ts'],outfile:path.join(temp,'build/main.js'),bundle:true,platform:'node',format:'cjs',external:['electron'],loader:{'.py':'text','.ps1':'text'},banner:desktopFixtureBanner,define:{PORTAL_DESKTOP_DEV_ASSETS:JSON.stringify(assets),MAIN_WINDOW_VITE_DEV_SERVER_URL:JSON.stringify(url),MAIN_WINDOW_VITE_NAME:'"main_window"',PORTAL_DESKTOP_BUILD:'"dsh-compat-test"',PORTAL_DESKTOP_UPDATE_REPOSITORY:'"fixture/repo"'}});
 await build({entryPoints:['desktop/preload/preload.ts'],outfile:path.join(temp,'build/preload.js'),bundle:true,platform:'node',format:'cjs',external:['electron']});
 const app = await launchDesktop({executablePath:electron,args:[path.join(temp,'build/main.js')],cwd:root,env:{...process.env,PORTAL_DESKTOP_USER_DATA:profile,PORTAL_DESKTOP_TEST_MOCK_KEYCHAIN:'1'}});
 try {

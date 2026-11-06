@@ -37,6 +37,7 @@ import { configureLocalSession, registerLocalProtocol } from './protocol';
 import { SettingsStore } from './settings';
 import { registerShellIpc } from './shell-ipc';
 import { installWindowsTaskbarIcons } from './taskbar-icons';
+import { bundledNpmCLI, nativeResource } from './resources';
 import { createApplicationTray, installApplicationMenu } from './tray';
 import { repairDevelopmentShortcut } from './windows-identity';
 
@@ -154,7 +155,7 @@ export function createDesktopApplication(options: DesktopOptions) {
       return result.canceled ? undefined : result.filePaths[0];
     }, file => shell.openPath(file), file => shell.showItemInFolder(file));
     const localFiles = new LocalFilePreviews(() => store.settings.workspace);
-    dshPlugins = new DshPluginManager(path.join(directory, 'third-party-plugins'), path.join(assets, 'dsh-plugin-host.cjs'), app.isPackaged ? path.join(process.resourcesPath, 'npm/bin/npm-cli.js') : path.resolve('node_modules/npm/bin/npm-cli.js'), new URL(shellURL()).origin);
+    dshPlugins = new DshPluginManager(path.join(directory, 'third-party-plugins'), path.join(assets, 'dsh-plugin-host.cjs'), bundledNpmCLI(), new URL(shellURL()).origin, nativeResource('node-bin'));
     dshPlugins.openClient = () => { lifecycle.window?.show(); lifecycle.window?.focus(); };
     dshPlugins.resolveModel = () => resolvePluginModel(directory, store.settings, !!store.connection, request => proxy.handle(request));
     dshPlugins.onModelNotice = message => lifecycle.window?.webContents.send('beings:dsh-model-notice', message);
@@ -232,7 +233,7 @@ export function createDesktopApplication(options: DesktopOptions) {
       showWindow();
       void updates.check();
     });
-    lifecycle.tray = createApplicationTray(showWindow, app.isPackaged);
+    lifecycle.tray = createApplicationTray(showWindow);
     lifecycle.openWhenReady();
     await exclusive(() => portalController.restoreStartup());
     stopBackgroundPoll = portalController.startPolling();

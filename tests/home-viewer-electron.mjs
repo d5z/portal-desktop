@@ -9,6 +9,14 @@ import { WebSocketServer } from 'ws';
 import { build } from 'esbuild';
 import electronPath from 'electron';
 import { launchDesktop } from './support/electron-lifecycle.mjs';
+import { desktopExecutable } from './support/desktop.mjs';
+const packaged = process.argv.includes('--packaged');
+let assets = path.resolve('desktop/generated');
+if (packaged) {
+  const executable = await desktopExecutable();
+  const resources = process.platform === 'darwin' ? path.resolve(path.dirname(executable), '../Resources') : path.join(path.dirname(executable), 'resources');
+  assets = path.join(resources, 'app.asar/.vite/renderer/main_window');
+}
 const directory = await mkdtemp(path.join(os.tmpdir(), 'home-stream-'));
 let app, server, wss;
 let exchanges = 0, htmlLoads = 0, sockets = 0, actions = [], controls = [], expired = false, canControl = false;
@@ -16,7 +24,7 @@ const state = () => ({ ready: true, can_control: canControl, controller: canCont
   view_mode: 'native', frame_width: 320, frame_height: 180, live_view: { available: true, protocol: 'rfb' } });
 const origins = [], cookies = [];
 try {
-  execFileSync('node', ['scripts/build-home-viewer.mjs'], { stdio: 'pipe' });
+  if (!packaged) execFileSync(process.execPath, ['scripts/build-home-viewer.mjs'], { stdio: 'pipe' });
   execFileSync('openssl', ['req', '-x509', '-newkey', 'rsa:2048', '-nodes', '-keyout', path.join(directory, 'key.pem'), '-out', path.join(directory, 'cert.pem'), '-days', '1', '-subj', '/CN=home.beings.town'], { stdio: 'ignore' });
   const key = await readFile(path.join(directory, 'key.pem')), cert = await readFile(path.join(directory, 'cert.pem'));
   const fingerprint = new X509Certificate(cert).fingerprint256;
@@ -74,7 +82,7 @@ try {
     app.whenReady().then(async () => {
       const window = new BrowserWindow({ width: 900, height: 650, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
       await window.loadURL('data:text/html,<title>Home stream test</title>');
-      const phases = []; const viewer = new HomeViewer(() => window, phase => phases.push(phase), ${JSON.stringify(path.resolve('desktop/generated'))});
+      const phases = []; const viewer = new HomeViewer(() => window, phase => phases.push(phase), ${JSON.stringify(assets)});
       globalThis.fixture = { viewer, window, phases, logs };
       viewer.setBounds({ x: 200, y: 100, width: 600, height: 400, visible: true, presentation: 'preview' });
       viewer.open('https://home.beings.town/desktop/connect?ticket=fixture-one', 'computer');
@@ -84,7 +92,7 @@ try {
       build.onResolve({ filter: /^ws$/ }, args => args.namespace === 'fixture-ws' ? { path: path.resolve('node_modules/ws/index.js') } : { path: 'ws', namespace: 'fixture-ws' });
       build.onLoad({ filter: /.*/, namespace: 'fixture-ws' }, () => ({ loader: 'js', resolveDir: process.cwd(), contents: `import WS from 'ws'; export default class extends WS { constructor(url, options) { const target = new URL(url); target.hostname = '127.0.0.1'; target.port = '${port}'; super(target, { ...options, servername: 'home.beings.town', ca: ${JSON.stringify(cert.toString())} }); } }` }));
     } }] });
-  app = await launchDesktop({ executablePath: electronPath, args: [entry], env: { ...process.env, PORTAL_DESKTOP_USER_DATA: directory } });
+  app = await launchDesktop({ executablePath: electronPath, args: [entry], cwd: directory, env: { ...process.env, PORTAL_DESKTOP_USER_DATA: directory } });
   await app.firstWindow();
   const wait = async predicate => { for (let i = 0; i < 100; i++) { if (await predicate()) return; await new Promise(r => setTimeout(r, 100)); } throw Error('fixture timeout'); };
   const native = code => app.evaluate(({}, code) => globalThis.fixture.viewer.view.webContents.executeJavaScript(code), code);

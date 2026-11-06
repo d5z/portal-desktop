@@ -1,5 +1,6 @@
-import { app, BrowserWindow, nativeTheme, type BrowserWindowConstructorOptions } from 'electron';
+import { BrowserWindow, nativeTheme, type BrowserWindowConstructorOptions } from 'electron';
 import path from 'node:path';
+import { systemIcon } from './branding';
 import { ClientBrowser } from '../browser/browser';
 
 const CLIENT_NAME = 'Portal Desktop';
@@ -88,16 +89,9 @@ export function createMainWindow(options: MainWindowOptions) {
 
 /** Shared native caption, icon and platform styling for client-owned windows. */
 export function clientWindowOptions(): BrowserWindowConstructorOptions {
-  const windowIcon = () => path.join(
-    app.isPackaged ? process.resourcesPath : app.getAppPath(),
-    app.isPackaged ? 'branding' : 'resources/branding',
-    process.platform === 'win32'
-      ? 'logo.png'
-      : process.platform === 'darwin' ? 'app-mac.png' : 'app.png',
-  );
   return {
     width: 1280, height: 860, minWidth: 920, minHeight: 640, title: CLIENT_NAME,
-    icon: windowIcon(),
+    icon: systemIcon(false),
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#212121' : '#ffffff',
     ...(process.platform === 'win32' ? { backgroundMaterial: 'none' as const } : {}),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',

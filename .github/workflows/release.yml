@@ -134,6 +134,11 @@ jobs:
       - run: npm run make
       - name: Verify packaged resources, PDF image decoders and cloud computer frame
         run: node tests/packaged-resources.mjs
+      - name: Verify packaged Node runtime and plugin host without system Node
+        run: npm run test:packaged-runtime
+      - name: Verify cloud viewer resources inside ASAR
+        if: runner.os == 'macOS'
+        run: node tests/home-viewer-electron.mjs --packaged
       - name: Verify interrupted upgrade recovery and installer retry
         run: node tests/update-recovery-electron.mjs
       - name: Verify signed macOS DMG installation and Release ZIP upgrade preflight

@@ -1,21 +1,17 @@
 import { app, Menu, nativeImage, Tray } from 'electron';
-import path from 'node:path';
+import { brandingPath } from './branding';
 import { watchSystemTheme } from './system-theme';
 
 const CLIENT_NAME = 'Portal Desktop';
 
-export function createApplicationTray(showWindow: () => void, isPackaged: boolean) {
-  const branding = path.join(
-    isPackaged ? process.resourcesPath : app.getAppPath(),
-    isPackaged ? 'branding' : 'resources/branding',
-  );
+export function createApplicationTray(showWindow: () => void) {
   const image = (dark = true) => {
     if (process.platform === 'darwin') {
-      const icon = nativeImage.createFromPath(path.join(branding, 'trayTemplate.png'));
+      const icon = nativeImage.createFromPath(brandingPath('trayTemplate.png'));
       icon.setTemplateImage(true);
       return icon;
     }
-    return nativeImage.createFromPath(path.join(branding, `tray-${dark ? 'white' : 'black'}.png`));
+    return nativeImage.createFromPath(brandingPath(`tray-${dark ? 'white' : 'black'}.png`));
   };
   const tray = new Tray(image());
   if (process.platform !== 'darwin') {

@@ -1,6 +1,9 @@
 import path from 'node:path';
 import { access, readFile } from 'node:fs/promises';
 
+// A fixture's main.js is temporary; production Forge starts from the application root.
+export const desktopFixtureBanner = { js: `require('electron').app.setAppPath(${JSON.stringify(path.resolve('.'))});` };
+
 export async function desktopExecutable() {
   const { productName } = JSON.parse(await readFile(new URL('../../package.json', import.meta.url), 'utf8'));
   const executable = process.env.PORTAL_DESKTOP_EXECUTABLE || (process.platform === 'darwin'

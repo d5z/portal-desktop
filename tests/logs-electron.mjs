@@ -7,6 +7,7 @@ import { build } from 'esbuild';
 import { build as buildRenderer } from 'vite';
 import electron from 'electron';
 import { strFromU8, unzipSync } from 'fflate';
+import { desktopFixtureBanner } from './support/desktop.mjs';
 import { launchDesktop } from './support/electron-lifecycle.mjs';
 
 const temporary = await mkdtemp(path.join(os.tmpdir(), 'client-logs-ui-'));
@@ -23,13 +24,9 @@ try {
   await buildRenderer({ configFile: path.resolve('vite.renderer.config.ts'), build: { outDir: assets } });
   await build({ entryPoints: ['desktop/main/main.ts'], outfile: path.join(buildDirectory, 'main.js'),
     bundle: true, platform: 'node', format: 'cjs', external: ['electron'], loader: { '.py': 'text', '.ps1': 'text' },
-    define: { MAIN_WINDOW_VITE_DEV_SERVER_URL: 'undefined', MAIN_WINDOW_VITE_NAME: '"main_window"',
+    banner: desktopFixtureBanner,
+    define: { PORTAL_DESKTOP_DEV_ASSETS: JSON.stringify(assets), MAIN_WINDOW_VITE_DEV_SERVER_URL: 'undefined', MAIN_WINDOW_VITE_NAME: '"main_window"',
       PORTAL_DESKTOP_BUILD: '"logs-test"', PORTAL_DESKTOP_UPDATE_REPOSITORY: '"fixture/repo"' },
-    plugins: [{ name: 'local-assets', setup(build) {
-      build.onLoad({ filter: /desktop[\\/]main[\\/]main\.ts$/ }, async args => ({
-        contents: (await readFile(args.path, 'utf8')).replace("path.resolve('desktop/generated')", JSON.stringify(assets)), loader: 'ts',
-      }));
-    } }],
   });
   await build({ entryPoints: ['desktop/preload/preload.ts'], outfile: path.join(buildDirectory, 'preload.js'),
     bundle: true, platform: 'node', format: 'cjs', external: ['electron'] });

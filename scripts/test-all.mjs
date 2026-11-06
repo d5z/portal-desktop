@@ -96,6 +96,8 @@ try {
     await npm('package', ['run', 'package']);
   }
   await step('packaged-resources', process.execPath, ['tests/packaged-resources.mjs']);
+  await npm('packaged-runtime', ['run', 'test:packaged-runtime']);
+  await step('home-viewer-packaged', process.execPath, ['tests/home-viewer-electron.mjs', '--packaged']);
   await npm('model-catalog', ['run', 'test:model-catalog']);
   await npm('chat-react', ['run', 'test:chat-react']);
   await npm('chat-surface-interaction', ['run', 'test:chat-surface-interaction']);
