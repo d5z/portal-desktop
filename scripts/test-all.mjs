@@ -88,6 +88,7 @@ try {
   await npm('settings-navigation', ['run', 'test:settings-navigation']);
   await step('workspace-motion', process.execPath, ['tests/workspace-motion.mjs']);
   await step('panel-layout-performance', process.execPath, ['tests/panel-layout-performance.mjs']);
+  await step('chat-resize-performance', process.execPath, ['tests/chat-resize-performance.mjs']);
   await step('being-panel-retention', process.execPath, ['tests/being-panel-retention.mjs']);
   // Some engine tests share process-level environment variables; serialize Rust tests.
   const rustArgs = ['test', '--locked', '-p', 'heart-portal', '--', '--test-threads=1'];

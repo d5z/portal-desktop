@@ -2,21 +2,24 @@ import { useEffect, useState } from 'react';
 import useRafState from 'ahooks/es/useRafState';
 
 const touchQuery = '(max-width: 760px), (hover: none) and (pointer: coarse)';
+const narrowQuery = '(max-width: 900px)';
 const readViewport = () => ({
   height: window.visualViewport?.height || innerHeight,
   width: innerWidth,
   offset: window.visualViewport?.offsetTop || 0,
 });
 
-/** Merge visual/window viewport events into one update per frame, skipping unchanged geometry. */
+/** Desktop geometry belongs to CSS; only mobile keyboards need visual viewport state. */
 export function useChatViewport(mobileWeb: boolean) {
-  const [viewport, setViewport] = useRafState(readViewport);
+  const [viewport, setViewport] = useRafState(() => mobileWeb ? readViewport() : undefined);
+  const [narrow, setNarrow] = useState(() => matchMedia(narrowQuery).matches);
   const [touch, setTouch] = useState(() => matchMedia(touchQuery).matches);
   useEffect(() => {
+    if (!mobileWeb) return;
     const visual = window.visualViewport;
     const resize = () => {
       const next = readViewport();
-      setViewport(previous => previous.height === next.height && previous.width === next.width && previous.offset === next.offset ? previous : next);
+      setViewport(previous => previous?.height === next.height && previous.width === next.width && previous.offset === next.offset ? previous : next);
     };
     resize();
     window.addEventListener('resize', resize);
@@ -27,7 +30,14 @@ export function useChatViewport(mobileWeb: boolean) {
       visual?.removeEventListener('resize', resize);
       visual?.removeEventListener('scroll', resize);
     };
-  }, [setViewport]);
+  }, [mobileWeb, setViewport]);
+  useEffect(() => {
+    const media = matchMedia(narrowQuery);
+    const change = () => setNarrow(media.matches);
+    change();
+    media.addEventListener('change', change);
+    return () => media.removeEventListener('change', change);
+  }, []);
   useEffect(() => {
     if (!mobileWeb) return;
     const media = matchMedia(touchQuery);
@@ -36,5 +46,5 @@ export function useChatViewport(mobileWeb: boolean) {
     media.addEventListener('change', change);
     return () => media.removeEventListener('change', change);
   }, [mobileWeb]);
-  return { viewport, nativeTouch: mobileWeb && touch };
+  return { viewport: mobileWeb ? viewport : undefined, narrow, nativeTouch: mobileWeb && touch };
 }

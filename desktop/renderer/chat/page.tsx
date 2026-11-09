@@ -143,7 +143,7 @@ function ChatView({
   mobileWeb: boolean;
 }) {
   useModel(state);
-  const { viewport, nativeTouch } = useChatViewport(mobileWeb);
+  const { viewport, narrow, nativeTouch } = useChatViewport(mobileWeb);
   const [editingQueued, setEditingQueued] = useState<Message | null>(null);
   const timelineItems = replyBubbles(sceneItems(withScheduling(state.items.filter(item => item.kind !== "message" || !item.queued || !!item.attachmentViews?.length || !!item.attachmentUploads?.length), state.sceneTasks), state.historyScope, state.currentScene, state.showSbsMessages));
   const historyWindow=useHistoryWindow(state.historyLoading ? [] : timelineItems,JSON.stringify([state.historyScope,state.currentScene.sceneId,state.showSbsMessages]),before=>runtime.loadOlderHistory(before));
@@ -359,8 +359,8 @@ function ChatView({
         {
           "--reading-size": `${readingSize}px`,
           "--chat-top-inset": `${topInset}px`,
-          "--app-height": `${viewport.height}px`,
-          "--app-offset": `${viewport.offset}px`,
+          "--app-height": viewport ? `${viewport.height}px` : undefined,
+          "--app-offset": viewport ? `${viewport.offset}px` : undefined,
       } as CSSProperties
       }
       onKeyDown={(event) => {
@@ -385,7 +385,7 @@ function ChatView({
       <div id="drop-zone" className={dragging ? "active" : ""}>
         松开以添加附件
       </div>
-      <div id="app" inert={(nativeTouch && panel === 'model') || (showIntelligentUI && viewport.width <= 900)}>
+      <div id="app" inert={(nativeTouch && panel === 'model') || (showIntelligentUI && narrow)}>
         <header id="header">
           <SbsControl known={state.sbsKnown} enabled={state.sbsEnabled} origin={state.sbsStreamingOrigin} phase={state.sbsActivityPhase}
             showContent={state.showSbsMessages} allScenes={state.historyScope==='all'}
@@ -667,7 +667,7 @@ function ChatView({
           />
         </div>
       </div>
-      {showIntelligentUI && <IntelligentUIExamples example={uiExample} overlay={viewport.width <= 900} onSelect={setUIExample} onClose={closeExamples}
+      {showIntelligentUI && <IntelligentUIExamples example={uiExample} overlay={narrow} onSelect={setUIExample} onClose={closeExamples}
         onContinue={text => { state.draft = text; state.changed(); closeExamples(); }}/>}
       <ChatSettings
         mobilePage={nativeTouch}
