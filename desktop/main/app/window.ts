@@ -1,6 +1,7 @@
 import { BrowserWindow, nativeTheme, type BrowserWindowConstructorOptions } from 'electron';
 import path from 'node:path';
 import { systemIcon } from './branding';
+import { windowPresentation } from './window-presentation';
 import { ClientBrowser } from '../browser/browser';
 
 const CLIENT_NAME = 'Portal Desktop';
@@ -15,10 +16,12 @@ export interface MainWindowOptions {
   openExternal: (url: string) => void;
   onBrowser: (browser: ClientBrowser) => void;
   onClosed: (window: BrowserWindow) => void;
+  onHideError: (error: unknown) => void;
 }
 
 export function createMainWindow(options: MainWindowOptions) {
   const window = new BrowserWindow(clientWindowOptions());
+  const presentation = windowPresentation(window);
   if (process.platform === 'win32') {
     window.setMenuBarVisibility(false);
     // ICON_SMALL stays black; taskbar-icons updates ICON_BIG independently.
@@ -57,7 +60,7 @@ export function createMainWindow(options: MainWindowOptions) {
     // The runtime is an ordinary navigation, so CSP permission alone is insufficient.
     const parentURL = event.frame?.parent?.url;
     // DSH notification clicks focus this host instead of launching another app.
-    if (url === 'dsh://open' && parentURL === options.shellURL()) { event.preventDefault(); window.show(); window.focus(); return; }
+    if (url === 'dsh://open' && parentURL === options.shellURL()) { event.preventDefault(); presentation.show(); return; }
     const chatParent = parentURL ? new URL(parentURL) : undefined;
     const runtimeDocument = !event.isMainFrame && parsed.protocol === 'beings:' && parsed.hostname === 'chat'
       && parsed.pathname === '/iui-runtime.html' && !parsed.search && !parsed.hash
@@ -78,7 +81,7 @@ export function createMainWindow(options: MainWindowOptions) {
   window.on('close', event => {
     if (options.isQuitting() || options.isSessionEnding()) return;
     event.preventDefault();
-    window.hide();
+    void presentation.hide().catch(error => { presentation.show(); options.onHideError(error); });
   });
   // Let Windows logoff/shutdown close the app rather than hide the window.
   window.on('query-session-end', options.markSessionEnding);

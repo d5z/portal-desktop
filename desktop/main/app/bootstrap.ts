@@ -67,6 +67,7 @@ export function createDesktopApplication(options: DesktopOptions) {
   const mutations = new MutationQueue();
   const exclusive = mutations.run;
   const cleanupForQuit = async () => {
+    await lifecycle.prepareWindowsForQuit();
     await dshPlugins?.shutdown();
     await kitInstaller?.dispose();
     await portal.stop();
@@ -75,6 +76,7 @@ export function createDesktopApplication(options: DesktopOptions) {
     await errorLog.flush();
   };
   const resumeAfterFailedShutdown = async () => {
+    lifecycle.restoreWindowsAfterFailedQuit();
     try { await dshPlugins?.resumeAfterFailedShutdown(); }
     catch (error) { errorLog.report('plugins-resume-after-shutdown', error); }
   };
@@ -156,7 +158,7 @@ export function createDesktopApplication(options: DesktopOptions) {
     }, file => shell.openPath(file), file => shell.showItemInFolder(file));
     const localFiles = new LocalFilePreviews(() => store.settings.workspace);
     dshPlugins = new DshPluginManager(path.join(directory, 'third-party-plugins'), path.join(assets, 'dsh-plugin-host.cjs'), bundledNpmCLI(), new URL(shellURL()).origin, nativeResource('node-bin'));
-    dshPlugins.openClient = () => { lifecycle.window?.show(); lifecycle.window?.focus(); };
+    dshPlugins.openClient = showWindow;
     dshPlugins.resolveModel = () => resolvePluginModel(directory, store.settings, !!store.connection, request => proxy.handle(request));
     dshPlugins.onModelNotice = message => lifecycle.window?.webContents.send('beings:dsh-model-notice', message);
     // Plugin host startup must not delay the native window or Town's own IPC.

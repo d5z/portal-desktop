@@ -2,6 +2,7 @@ import { app, type BrowserWindow } from 'electron';
 import path from 'node:path';
 import { permissionMode } from '../../shared/security';
 import { ClientErrorLog } from '../app/error-log';
+import { windowPresentation } from '../app/window-presentation';
 import { SettingsStore } from '../app/settings';
 import { PluginRegistry } from '../plugins/registry';
 import { ApprovalDialogs } from './approval-dialogs';
@@ -29,7 +30,7 @@ export async function createDesktopCommands(options: {
   const toolApproval = new ToolApproval(() => permissionMode(store.settings.permissionMode), async input => {
     const window = getWindow();
     if (!window || window.isDestroyed()) return false;
-    window.show();
+    windowPresentation(window).show();
     return approvalDialogs.request(input);
   }, approvalGrants);
   const clientCommands = new ClientCommandServer(path.join(directory, '.portal-client.json'),

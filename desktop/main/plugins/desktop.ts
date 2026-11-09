@@ -44,7 +44,7 @@ export function createDesktopPlugins(options: {
   }), event => { pluginWindows?.emit(event); const window = getWindow(); if (window && !window.webContents.isDestroyed()) window.webContents.send('beings:plugin-event', event); });
   pluginWindows = new PluginWindows(plugins, shellURL, getWindow, options.appearance);
   const closePluginSessions = () => { pluginWindows?.close(); plugins.invalidate(); };
-  app.once('before-quit', () => pluginWindows?.close());
+  app.once('will-quit', () => pluginWindows?.close());
   const publishPluginEvent = (topic: PluginEventTopic) => plugins.publish(topic);
   return {
     registry: plugins, windows: pluginWindows, close: closePluginSessions, publish: publishPluginEvent,

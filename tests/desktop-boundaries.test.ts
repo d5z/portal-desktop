@@ -118,7 +118,7 @@ describe('desktop lifecycle', () => {
   it('defers second-launch visibility until the shell is ready and reuses its native window', () => {
     const { lifecycle } = setup();
     const window = Object.assign(new EventEmitter(), {
-      webContents: new EventEmitter(), isDestroyed: () => false, isMinimized: () => false,
+      webContents: new EventEmitter(), isDestroyed: () => false, isMinimized: () => false, isResizable: () => true,
       show: vi.fn(), focus: vi.fn(),
     });
     mocks.createWindow.mockReturnValue({ window, browser: {} });

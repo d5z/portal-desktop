@@ -1,10 +1,11 @@
 import { homeFileReference } from '../../shared/being-files';
-import { app, dialog, type BrowserWindow, type Tray } from 'electron';
+import { app, BrowserWindow, dialog, type Tray } from 'electron';
 import type { ClientBrowser } from '../browser/browser';
 import { installerTarget } from '../updates/installer-events';
 import type { ClientErrorLog } from './error-log';
 import type { Exclusive } from './mutations';
 import { createMainWindow } from './window';
+import { windowPresentation } from './window-presentation';
 
 interface LifecycleOptions {
   clientName: string;
@@ -37,6 +38,7 @@ export class DesktopLifecycle {
   constructor(private options: LifecycleOptions) { }
 
   start(ready: () => Promise<void>) {
+    app.on('browser-window-created', (_event, window) => { windowPresentation(window); });
     app.on('second-instance', (_event, argv) => {
       const args = argv ?? [];
       const target = installerTarget(args);
@@ -62,12 +64,12 @@ export class DesktopLifecycle {
       this.options.cancelPairing();
       this.error = '';
       void this.options.exclusive(this.options.cleanup).then(this.finishQuit).catch(async error => {
-        this.options.errorLog.report('client-quit', error);
+        const detail = this.options.errorLog.report('client-quit', error);
         this.quitting = false;
         await this.options.resumeAfterFailedShutdown();
-        this.error = '退出未完成，当前客户端保持打开。请在 Portal 设置中检查运行状态，停止后再退出。';
+        this.error = '退出未完成，当前客户端保持打开。请处理错误后重试。';
         this.showWindow();
-        if (this.window && !this.window.isDestroyed()) void dialog.showMessageBox(this.window, { type: 'error', title: '退出未完成', message: this.error, buttons: ['知道了'] }).catch(() => { });
+        if (this.window && !this.window.isDestroyed()) void dialog.showMessageBox(this.window, { type: 'error', title: '退出未完成', message: this.error, detail, buttons: ['知道了'] }).catch(() => { });
       });
     });
   }
@@ -101,6 +103,16 @@ export class DesktopLifecycle {
     app.quit();
   };
 
+  async prepareWindowsForQuit() {
+    const results = await Promise.allSettled(BrowserWindow.getAllWindows().map(window => windowPresentation(window).prepareForQuit()));
+    const failed = results.find(result => result.status === 'rejected');
+    if (failed?.status === 'rejected') throw failed.reason;
+  }
+
+  restoreWindowsAfterFailedQuit() {
+    for (const window of BrowserWindow.getAllWindows()) windowPresentation(window).cancelQuit();
+  }
+
   openWhenReady() {
     this.windowReady = true;
     this.createWindow();
@@ -110,9 +122,7 @@ export class DesktopLifecycle {
     // Second launches must not load the shell before protocols and IPC exist.
     if (this.quitting || !this.windowReady) return;
     if (!this.window) { this.createWindow(); return; }
-    if (this.window.isMinimized()) this.window.restore();
-    this.window.show();
-    this.window.focus();
+    windowPresentation(this.window).show();
   };
 
   private createWindow() {
@@ -139,6 +149,12 @@ export class DesktopLifecycle {
       },
       onBrowser: value => { this.browser = value; },
       onClosed: value => { if (this.window === value) this.window = null; },
+      onHideError: error => {
+        const message = errorLog.report('window-hide', error);
+        if (this.window && !this.window.isDestroyed()) void dialog.showMessageBox(this.window, {
+          type: 'error', title: '窗口未关闭', message, buttons: ['知道了'],
+        });
+      },
     });
     const window = this.window = created.window;
     this.browser = created.browser;

@@ -33,6 +33,7 @@ Windows 强制接管由 `tests/windows-force.test.ts` 验证：真实临时引�
 | SBS 状态同步 | 真实 Loom 与桌面桥接、本地配置接口；刷新重新读取、慢响应、外部修改、切换失败、旧响应隔离与重试恢复 | `npm run test:sbs-refresh` |
 | Town SDK 协议界面 | 自动取码/确认、取消、鉴权失败转手动、草稿保留、手动配对、真实 SSE hello、三类消息 via 标记、发送身份及自身私信拦截；本地 fixture，不向真实 Being/Town 写入 | `npm run test:town-sdk` |
 | 客户端生命周期 | 关闭隐藏、菜单/再次启动恢复原窗口、明确退出；未连接 Being 时操作客户端自启开关（系统登录项 API 使用 fixture，不修改用户登录项） | `npm run test:client-lifecycle` |
+| macOS 全屏与更新退出 | 原生全屏关闭/重新显示、进入和离开动画中退出、辅助窗口全屏、安装失败后恢复全屏操作与重试；使用生产主进程/preload、隔离配置，安装交接使用 fixture | `node tests/update-recovery-electron.mjs` |
 | 桌面通知 | 启动实际 Electron 包；总开关/分类设置、重启持久化、真实原生通知请求、SSE 分类与自己发言过滤、模拟系统点击事件后恢复窗口并打开收件箱/围炉 | `npm run test:notifications` |
 | Portal 窗口生命周期 | 关闭窗口后仍能调用真实 Portal、恢复原窗口、网络重连不重启引擎、明确停止 | `npm run test:portal-e2e` |
 | 客户端单元测试 | 凭据隔离、代理路由、流式请求、Portal 守护、配置失败回滚、Town 认证和 Kit 导入边界 | `npm test` |
@@ -45,6 +46,8 @@ Windows 强制接管由 `tests/windows-force.test.ts` 验证：真实临时引�
 | Windows 客户端安装升级 | 实际 NSIS Setup 安装较低版本测试基线，通过客户端 Release 检查、摘要校验、Setup 安装及自动打开新版；保留配置、凭据、工作文件和工具能力，验证计划任务运行的 Portal 摘要与客户端随包清单一致 | `npm run make` 后执行 `npm run test:windows-upgrade` |
 
 本地模拟 Being 能稳定复现协议及客户端行为，不代表真实云端当前可用，也不测试 LLM 回复质量或真实 Town token 的授权情况。登录项测试通过卸载/重新加载临时注册项模拟启动过程，不会重启或注销电脑。睡眠唤醒和 Windows 计划任务全生命周期仍需目标机器补充验收。Windows 专用 Rust 测试在 Mac 上按引擎声明跳过。
+
+全屏回归需要已登录的 macOS 图形桌面，会切换测试窗口所在的 Space。`tests/window-presentation.test.ts` 另覆盖窗口显示意图、关闭/退出竞争、原生事件超时后重试和失败恢复；安装交接 fixture 不代表签名安装包已完成真实替换，后者由 `test:macos-upgrade` 验证。
 
 自动配对的流解析、总时限、取消和身份变化由 `tests/town-pairing.test.ts` 覆盖，包括拆分 UTF-8/CRLF、工具结果排除、多段回复续写、六字符前缀与多个候选码拒绝、阻塞流中止、取消后确认响应迟到和等待写入期间取消。`tests/renderer-state.test.ts` 覆盖自动默认入口、失败回退与取消/提交竞态。原生 `test:town-sdk` 另保留手动配对回归，截图写入系统临时目录的 `town-auto-pair-review.png` 和 `town-auto-pair-manual-review.png`。
 

@@ -18,6 +18,7 @@ vi.mock('electron', async () => {
       setIcon = vi.fn();
       hookWindowMessage = vi.fn();
       isDestroyed = () => false;
+      isResizable = () => true;
       loadURL = vi.fn();
     },
   };
@@ -32,7 +33,7 @@ afterEach(() => { nativeTheme.removeAllListeners(); vi.restoreAllMocks(); });
 it('allows reloading the Town shell while blocking other main-window destinations', () => {
   const { window } = createMainWindow({
     shellURL: () => 'beings://desktop/', isQuitting: () => false, isSessionEnding: () => false,
-    markSessionEnding: vi.fn(), openExternal: vi.fn(), onBrowser: vi.fn(), onClosed: vi.fn(),
+    markSessionEnding: vi.fn(), openExternal: vi.fn(), onBrowser: vi.fn(), onClosed: vi.fn(), onHideError: vi.fn(),
   });
   for (const url of ['beings://desktop/', 'https://example.invalid/', 'beings://chat/', 'beings://desktop/other.html']) {
     const preventDefault = vi.fn();
@@ -45,7 +46,7 @@ it('keeps the caption black while shell theme listeners follow Windows independe
   vi.spyOn(process, 'platform', 'get').mockReturnValue('win32');
   const { window } = createMainWindow({
     shellURL: () => 'beings://desktop/', isQuitting: () => false, isSessionEnding: () => false,
-    markSessionEnding: vi.fn(), openExternal: vi.fn(), onBrowser: vi.fn(), onClosed: vi.fn(),
+    markSessionEnding: vi.fn(), openExternal: vi.fn(), onBrowser: vi.fn(), onClosed: vi.fn(), onHideError: vi.fn(),
   });
   expect((window as unknown as { options: { icon: string } }).options.icon).toMatch(/logo\.png$/);
   expect(window.setAppDetails).not.toHaveBeenCalled();

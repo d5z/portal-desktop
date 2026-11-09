@@ -4,7 +4,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { expect, it, vi } from 'vitest';
 
-const fixture = vi.hoisted(() => ({ directory: '', packaged: false, startup: undefined as Promise<void> | undefined }));
+const fixture = vi.hoisted(() => ({ directory: '', packaged: false, startup: undefined as Promise<void> | undefined, windows: [] as unknown[] }));
 vi.mock('electron', async () => {
   const { EventEmitter } = await import('node:events');
   const app = Object.assign(new EventEmitter(), {
@@ -15,7 +15,7 @@ vi.mock('electron', async () => {
     whenReady: () => ({ then: (ready: () => Promise<void>) => (fixture.startup = Promise.resolve().then(ready)) }),
   });
   Object.defineProperty(app, 'isPackaged', { get: () => fixture.packaged });
-  return { app, clipboard: {}, Notification: { isSupported: () => true }, ipcMain: { handle: vi.fn() }, net: { fetch: vi.fn() },
+  return { app, BrowserWindow: { getAllWindows: () => fixture.windows }, clipboard: {}, Notification: { isSupported: () => true }, ipcMain: { handle: vi.fn() }, net: { fetch: vi.fn() },
     dialog: { showErrorBox: vi.fn(), showMessageBox: vi.fn() }, nativeTheme: new EventEmitter(), nativeImage: {}, shell: { showItemInFolder: vi.fn() },
     safeStorage: { isEncryptionAvailable: () => true },
     protocol: { registerSchemesAsPrivileged: vi.fn(), handle: vi.fn() },
@@ -30,6 +30,7 @@ vi.mock('../desktop/main/app/taskbar-icons', () => ({ installWindowsTaskbarIcons
 it.each(['normal', 'manual installer', 'downloaded update'] as const)('initializes one usable window and allows it to close during %s shutdown', async shutdown => {
   vi.resetModules();
   vi.clearAllMocks();
+  fixture.windows = [];
   fixture.directory = await mkdtemp(path.join(os.tmpdir(), 'portal-window-startup-'));
   vi.stubEnv('PORTAL_DESKTOP_USER_DATA', fixture.directory);
   const { SettingsStore } = await import('../desktop/main/app/settings');
@@ -47,10 +48,12 @@ it.each(['normal', 'manual installer', 'downloaded update'] as const)('initializ
   vi.mocked(createMainWindow).mockImplementation(options => {
     protocolReadyAtCreation.push(vi.mocked(protocol.handle).mock.calls.length > 0);
     const window = Object.assign(new EventEmitter(), {
-      isDestroyed: () => false, isMinimized: () => false, show: vi.fn(), focus: vi.fn(), restore: vi.fn(), setProgressBar: vi.fn(),
+      isDestroyed: () => false, isMinimized: () => false, isResizable: () => true, isFullScreen: () => false, isFullScreenable: () => true, setFullScreenable: vi.fn(),
+      show: vi.fn(), focus: vi.fn(), restore: vi.fn(), setProgressBar: vi.fn(),
       webContents: Object.assign(new EventEmitter(), { isDestroyed: () => false, send: vi.fn() }),
     });
     const browser = { close: vi.fn() };
+    fixture.windows = [window];
     options.onBrowser(browser as never);
     return { window, browser } as never;
   });

@@ -1,6 +1,7 @@
 import { BrowserWindow, ipcMain } from 'electron';
 import { randomUUID } from 'node:crypto';
 import { clientWindowOptions } from '../app/window';
+import { windowPresentation } from '../app/window-presentation';
 import type { PluginRegistry } from './registry';
 import type { PluginEvent, PluginHostRequest, PluginWindowInfo } from '../../shared/plugins';
 
@@ -85,7 +86,7 @@ export class PluginWindows {
       const finish = (result?: unknown, error?: string) => { clearTimeout(timer); this.pending.delete(requestId); error ? reject(new Error(error)) : resolve(result); };
       const timer = setTimeout(() => finish(undefined, '主窗口未响应，请重试。'), 5000);
       this.pending.set(requestId, { owner: entry.window.webContents.id, finish });
-      if (action !== 'compose' && !(action === 'ui' && (value as any)?.method === 'ui.notice')) { main.show(); main.focus(); }
+      if (action !== 'compose' && !(action === 'ui' && (value as any)?.method === 'ui.notice')) windowPresentation(main).show();
       main.webContents.send('beings:plugin-host-request', { requestId, action, value });
     });
   }
