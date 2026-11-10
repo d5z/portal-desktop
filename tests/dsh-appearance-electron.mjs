@@ -29,7 +29,7 @@ const errors=[];page.on('pageerror',e=>errors.push(e.message));
 const settings = async () => {
   await page.locator('#options-trigger').click();await page.locator('#client-settings-button').click();
 };
-const manager = async () => { await settings();await page.getByRole('tab',{name:'插件',exact:true}).click();await page.getByRole('tab',{name:'DeepSeek Harness 插件',exact:true}).click(); };
+const manager = async () => { await settings();await page.getByRole('tab',{name:'插件',exact:true}).click();await page.getByRole('tab',{name:'第三方插件',exact:true}).click(); };
 const themes = async () => { await manager();await page.getByRole('button',{name:'配置 dsh-vscode-themes2',exact:true}).click(); };
 const closeManager = async () => { await page.waitForFunction(()=>!document.querySelector('#third-party-plugins')?.hasAttribute('aria-busy')); await page.getByRole('button',{name:'关闭客户端设置',exact:true}).click(); await page.locator('#client-settings-dialog').waitFor({state:'hidden'}); };
 const appearance = async () => { await settings();await page.getByRole('tab',{name:'外观与阅读',exact:true}).click(); };

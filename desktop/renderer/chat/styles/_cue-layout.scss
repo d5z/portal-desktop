@@ -1,0 +1,153 @@
+/* Cue-inspired conversation rail: messages and composer share one measured edge. */
+:root {
+  --chat-reply: #f0f1f0;
+  --chat-sent: #3478f6;
+}
+:root[data-theme='dark'] {
+  --chat-reply: #303237;
+  --chat-sent: #416fd0;
+}
+
+#messages {
+  padding: calc(24px + var(--chat-top-inset, 0px)) max(20px, calc((100% - var(--chat-content-width)) / 2)) max(120px, calc(var(--chat-composer-height, 99px) + 18px));
+  scroll-padding-top: calc(20px + var(--chat-top-inset, 0px));
+  /* Keep programmatic focus jumps above the floating composer and its Muse-like gap. */
+  scroll-padding-bottom: max(160px, calc(var(--chat-composer-height, 99px) + 60px));
+}
+
+.message-bubble-row {
+  width: 100%;
+}
+
+.message.user .message-bubble-row {
+  max-width: 100%;
+}
+
+.message.being .content,
+.message.user .content {
+  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
+  border-radius: 18px;
+  box-shadow: 0 2px 8px rgb(0 0 0 / 4%);
+}
+
+.message.being .content {
+  padding: 10px 14px;
+}
+
+.message.user .content {
+  padding: 10px 14px;
+  border-color: color-mix(in srgb, #fff 12%, transparent);
+  color: #fff;
+}
+
+/* Being labels share the bubble's left edge instead of inheriting meta padding. */
+.message.being .meta {
+  margin-inline: 0;
+}
+
+.message.being .message-scene {
+  margin-inline-start: 0;
+}
+
+/* Links keep the Cue contrast on blue bubbles and can break at URL punctuation. */
+.message .content a {
+  color: var(--accent);
+  font: inherit;
+  line-height: inherit;
+  overflow-wrap: anywhere;
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+
+.message.user .content a,
+.message.user .content .chat-place-link,
+.message.user .content code .chat-code-link {
+  color: color-mix(in srgb, #fff 92%, var(--chat-sent) 8%);
+  text-decoration-color: color-mix(in srgb, #fff 76%, transparent);
+}
+
+.message.user .content a:hover,
+.message.user .content .chat-place-link:hover,
+.message.user .content code .chat-code-link:hover {
+  color: #fff;
+  background: color-mix(in srgb, #fff 12%, transparent);
+}
+
+/* Rich Markdown keeps readable contrast inside a sent bubble as well. */
+.message.user .content :is(code, .code-block, .table-wrap) {
+  background: color-mix(in srgb, #fff 12%, transparent);
+  border-color: color-mix(in srgb, #fff 22%, transparent);
+  color: inherit;
+}
+
+.message.user .content .code-block pre,
+.message.user .content .code-block pre code {
+  background: transparent;
+}
+
+.message.user .content :is(.code-lang, th, td) {
+  border-color: color-mix(in srgb, #fff 22%, transparent);
+  color: inherit;
+}
+
+.message.user .content blockquote {
+  border-color: color-mix(in srgb, #fff 46%, transparent);
+  color: inherit;
+}
+
+/* Keep process activity behind the floating composer instead of showing through it. */
+.run-activity {
+  position: relative;
+  z-index: 1;
+}
+
+#input-area {
+  width: calc(100% - 40px);
+  max-width: var(--chat-content-width);
+  position: absolute;
+  inset-inline: 0;
+  bottom: 18px;
+  z-index: 4;
+  margin: 0 auto;
+  padding: 8px 12px 7px;
+  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
+  border-radius: 24px;
+  background: var(--composer-surface, var(--bg));
+  box-shadow: 0 5px 18px rgb(0 0 0 / 6%);
+}
+
+#input-area.has-queue {
+  position: relative;
+  inset-inline: auto;
+  bottom: auto;
+  margin-top: 0;
+}
+
+#input-area:focus-within {
+  border-color: color-mix(in srgb, var(--text) 24%, transparent);
+  box-shadow: 0 5px 18px rgb(0 0 0 / 8%);
+}
+
+#input-area #input-row {
+  gap: 4px 8px;
+}
+
+#input-area #input {
+  min-height: 42px;
+  max-height: 112px;
+  padding: 1px 2px 7px;
+  line-height: 1.5;
+}
+
+@media (max-width: 680px) {
+  #input-area {
+    width: calc(100% - 40px);
+    bottom: 14px;
+  }
+
+  #input-area.has-queue {
+    margin-top: 0;
+    margin-bottom: 14px;
+  }
+}

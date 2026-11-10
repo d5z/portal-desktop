@@ -1,3 +1,4 @@
+import { WorkspaceDrawer, DrawerPresence } from "../shared/components/workspace-drawer";
 import iconStyles from './icon.module.scss';
 import { PluginIconEditor } from './icon';
 import { useEffect, useRef, useState } from 'react';
@@ -30,14 +31,13 @@ export function PluginSidebar({ model, theme, contextKey }: PluginSurfaceProps) 
   const plugins = useModel(model);
   const selected = plugins.selected?.placement === 'sidebar' ? plugins.selected : undefined;
   const installed = plugins.library.plugins.find(p => p.enabled && p.manifest.id === selected?.id);
-  if (!selected || !installed || !plugins.api) return null;
-  return <aside ref={panel} style={{ width, flexBasis: width }} className="plugin-sidebar" aria-label={`${installed.manifest.name}侧栏`}>
+  return <DrawerPresence open={!!(selected && installed && plugins.api)}>{selected && installed && plugins.api && <WorkspaceDrawer ref={panel} style={{ width, flexBasis: width }} className="plugin-sidebar" aria-label={`${installed.manifest.name}侧栏`}>
     <PanelResizeHandle panel={panel} label="调整插件侧栏宽度" width={width} onResize={setWidth} initial={340} />
     <header><strong>{installed.manifest.name}</strong>
       <button className="text-button" onClick={() => plugins.closeSidebar()}>关闭插件侧栏</button></header>
     <PluginFrame key={`${selected.id}:${selected.revision}:${contextKey}`} api={plugins.api} model={plugins} id={selected.id}
       view={selected.view} slot={selected.slot} theme={theme} title={`${installed.manifest.name}侧栏`} />
-  </aside>;
+  </WorkspaceDrawer>}</DrawerPresence>;
 }
 
 export function PluginCard({ model, plugin, embedded = false, beforeOpen }: { model: PluginsModel; embedded?: boolean; beforeOpen?: () => Promise<boolean>; plugin: import('../../shared/plugins').InstalledPlugin }) {

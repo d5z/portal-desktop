@@ -20,7 +20,7 @@ function PluginLibrary({ town }: { town: TownModel }) {
   }, [town]);
   return <div className="plugin-library">
     <div className="plugin-library-tabs" role="tablist" aria-label="插件类型" onKeyDown={navigateTabs}>
-      {([['town', '官方插件'], ['dsh', 'DeepSeek Harness 插件']] as const).map(([id, label]) => <button key={id} id={`plugin-type-${id}`} role="tab" aria-selected={kind === id} aria-controls={`plugin-library-${id}`} tabIndex={kind === id ? 0 : -1} onClick={() => { town.pluginKind = id; setKind(id); }}>{label}</button>)}
+      {([['town', '官方插件'], ['dsh', '第三方插件']] as const).map(([id, label]) => <button key={id} id={`plugin-type-${id}`} role="tab" aria-selected={kind === id} aria-controls={`plugin-library-${id}`} tabIndex={kind === id ? 0 : -1} onClick={() => { town.pluginKind = id; setKind(id); }}>{label}</button>)}
     </div>
     <div id="plugin-library-dsh" role="tabpanel" aria-labelledby="plugin-type-dsh" hidden={kind !== 'dsh'}>{kind === 'dsh' && <div className="dsh-library-host" ref={dshRuntime.setManagerHost} />}</div>
     <div id="plugin-library-town" role="tabpanel" aria-labelledby="plugin-type-town" hidden={kind !== 'town'}>

@@ -13,17 +13,17 @@
 /* Keep the draft and its actions in two compact, stable rows. */
 #input-area {
   padding: 12px 14px 10px;
-  border-radius: 22px;
+  border-radius: 16px;
   border-color: color-mix(in srgb, var(--text) 12%, transparent);
-  background: var(--bg);
-  box-shadow: 0 4px 20px #00000005;
+  background: var(--composer-surface, var(--bg));
+  box-shadow: none;
   transition:
     border-color 0.16s ease,
     box-shadow 0.16s ease;
 }
 #input-area:focus-within {
   border-color: color-mix(in srgb, var(--text) 24%, transparent);
-  box-shadow: 0 5px 24px #00000008;
+  box-shadow: none;
 }
 #input-area #input-row {
   gap: 6px 8px;

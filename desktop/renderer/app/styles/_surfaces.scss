@@ -239,10 +239,8 @@
   overscroll-behavior: contain;
   padding: 10px;
   border: 0;
-  border-radius: 20px;
-  box-shadow:
-    0 12px 40px #00000020,
-    0 2px 8px #0000000a;
+  border-radius: 14px;
+  box-shadow: var(--popover-shadow);
 }
 
 #options-home > button {
@@ -252,7 +250,7 @@
   gap: 12px;
   font-size: 14px;
   color: var(--text);
-  border-radius: 11px;
+  border-radius: 8px;
 }
 
 #options-home > .options-portal-status {

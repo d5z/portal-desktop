@@ -504,7 +504,26 @@ body[data-town-dsh-theme] ::selection {
 .workspace-rail
   .dsh-rail-entries
   :is(button, a[href], [role='button']):is(:hover, [aria-expanded='true'], [aria-current='page']) {
-  background: var(--selected);
+  background: var(--surface);
+}
+
+.workspace-rail .dsh-rail-entries :is(button, a[href], [role='button']) > :is(svg, img, span[aria-hidden='true']) {
+  transition: transform 420ms cubic-bezier(0.2, 0.65, 0.3, 1);
+}
+
+.workspace-rail .dsh-rail-entries :is(button, a[href], [role='button']):is(:hover, :focus-visible):not(:disabled) > :is(svg, img, span[aria-hidden='true']) {
+  transform: rotate(-6deg) scale(1.08);
+}
+
+.workspace-rail .dsh-rail-entries :is(button, a[href], [role='button']):active:not(:disabled) > :is(svg, img, span[aria-hidden='true']) {
+  transform: scale(0.94);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .workspace-rail .dsh-rail-entries :is(button, a[href], [role='button']) > :is(svg, img, span[aria-hidden='true']) {
+    transition: none;
+    transform: none !important;
+  }
 }
 
 .workspace-rail .dsh-rail-entries :is(button, a[href], [role='button']):focus-visible {
@@ -673,10 +692,6 @@ body[data-town-dsh-theme] ::selection {
 /* Plugin drawers supplement Town navigation; they never replace its rail.
    Reserve space only when both the plugin and Town retain usable widths. */
 @media (min-width: 1100px) {
-  body.dsh-rightbar-track .workspace-stage {
-    margin-right: 360px;
-  }
-
   body.dsh-rightbar-track .dsh-rightbar {
     width: 360px;
   }
@@ -1190,4 +1205,31 @@ body[data-town-dsh] {
   color: var(--text);
   font-size: 12px;
   line-height: 1.7;
+}
+
+/* Use the same workspace slot and drawer motion as the built-in panels. */
+.workspace-body > .dsh-rightbar {
+  position: relative;
+  inset: auto;
+  flex: 0 0 360px;
+  width: 360px;
+  min-width: 0;
+  margin-left: var(--panel-gap);
+  border: 0;
+  border-radius: var(--panel-radius);
+  box-shadow: var(--panel-shadow);
+}
+
+.workspace-body > .dsh-rightbar.fullscreen {
+  position: absolute;
+  inset: 8px 8px 8px 76px;
+  width: auto;
+}
+
+@media (max-width: 1099px) {
+  .workspace-body > .dsh-rightbar {
+    position: absolute;
+    inset: 8px 8px 8px auto;
+    width: min(400px, calc(100% - 88px));
+  }
 }

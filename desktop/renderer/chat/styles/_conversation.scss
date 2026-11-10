@@ -1,11 +1,11 @@
 /* Soft chat bubbles and floating composer, shared with the desktop shell. */
 #messages {
-  --reply-padding-y: 15px;
-  --reply-padding-x: 19px;
+  --reply-padding-y: 12px;
+  --reply-padding-x: 16px;
   --reply-min-width: calc(var(--reply-padding-x) * 2 + 25px);
   --reply-min-height: calc(var(--reading-size, 16px) * 1.7 + var(--reply-padding-y) * 2);
 
-  padding: calc(26px + var(--chat-top-inset, 0px)) max(24px, calc((100% - 860px) / 2)) 24px;
+  padding: calc(26px + var(--chat-top-inset, 0px)) max(24px, calc((100% - 800px) / 2)) 24px;
   scroll-padding-top: calc(20px + var(--chat-top-inset, 0px));
 }
 
@@ -36,15 +36,15 @@
   min-height: var(--reply-min-height);
   max-width: 92%;
   padding: var(--reply-padding-y) var(--reply-padding-x);
-  border-radius: 24px;
+  border-radius: 16px;
   background: var(--chat-reply);
 }
 
 .message.user .content {
   max-width: 85%;
-  padding: 13px 19px;
+  padding: 12px 16px;
   border: 0;
-  border-radius: 24px;
+  border-radius: 16px;
   background: var(--chat-sent);
 }
 
@@ -63,13 +63,13 @@
 
 #input-area {
   width: calc(100% - 40px);
-  max-width: 880px;
-  margin: 0 auto 20px;
+  max-width: 820px;
+  margin: 0 auto 24px;
   padding: 12px 16px 8px;
   border: 1px solid var(--border);
   border-radius: 30px;
-  background: var(--bg);
-  box-shadow: 0 5px 22px #0000000b;
+  background: var(--composer-surface);
+  box-shadow: none;
   transition:
     box-shadow 0.18s,
     border-color 0.18s;
@@ -161,15 +161,6 @@
   height: 0;
 }
 
-#input-area {
-  padding: 12px 16px;
-  border-radius: 32px;
-}
-
-#input-row {
-  row-gap: 0;
-}
-
 /* Rich messages reflow within the pane; no horizontal reading surface. */
 .message .content :is(pre, code, th, td) {
   overflow-wrap: anywhere;
@@ -208,8 +199,8 @@
 
 @media (max-width: 880px) {
   #messages {
-    padding-left: 38px;
-    padding-right: 18px;
+    padding-left: 28px;
+    padding-right: 24px;
   }
 }
 

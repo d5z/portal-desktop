@@ -159,9 +159,9 @@
 :global(#input-area) .root :global(#input):global(.markdown-input) {
   width: 100%;
   height: auto;
-  min-height: 54px;
+  min-height: 44px;
   max-height: min(320px, 40vh);
-  padding: 8px 4px 12px;
+  padding: 6px 4px 8px;
   font-size: 15px;
   line-height: 1.7;
   scrollbar-width: thin;

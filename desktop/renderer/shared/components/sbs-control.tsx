@@ -3,13 +3,15 @@ import styles from './sbs-control.module.scss';
 import {createPortal} from 'react-dom';
 import {useEffect, useId, useLayoutEffect, useRef, useState} from 'react';
 
-export function SbsControl({known, enabled, origin, phase, showContent, allScenes, visibilityReady = true, onVisibility, onToggle}: {
+export function SbsControl({known, enabled, origin, phase, showContent, allScenes, visibilityReady = true, onVisibility, onToggle, name}: {
+  name?:string;
   known:boolean; enabled:boolean; origin?:string; phase?:string; showContent:boolean; allScenes:boolean;
   visibilityReady?:boolean; onVisibility:(show:boolean)=>void; onToggle:()=>void;
 }) {
   const trigger=useRef<HTMLButtonElement>(null), panel=useRef<HTMLDivElement>(null), id=useId();
   const [open,setOpen]=useState(false), [position,setPosition]=useState({top:0,left:0});
   const present=useDisclosurePresence(open);
+  const idle=known && enabled && !origin;
   const status=origin ? phase==='working' ? '正在执行工具' : phase==='replying' ? '正在整理回复'
     : phase==='thinking' ? '正在思考' : '正在执行回调'
     : !known ? 'SBS 状态同步中' : enabled ? 'SBS 待命中' : 'SBS 已关闭';
@@ -41,11 +43,19 @@ export function SbsControl({known, enabled, origin, phase, showContent, allScene
     return()=>{document.removeEventListener('pointerdown',outside);document.removeEventListener('keydown',escape);document.removeEventListener('focusin',outside);window.removeEventListener('blur',blur);};
   },[open]);
   return <div className={styles.root}>
-    <button ref={trigger} type="button" className={styles.trigger} aria-label="SBS 状态与显示设置"
+    <button ref={trigger} type="button" className={`${styles.trigger}${name ? ` ${styles.identity}` : ""}`} data-idle={idle} aria-label="SBS 状态与显示设置"
       aria-controls={open?id:undefined} aria-expanded={open} aria-haspopup="dialog" title={status} onClick={()=>setOpen(value=>!value)}>
-      <span className={styles.dot} data-enabled={known && enabled} data-active={!!origin} aria-hidden="true" />
+      {name ? <>
+        <span className={styles.identityName}>
+          <span className={styles.dot} data-enabled={known && enabled} data-active={!!origin} aria-hidden="true" />
+          <span id="conversation-name" className={styles.name}>{name}</span>
+        </span>
+        {!idle && <span className={styles.inlineStatus} role="status" aria-live="polite" aria-label={status}>
+          <span>{status.replace(/^SBS /, '')}</span>
+        </span>}
+      </> : <span className={styles.dot} data-enabled={known && enabled} data-active={!!origin} aria-hidden="true" />}
     </button>
-    {origin && <span className={styles.active} role="status" aria-live="polite"><span>{origin==='callback' ? 'SBS 回调' : 'SBS 活动'}</span>{status}</span>}
+    {!name && origin && <span className={styles.active} role="status" aria-live="polite"><span>{origin==='callback' ? 'SBS 回调' : 'SBS 活动'}</span>{status}</span>}
     {present && createPortal(<div ref={panel} id={id} className={styles.panel} data-open={open} inert={!open} aria-hidden={!open} role="dialog" aria-labelledby={id+'-title'} tabIndex={-1} style={position}
       onBlur={event=>{
         if(!event.currentTarget.contains(event.relatedTarget) && !trigger.current?.contains(event.relatedTarget))setOpen(false);

@@ -1,79 +1,49 @@
 .bar.bar {
-  background: transparent;
   box-shadow: none;
+  z-index: 5;
+  position: absolute;
+  inset: 0 0 auto;
+  height: 88px;
+  background: linear-gradient(to bottom, var(--bg) 0%, var(--bg) 24%, color-mix(in srgb, var(--bg) 90%, transparent) 56%, transparent 100%);
+  -webkit-app-region: drag;
 }
 
 .bar button {
   -webkit-app-region: no-drag;
 }
 
-// Keep the scene drawer positioned against the full workspace, not this short header.
-.bar[data-floating='true'] {
-  height: 68px;
-  margin-bottom: -68px;
-  z-index: 5;
-  pointer-events: none;
-  -webkit-app-region: no-drag;
-
-  &::before {
-    content: '';
-    position: absolute;
-    inset: 0 0 auto;
-    height: 112px;
-    z-index: -1;
-    pointer-events: none;
-    background: linear-gradient(
-      to bottom,
-      color-mix(in srgb, var(--bg) 94%, transparent),
-      color-mix(in srgb, var(--bg) 78%, transparent) 40%,
-      transparent
-    );
-  }
-
-  &::after {
-    content: '';
-    position: absolute;
-    inset: 0 0 auto;
-    height: 24px;
-    z-index: -1;
-    pointer-events: auto;
-    -webkit-app-region: drag;
-  }
-
-  > * {
-    pointer-events: auto;
-  }
-
-  :global([id='chat-scene-indicator']),
-  :global([id='refresh-chat']) {
-    background: var(--control);
-    border: 0;
-    box-shadow: 0 4px 18px #0000000d;
-  }
-
-  :global([id='refresh-chat']) {
-    width: 36px;
-    height: 36px;
-    border-radius: 50%;
-  }
+.bar > :global([class~='pair-name']) {
+  align-self: start;
+  margin-top: 12px;
 }
 
-// Notices and selected-topic ribbons retain their own readable space.
-:global(body[class~='has-topic']) .bar[data-floating='true'] {
-  margin-bottom: 0;
+.bar > :global([class~='topbar-actions']) {
+  align-self: start;
+  margin-top: 15px;
 }
 
-.bar :global([id='chat-scene-indicator']),
-.bar :global([id='refresh-chat']) {
+// Only the floating controls cast a shadow over the conversation.
+.bar :global([class~='topbar-icon-button']) {
+  background: var(--control);
+  border: 0;
+  box-shadow: var(--panel-shadow);
+}
+
+.bar :global([class~='topbar-icon-button']) {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+
+.bar :global([class~='topbar-icon-button']) {
   transition:
     background-color 150ms ease,
     box-shadow 150ms ease,
     transform 150ms ease;
 
   &:hover:not(:disabled) {
-    box-shadow:
-      0 2px 5px #00000005,
-      0 6px 20px #00000010;
+    background: var(--surface);
+    box-shadow: var(--panel-shadow);
   }
   &:active:not(:disabled) {
     transform: scale(0.97);
@@ -81,8 +51,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bar :global([id='chat-scene-indicator']),
-  .bar :global([id='refresh-chat']) {
+  .bar :global([class~='topbar-icon-button']) {
     transition: none;
     transform: none;
   }

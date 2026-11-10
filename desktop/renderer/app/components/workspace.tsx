@@ -1,3 +1,4 @@
+import { useDisclosurePresence } from "../../shared/hooks/use-disclosure-presence";
 import { useEffect, useRef } from "react";
 import { PanelResizeHandle, usePanelWidth } from "../../shared/components/panel-resize";
 import { useModel } from "../../shared/hooks/use-model";
@@ -56,6 +57,7 @@ export function Companion({ model }: { model: WorkspaceModel }) {
     ref = workspace.scenes.reference || workspace.scenes.current;
   const panel = useRef<HTMLElement>(null);
   const [width, setWidth] = usePanelWidth("companion", 340);
+  const present = useDisclosurePresence(workspace.open, 250);
   useEffect(() => {
     if (!workspace.open && panel.current?.contains(document.activeElement))
       document
@@ -68,53 +70,60 @@ export function Companion({ model }: { model: WorkspaceModel }) {
       ref={panel}
       style={{ width }}
       aria-label="一起看"
-      hidden={!workspace.open}
+      role="dialog"
+      aria-modal="false"
+      hidden={!present}
+      inert={!workspace.open}
+      data-open={workspace.open}
+      onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); workspace.toggle(false); } }}
     >
       <PanelResizeHandle panel={panel} label="调整一起看面板宽度" width={width} onResize={setWidth} initial={340} reserve={64} disabled={!workspace.open} />
-      <div className="companion-heading">
-        <div>
-          <h2>一起看</h2>
+      <div className="companion-content">
+        <div className="companion-heading">
+          <div>
+            <h2>一起看</h2>
+          </div>
+          <button
+            id="close-companion"
+            className="icon-button close"
+            aria-label="收起话题"
+            onClick={() => workspace.toggle(false)}
+          />
+        </div>
+        <div className="shared-object">
+          <h3 id="scene-object-title">{ref.selection?.title}</h3>
+          <p id="scene-object-source">
+            {ref.selection
+              ? `${ref.title} · ${ref.selection.author || ref.identity || "公开内容"} · ${new Date(ref.observedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`
+              : ""}
+          </p>
+          <blockquote id="scene-object-text">{ref.selection?.excerpt}</blockquote>
         </div>
         <button
-          id="close-companion"
-          className="icon-button close"
-          aria-label="收起话题"
-          onClick={() => workspace.toggle(false)}
-        />
-      </div>
-      <div className="shared-object">
-        <h3 id="scene-object-title">{ref.selection?.title}</h3>
-        <p id="scene-object-source">
-          {ref.selection
-            ? `${ref.title} · ${ref.selection.author || ref.identity || "公开内容"} · ${new Date(ref.observedAt).toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit" })}`
-            : ""}
-        </p>
-        <blockquote id="scene-object-text">{ref.selection?.excerpt}</blockquote>
-      </div>
-      <button
-        id="scene-compose"
-        className="primary"
-        disabled={
-          !ref.selection ||
-          !workspace.scenes.being ||
-          Boolean(workspace.draftRequest)
-        }
-        onClick={() => workspace.compose()}
-      >
-        放入对话 <span aria-hidden="true">↗</span>
-      </button>
-      <p className="scene-disclosure">仅放入引用与出处，由你发送。</p>
-      <div className="object-actions">
-        <button
-          id="scene-return"
-          hidden={!workspace.scenes.reference}
-          onClick={() => workspace.returnToSource()}
+          id="scene-compose"
+          className="primary"
+          disabled={
+            !ref.selection ||
+            !workspace.scenes.being ||
+            Boolean(workspace.draftRequest)
+          }
+          onClick={() => workspace.compose()}
         >
-          回到来源
+          放入对话 <span aria-hidden="true">↗</span>
         </button>
-        <button id="scene-clear" onClick={() => workspace.clear()}>
-          结束这个话题
-        </button>
+        <p className="scene-disclosure">仅放入引用与出处，由你发送。</p>
+        <div className="object-actions">
+          <button
+            id="scene-return"
+            hidden={!workspace.scenes.reference}
+            onClick={() => workspace.returnToSource()}
+          >
+            回到来源
+          </button>
+          <button id="scene-clear" onClick={() => workspace.clear()}>
+            结束这个话题
+          </button>
+        </div>
       </div>
     </aside>
   );

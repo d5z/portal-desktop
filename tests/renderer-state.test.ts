@@ -33,6 +33,7 @@ describe('plugin draft visibility', () => {
     app.chatSource = 'beings://chat/loom.html';
     app.chatLoading = false;
     app.view = 'plugins';
+    app.chatSplitOpen = false;
     app.post = vi.fn();
     const pending = app.plugins.compose({ text: '一起完善这个目标', sceneId: 'scene-a' });
     const message = vi.mocked(app.post).mock.calls[0][0] as { id: string };
@@ -43,6 +44,31 @@ describe('plugin draft visibility', () => {
     expect(app.chatSplitOpen).toBe(outcome === 'inserted');
     expect(app.view).toBe('plugins');
     expect(app.post).toHaveBeenCalledTimes(1);
+  });
+});
+describe('independent workspace panels', () => {
+  it('preserves chat and right-page state until their explicit controls change it', () => {
+    const app = new AppModel(api().value);
+    vi.spyOn(app.town, 'show').mockImplementation(() => {});
+    app.navigate('firesides');
+    expect(app.chatSplitOpen).toBe(true);
+    app.toggleChatSplit();
+    app.navigate('bonfire');
+    expect(app.chatSplitOpen).toBe(false);
+    app.toggleBeingInfo();
+    expect(app.chatSplitOpen).toBe(false);
+    app.town.choose({ id: 'fixture', title: '一起看', excerpt: '保留右侧来源页', private: false });
+    expect(app.view).toBe('bonfire');
+    expect(app.chatSplitOpen).toBe(true);
+    expect(app.workspace.open).toBe(true);
+    app.navigate('firesides');
+    expect(app.workspace.open).toBe(true);
+    app.navigate('chat');
+    expect(app.view).toBe('firesides');
+    app.toggleChatSplit();
+    app.closePlace();
+    expect(app.view).toBe('chat');
+    expect(app.chatSplitOpen).toBe(true);
   });
 });
 const state = (being = "willow"): Snapshot => ({
@@ -384,7 +410,7 @@ describe("React desktop state lifecycle", () => {
     await app.changeChatSession("rename", "技术方案", discussion.scene_id);
     expect(app.toastMessage).toBe("");
   });
-  it("returns to the main scene and closes the parallel chat from the Being shortcut", async () => {
+  it("returns to the main scene without closing the right page from the Being shortcut", async () => {
     const main = { scene_id: "desktop-main", scene_meta: { client: "portal-desktop", scene_label: "日常对话" } };
     const other = { scene_id: "desktop-other", scene_meta: { client: "portal-desktop", scene_label: "讨论" } };
     const initial = { ...state(), chatScene: other, chatSessions: [main, other] };
@@ -394,8 +420,8 @@ describe("React desktop state lifecycle", () => {
     app.navigate("bonfire");
     app.toggleChatSplit();
     await app.returnToMainChat();
-    expect(app.view).toBe("chat");
-    expect(app.chatSplitOpen).toBe(false);
+    expect(app.view).toBe("bonfire");
+    expect(app.chatSplitOpen).toBe(true);
     expect(app.snapshot?.chatScene?.scene_id).toBe(main.scene_id);
     expect(changeChatSession).toHaveBeenCalledTimes(1);
     await app.returnToMainChat();

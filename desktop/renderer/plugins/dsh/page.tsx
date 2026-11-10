@@ -1,3 +1,4 @@
+import { WorkspaceDrawer, DrawerPresence } from "../../shared/components/workspace-drawer";
 import { createPortal } from 'react-dom';
 import { Icon } from '../../shared/icons/icon';
 import { publicErrorMessage } from '../../../shared/errors';
@@ -75,6 +76,8 @@ function DshPluginContent({ degraded = false }: { degraded?: boolean }) {
   const [notice, setNotice] = useState('');
   const reload = runtime.restartRequired;
   const rightbarSlot = useRef<HTMLDivElement>(null);
+  const [drawerHost, setDrawerHost] = useState<HTMLElement | null>(null);
+  useEffect(() => { setDrawerHost(document.querySelector<HTMLElement>(".workspace-body")); }, []);
   const [rightbarWidth, setRightbarWidth] = useState(400);
   useEffect(() => {
     if (!runtime.rightbar.open || !rightbarSlot.current) return;
@@ -165,7 +168,7 @@ function DshPluginContent({ degraded = false }: { degraded?: boolean }) {
       <div className="dsh-manager-main">
       <header className="dsh-manager-heading">
         {selected && !runtime.settingsNavigate && <button className="text-button" onClick={() => requestLeave(() => runtime.openManager())}>返回插件列表</button>}
-        <DshSlot name="settings.header" /><h2 id="dsh-manager-title">DeepSeek Harness 插件</h2><DshSlot name="settings.action" />
+        <DshSlot name="settings.header" /><h2 id="dsh-manager-title">第三方插件</h2><DshSlot name="settings.action" />
         {!runtime.managerHost && <button className="close" aria-label="关闭" disabled={busy || formState.busy} onClick={close}><span className="dsh-sr-only" aria-hidden="true"><DshSlot name="settings.close" /></span></button>}
       </header>
 
@@ -194,7 +197,7 @@ function DshPluginContent({ degraded = false }: { degraded?: boolean }) {
         </> : <div className="dsh-help"><section><h3>兼容范围</h3><p>支持插件安装、配置、主题、面板、命令，以及图片附件。</p><p>完整 Agent / Session、提示词、工具执行、MCP、终端及 Harness 私有桌面接口尚未全部接入。“已启用”表示插件完成加载，不代表所有功能都可用。</p></section><section><h3>安装与数据</h3><p>插件可访问本机宿主与页面。安装脚本默认关闭，可在安装确认中允许构建。卸载保留插件数据；部分全局脚本与样式需要重新加载页面才能移除。</p><p>插件通知遵循 Town 的通知设置。需要模型的能力先检查 Being 当前模型，不适配时再使用现有 subagent 配置。两者均不可用时显示原因。Being 当前接口暂不支持插件独立生成。</p></section><DshSlot name="settings.general.item" /></div>}</section>}
         {selected ? <section className="settings-detail-page" id={`dsh-detail-${selected.id}`} aria-label={`${selected.id} 设置`}>{pluginSettings}</section> : <>
         <div className="dsh-list-toolbar"><input type="search" aria-label="搜索已安装插件" placeholder="搜索已安装插件…" value={query} onChange={event => setQuery(event.target.value)} /><select aria-label="插件状态" value={filter} onChange={event => setFilter(event.target.value)}><option value="all">全部状态</option><option value="enabled">已启用</option><option value="disabled">已停用</option><option value="issue">需要处理</option></select><span className="dsh-list-count">{runtime.state.plugins.length} 个已安装</span></div>
-        {!runtime.state.plugins.length ? <div className="dsh-empty"><h3>添加你的第一个插件</h3><p>安装 DeepSeek Harness 插件，为 Town 添加面板、主题和工具。</p><button className="secondary" onClick={() => requestLeave(() => runtime.openManager('install'))}>选择插件来源</button></div> : !visible.length ? <p className="dsh-empty">没有符合条件的插件。<button className="text-button" onClick={() => { setQuery(''); setFilter('all'); }}>清除筛选</button></p> : <div className="dsh-plugin-list">{visible.map(plugin => {
+        {!runtime.state.plugins.length ? <div className="dsh-empty"><h3>添加你的第一个插件</h3><p>安装第三方插件，为 Town 添加面板、主题和工具。</p><button className="secondary" onClick={() => requestLeave(() => runtime.openManager('install'))}>选择插件来源</button></div> : !visible.length ? <p className="dsh-empty">没有符合条件的插件。<button className="text-button" onClick={() => { setQuery(''); setFilter('all'); }}>清除筛选</button></p> : <div className="dsh-plugin-list">{visible.map(plugin => {
           const issue = pluginIssue(plugin, runtime.errors[plugin.id]);
           return <article className="dsh-plugin-row" key={plugin.id}>
             <button className="dsh-plugin-select" aria-label={`配置 ${plugin.id}`} disabled={busy || formState.busy} onClick={() => requestLeave(() => runtime.openPlugin(plugin.id))}>
@@ -229,10 +232,10 @@ function DshPluginContent({ degraded = false }: { degraded?: boolean }) {
         <div className="dialog-footer"><button className="secondary" type="button" disabled={busy} onClick={() => { setError(''); runtime.openManager(); }}>取消</button><button className="primary" type="submit" disabled={busy || !source.trim() || !canActivate}>{busy ? '正在安装…' : '安装'}</button></div>
       </form>
     </Dialog>, document.body)}
-    {runtime.managerHost ? createPortal(<section id="third-party-plugins" className="dsh-manager-embedded" aria-label="DeepSeek Harness 插件" aria-busy={busy || formState.busy || undefined}>{manager}</section>, runtime.managerHost) : runtime.managerOpen && !runtime.settingsNavigate && <><div className="dsh-manager-backdrop" onClick={close} /><Dialog id="third-party-plugins" modal={false} busy={busy || formState.busy} open onClose={close} aria-labelledby="dsh-manager-title" tabIndex={-1} dismissOnBackdrop>{manager}</Dialog></>}
+    {runtime.managerHost ? createPortal(<section id="third-party-plugins" className="dsh-manager-embedded" aria-label="第三方插件" aria-busy={busy || formState.busy || undefined}>{manager}</section>, runtime.managerHost) : runtime.managerOpen && !runtime.settingsNavigate && <><div className="dsh-manager-backdrop" onClick={close} /><Dialog id="third-party-plugins" modal={false} busy={busy || formState.busy} open onClose={close} aria-labelledby="dsh-manager-title" tabIndex={-1} dismissOnBackdrop>{manager}</Dialog></>}
     <DshNavigation boundary={PluginBoundary} openOnboarding={id => setExplicitStep(id)} />
     {runtime.mainPanel && <section className="dsh-main-panel"><header><button className="secondary" onClick={() => { runtime.selectPanel(null); }}>返回 Town</button></header><PluginBoundary key={runtime.mainPanel} resetKey={runtime.lifecycleVersion}><DshSlot name="main" options={{ entryKey: runtime.mainPanel }} /></PluginBoundary></section>}
-    {runtime.rightbar.open && <aside className={`dsh-rightbar ${runtime.rightbar.fullscreen ? 'fullscreen' : ''}`} aria-label="插件操作面板">
+    {drawerHost && createPortal(<DrawerPresence open={runtime.rightbar.open}>{runtime.rightbar.open && <WorkspaceDrawer className={`dsh-rightbar ${runtime.rightbar.fullscreen ? 'fullscreen' : ''}`} aria-label="插件操作面板">
       <header className="dsh-rightbar-heading"><h2>{runtime.sidebarTabs.find(tab => tab.id === runtime.activeSidebarTab)?.title() || '插件面板'}</h2>
         <button aria-label={runtime.rightbar.fullscreen ? '还原插件侧栏' : '展开插件侧栏'} title={runtime.rightbar.fullscreen ? '还原插件侧栏' : '展开插件侧栏'} aria-pressed={runtime.rightbar.fullscreen} onClick={() => runtime.toggleRightbarFullscreen()}><Icon name={runtime.rightbar.fullscreen ? 'split-panel' : 'expand'} /></button>
         <button aria-label="关闭插件侧栏" title="关闭插件侧栏" onClick={() => runtime.closeRightbar()}><Icon name="close" /></button>
@@ -241,7 +244,7 @@ function DshPluginContent({ degraded = false }: { degraded?: boolean }) {
         <DshLimitations owner={runtime.slots.find(slot => slot.name === 'sidebar.right.pane.tab' && slot.key === runtime.activeSidebarTab)?.owner} />
         <div className="dsh-pane-slot" ref={rightbarSlot}>{runtime.activeSidebarTab ? <DshSlot name="sidebar.right.pane.tab" options={{ entryKey: runtime.activeSidebarTab }} /> : <DshSlot name="rightbar" owner={{ width: rightbarWidth, viewportWidth: innerWidth, canShow: true }} />}</div>
       </div></PluginBoundary>
-    </aside>}
+    </WorkspaceDrawer>}</DrawerPresence>, drawerHost)}
     {onboarding && <PluginBoundary key={onboarding.id}><DshSlot name="settings.onboarding" options={{ only: onboarding.id }} owner={{ stepId: onboarding.id, explicit: !!explicitStep, complete: () => { setCompleted(previous => [...previous, onboarding.id!]); setExplicitStep(undefined); }, openSection: (id: string) => { runtime.openSettingsSection(id); } }} /></PluginBoundary>}
     <div className="dsh-shell-overlay"><PluginBoundary resetKey={runtime.lifecycleVersion}><DshSlot name="shell.overlay" /></PluginBoundary><PluginBoundary resetKey={runtime.lifecycleVersion}><DshSlot name="overlay" /></PluginBoundary><PluginBoundary resetKey={runtime.lifecycleVersion}><DshSlot name="app.overlay" /></PluginBoundary></div>
   </>;

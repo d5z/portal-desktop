@@ -38,17 +38,15 @@ export class AppModel extends Store {
     this.closePlace();
     this.post({ type: 'beings:ui-examples-return', text, revision: new URL(this.chatSource || 'https://invalid').searchParams.get('revision') });
   };
-  chatSplitOpen = false;
+  chatSplitOpen = true;
   toggleChatSplit = () => { this.chatSplitOpen = !this.chatSplitOpen; this.changed(); };
   beingInfoOpen = false;
   toggleBeingInfo = () => {
     this.beingInfoOpen = !this.beingInfoOpen;
-    if (this.beingInfoOpen) this.chatSplitOpen = false;
     this.changed();
   };
 
   returnToMainChat = async () => {
-    this.chatSplitOpen = false;
     this.navigate("chat");
     const main = this.snapshot?.chatSessions?.[0];
     if (main && (main.scene_id !== this.snapshot?.chatScene?.scene_id || this.chatHistoryScope !== "current"))
@@ -353,14 +351,15 @@ export class AppModel extends Store {
     // Chat links and settings entries use the same Portal surface.
     if (view === 'portal') { this.openPortalSettings(); return; }
     if (view === 'plugin-library') { view = 'kits'; this.town.groveKind = 'plugin'; this.town.pluginKind = 'town'; }
-    this.view = view;
     const scene = this.snapshot?.chatScene?.scene_id;
     if (view === "chat" && this.chatHistoryScope === "current" && scene && this.chatSceneActivity[scene] === "done") {
       this.readSceneReplies.add(scene);
       delete this.chatSceneActivity[scene];
     }
+    // Revealing chat must not replace the independently open right-hand page.
+    if (view === 'chat') { this.chatSplitOpen = true; this.changed(); return; }
+    this.view = view;
     this.workspace.enter(view);
-    this.workspace.toggle(false);
     this.town.show(view, id);
     this.changed();
   };
@@ -446,9 +445,8 @@ export class AppModel extends Store {
     this.applySnapshot(next);
     this.historyTarget = operation === 'select' && next.chatScene && Number.isSafeInteger(historySeq) && historySeq! > 0
       ? { endpoint, sceneId: next.chatScene.scene_id, seq: historySeq! } : undefined;
-    if (this.historyTarget) this.beingInfoOpen = false;
     this.chatHistoryScope = this.historyTarget ? "current" : this.savedChatHistoryScope();
-    if (!this.chatSplitOpen) this.navigate("chat");
+    this.navigate("chat");
     this.postCurrentSession();
     if (next.chatScene && next.chatScene.scene_id !== previousSceneId)
       this.toast(`已切到「${next.chatScene.scene_meta.scene_label}」场景`);
@@ -476,7 +474,7 @@ export class AppModel extends Store {
     this.chatHistoryScope = scope;
     try { localStorage.setItem(this.chatHistoryScopeKey, scope); }
     catch { /* Keep the view usable when local storage is unavailable. */ }
-    if (!this.chatSplitOpen) this.navigate("chat");
+    this.navigate("chat");
     this.post({ type: "beings:history-scope", scope, revision: new URL(this.chatSource).searchParams.get("revision") });
   }
   changeChatSbsVisibility(show: boolean) {
@@ -627,7 +625,10 @@ export class AppModel extends Store {
   closePlace = () => {
     this.settingsRoute = "";
     this.settingsForwardRoute = "";
-    this.navigate("chat");
+    this.view = 'chat';
+    this.workspace.enter('chat');
+    this.town.show('chat');
+    this.navigate('chat');
   };
   returnFromPlace = () => {
     if (this.settingsRoute === "portal") this.returnToClientSettings();

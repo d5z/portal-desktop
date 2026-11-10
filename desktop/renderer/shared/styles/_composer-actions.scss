@@ -105,9 +105,9 @@
   padding: 0;
   border: 0;
   border-radius: 50%;
-  background: #c6e2fb;
-  color: #315c83;
-  box-shadow: 0 1px 2px #244b7014;
+  background: var(--text);
+  color: var(--bg);
+  box-shadow: none;
   opacity: 1;
   cursor: pointer;
   align-self: center;
@@ -131,12 +131,12 @@
   stroke: none;
 }
 #input-area #input-row #send-btn:hover:not(:disabled) {
-  background: #acd5fc;
-  color: #23496c;
+  background: var(--text-dim);
+  color: var(--bg);
 }
 #input-area #input-row #send-btn:disabled {
-  background: #edf4fb;
-  color: #9da9b5;
+  background: var(--bg-soft);
+  color: var(--text-muted);
   box-shadow: none;
   cursor: default;
 }
@@ -146,17 +146,6 @@
 #input-area #input-row #send-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
-}
-:root[data-theme='dark'] #input-area #input-row #send-btn {
-  background: #365a78;
-  color: #edf6ff;
-}
-:root[data-theme='dark'] #input-area #input-row #send-btn:hover:not(:disabled) {
-  background: #416b8e;
-}
-:root[data-theme='dark'] #input-area #input-row #send-btn:disabled {
-  background: #293d50;
-  color: #8293a3;
 }
 #input-area #input-row > .chat-composer {
   grid-column: 1 / -1;

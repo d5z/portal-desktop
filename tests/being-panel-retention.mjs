@@ -55,12 +55,13 @@ try {
     };
     window.fixtureApp.changed();
   });
-  const toggle=page.getByRole('button',{name:'Being 信息',exact:true});
+  const toggle=page.getByRole('button',{name:'资料库',exact:true});
   const library=page.getByRole('tab',{name:'资料库',exact:true});
   const details=page.getByRole('tab',{name:'详情',exact:true});
   const files=page.getByRole('list',{name:'工作区文件'});
+  assert.deepEqual(await page.evaluate(()=>window.libraryCalls),[], 'Closed library does not fetch');
   await toggle.click();
-  assert.deepEqual(await page.evaluate(()=>window.libraryCalls),[], 'Library is lazy until first visit');
+  assert.deepEqual(await page.evaluate(()=>window.libraryCalls),[''], 'Person action opens and loads the library directly');
   await library.click();
   await page.getByRole('tab',{name:'工作区',exact:true}).click();
   await page.getByText('正在读取工作区…',{exact:true}).waitFor();

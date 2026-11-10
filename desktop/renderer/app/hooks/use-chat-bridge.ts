@@ -27,7 +27,7 @@ export function useChatBridge(
   }, [app, frame]);
   useLayoutEffect(() => {
     const iframe = frame.current;
-    const header = document.querySelector<HTMLElement>('.workspace-stage > .topbar');
+    const header = document.querySelector<HTMLElement>('#chat-view > .topbar');
     if (!iframe || !header) return;
     let pending = 0;
     const measure = () => {

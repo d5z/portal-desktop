@@ -5,6 +5,8 @@
   align-items: center;
   gap: 5px;
   flex: none;
+  min-width: 0;
+  max-width: 100%;
   -webkit-app-region: no-drag;
   color: var(--text);
   font-size: 13px;
@@ -24,6 +26,71 @@
   cursor: pointer;
   border-radius: 8px;
   font: inherit;
+}
+
+.identity {
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  max-width: min(240px, 100%);
+  min-height: 62px;
+  padding: 10px 20px;
+  border-radius: 24px;
+  background: var(--control);
+  box-shadow: var(--popover-shadow);
+  transition: background-color 160ms ease;
+
+  &[data-idle='true'] {
+    min-height: 42px;
+  }
+}
+
+.trigger.identity:hover,
+.identity[aria-expanded='true'] {
+  background: var(--surface);
+}
+
+.identityName {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.identityName .dot {
+  width: 7px;
+  height: 7px;
+  border: 0;
+  background: var(--secondary);
+}
+
+.name:global(#conversation-name) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 550;
+  line-height: 20px;
+}
+
+.inlineStatus {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  max-width: 100%;
+  color: var(--secondary);
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.inlineStatus > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .trigger:hover {

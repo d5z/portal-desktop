@@ -801,7 +801,7 @@
   }
 }
 
-/* The rail slides over the settled chat layout instead of resizing it every frame. */
+/* Reveal the panel as one surface without reflowing the chat on every frame. */
 .being-info-body {
   position: relative;
   display: flex;
@@ -809,23 +809,6 @@
   flex: 1;
   width: 100%;
   min-height: 0;
-}
-
-.being-info[data-animating='true'] {
-  overflow: clip;
-  will-change: transform;
-}
-
-.being-info[data-closing='true'] {
-  position: absolute;
-  inset: 0 0 0 auto;
-  z-index: 80;
-  transform: translateX(100%);
-}
-
-.being-info-content > [role='tabpanel']:not([hidden]),
-.being-privacy-panel {
-  animation: being-content-enter 180ms ease-out both;
 }
 
 @keyframes being-content-enter {
@@ -860,38 +843,11 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .being-info-content > [role='tabpanel']:not([hidden]),
-  .being-privacy-panel,
   .being-computer-menu {
     animation: none;
   }
   .being-tabs button,
   .being-info-close {
     transition: none;
-  }
-}
-
-.chat-session-panel {
-  transform-origin: left top;
-  transition:
-    opacity 160ms ease,
-    transform 160ms cubic-bezier(0.22, 1, 0.36, 1);
-
-  &[data-open='false'] {
-    opacity: 0;
-    transform: translateX(-12px);
-    pointer-events: none;
-  }
-
-  @starting-style {
-    opacity: 0;
-    transform: translateX(-12px);
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .chat-session-panel {
-    transition: none;
-    transform: none;
   }
 }

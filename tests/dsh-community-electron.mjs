@@ -34,7 +34,7 @@ try {
    await page.locator('#options-trigger').click();
    await page.locator('#client-settings-button').click();
    await page.getByRole('tab',{name:'插件',exact:true}).click();
-   await page.getByRole('tab',{name:'DeepSeek Harness 插件',exact:true}).click();
+   await page.getByRole('tab',{name:'第三方插件',exact:true}).click();
  };
  page.on('pageerror', error => console.log('PAGE ERROR', error.message));
  page.on('console', message => { if (message.type() === 'error') console.log('CONSOLE', message.text().slice(0, 500)); });
@@ -231,7 +231,7 @@ try {
  await page.getByRole('button',{name:'工具库',exact:true}).click();
  await page.getByRole('tab',{name:'Plugin',exact:true}).click();
  const pluginTabs = page.getByRole('tablist',{name:'插件类型'});
- assert.deepEqual(await pluginTabs.getByRole('tab').allTextContents(),['官方插件','DeepSeek Harness 插件']);
+ assert.deepEqual(await pluginTabs.getByRole('tab').allTextContents(),['官方插件','第三方插件']);
  assert.equal(await pluginTabs.getByRole('tab',{name:'官方插件',exact:true}).getAttribute('aria-selected'),'true');
  await pluginTabs.getByRole('tab',{name:'官方插件',exact:true}).focus();
  await page.keyboard.press('ArrowRight');

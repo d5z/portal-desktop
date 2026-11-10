@@ -151,8 +151,6 @@ try {
   const original = await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id);
   await chat.locator('#input').fill('原会话草稿');
   await page.getByRole('button',{name:'展开场景列表',exact:true}).click();
-  await page.getByLabel('场景列表选项',{exact:true}).click();
-  await page.getByRole('button',{name:'保持显示聊天面板',exact:true}).click();
   const sbsVisibility = page.locator('[role="dialog"][aria-labelledby][data-open="true"] input').first();
   const visibilityState = async (method) => {
     if (!await sbsVisibility.isVisible()) await page.getByLabel('SBS 状态与显示设置',{exact:true}).click();
@@ -187,7 +185,7 @@ try {
   await chat.locator('#input').fill('方案草稿');
   await page.getByRole('button',{name:'切换到场景：桌面·测试设备'}).click();
   await chat.locator('#input').waitFor();
-  await page.waitForFunction(() => document.querySelector('#chat-scene-indicator')?.textContent.includes('桌面·测试设备'));
+  await page.waitForFunction(() => document.querySelector('#chat-scene-indicator')?.title.includes('桌面·测试设备'));
   assert.equal(await chat.locator('#input').evaluate(el => el.value ?? el.editor.getMarkdown()),'原会话草稿');
   await chat.getByText('SBS 全局测试消息',{exact:true}).waitFor();
   assert.equal(await visibilityState('isChecked'),true);
@@ -263,7 +261,7 @@ try {
     }
     function assertStream(value) { if (!value) throw new Error('Missing stream for '+scene); }
   }, {scene,text,close});
-  await page.waitForFunction(() => document.querySelector('#chat-scene-indicator')?.textContent.includes('桌面·测试设备'));
+  await page.waitForFunction(() => document.querySelector('#chat-scene-indicator')?.title.includes('桌面·测试设备'));
   // Wait on the main-process fixture, rather than assuming click completion means POST completion.
   for (let i=0; !(await application.evaluate((_,id) => globalThis.fixture.streams.has(id),original)); i++) {
     assert.ok(i < 100, 'A stream must open'); await new Promise(resolve => setTimeout(resolve,20));
@@ -336,7 +334,7 @@ try {
   await page.reload();
   await chat.getByText('回复：方案内容',{exact:true}).waitFor();
   assert.equal(await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id),discussion);
-  await page.getByRole('button',{name:'展开场景列表',exact:true}).click();
+  await page.getByRole('button',{name:'收起场景列表',exact:true}).waitFor();
   // Right-click an inactive scene: rename and delete must not select it.
   await page.getByRole('button',{name:'切换到场景：桌面·测试设备'}).click({button:'right'});
   await page.getByRole('menu',{name:'场景操作'}).waitFor();
@@ -368,7 +366,7 @@ try {
   const replacement = await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id);
   assert.notEqual(replacement,discussion);
   await page.reload();
-  await page.getByRole('button',{name:'展开场景列表',exact:true}).click();
+  await page.getByRole('button',{name:'收起场景列表',exact:true}).waitFor();
   await page.getByRole('button',{name:'切换到场景：新场景'}).waitFor();
   assert.equal(await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id),replacement);
   await page.getByRole('checkbox',{name:'显示全部场景上下文',exact:true}).check();
@@ -399,7 +397,7 @@ try {
   assert.equal(await chat.locator('.message.user').filter({hasText:'Bound scene message'}).count(),1);
   assert.equal((await application.evaluate(() => globalThis.fixture.requests)).at(-1).scene_id,'feishu-shared');
   await page.reload();
-  await page.getByRole('button',{name:'展开场景列表',exact:true}).click();
+  await page.getByRole('button',{name:'收起场景列表',exact:true}).waitFor();
   await page.getByRole('button',{name:'切换到场景：跨客户端场景'}).waitFor();
   assert.equal((await page.evaluate(() => window.beings.snapshot())).chatScene.scene_id,'feishu-shared');
   // Scheduling is inspectable process metadata, never inline conversation prose.
@@ -452,5 +450,5 @@ try {
   await page.waitForFunction(() => !window.fixtureApp.chatLoading && window.fixtureApp.chatSbsSceneId === window.fixtureApp.snapshot.chatScene.scene_id);
   assert.equal(await visibilityState('isChecked'),true, 'Scene SBS visibility survives a fresh chat frame');
   assert.deepEqual(errors,[]);
-  console.log('PASS: same Being, create/switch/rename scenes through the actual UI, isolated history, per-scene SBS visibility and persistence, per-scene drafts, send identity, top scene picker, collapse/reopen, FIFO scene queue, context-menu rename, confirmed deletion, last-scene replacement and reload.');
+  console.log('PASS: same Being, create/switch/rename scenes through the actual UI, isolated history, per-scene SBS visibility and persistence, per-scene drafts, send identity, scene sidebar, collapse/reopen, FIFO scene queue, context-menu rename, confirmed deletion, last-scene replacement and reload.');
 } finally { await application?.close(); await rm(directory,{recursive:true,force:true}); }

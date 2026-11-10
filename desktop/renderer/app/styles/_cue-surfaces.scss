@@ -1,0 +1,263 @@
+/* Cue-inspired settings and Being profile surfaces. */
+#client-settings-dialog {
+  width: min(1080px, calc(100vw - 48px));
+  height: min(760px, calc(100dvh - 48px));
+  max-height: calc(100dvh - 48px);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  box-shadow: 0 24px 90px rgb(20 24 32 / 18%), 0 4px 16px rgb(20 24 32 / 8%);
+
+  --utility-radius: 18px;
+}
+
+#client-settings-dialog .client-settings-content {
+  grid-template-columns: 236px minmax(0, 1fr);
+  grid-template-rows: 78px minmax(0, 1fr);
+  background: var(--bg);
+}
+
+#client-settings-dialog .client-settings-content > .dialog-heading,
+#client-settings-dialog .settings-tabs {
+  background: var(--control);
+  border-right: 1px solid var(--line);
+}
+
+#client-settings-dialog .client-settings-content > .dialog-heading {
+  padding: 24px 24px 16px;
+}
+
+#client-settings-dialog .dialog-heading h2 {
+  font-size: 22px;
+  letter-spacing: -0.02em;
+}
+
+#client-settings-dialog .settings-tabs {
+  gap: 0;
+  padding: 12px 14px 24px;
+}
+
+#client-settings-dialog .settings-tab-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+#client-settings-dialog .settings-tab-separator {
+  display: block;
+  height: 1px;
+  margin: 12px 10px;
+  background: var(--line);
+}
+
+#client-settings-dialog .settings-tabs button {
+  min-height: 44px;
+  padding: 11px 12px;
+  border-radius: 11px;
+  font-size: 13px;
+}
+
+#client-settings-dialog .settings-tabs button[aria-selected='true'] {
+  background: var(--surface);
+  box-shadow: none;
+}
+
+#client-settings-dialog .settings-page-heading {
+  min-height: 84px;
+  padding: 24px 48px 20px;
+}
+
+#client-settings-dialog .settings-page-title {
+  font-size: 23px;
+  letter-spacing: -0.025em;
+}
+
+#client-settings-dialog .dialog-body {
+  padding: 0 48px 36px;
+}
+
+#client-settings-dialog .settings-inline-body {
+  padding-inline: 48px;
+}
+
+#client-settings-dialog .settings-item-list {
+  display: grid;
+  gap: 12px;
+}
+
+#client-settings-dialog .settings-item-list > .settings-item,
+#client-settings-dialog .settings-group,
+#client-settings-dialog .general-settings-group,
+#client-settings-dialog .permission-settings-section {
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--control);
+}
+
+#client-settings-dialog .settings-item-list > .settings-item {
+  min-height: 72px;
+  padding: 18px 20px;
+  border-bottom: 0;
+}
+
+#client-settings-dialog .settings-group,
+#client-settings-dialog .general-settings-group {
+  padding: 6px 20px;
+  margin: 0 0 14px;
+}
+
+#client-settings-dialog .settings-group h3 {
+  margin: 12px 0 6px;
+}
+
+#client-settings-dialog .permission-settings-section {
+  margin: 0;
+  padding: 18px 20px;
+}
+
+#client-settings-dialog .settings-inline-body :is(.portal-card, .settings-page-link, .llm-current) {
+  border-radius: 18px;
+}
+
+#client-settings-dialog .settings-page-link {
+  width: 100%;
+  margin-inline: 0;
+  padding: 18px 20px;
+  background: var(--control);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+}
+
+#being-info .being-info-content {
+  padding: 0;
+  margin: 0;
+}
+
+#being-info .being-info-content > section {
+  padding: 0;
+}
+
+#being-info #being-profile-panel h3 {
+  margin: 0 0 12px;
+  color: var(--secondary);
+  font-size: 17px;
+  font-weight: 600;
+}
+
+#being-info .being-details {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+#being-info .being-details > div {
+  min-height: 54px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+#being-info .being-details > div:last-child {
+  border-bottom: 0;
+}
+
+#being-info .being-action-row {
+  min-height: 56px;
+  margin: 0;
+  padding: 16px 0;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+
+#being-info .being-action-row::before {
+  inset: 4px -10px;
+  border-radius: 10px;
+}
+
+#being-info .being-action-row > span:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+#being-info .being-action-row strong {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+#being-info .being-action-row small {
+  color: var(--secondary);
+  font-size: 12px;
+}
+
+#being-info #being-library-panel > div,
+#being-info #being-computer-panel > figure {
+  margin-top: 0;
+}
+
+#being-info #being-library-panel .recentEmpty,
+#being-info #being-library-panel > p {
+  min-height: 120px;
+  margin: 0;
+  padding: 34px 12px;
+  color: var(--secondary);
+  text-align: center;
+}
+
+#being-info #being-computer-panel .being-computer-screen,
+#being-info #being-computer-panel .being-computer-preview {
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: linear-gradient(155deg, color-mix(in srgb, var(--surface) 92%, var(--control)), var(--control));
+  box-shadow: none;
+}
+
+#being-info #being-computer-panel .being-computer-screen {
+  min-height: 240px;
+}
+
+#being-info #being-computer-panel .being-computer-footer {
+  min-height: 58px;
+  margin-top: 12px;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: transparent;
+}
+
+@media (max-width: 720px) {
+  #client-settings-dialog {
+    width: calc(100vw - 24px);
+    height: calc(100dvh - 24px);
+    border-radius: 20px;
+  }
+
+  #client-settings-dialog .client-settings-content {
+    grid-template-columns: 1fr;
+    grid-template-rows: 56px auto minmax(0, 1fr);
+  }
+
+  #client-settings-dialog .client-settings-content > .dialog-heading {
+    padding: 16px 20px;
+    border-right: 0;
+  }
+
+  #client-settings-dialog .settings-tabs {
+    padding: 4px 12px 12px;
+    border-right: 0;
+  }
+
+  #client-settings-dialog .settings-tab-wrap {
+    display: contents;
+  }
+
+  #client-settings-dialog .settings-tab-separator {
+    display: none;
+  }
+
+  #client-settings-dialog .settings-page-heading,
+  #client-settings-dialog .settings-inline-body,
+  #client-settings-dialog .dialog-body {
+    padding-inline: 20px;
+  }
+}

@@ -18,7 +18,7 @@ export async function containedFile(root: string, relative: unknown) {
 export async function readDshPackage(root: string, requireDeclaration = true, allowUnbuiltClient = false) {
   const data = JSON.parse(await readFile(path.join(root, 'package.json'), 'utf8'));
   packageName(data.name);
-  if ((requireDeclaration && !data.dsh) || typeof data.version !== 'string') throw new Error('此包没有 DSH 插件声明。');
+  if ((requireDeclaration && !data.dsh) || typeof data.version !== 'string') throw new Error('此包没有第三方插件声明。');
   data.dsh ??= {};
   if (data.dsh.client?.platform && !['web', 'all'].includes(data.dsh.client.platform)) throw new Error(`插件与当前 Town 不适配：不支持此客户端平台：${data.dsh.client.platform}`);
   if (data.engines?.dsh && (!validRange(data.engines.dsh) || !satisfies('0.2.1-rc.5', data.engines.dsh, { includePrerelease: true }))) throw new Error(`插件与当前 Town 不适配：需要 DSH ${data.engines.dsh}；当前适配目标为 0.2.1-rc.5。`);

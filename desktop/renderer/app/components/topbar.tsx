@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { AppModel } from "../models/app";
 import { useModel } from "../../shared/hooks/use-model";
-import { ChatSceneIndicator } from "./chat-scene";
 import { UpdateProgress } from "./update-progress";
 import { PortalStatus, portalStatus } from '../../portal/status';
 import styles from './topbar.module.scss';
@@ -140,35 +139,10 @@ function ReadyTopbar({ model: app }: { model: AppModel }) {
     void app.downloadClientUpdate();
   };
   return (
-    <header className={`topbar ${styles.bar}`} data-floating={app.view === 'chat' && !app.snapshot?.notice} hidden={app.view !== "chat" && !app.chatSplitOpen}>
-      <ChatSceneIndicator
-        createRequest={app.chatSessionCreateRequest}
-        visible={app.view === "chat" || app.chatSplitOpen}
-        onReveal={() => {
-          if (!app.chatSplitOpen) app.navigate("chat");
-        }}
-        scene={app.snapshot?.chatScene}
-        sessions={app.snapshot?.chatSessions}
-        activity={app.chatSceneActivity}
-        onSession={(operation, value, sceneId) => app.changeChatSession(operation, value, sceneId)}
-        connected={hasToken}
-        scope={app.chatHistoryScope}
-        scopeReady={hasToken && !app.chatLoading && app.chatHistoryScopeKnown}
-        onScope={(scope) => app.changeChatHistoryScope(scope)}
-        onCopy={(id) => void app.run(async () => {
-          await app.api.copyText(id);
-          app.toast("场景 ID 已复制");
-        })}
-      />
-      <div className="pair-name" hidden={app.view !== "chat" || app.subagentSettingsOpen}>
-        <button id="toggle-being-info" type="button" className="conversation-identity"
-          hidden={app.view !== "chat" || app.subagentSettingsOpen} aria-label="Being 信息"
-          title={`${town.displayName || app.snapshot?.settings.being || 'Being'} · 查看资料`} aria-describedby="conversation-name" aria-controls="being-info" aria-expanded={app.beingInfoOpen}
-          onClick={app.toggleBeingInfo}>
-          <span className="conversation-avatar" aria-hidden="true">{(town.displayName || app.snapshot?.settings.being || "Being").slice(0, 1).toUpperCase()}</span>
-          <span id="conversation-name">{town.displayName || app.snapshot?.settings.being || "Being"}</span>
-        </button>
-        <SbsControl known={hasToken && app.sbsKnown && !app.chatLoading} enabled={app.sbsEnabled}
+    <header className={`topbar ${styles.bar}`}>
+      <div aria-hidden="true" />
+      <div className="pair-name" hidden={app.subagentSettingsOpen}>
+        <SbsControl name={town.displayName || app.snapshot?.settings.being || "Being"} known={hasToken && app.sbsKnown && !app.chatLoading} enabled={app.sbsEnabled}
           origin={app.chatSbsOrigin} phase={app.chatSbsPhase} showContent={app.chatShowSbsMessages} allScenes={app.chatHistoryScope==='all'}
           visibilityReady={hasToken && !app.chatLoading && !!app.chatSbsSceneId && app.chatSbsSceneId===app.snapshot?.chatScene?.scene_id}
           onVisibility={show=>app.changeChatSbsVisibility(show)} onToggle={()=>app.toggleSbs()} />
@@ -186,6 +160,11 @@ function ReadyTopbar({ model: app }: { model: AppModel }) {
         >
           <Icon name="sync" />
         </IconButton>
+        {app.view === "chat" && !app.subagentSettingsOpen && <IconButton
+          id="toggle-being-info" className="topbar-icon-button" label="资料库"
+          aria-controls="being-info" aria-expanded={app.beingInfoOpen} onClick={app.toggleBeingInfo}>
+          <Icon name="person" />
+        </IconButton>}
         {createPortal(<div className="rail-update">
         <UpdateProgress
           state={app.update}

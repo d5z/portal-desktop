@@ -53,6 +53,7 @@ try {
   await page.locator('.client-file-viewer').waitFor({state:'detached'});
   await page.locator('#browser-title').filter({hasText:'链接目标页'}).waitFor();
   await page.waitForFunction(async()=>!(await window.beings.browserState()).loading);
+  await page.waitForFunction(()=>!document.querySelector('#browser-panel').hasAttribute('data-animating'));
   const layout=()=>page.evaluate(()=>{const box=selector=>{const r=document.querySelector(selector).getBoundingClientRect();return {x:r.x,right:r.right,width:r.width}};return {stage:box('.workspace-stage'),browser:box('#browser-panel'),viewport:box('#browser-viewport'),width:innerWidth,info:document.querySelector('#fixture-info').checkVisibility()}});
   let sizes=await layout();
   assert(sizes.stage.width>=280);assert(sizes.browser.x>=sizes.stage.right-1);assert(sizes.browser.right<=sizes.width+1);assert.equal(sizes.info,false);

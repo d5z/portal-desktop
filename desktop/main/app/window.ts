@@ -99,7 +99,7 @@ export function clientWindowOptions(): BrowserWindowConstructorOptions {
     ...(process.platform === 'win32' ? { backgroundMaterial: 'none' as const } : {}),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     autoHideMenuBar: process.platform === 'win32',
-    trafficLightPosition: { x: 18, y: 20 },
+    trafficLightPosition: { x: 8, y: 12 },
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'), sandbox: true, contextIsolation: true,
       nodeIntegration: false, nodeIntegrationInSubFrames: false, webSecurity: true,

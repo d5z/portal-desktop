@@ -1,3 +1,4 @@
+import { WorkspaceDrawer } from "../../shared/components/workspace-drawer";
 import type { SettingsDetail } from "../../shared/components/settings-surface";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { PanelResizeHandle, usePanelWidth } from '../../shared/components/panel-resize';
@@ -159,7 +160,8 @@ export function SubagentModelSettings({ app, embedded = false, inline = false, o
     setTarget(value);
     setVisited(previous => new Set([...previous, value]));
   };
-  return <div id="subagent-model-panel" ref={panel} className={embedded ? "embedded-model-settings" : undefined} style={embedded ? undefined : {width, flexBasis:width}}>
+  const Panel = embedded ? "div" : WorkspaceDrawer;
+  return <Panel id="subagent-model-panel" ref={panel} className={embedded ? "embedded-model-settings" : undefined} style={embedded ? undefined : {width, flexBasis:width}}>
     {!embedded && <PanelResizeHandle panel={panel} label="调整模型设置宽度" width={width} onResize={setWidth} initial={320} min={240} max={640} reserve={396} />}
     <aside id="settings-panel" aria-label="模型设置" onKeyDown={event => { if (!embedded && event.key === 'Escape') { event.stopPropagation(); close(); } }}>
       <div className="settings-header panel-header" hidden={embedded}>
@@ -187,5 +189,5 @@ export function SubagentModelSettings({ app, embedded = false, inline = false, o
         {value === 'subagent' && <div hidden={detailOpen}>{subagentConfiguration}</div>}
       </div>)}
     </aside>
-  </div>;
+  </Panel>;
 }

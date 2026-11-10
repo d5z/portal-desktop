@@ -1,3 +1,4 @@
+import { WorkspaceDrawer, DrawerPresence } from "../shared/components/workspace-drawer";
 import { HomeFileViewer } from './components/home-file-viewer';
 import { IconButton } from '../shared/components/icon-button';
 import { Icon } from '../shared/icons/icon';
@@ -122,21 +123,20 @@ export function App({ model }: { model: AppModel }) {
         <div className="workspace-body">
           <WorkspaceNavigation app={app} />
           <div className="workspace-stage">
-            <Topbar model={app} />
-            <p
-              id="startup-notice"
-              className="startup-notice"
-              role="status"
-              hidden={!app.snapshot?.notice}
-            >
-              {app.snapshot?.notice || ""}
-            </p>
-            <SceneRibbon model={app.workspace} />
             <div className={`workspace-content${app.view !== "chat" && app.chatSplitOpen ? " split-chat" : ""}`}>
-            <section ref={chatPanel} id="chat-view" className="view" hidden={app.view !== "chat" && !app.chatSplitOpen}
+            <WorkspaceDrawer as="section" fluid ref={chatPanel} id="chat-view" className="view" open={app.view === "chat" || app.chatSplitOpen}
               style={{ "--chat-pane-width": `${chatWidth}px` } as import("react").CSSProperties}>
+              <Topbar model={app} />
+              <p
+                id="startup-notice"
+                className="startup-notice"
+                role="status"
+                hidden={!app.snapshot?.notice}
+              >
+                {app.snapshot?.notice || ""}
+              </p>
+              <SceneRibbon model={app.workspace} />
               <PanelResizeHandle panel={chatPanel} label="调整并排对话宽度" edge="right" width={chatWidth} onResize={setChatWidth} initial={640} min={300} max={1000} disabled={app.view === "chat" || !app.chatSplitOpen} />
-              {app.view !== "chat" && <header className="split-chat-heading"><span>与你的 Being 对话</span><button className="close" aria-label="收起并排对话" onClick={app.toggleChatSplit} /></header>}
               <div
                 id="welcome"
                 hidden={!app.snapshot || app.snapshot.settings.hasToken}
@@ -175,18 +175,18 @@ export function App({ model }: { model: AppModel }) {
                   if (app.chatSource) app.frameLoaded();
                 }}
               />
-            </section>
-            {app.view !== "chat" && <section id="place-panel" className="place-surface central-place" aria-labelledby="view-title">
-              <PlaceContent app={app} />
-            </section>}
+              <Companion model={app.workspace} />
+            </WorkspaceDrawer>
+            <DrawerPresence open={app.view !== "chat"}>{app.view !== "chat" && <WorkspaceDrawer as="section" id="place-panel" className="place-surface central-place" aria-labelledby="view-title">
+              <PlaceContent app={app} view={app.view} />
+            </WorkspaceDrawer>}</DrawerPresence>
             </div>
           </div>
           <AttachmentFileViewer scope={`${app.chatSource}:${app.snapshot?.chatScene?.scene_id || ''}`} frame={frame}>
             <BeingInfo app={app} />
           </AttachmentFileViewer>
-          {app.subagentSettingsOpen && !app.settingsRoute && <SubagentModelSettings app={app} />}
-          <Companion model={app.workspace} />
-          {app.view === "chat" && (!app.subagentSettingsOpen || Boolean(app.settingsRoute)) && <PluginSidebar model={app.plugins} theme={app.colorScheme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />}
+          <DrawerPresence open={app.subagentSettingsOpen && !app.settingsRoute}>{app.subagentSettingsOpen && !app.settingsRoute && <SubagentModelSettings app={app} />}</DrawerPresence>
+          <DrawerPresence open={app.view === "chat" && (!app.subagentSettingsOpen || Boolean(app.settingsRoute))}>{app.view === "chat" && (!app.subagentSettingsOpen || Boolean(app.settingsRoute)) && <PluginSidebar model={app.plugins} theme={app.colorScheme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />}</DrawerPresence>
           <Browser model={app} />
         </div>
       </main>
@@ -207,7 +207,9 @@ export function App({ model }: { model: AppModel }) {
   );
 }
 
-function PlaceContent({ app }: { app: AppModel }) {
+// Keep the rendered destination stable while its drawer exits. The model can
+// stop background work immediately without replacing the departing page.
+function PlaceContent({ app, view }: { app: AppModel; view: string }) {
   useModel(app.town);
   const plugins = useModel(app.plugins);
   const selectedPlugin = plugins.selected?.placement === 'page'
@@ -216,25 +218,25 @@ function PlaceContent({ app }: { app: AppModel }) {
   return (
     <>
       <PlaceHeading
-        view={app.view}
-        title={app.view === 'ui-examples' ? '智能交互示例' : app.view === 'plugins' ? selectedPlugin?.manifest.name : undefined}
-        actions={app.view !== 'ui-examples' && <>
+        view={view}
+        title={view === 'ui-examples' ? '智能交互示例' : view === 'plugins' ? selectedPlugin?.manifest.name : undefined}
+        actions={view !== 'ui-examples' && <>
           <PluginSlots model={app.plugins} />
-          {app.view === 'plugins' && <IconButton className="plugin-manage-button" label="管理插件" onClick={() => plugins.manage()}>
+          {view === 'plugins' && <IconButton className="plugin-manage-button" label="管理插件" onClick={() => plugins.manage()}>
             <Icon name="more-filled" />
           </IconButton>}
         </>}
         chatExpanded={app.chatSplitOpen}
         onToggleChat={app.toggleChatSplit}
         navigate={app.navigate}
-        onBack={app.view !== "ui-examples" && (app.settingsRoute === "portal" || app.town.returnView) ? app.returnFromPlace : undefined}
-        onForward={app.view !== "ui-examples" && app.town.forwardView ? app.forwardFromPlace : undefined}
-        onClose={app.view === "ui-examples" ? () => app.returnFromUIExamples() : app.closePlace}
+        onBack={view !== "ui-examples" && (app.settingsRoute === "portal" || app.town.returnView) ? app.returnFromPlace : undefined}
+        onForward={view !== "ui-examples" && app.town.forwardView ? app.forwardFromPlace : undefined}
+        onClose={view === "ui-examples" ? () => app.returnFromUIExamples() : app.closePlace}
       />
-      {app.view === "ui-examples" ? <UIExamplesPlace key={`${app.chatSource}:${app.snapshot?.chatScene?.scene_id || ""}`} app={app} /> : <div className="plugin-place-layout">
+      {view === "ui-examples" ? <UIExamplesPlace key={`${app.chatSource}:${app.snapshot?.chatScene?.scene_id || ""}`} app={app} /> : <div className="plugin-place-layout">
         <div className="plugin-place-main">
-          {app.view === "portal" ? <Portal model={app} /> : app.view !== "plugins" && <Town model={app.town} />}
-          {app.view === 'plugins' && <Plugins model={app.plugins} theme={app.colorScheme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />}
+          {view === "portal" ? <Portal model={app} /> : view !== "plugins" && <Town model={app.town} visible />}
+          {view === 'plugins' && <Plugins model={app.plugins} theme={app.colorScheme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />}
         </div>
         <PluginSidebar model={app.plugins} theme={app.colorScheme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />
       </div>}

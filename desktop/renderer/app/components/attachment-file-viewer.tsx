@@ -1,3 +1,4 @@
+import { DrawerPresence } from "../../shared/components/workspace-drawer";
 import { LocalFileAction } from '../../shared/components/local-file-link';
 import { homeRecentFiles } from '../models/home-recent-files';
 import { IconButton } from '../../shared/components/icon-button';
@@ -81,7 +82,7 @@ export function AttachmentFileViewer({frame,children,scope}:{frame:RefObject<HTM
     const message=await revealLocalFile(window.beings,localPath);
     if(ticket===sequence.current)setRevealError(message);
   };
-  return <LocalFileAction.Provider value={loadLocal}>{(file || localPath) && <FilePreviewPanel key={localPath || file?.id} name={name} path={localPath || undefined} onClose={close}
+  return <LocalFileAction.Provider value={loadLocal}><DrawerPresence open={!!(file || localPath)}>{(file || localPath) && <FilePreviewPanel key={localPath || file?.id} name={name} path={localPath || undefined} onClose={close}
     actions={localPath ? <>
       {html && <FilePreviewModes source={source} onChange={setSource} />}
       <IconButton className="file-preview-icon" label="刷新" disabled={busy} onClick={()=>void loadLocal(localPath)}><Icon name="refresh-library" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" /></IconButton>
@@ -94,5 +95,5 @@ export function AttachmentFileViewer({frame,children,scope}:{frame:RefObject<HTM
     {file && (html && !source ? <iframe key={file.id} title="HTML 文件预览" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads" referrerPolicy="no-referrer" src={file.url}/> :
       file.blob?.type.startsWith('image/') ? <FileImage blob={file.blob} name={file.name}/> :
       file.extension==='xlsx'?<XlsxPreview key={file.id} blob={file.blob!}/>:file.extension==='pptx'?<PptxPreview key={file.id} blob={file.blob!}/>:file.extension==='pdf'?<PdfPreview key={file.id} blob={file.blob!}/>:<div className="client-file-body">{file.segments?file.segments.map((s,i)=><section key={i}>{s.label && <h3>{s.label}</h3>}<Markdown content={s.text} intelligentUI={false}/></section>):<TextFile extension={file.extension} text={file.text || ''}/>}</div>)}
-  </FilePreviewPanel>}{children}</LocalFileAction.Provider>;
+  </FilePreviewPanel>}</DrawerPresence>{children}</LocalFileAction.Provider>;
 }

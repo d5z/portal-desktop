@@ -178,13 +178,16 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
           ></button>
         </div>
         <div className="settings-tabs" role="tablist" aria-label="设置分类" aria-orientation={compact ? "horizontal" : "vertical"} onKeyDown={navigateTabs}>
-          {settingsTabs.map(item => <button key={item.id} id={`settings-tab-${item.id}`} role="tab"
-            aria-controls={`settings-panel-${item.id}`} aria-selected={activeTab === item.id}
-            disabled={busy} tabIndex={activeTab === item.id ? 0 : -1} onClick={() => { const action = () => void selectTab(item.id); if (dshRuntime.settingsHost && dshRuntime.requestSettingsLeave) dshRuntime.requestSettingsLeave(action); else action(); }}
-            >
-            <Icon name={item.icon} />
-            {item.label}
-          </button>)}
+          {settingsTabs.map((item, index) => <div key={item.id} className="settings-tab-wrap">
+            {[4, 5, 7].includes(index) && <span className="settings-tab-separator" aria-hidden="true" />}
+            <button id={`settings-tab-${item.id}`} role="tab"
+              aria-controls={`settings-panel-${item.id}`} aria-selected={activeTab === item.id}
+              disabled={busy} tabIndex={activeTab === item.id ? 0 : -1} onClick={() => { const action = () => void selectTab(item.id); if (dshRuntime.settingsHost && dshRuntime.requestSettingsLeave) dshRuntime.requestSettingsLeave(action); else action(); }}
+              >
+              <Icon name={item.icon} />
+              {item.label}
+            </button>
+          </div>)}
         </div>
         <section className="settings-page">
         <div className="settings-page-heading">
@@ -207,7 +210,7 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
         <div className="dialog-body settings-home-body settings-inline-body" ref={body} onScroll={event => pageScroll.current.set(pagePath, event.currentTarget.scrollTop)}>
         <div id="settings-panel-plugins" role="tabpanel" aria-labelledby="settings-tab-plugins" hidden={activeTab !== 'plugins'}>
           <div className="plugin-library-tabs" hidden={Boolean(detailId)} role="tablist" aria-label="设置中的插件类型" onKeyDown={navigateTabs}>
-            {([['town','官方插件'],['dsh','DeepSeek Harness 插件']] as const).map(([kind,label]) => <button key={kind} role="tab" id={`settings-plugin-${kind}`} aria-controls={`settings-plugin-content-${kind}`} aria-selected={pluginKind === kind} tabIndex={pluginKind === kind ? 0 : -1} onClick={() => { const change = () => setPluginKind(kind); if (dshRuntime.requestSettingsLeave) dshRuntime.requestSettingsLeave(change); else change(); }}>{label}</button>)}
+            {([['town','官方插件'],['dsh','第三方插件']] as const).map(([kind,label]) => <button key={kind} role="tab" id={`settings-plugin-${kind}`} aria-controls={`settings-plugin-content-${kind}`} aria-selected={pluginKind === kind} tabIndex={pluginKind === kind ? 0 : -1} onClick={() => { const change = () => setPluginKind(kind); if (dshRuntime.requestSettingsLeave) dshRuntime.requestSettingsLeave(change); else change(); }}>{label}</button>)}
           </div>
           <div id="settings-plugin-content-town" role="tabpanel" aria-labelledby="settings-plugin-town" hidden={pluginKind !== 'town'}>
             {townPlugin ? <PluginCard embedded key={townPlugin.manifest.id} model={plugins} plugin={townPlugin} beforeOpen={() => leave(true)} /> : <div className="settings-plugin-list">{plugins.library.plugins.map(plugin => <button className="settings-plugin-link" key={plugin.manifest.id} onClick={() => setTownPluginId(plugin.manifest.id)}>
@@ -538,7 +541,7 @@ export const ConnectionSettings = memo(function ConnectionSettings({ model, embe
                 }
               />
             </SettingsItem>
-            <section className="permission-settings-section"><div className="permission-section-heading"><strong>工作权限</strong><small>主助手与子代理共用</small></div>
+            <section className="permission-settings-section"><div className="permission-section-heading"><strong>访问权限</strong><small>主助手与子代理共用</small></div>
               <PermissionPicker value={form?.permissionMode ?? 'auto-review'} onChange={mode => app.editForm('permissionMode', mode)}/>
               <p className="permission-note">仅适用于 Portal 调用，主助手和子代理共用。</p>
             </section>

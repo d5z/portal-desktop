@@ -193,7 +193,7 @@ try {
   await chat.getByText('切换后从服务器取回的网页对话', { exact: true }).waitFor();
   assert.ok(historyReads.length > beforeAll, 'Switching to all scenes fetches the latest history');
   assert.equal(historyLimits.at(-1), 250, 'Saved limit reaches the live chat; stale messages cannot change it');
-  await page.waitForFunction(() => document.querySelector('#chat-scene-indicator .chat-scene-label').textContent === '桌面·测试电脑');
+  await page.waitForFunction(() => document.querySelector('#chat-scene-indicator').title.includes('桌面·测试电脑'));
   assert.equal(await chat.locator('#input').evaluate(el => el.value ?? el.editor.getMarkdown()), '切换时保留的草稿');
   assert.equal(await chat.locator('#input').isDisabled(), false, '全部场景上下文仍向当前场景发送');
   await page.getByLabel('场景列表选项', { exact: true }).click();
@@ -217,7 +217,7 @@ try {
   assert.ok(historyReads.length > beforeCurrent, 'Returning to the current scene also refreshes history');
   assert.equal(await chat.getByText('切换后从服务器取回的网页对话', { exact: true }).count(), 0);
   assert.equal(await chat.locator('#input').evaluate(el => el.value ?? el.editor.getMarkdown()), '切换时保留的草稿');
-  await page.waitForFunction(() => document.querySelector('#chat-scene-indicator .chat-scene-label').textContent === '桌面·测试电脑');
+  await page.waitForFunction(() => document.querySelector('#chat-scene-indicator').title.includes('桌面·测试电脑'));
   // An out-of-date frame command cannot switch the current chat.
   const scopeReplies = await page.evaluate(() => {
     const count = window.scopeStates.length;

@@ -53,12 +53,22 @@ try {
       window.resizeObserver.observe(document.querySelector('.chat-root'), { attributes: true, attributeFilter: ['style'] });
       return window.resizeAnchor?.getBoundingClientRect().top - top;
     }, reading);
+    await page.evaluate(() => {
+      window.resizeDrawerNotifications = 0;
+      window.countDrawerNotification = () => window.resizeDrawerNotifications++;
+      window.addEventListener('beings:drawer-motion', window.countDrawerNotification);
+    });
     const before = await metrics();
     for (let i = 0; i < 60; i++) {
       await page.setViewportSize({ width: 1600 + i * 2, height: 900 - i * 2 });
       await chat.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
     }
     const after = await metrics();
+    const drawerNotifications = await page.evaluate(() => {
+      window.removeEventListener('beings:drawer-motion', window.countDrawerNotification);
+      return window.resizeDrawerNotifications;
+    });
+    assert.equal(drawerNotifications, 0, 'Resizing idle panes must not repeat drawer completion notifications');
     const geometry = await chat.evaluate(() => {
       window.resizeObserver.disconnect();
       const messages = document.querySelector('#messages');
@@ -72,7 +82,7 @@ try {
         anchor: window.resizeAnchor?.getBoundingClientRect().top - messages.getBoundingClientRect().top,
       };
     });
-    const result = { reading, ...geometry, taskMs: Math.round((after.TaskDuration - before.TaskDuration) * 1000), layoutMs: Math.round((after.LayoutDuration - before.LayoutDuration) * 1000) };
+    const result = { reading, ...geometry, drawerNotifications, taskMs: Math.round((after.TaskDuration - before.TaskDuration) * 1000), layoutMs: Math.round((after.LayoutDuration - before.LayoutDuration) * 1000) };
     console.log(JSON.stringify(result));
     if (!process.env.RESIZE_BASELINE) assert.equal(geometry.styleWrites, 0, 'Desktop resizing must use CSS without per-pixel root style updates');
     assert.ok(Math.abs(geometry.height - geometry.viewportHeight) < 2, 'Chat tracks the iframe height');
@@ -85,7 +95,7 @@ try {
   await chat.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await measure(true);
   // High polling-rate pointers can deliver several moves before the next paint.
-  await page.getByRole('button', { name: 'Being 信息', exact: true }).click();
+  await page.getByRole('button', { name: '资料库', exact: true }).click();
   const divider = page.getByRole('separator', { name: '调整 Being 信息宽度', exact: true });
   await divider.evaluate(node => {
     node.addEventListener('pointerdown', event => { window.resizePointer = event.pointerId; }, { once: true });
@@ -123,7 +133,7 @@ try {
   }
   assert.equal(await divider.getAttribute('data-resizing'), null, 'Release clears the drag overlay');
   await page.reload();
-  await page.getByRole('button', { name: 'Being 信息', exact: true }).click();
+  await page.getByRole('button', { name: '资料库', exact: true }).click();
   assert.equal(await page.locator('#being-info').evaluate(node => node.getBoundingClientRect().width), startWidth + 100, 'Final drag width is persisted');
   await divider.press('ArrowLeft');
   assert.equal(await page.locator('#being-info').evaluate(node => node.getBoundingClientRect().width), startWidth + 124, 'Keyboard resize stays immediate');

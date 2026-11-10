@@ -38,22 +38,31 @@ try {
   await page.goto(origin);
 
   await mkdir('output/playwright',{recursive:true});
-  const toggle=page.getByRole('button',{name:'Being 信息',exact:true});
+  const toggle=page.getByRole('button',{name:'资料库',exact:true});
   await toggle.click();
   await page.waitForFunction(()=>!document.querySelector('#being-info').hasAttribute('data-animating'));
   await page.frameLocator('#chat-frame').locator('.message').nth(9).waitFor();
-  const measure = async () => page.evaluate(async () => {
-    const frame=document.querySelector('#chat-frame');
-    const widths=[frame.clientWidth];
-    const observer=new ResizeObserver(()=>widths.push(frame.clientWidth));
-    observer.observe(frame);
-    await new Promise(requestAnimationFrame);
-    const start=performance.now();
-    window.fixtureApp.toggleBeingInfo();
-    await new Promise(resolve=>{function check(now){if(now-start>650)resolve();else requestAnimationFrame(check);}requestAnimationFrame(check);});
-    observer.disconnect();
-    return {widths,hidden:document.querySelector('#being-info').hidden};
-  });
+  const cdp = await context.newCDPSession(page);
+  await cdp.send('Performance.enable');
+  const metrics = async () => Object.fromEntries((await cdp.send('Performance.getMetrics')).metrics.map(({name,value})=>[name,value]));
+  const measure = async () => {
+    const before = await metrics();
+    const result = await page.evaluate(async () => {
+      const frame=document.querySelector('#chat-frame');
+      const widths=[frame.clientWidth], panelWidths=[], chatWidths=[], alignment=[];
+      const panel=document.querySelector('#being-info'), chat=document.querySelector('#chat-view');
+      const observer=new ResizeObserver(()=>widths.push(frame.clientWidth));
+      observer.observe(frame);
+      await new Promise(requestAnimationFrame);
+      const start=performance.now();
+      window.fixtureApp.toggleBeingInfo();
+      await new Promise(resolve=>{function check(now){const c=chat.getBoundingClientRect(),f=frame.getBoundingClientRect();panelWidths.push(panel.dataset.animating ? parseFloat(getComputedStyle(panel).getPropertyValue('--drawer-size')) : panel.getBoundingClientRect().width);chatWidths.push(c.width);alignment.push({left:f.left-c.left,width:f.width-c.width});if(now-start>650)resolve();else requestAnimationFrame(check);}requestAnimationFrame(check);});
+      observer.disconnect();
+      return {widths,panelWidths,chatWidths,alignment,hidden:document.querySelector('#being-info').hidden};
+    });
+    const after = await metrics();
+    return {...result, performance: {taskMs: (after.TaskDuration-before.TaskDuration)*1000, layoutMs: (after.LayoutDuration-before.LayoutDuration)*1000, layouts: after.LayoutCount-before.LayoutCount, styles: after.RecalcStyleCount-before.RecalcStyleCount}};
+  };
   const child=page.frames().find(frame=>frame.url().includes('/loom.html'));
   const readingBefore = await child.evaluate(async()=>{
     const messages=document.querySelector('#messages');
@@ -69,8 +78,14 @@ try {
   const open=await measure();
   console.log(JSON.stringify({close,open,readingBefore,readingAfter}));
   if(!process.env.MOTION_BASELINE) {
-    assert.ok(new Set(close.widths).size<=2,'Closing must resize the iframe once, not every animation frame');
-    assert.ok(new Set(open.widths).size<=2,'Opening must resize the iframe once, not every animation frame');
+    assert.ok(close.panelWidths.some(width=>width>2 && width<318),'Closing drawer passes through intermediate widths');
+    assert.ok(open.panelWidths.some(width=>width>2 && width<318),'Opening drawer passes through intermediate widths');
+    assert.ok(close.chatWidths.some(width=>width>1030 && width<1354),'Chat viewport grows continuously with the drawer');
+    assert.ok(open.chatWidths.some(width=>width>1030 && width<1354),'Chat viewport contracts continuously with the drawer');
+    for (const sample of [...close.alignment,...open.alignment]) {
+      assert.ok(Math.abs(sample.left)<1,'Chat stays attached to the left edge, with no extra centering jump');
+      assert.ok(Math.abs(sample.width)<1,'Chat always fills its viewport without blank strips');
+    }
     assert.ok(Math.abs(readingBefore-readingAfter)<2, "Closing preserves the current message reading anchor");
     assert.equal(close.hidden,true); assert.equal(open.hidden,false);
     assert.ok(close.widths.every((w,i,a)=>!i || w>=a[i-1]),'Closing never shrinks the chat back before hiding');

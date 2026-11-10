@@ -1,5 +1,6 @@
+import { ChatSceneIndicator } from "./chat-scene";
 import { NavigationIcon } from '../../shared/icons/navigation';
-import { usePanelMotion } from "../hooks/use-panel-motion";
+import { WorkspaceDrawer } from "../../shared/components/workspace-drawer";
 import { dshRuntime } from "../../plugins/dsh/runtime";
 import { PluginIcon } from "../../plugins/icon";
 import { RecentHistory } from './recent-history';
@@ -28,10 +29,31 @@ const destinations = [
   ["town", "小镇广场", "rail-town"],
 ] as const;
 
-function RailButton({ label, children, active, disabled, unread, onClick, className = "", plugin = false, id, expanded, navigationKey }: {
+function RailButton({ label, children, active, disabled, unread, onClick, className = "", plugin = false, id, expanded, navigationKey, shortcut, onHover, tooltip = true }: {
   navigationKey?: string; id?: string; expanded?: boolean; label: string; children: ReactNode; active?: boolean; disabled?: boolean; unread?: boolean;
-  onClick: () => void; className?: string; plugin?: boolean;
+  onClick: () => void; className?: string; plugin?: boolean; shortcut?: string; onHover?: (hovered: boolean) => void; tooltip?: boolean;
 }) {
+  const animateIcon = (button: HTMLButtonElement) => {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    const icon = button.querySelector<SVGSVGElement>('svg[data-navigation-icon]');
+    const shape = icon?.querySelector<SVGPathElement>('.rail-icon-line');
+    if (!icon || !shape) return;
+    const from = getComputedStyle(shape).transform;
+    shape.getAnimations().forEach(animation => animation.cancel());
+    const poses = icon.dataset.navigationIcon === 'rail-search'
+      ? ['translate(1.5px, -1px) rotate(-10deg)', 'translate(-1px, 0) rotate(4deg)']
+      : ['rail-scrolls', 'rail-embers', 'rail-contacts', 'rail-announcements'].includes(icon.dataset.navigationIcon!)
+        ? ['translateY(-2px) rotate(-5deg)', 'translateY(-0.5px) rotate(2deg)']
+        : icon.dataset.navigationIcon === 'rail-mail'
+          ? ['translateY(-1px) rotate(8deg)', 'rotate(-3deg)']
+          : ['rotate(-9deg) scale(1.06)', 'rotate(4deg) scale(1.02)'];
+    shape.animate([
+      { transform: from, offset: 0 },
+      { transform: poses[0], offset: 0.4 },
+      { transform: poses[1], offset: 0.72 },
+      { transform: 'none', offset: 1 },
+    ], { duration: 680, easing: 'cubic-bezier(0.2, 0.65, 0.3, 1)' });
+  };
   const tooltipId = useId();
   const [tip, setTip] = useState<{ left: number; top: number } | null>(null);
   const show = (element: HTMLButtonElement) => {
@@ -41,13 +63,19 @@ function RailButton({ label, children, active, disabled, unread, onClick, classN
   return <>
     <button data-navigation-key={navigationKey} id={id} aria-expanded={expanded} className={`rail-button ${className}`} aria-label={label + (unread ? " · 有新动态" : "")} aria-current={active ? "page" : undefined}
       aria-describedby={tip ? tooltipId : undefined} disabled={disabled} data-plugin-navigation={plugin || undefined}
-      onPointerDown={() => setTip(null)} onMouseEnter={event => show(event.currentTarget)} onMouseLeave={() => setTip(null)}
-      onFocus={event => show(event.currentTarget)} onBlur={() => setTip(null)}
+      onPointerDown={event => {
+        setTip(null);
+        event.currentTarget.querySelector('.rail-icon-line')?.getAnimations().forEach(animation => animation.cancel());
+      }} onMouseEnter={event => { animateIcon(event.currentTarget); if (tooltip) show(event.currentTarget); onHover?.(true); }} onMouseLeave={() => { setTip(null); onHover?.(false); }}
+      onFocus={event => {
+        if (event.currentTarget.matches(':focus-visible')) animateIcon(event.currentTarget);
+        if (tooltip) show(event.currentTarget);
+      }} onBlur={() => setTip(null)}
       onKeyDown={event => { if (event.key === "Escape") setTip(null); }}
       onClick={() => { setTip(null); onClick(); }}>
       {children}{unread && <span className="rail-unread" aria-hidden="true" />}
     </button>
-    {tip && createPortal(<div id={tooltipId} role="tooltip" className="rail-tooltip" style={{ left: tip.left, top: tip.top }}>{label}{unread ? " · 有新动态" : ""}</div>, document.body)}
+    {tip && createPortal(<div id={tooltipId} role="tooltip" className="rail-tooltip" style={{ left: tip.left, top: tip.top }}><span>{label}{unread ? " · 有新动态" : ""}</span>{shortcut && <kbd>{shortcut}</kbd>}</div>, document.body)}
   </>;
 }
 
@@ -70,6 +98,17 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
       return Array.isArray(saved) ? saved.filter((key): key is string => typeof key === "string") : [];
     } catch { return []; }
   });
+  const [scenePreview, setScenePreview] = useState(false);
+  const previewTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const showScenePreview = (show: boolean) => {
+    clearTimeout(previewTimer.current);
+    setScenePreview(show);
+  };
+  const hoverScenes = (show: boolean) => {
+    clearTimeout(previewTimer.current);
+    previewTimer.current = setTimeout(() => setScenePreview(show), show ? 160 : 240);
+  };
+  useEffect(() => () => clearTimeout(previewTimer.current), []);
   const [moreOpen, setMoreOpen] = useState(false);
   const morePanel = useRef<HTMLDivElement>(null);
   const closeMore = (restoreFocus = false) => {
@@ -117,14 +156,23 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
     setOrder(next);
     try { localStorage.setItem("beings:navigation-order", JSON.stringify(next)); } catch { /* Keep session order. */ }
   });
+  const connected = Boolean(app.snapshot?.settings.hasToken);
   return <nav className="workspace-rail" aria-label="主导航">
-    <RailButton label={`${name} · 返回主对话`} className="rail-being" onClick={() => void app.returnToMainChat()}>
-      <span aria-hidden="true">{name.slice(0, 1).toUpperCase()}</span>
-    </RailButton>
+    {app.startup === 'ready' && <ChatSceneIndicator
+      beingName={name} onHome={() => void app.returnToMainChat()}
+      preview={scenePreview && !sort['data-sorting']} onPreviewChange={showScenePreview} onPreviewLeave={() => hoverScenes(false)}
+      createRequest={app.chatSessionCreateRequest}
+      scene={app.snapshot?.chatScene} sessions={app.snapshot?.chatSessions} activity={app.chatSceneActivity}
+      onSession={(operation, value, sceneId) => app.changeChatSession(operation, value, sceneId)}
+      connected={connected} scope={app.chatHistoryScope}
+      scopeReady={connected && !app.chatLoading && app.chatHistoryScopeKnown}
+      onScope={scope => app.changeChatHistoryScope(scope)}
+      onCopy={id => void app.run(async () => { await app.api.copyText(id); app.toast('场景 ID 已复制'); })}
+    />}
     <div className="rail-links" {...sort}>
       {orderedKeys.map(key => {
-        if (key === "chat") return <RailButton key={key} navigationKey={key}  label="对话" active={app.view === "chat"} onClick={() => app.navigate("chat")}><NavigationIcon name="rail-chat" /></RailButton>;
-        if (key === "search") return <RailButton key={key} navigationKey={key}  id="toggle-chat-search" expanded={app.searchOpen} label="查找对话" disabled={!app.snapshot?.settings.hasToken} onClick={() => app.openSearch()}><NavigationIcon name="rail-search" /></RailButton>;
+        if (key === "chat") return <RailButton key={key} navigationKey={key} id="rail-chat-trigger" onHover={hoverScenes} tooltip={false} label="对话" shortcut={app.api.platform === 'darwin' ? '⌘1' : 'Ctrl 1'} active={app.view === "chat"} onClick={() => app.navigate("chat")}><NavigationIcon name="rail-chat" /></RailButton>;
+        if (key === "search") return <RailButton key={key} navigationKey={key} id="toggle-chat-search" expanded={app.searchOpen} label="查找对话" shortcut={app.api.platform === 'darwin' ? '⌘F' : 'Ctrl F'} disabled={!app.snapshot?.settings.hasToken} onClick={() => app.openSearch()}><NavigationIcon name="rail-search" /></RailButton>;
         const entry = entries.find(entry => entry.key === key)!;
         return <RailButton key={key} navigationKey={key} label={entry.label} active={entry.active}
 
@@ -164,8 +212,9 @@ export function BeingInfo({ app }: { app: AppModel }) {
   const [width, setWidth] = usePanelWidth("being", 320);
   const [browserHost, setBrowserHost] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => { setBrowserHost(panel.current?.parentElement || null); }, []);
-  const [tab, setTab] = useState<typeof beingTabs[number][0]>("profile");
+  const [tab, setTab] = useState<typeof beingTabs[number][0]>("library");
   const [privacyOpen, setPrivacyOpen] = useState(false);
+  useLayoutEffect(() => { if (app.beingInfoOpen) { setTab('library'); setPrivacyOpen(false); } }, [app.beingInfoOpen]);
   const privacyEntry = useRef<HTMLButtonElement>(null);
   const privacyBack = useRef<HTMLButtonElement>(null);
   const closePrivacy = () => { setPrivacyOpen(false); requestAnimationFrame(() => privacyEntry.current?.focus()); };
@@ -173,7 +222,6 @@ export function BeingInfo({ app }: { app: AppModel }) {
   const name = town.displayName || app.snapshot?.settings.being || "Being";
   const status = !app.snapshot?.settings.hasToken ? "未连接" : ({online:"已连接",connecting:"连接中",reconnecting:"重连中",offline:"已离线",degraded:"连接不稳定"}[app.connection] || "正在确认连接");
   const hidden = !app.beingInfoOpen || app.view !== "chat" || (app.subagentSettingsOpen && !app.settingsRoute);
-  const present = usePanelMotion(panel, !hidden, width);
   const browserAvailable = app.view === "chat" && !(app.subagentSettingsOpen && !app.settingsRoute);
   const modelKey = JSON.stringify([app.snapshot?.settings.endpoint, app.snapshot?.settings.being, app.snapshot?.settings.hasToken]);
   const content = useRef<HTMLDivElement>(null);
@@ -198,7 +246,7 @@ export function BeingInfo({ app }: { app: AppModel }) {
   }, [app, hidden, connected, modelKey, app.subagentSettingsOpen]);
 
   const closeInfo = () => { app.toggleBeingInfo(); document.getElementById("toggle-being-info")?.focus(); };
-  return <aside ref={panel} style={{ width, flexBasis: width }} id="being-info" className="being-info" aria-label={privacyOpen ? "隐私说明" : "Being 信息"} hidden={!present} inert={hidden} aria-hidden={hidden} data-closing={hidden && present || undefined}
+  return <WorkspaceDrawer ref={panel} open={!hidden} style={{ width, flexBasis: width }} id="being-info" className="being-info" aria-label={privacyOpen ? "隐私说明" : "Being 信息"}
     onKeyDown={event => {
       if (event.key === "Escape" && !event.defaultPrevented && !privacyOpen) {
         event.stopPropagation(); closeInfo();
@@ -231,10 +279,8 @@ export function BeingInfo({ app }: { app: AppModel }) {
       if (!hidden && !privacyOpen) scrollPositions.current[tab] = event.currentTarget.scrollTop;
     }}>
     <section id="being-profile-panel" role="tabpanel" tabIndex={0} aria-labelledby="being-profile-tab" hidden={tab !== "profile"}>
-      <h3>关于 Being</h3>
+      <h3>当前状态</h3>
       <dl className="being-details">
-        <div><dt>名称</dt><dd>{name}</dd></div>
-        <div><dt>小镇身份</dt><dd>{town.live?.beingId || "尚未配对"}</dd></div>
         <div><dt>当前场景</dt><dd>{app.snapshot?.chatScene?.scene_meta.scene_label || "尚未创建"}</dd></div>
         <div><dt>自主醒来</dt><dd><button className="being-wake-switch" type="button" role="switch" aria-label="自主醒来" aria-checked={app.sbsKnown && app.sbsEnabled} disabled={!app.snapshot?.settings.hasToken || !app.sbsKnown || app.chatLoading} onClick={() => app.toggleSbs()}>
           <span>{app.sbsKnown ? app.sbsEnabled ? "已开启" : "已关闭" : "待同步"}</span><span className="being-wake-track" aria-hidden="true" />
@@ -260,5 +306,5 @@ export function BeingInfo({ app }: { app: AppModel }) {
       <div className="being-privacy-content"><PrivacyContent /></div>
     </section>}
     </div>
-  </aside>;
+  </WorkspaceDrawer>;
 }

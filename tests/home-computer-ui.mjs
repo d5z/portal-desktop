@@ -83,11 +83,12 @@ try {
   assert.equal(handle.width, 20, 'resize hit target should span both sides of the divider');
   const nativeBounds = await page.locator('.being-computer-viewport').boundingBox();
   assert(nativeBounds.x >= handle.x + handle.width, 'native view must not cover the resize target');
-  await page.mouse.move(beforeDrag.x + 8, beforeDrag.y + beforeDrag.height / 2);
+  assert.equal(handle.x + handle.width / 2, beforeDrag.x - 4, 'resize target is centered in the 8px gutter');
+  await page.mouse.move(handle.x + handle.width / 2, beforeDrag.y + beforeDrag.height / 2);
   await page.mouse.down();
-  await page.mouse.move(beforeDrag.x - 42, beforeDrag.y + beforeDrag.height / 2, { steps: 5 });
+  await page.mouse.move(handle.x + handle.width / 2 - 50, beforeDrag.y + beforeDrag.height / 2, { steps: 5 });
   await page.mouse.up();
-  assert((await pane.boundingBox()).width > beforeDrag.width + 40, 'dragging from the wider inner edge should resize');
+  assert((await pane.boundingBox()).width > beforeDrag.width + 40, 'dragging from the gutter center should resize');
   await divider.dblclick();
   const rect = await page.locator('.being-computer-viewport').boundingBox();
   assert(rect.height > 800, 'expanded browser should use the full available height');
@@ -152,7 +153,7 @@ try {
   }
   await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; document.body.setAttribute('data-ds-dark-theme', ''); });
   await page.waitForFunction(() => getComputedStyle(document.querySelector('.being-computer-controls button')).color !== 'rgb(36, 36, 36)');
-  await page.waitForFunction(() => getComputedStyle(document.querySelector('.being-computer-primary')).color === 'rgb(32, 33, 36)');
+  await page.waitForFunction(() => getComputedStyle(document.querySelector('.being-computer-primary')).color === 'rgb(27, 28, 30)');
   await page.locator('#being-info').screenshot({ path: 'output/playwright/home-narrow-dark.png' });
   assert.deepEqual(errors, []);
   console.log('PASS Home UI: preview before explicit expansion, separate full-height pane, unchanged profile, retained tab/route/collapse session, modal/menu occlusion, maximize, expiration, binding and responsive layouts.');

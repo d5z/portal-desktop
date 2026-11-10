@@ -210,6 +210,7 @@ const glyphs = {
       <path d="M12 11v6m0-10v.1" />
     </>
   ) },
+  'person': { viewBox: '0 0 24 24', content: (<><circle cx="12" cy="8" r="3.5" /><path d="M5 21v-2a7 7 0 0 1 14 0v2" /></>) },
   'rail-bonfire': { viewBox: '0 0 24 24', content: (<path className="rail-icon-line" pathLength="100" d="M12 3c2 5 6 6 6 11a6 6 0 0 1-12 0c0-3 2-5 3-7 0 3 1 4 2 4 2-2 2-5 1-8Z" />) },
   'rail-firesides': { viewBox: '0 0 24 24', content: (<path className="rail-icon-line" pathLength="100" d="M4 5h16v11H9l-5 4V5Zm4 4h8m-8 3h5" />) },
   'rail-mail': { viewBox: '0 0 24 24', content: (<path className="rail-icon-line" pathLength="100" d="M3 6h18v13H3V6Zm0 1 9 7 9-7" />) },
@@ -220,7 +221,7 @@ const glyphs = {
   'rail-announcements': { viewBox: '0 0 24 24', content: (<path className="rail-icon-line" pathLength="100" d="M4 4h16v16H4V4Zm4 4h8m-8 4h8m-8 4h5" />) },
   'rail-contacts': { viewBox: '0 0 24 24', content: (<path className="rail-icon-line" pathLength="100" d="M5 3h16v18H5V3ZM2 7h4m-4 5h4m-4 5h4m5-8a2 2 0 1 0 4 0 2 2 0 1 0-4 0m-2 8v-1a4 4 0 0 1 8 0v1" />) },
   'rail-town': { viewBox: '0 0 24 24', content: (<path className="rail-icon-line" pathLength="100" d="m3 10 9-7 9 7M5 9v12h14V9m-9 12v-7h4v7" />) },
-  'rail-chat': { viewBox: '0 0 24 24', content: (<path className="rail-icon-line" pathLength="100" d="M4 4h16v12H9l-5 4V4Z" />) },
+  'rail-chat': { viewBox: '0 0 24 24', content: (<path className="rail-icon-line" pathLength="100" d="M21 11.5a9 9 0 0 1-9 8.5 10 10 0 0 1-4-.8L3 21l1.7-4.5A8 8 0 0 1 3 11.5a9 9 0 0 1 18 0Z" />) },
   'rail-search': { viewBox: '0 0 24 24', content: (<path className="rail-icon-line" pathLength="100" d="m16 16 5 5M18 10a8 8 0 1 1-16 0 8 8 0 0 1 16 0Z" />) },
   'rail-collapse': { viewBox: '0 0 24 24', content: (<path className="rail-icon-line" pathLength="100" d="m7 14 5-5 5 5" />) },
   'rail-more': { viewBox: '0 0 24 24', content: (<path className="rail-icon-line" pathLength="100" d="M5 11h2v2H5zM11 11h2v2h-2zM17 11h2v2h-2z" />) },

@@ -1,6 +1,6 @@
 import { readShellStyles } from './support/shell-styles.mjs';
 import assert from 'node:assert/strict';
-import { build } from 'esbuild';
+import { build } from '../scripts/renderer-build.mjs';
 import { chromium } from 'playwright';
 import { mkdir } from 'node:fs/promises';
 
@@ -17,21 +17,24 @@ const { outputFiles } = await build({
         onScope={setScope} onCopy={() => {}} onSession={async (_, id) => { setScene(scenes.find(s => s.scene_id === id)); setScope('current'); }} />;
     }
     createRoot(document.getElementById('root')).render(<Fixture />);
-  ` }, bundle: true, write: false, format: 'iife', platform: 'browser', jsx: 'automatic',
+  ` }, bundle: true, write: false, outfile: 'fixture/scene-context.js', format: 'iife', platform: 'browser', jsx: 'automatic',
 });
 const browser = await chromium.launch({ headless: true, ...(process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE ? { executablePath: process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE } : { channel: 'chrome' }) });
 try {
   const page = await browser.newPage({ viewport: { width: 1000, height: 720 } });
-  await page.setContent('<html><body><div id="root"></div></body></html>');
+  await page.setContent('<html><body><div class="workspace-stage" style="height:100vh"><div id="root" class="workspace-rail"></div><div class="workspace-content"></div></div></body></html>');
   await page.addStyleTag({ content: await readShellStyles() });
-  await page.addScriptTag({ content: outputFiles[0].text });
+  for (const file of outputFiles.filter(file => file.path.endsWith('.css'))) await page.addStyleTag({ content: file.text });
+  await page.addScriptTag({ content: outputFiles.find(file => file.path.endsWith('.js')).text });
+  await page.getByRole('button', { name: '展开场景列表', exact: true }).click();
   const toggle = page.getByRole('checkbox', { name: '显示全部场景上下文' });
   const selected = page.getByRole('button', { name: '切换到场景：方案讨论' });
   assert.equal(await page.getByRole('button', { name: '全部场景', exact: true }).count(), 0);
   await toggle.check();
   assert.equal(await toggle.isChecked(), true);
   assert.equal(await selected.getAttribute('aria-current'), 'true');
-  assert.equal(await page.locator('.chat-scene-label').innerText(), '方案讨论');
+  assert.ok((await page.locator('#chat-scene-indicator').getAttribute('title')).includes('方案讨论'));
+  await page.getByLabel('场景列表选项', { exact: true }).click();
   await page.getByRole('button', { name: '场景详情', exact: true }).click();
   await page.locator('#chat-scene-dialog').waitFor();
   assert.equal(await page.locator('#chat-scene-id').innerText(), 'scene-0');
@@ -42,7 +45,7 @@ try {
   await mkdir('test-results', { recursive: true });
   await page.screenshot({ path: 'test-results/chat-scene-context.png' });
   await page.getByRole('button', { name: '切换到场景：日常交流' }).click();
-  assert.equal(await page.locator('.chat-scene-label').innerText(), '日常交流');
+  assert.ok((await page.locator('#chat-scene-indicator').getAttribute('title')).includes('日常交流'));
   assert.equal(await toggle.isChecked(), false);
   console.log('PASS: context toggle preserves selected scene, label and details; no standalone all-scenes item.');
 } finally { await browser.close(); }

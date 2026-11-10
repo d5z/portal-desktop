@@ -31,10 +31,6 @@
   white-space: nowrap;
 }
 
-body:not([data-view='chat']) #conversation-name {
-  display: none;
-}
-
 #client-version {
   font-size: 11px;
   color: var(--muted);

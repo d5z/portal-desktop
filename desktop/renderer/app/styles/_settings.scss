@@ -324,23 +324,6 @@
   color: var(--muted);
 }
 
-#place-panel,
-#companion-panel:not([hidden]) {
-  animation: surface-enter 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-@keyframes surface-enter {
-  from {
-    opacity: 0;
-    transform: translateY(6px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
 .social-message {
   padding: 23px 4px;
   border-bottom-color: color-mix(in srgb, var(--line) 65%, transparent);
@@ -374,11 +357,6 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #place-panel,
-  #companion-panel:not([hidden]) {
-    animation: none;
-  }
-
   .options-menu button {
     transition: none;
   }

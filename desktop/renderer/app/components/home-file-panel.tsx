@@ -1,3 +1,4 @@
+import { DrawerPresence } from "../../shared/components/workspace-drawer";
 import { MAX_HOME_PREVIEW, HOME_PREVIEW_TOO_LARGE } from '../../../shared/home';
 import { lazy, Suspense, useState } from 'react';
 import { FilePreviewPanel, FilePreviewModes } from './file-preview-panel';
@@ -10,7 +11,7 @@ const FileContent = lazy(() => import('./home-file-preview').then(module => ({ d
 /** The library and conversation receipts share one preview and download surface. */
 export function HomeFilePanel({ store }: { store: HomeLibrary }) {
   const model = useModel(store);
-  return model.selected && <SelectedFilePanel key={model.selected.path} model={model} />;
+  return <DrawerPresence open={!!model.selected}>{model.selected && <SelectedFilePanel key={model.selected.path} model={model} />}</DrawerPresence>;
 }
 function SelectedFilePanel({ model }: { model: HomeLibrary }) {
   const [source, setSource] = useState(false);

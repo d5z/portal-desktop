@@ -1,5 +1,5 @@
+import { DrawerPresence, WorkspaceDrawer } from "../../shared/components/workspace-drawer";
 import { Icon } from '../../shared/icons/icon';
-import { useDisclosurePresence } from "../../shared/hooks/use-disclosure-presence";
 import { createPortal } from "react-dom";
 import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
 import type { ChatScene } from "../../../shared/types";
@@ -8,7 +8,12 @@ import type { HistoryScope } from "../../chat/models/scenes";
 import { PanelResizeHandle, usePanelWidth } from "../../shared/components/panel-resize";
 import { Dialog } from "../../shared/components/dialog";
 
-export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connected, scope, scopeReady, onScope, onCopy, onSession, visible = true, onReveal, createRequest = 0 }: {
+export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connected, scope, scopeReady, onScope, onCopy, onSession, visible = true, onReveal, createRequest = 0, preview = false, onPreviewChange, onPreviewLeave, beingName = "Being", onHome }: {
+  beingName?: string;
+  onHome?: () => void;
+  preview?: boolean;
+  onPreviewChange?: (show: boolean) => void;
+  onPreviewLeave?: () => void;
   createRequest?: number;
   activity?: Record<string, ChatSceneActivity>;
   visible?: boolean;
@@ -76,47 +81,60 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
     catch (error) { setError(error instanceof Error ? error.message : String(error)); }
     finally { changing.current = false; setBusy(false); }
   };
-  const [expanded, setExpanded] = useState(false);
-  const scenePresent = useDisclosurePresence(expanded && visible);
+  const expanded = pinned || preview || Boolean(editing || deleting || open || menu);
+  const pin = (next: boolean) => {
+    setPinned(next);
+    onPreviewChange?.(false);
+    try { localStorage.setItem("beings:scenes-pinned", String(next)); } catch { /* Keep the session preference. */ }
+  };
   const trigger = useRef<HTMLButtonElement>(null);
-  // Reserve the same responsive width as the pinned list, without remounting chat.
-  useLayoutEffect(() => {
-    const stage = trigger.current?.closest<HTMLElement>(".workspace-stage");
-    if (!stage || !pinned || !scenePresent) return;
-    stage.style.setProperty("--scene-panel-width", `${width}px`);
-    return () => { stage.style.removeProperty("--scene-panel-width"); };
-  }, [pinned, scenePresent, width]);
+  const [panelHost, setPanelHost] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => { setPanelHost(document.querySelector<HTMLElement>(".workspace-stage")); }, []);
+  const lastPinned = useRef(pinned);
+  useLayoutEffect(() => { if (expanded) lastPinned.current = pinned; }, [expanded, pinned]);
+  const drawerPinned = expanded ? pinned : lastPinned.current;
   const label = scene?.scene_meta.scene_label || "场景标记不可用";
-  const collapse = () => { setMenu(undefined); setExpanded(false); trigger.current?.focus(); };
-  const reveal = () => { setExpanded(true); onReveal?.(); };
-  useEffect(() => { if (expanded && visible) search.current?.focus(); }, [expanded, visible]);
+  const collapse = () => { setMenu(undefined); pin(false); trigger.current?.focus(); };
+  const reveal = () => { pin(true); onReveal?.(); };
+  useEffect(() => { if (pinned && visible) search.current?.focus(); }, [pinned, visible]);
   useEffect(() => {
     if (!expanded || !visible || pinned || editing || deleting || open || menu) return;
-    const dismiss = () => { setExpanded(false); setMenu(undefined); };
+    const dismiss = () => { onPreviewChange?.(false); setMenu(undefined); };
     const outside = (event: Event) => {
-      if (panel.current?.contains(event.target as Node) || trigger.current?.contains(event.target as Node) || (event.target as Element)?.closest?.("dialog, .chat-session-context-menu")) return;
+      if (panel.current?.contains(event.target as Node) || trigger.current?.contains(event.target as Node) || document.getElementById("rail-chat-trigger")?.contains(event.target as Node) || (event.target as Element)?.closest?.("dialog, .chat-session-context-menu")) return;
       dismiss();
     };
     const blur = () => { if (!document.querySelector("dialog[open]")) dismiss(); };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape" && !event.defaultPrevented) dismiss(); };
     document.addEventListener("pointerdown", outside, true);
     document.addEventListener("focusin", outside, true);
     window.addEventListener("blur", blur);
-    return () => { document.removeEventListener("pointerdown", outside, true); document.removeEventListener("focusin", outside, true); window.removeEventListener("blur", blur); };
-  }, [expanded, visible, pinned, editing, deleting, open, menu]);
+    document.addEventListener("keydown", escape);
+    return () => { document.removeEventListener("keydown", escape); document.removeEventListener("pointerdown", outside, true); document.removeEventListener("focusin", outside, true); window.removeEventListener("blur", blur); };
+  }, [expanded, visible, pinned, editing, deleting, open, menu, onPreviewChange]);
   const matches = (session: ChatScene) => session.scene_meta.scene_label.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
   return (
     <>
       <div className="chat-scene-control">
-        <button ref={trigger} id="chat-scene-indicator" className="chat-scene-indicator" type="button"
-          aria-label={`${expanded && visible ? "收起" : "展开"}场景列表`} aria-controls="chat-session-panel" aria-expanded={expanded && visible}
-          title={label} onClick={() => expanded && visible ? collapse() : reveal()}>
-          <Icon name="chevron-down-20" className="chat-scene-icon" />
-          <span className="chat-scene-label">{scene ? label : "场景"}</span>
+        <button ref={trigger} id="chat-scene-indicator" className={`rail-button rail-being${pinned ? '' : ' rail-scene-toggle'}`} type="button"
+          aria-label={pinned ? `${beingName} · 返回主对话` : "展开场景列表"}
+          aria-controls={pinned ? undefined : "chat-session-panel"} aria-expanded={pinned ? undefined : false}
+          title={`${pinned ? '返回主对话' : '展开场景列表'} · ${label}`} onClick={pinned ? onHome : reveal}>
+          <span className="rail-scene-avatar" aria-hidden="true">{beingName.slice(0, 1).toUpperCase()}</span>
+          {!pinned && <Icon name="split-panel" />}
         </button>
       </div>
-      {scenePresent && <aside ref={panel} style={{ width }} id="chat-session-panel" className="chat-session-panel" data-open={visible && expanded} inert={!visible || !expanded} aria-hidden={!visible || !expanded} data-pinned={pinned} aria-label="场景列表"
+      {panelHost && createPortal(<DrawerPresence open={visible && expanded}><WorkspaceDrawer edge="left" ref={panel} style={{ width }} id="chat-session-panel" className="chat-session-panel" open={visible && expanded} data-pinned={drawerPinned} aria-label="场景列表"
+        onMouseEnter={() => onPreviewChange?.(true)}
+        onMouseLeave={() => { if (!panel.current?.contains(document.activeElement)) onPreviewLeave?.(); }}
         onKeyDown={event => { if (event.key === "Escape" && !editing && !open && !deleting && !menu) { event.preventDefault(); if (options.current?.open) { options.current.open = false; options.current.querySelector("summary")?.focus(); } else collapse(); } }}>
-        <PanelResizeHandle panel={panel} label="调整场景列表宽度" width={width} onResize={setWidth} initial={320} min={240} max={480} reserve={48} edge="right" />
+        <PanelResizeHandle panel={panel} label="调整场景列表宽度" width={width} onResize={setWidth} initial={320} min={240} max={480} reserve={48} edge="right" disabled={!pinned} />
+        {drawerPinned && <div className="chat-session-titlebar">
+          <strong>{beingName}</strong>
+          <button type="button" className="chat-session-collapse" aria-label="收起场景列表" title="收起场景列表" onClick={collapse}>
+            <Icon name="split-panel" />
+          </button>
+        </div>}
         <div className="chat-session-panel-heading">
           <label className="chat-session-search">
             <Icon name="search-20" />
@@ -125,8 +143,6 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
           <details ref={options} className="chat-session-options" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false; }}>
             <summary aria-label="场景列表选项" title="场景列表选项"><Icon name="more-filled" /></summary>
             <div className="chat-session-options-popover">
-              <button type="button" aria-pressed={pinned} onClick={() => { const next = !pinned; setPinned(next); try { localStorage.setItem("beings:scenes-pinned", String(next)); } catch {} options.current?.removeAttribute("open"); }}><Icon name="split-panel" /><span>保持显示聊天面板</span>{pinned && <Icon name="check-16" className="chat-session-option-check" />}</button>
-              <hr />
               <button type="button" disabled={!scene} onClick={() => { options.current?.removeAttribute("open"); setOpen(true); }}><Icon name="web-info" /><span>场景详情</span></button>
               <button type="button" disabled={!connected || busy || !sessions.length} onClick={() => { options.current?.removeAttribute("open"); edit("bind"); }}><Icon name="web-link" /><span>绑定已有场景</span></button>
               <hr />
@@ -167,7 +183,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
         </label>
         {error && !editing && !deleting && <p role="alert" className="chat-session-error">{error}</p>}
 
-      </aside>}
+      </WorkspaceDrawer></DrawerPresence>, panelHost)}
       {menu && createPortal(<div ref={menuRef} className="chat-session-context-menu" role="menu" aria-label="场景操作"
         style={{ left: menu.x, top: menu.y }} onContextMenu={event => { event.preventDefault(); event.stopPropagation(); }}
         onKeyDown={event => {

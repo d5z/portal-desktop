@@ -32,7 +32,7 @@ try {
  await page.locator('#options-trigger').click();
  await page.locator('#client-settings-button').click();
  await page.getByRole('tab',{name:'插件',exact:true}).click();
- await page.getByRole('tab',{name:'DeepSeek Harness 插件',exact:true}).click();
+ await page.getByRole('tab',{name:'第三方插件',exact:true}).click();
  await page.evaluate(()=>{window.__installDocument=document;window.__installTown=document.querySelector('#client-main');});
  await page.getByRole('navigation',{name:'插件管理导航'}).getByRole('button',{name:'安装插件',exact:true}).click();
  await page.locator('#dsh-source').fill(source);
@@ -124,7 +124,7 @@ try {
  await page.locator('#options-trigger').click();
  await page.locator('#client-settings-button').click();
  await page.locator('#client-settings-dialog').getByRole('tab',{name:'插件',exact:true}).click();
- await page.locator('#settings-panel-plugins').getByRole('tab',{name:'DeepSeek Harness 插件',exact:true}).click();
+ await page.locator('#settings-panel-plugins').getByRole('tab',{name:'第三方插件',exact:true}).click();
  await page.getByRole('button',{name:'配置 dsh-boot-suite',exact:true}).click();
  await page.getByRole('button',{name:'启动动画',exact:true}).click();
  await page.getByPlaceholder('例如：JOYCE MOORE').waitFor();

@@ -1,10 +1,13 @@
-/* A shared place: warm paper, quiet green landmarks and a space between two people. */
+/* Keep the established columns; the frame separates their surfaces. */
 .workspace-body {
   display: flex;
   flex: 1;
   min-height: 0;
   position: relative;
   isolation: isolate;
+  gap: 0;
+  padding: var(--panel-gap) var(--panel-gap) var(--panel-gap) 0;
+  background: var(--workspace-frame);
 }
 
 .workspace-stage {
@@ -124,7 +127,6 @@
   padding: 28px 22px;
   overflow: auto;
   overscroll-behavior: contain;
-  animation: companion-enter 0.2s ease-out;
   z-index: 4;
 }
 
@@ -573,30 +575,6 @@
 
   .town-toolbar {
     gap: 10px;
-  }
-}
-
-@media (max-width: 1120px) {
-  #companion-panel {
-    position: absolute;
-    right: 0;
-    top: 0;
-    bottom: 0;
-    box-shadow: -12px 0 40px #0002;
-    width: 310px;
-    background: var(--surface);
-  }
-}
-
-@keyframes companion-enter {
-  from {
-    opacity: 0;
-    transform: translateX(12px);
-  }
-
-  to {
-    opacity: 1;
-    transform: none;
   }
 }
 

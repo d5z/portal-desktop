@@ -1,3 +1,4 @@
+import { WorkspaceDrawer } from "../../shared/components/workspace-drawer";
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 import { IconButton } from '../../shared/components/icon-button';
@@ -33,7 +34,7 @@ export function FilePreviewPanel({ name, path, onClose, actions, children, porta
       });
     };
   }, []);
-  const content = <aside ref={panel} style={{ '--file-preview-width': `${width}px` } as CSSProperties}
+  const content = <WorkspaceDrawer ref={panel} style={{ '--file-preview-width': `${width}px` } as CSSProperties}
     className={`client-file-viewer${maximized ? ' maximized' : ''}`} aria-label={`文件预览：${name}`}>
     <PanelResizeHandle panel={panel} label="调整附件预览宽度" width={width} onResize={setWidth} initial={640} min={280} max={1200} reserve={280} disabled={maximized} />
     <header>
@@ -42,7 +43,7 @@ export function FilePreviewPanel({ name, path, onClose, actions, children, porta
       <IconButton className="file-preview-icon" label="关闭文件预览" onClick={onClose}><Icon name="close" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" /></IconButton>
     </header>
     {children}
-  </aside>;
+  </WorkspaceDrawer>;
   return portal ? createPortal(content, document.querySelector('.workspace-body') || document.body) : content;
 }
 

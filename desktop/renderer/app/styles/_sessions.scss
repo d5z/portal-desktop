@@ -156,6 +156,8 @@
 /* Session navigation stays open while composing and switching conversations. */
 .workspace-stage {
   position: relative;
+  /* Hover previews must collapse inside the content stage, never across the rail. */
+  overflow: clip;
 }
 
 .chat-scene-control {

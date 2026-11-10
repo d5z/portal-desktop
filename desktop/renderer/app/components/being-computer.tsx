@@ -1,3 +1,4 @@
+import { WorkspaceDrawer } from "../../shared/components/workspace-drawer";
 import { Icon } from '../../shared/icons/icon';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
@@ -100,7 +101,7 @@ export function BeingComputer({ name, api, active, context, browserHost, availab
     const layout = () => {
       const el = showPanel ? viewport.current : previewViewport.current;
       if (!el) return;
-      const blocked = menuOpen || !!confirmation || !!el.closest('[hidden]') || !!document.querySelector('dialog[open], [data-resizing="true"]');
+      const blocked = menuOpen || !!confirmation || !!el.closest('[hidden], [data-animating]') || !!document.querySelector('dialog[open], [data-resizing="true"]');
       const b = el.getBoundingClientRect(), clip = el.closest('.being-info-content')?.getBoundingClientRect();
       // A scrolled-out region must not intercept another surface's input.
       const visible = !blocked && b.width > 0 && b.height > 0 && b.y >= 0 && b.bottom <= innerHeight && b.x >= 0 && b.right <= innerWidth &&
@@ -115,8 +116,9 @@ export function BeingComputer({ name, api, active, context, browserHost, availab
     const target = showPanel ? viewport.current : previewViewport.current; if (target) resize.observe(target);
     const observer = new MutationObserver(schedule);
     observer.observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ['open', 'hidden', 'data-resizing', 'class', 'data-theme'], childList: true });
+    window.addEventListener('beings:drawer-motion', schedule);
     window.addEventListener('resize', schedule); document.addEventListener('scroll', schedule, true);
-    return () => { cancelAnimationFrame(frame); resize.disconnect(); observer.disconnect(); window.removeEventListener('resize', schedule); document.removeEventListener('scroll', schedule, true); };
+    return () => { cancelAnimationFrame(frame); resize.disconnect(); observer.disconnect(); window.removeEventListener('beings:drawer-motion', schedule); window.removeEventListener('resize', schedule); document.removeEventListener('scroll', schedule, true); };
   }, [api, active, available, viewing, showPanel, confirmation, menuOpen, maximized, browserHost]);
   // Only unmount or an actual hidden presentation hides the native view. Effect
   // dependency cleanup during maximize must not release the control lease.
@@ -197,15 +199,15 @@ export function BeingComputer({ name, api, active, context, browserHost, availab
       <figcaption className="being-computer-footer"><span>{name} 的屏幕</span>{!showPanel && controls}</figcaption>
       {!showPanel && feedback}
     </figure>
-    {browserHost && createPortal(<aside ref={panel} className="cloud-browser-pane" aria-label="云端浏览器" hidden={!showPanel} data-maximized={maximized || undefined}
+    {browserHost && createPortal(<WorkspaceDrawer ref={panel} className="cloud-browser-pane" aria-label="云端浏览器" open={showPanel} data-maximized={maximized || undefined}
       style={{ width, flexBasis: width }} onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); if (confirmation) setConfirmation(undefined); else if (!menuOpen) collapse(); } }}>
-      <PanelResizeHandle panel={panel} label="调整云端浏览器宽度" width={width} onResize={setWidth} initial={Math.round(innerWidth * .58)} min={360} max={1800} reserve={396} disabled={!showPanel || maximized} />
+      <PanelResizeHandle panel={panel} label="调整云端浏览器宽度" width={width} onResize={setWidth} initial={Math.round(innerWidth * .58)} min={360} max={1800} reserve={320} disabled={!showPanel || maximized} />
       <header className="place-sheet-heading cloud-browser-heading"><div className="place-sheet-title-row">
         <div className="place-sheet-title-main">{showPanel && <SplitChatToggle expanded={!maximized} onToggle={() => setMaximized(value => !value)} />}<h2>{name} 的电脑</h2></div>
         <button ref={closeButton} className="icon-button close" type="button" title="关闭面板" aria-label="关闭云电脑面板" onClick={collapse} />
       </div></header>
       <div className="being-computer-viewport" ref={viewport} aria-label="云端浏览器画面">{preview ? <img src={preview} alt="" /> : <ComputerLoading label="正在连接…" />}</div>
       {showPanel && feedback}
-    </aside>, browserHost)}
+    </WorkspaceDrawer>, browserHost)}
   </>;
 }

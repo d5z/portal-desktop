@@ -76,9 +76,9 @@ body:not([data-view='bonfire'], [data-view='firesides'], [data-view='mail'])
   padding: 14px;
   background: var(--bg);
   color: var(--text);
-  border: 1px solid var(--line);
-  border-radius: 22px;
-  box-shadow: 0 16px 48px #00000026;
+  border: 0;
+  border-radius: 14px;
+  box-shadow: var(--popover-shadow);
   animation: rail-more-enter 0.16s ease-out;
 }
 

@@ -26,10 +26,11 @@ import {
 import { TownFeed } from "./components/feed";
 import { SeedGarden, SeedDetail, SeedSearch } from "./components/seeds";
 import { Announcements, AnnouncementDetail, BonfireAnnouncements, Contacts, announcementCategories } from "./components/civic";
-export function Town({ model }: { model: TownModel }) {
+export function Town({ model, visible = model.visible }: { model: TownModel; visible?: boolean }) {
   const town = useModel(model),
     definition = definitions[town.view],
-    channel = town.channel(),
+    // The drawer can still be exiting after the model stops its live channel.
+    channel = visible && (town.view === 'bonfire' || town.view === 'mail' || town.view === 'firesides') ? town.view : undefined,
     social = Boolean(channel),
     connectionIssue = !["seeds", "announcements", "contacts"].includes(town.view) &&
       Boolean(town.live && ["reconnecting", "auth-error"].includes(town.live.phase)),
@@ -49,7 +50,7 @@ export function Town({ model }: { model: TownModel }) {
       data-module={town.view}
       ref={root}
       className={`view${social ? " social-view" : ""}${paginated ? " paginated-view" : ""}${town.view === "embers" ? " bookshelf-view" : ""}${["scrolls", "embers", "announcements"].includes(town.view) && !town.directId ? " reading-catalog" : ""}${town.view === "kits" && town.tab === "grove" && !town.directId ? " kit-catalog" : ""}${town.view === "seeds" && !town.directId ? " seed-catalog" : ""}`}
-      hidden={!town.visible || !definition}
+      hidden={!visible || !definition}
     >
       <div className="town-content">
         <div className="town-heading" hidden>

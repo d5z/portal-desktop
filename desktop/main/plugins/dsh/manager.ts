@@ -42,10 +42,10 @@ export class DshPluginManager {
     await mkdir(this.home, { recursive: true, mode: 0o700 });
     try {
       this.entries = JSON.parse(await readFile(path.join(this.home, 'plugins.json'), 'utf8'));
-      if (!Array.isArray(this.entries)) throw new Error('DeepSeek Harness 插件安装记录损坏。');
+      if (!Array.isArray(this.entries)) throw new Error('第三方插件安装记录损坏。');
       for (const entry of this.entries) {
         packageName(entry.plugin?.id);
-        if (!path.resolve(entry.root).startsWith(path.resolve(this.home, 'packages') + path.sep)) throw new Error('DeepSeek Harness 插件路径无效。');
+        if (!path.resolve(entry.root).startsWith(path.resolve(this.home, 'packages') + path.sep)) throw new Error('第三方插件路径无效。');
       }
     } catch (error) { if ((error as NodeJS.ErrnoException).code !== 'ENOENT') { this.entries = []; this.snapshot.error = String(error); return; } }
     await this.restart();
@@ -81,7 +81,7 @@ export class DshPluginManager {
       });
       const manifest = JSON.parse(await readFile(path.join(stage, 'package.json'), 'utf8'));
       const names = Object.keys(manifest.dependencies || {}).filter(name => !(name in hostLibraries));
-      if (names.length !== 1) throw new Error('一次只能安装一个 DSH 插件包。');
+      if (names.length !== 1) throw new Error('一次只能安装一个第三方插件包。');
       packageName(names[0]);
       const root = path.join(stage, 'node_modules', names[0]);
       const pkg = await readDshPackage(root, true, true);
@@ -164,7 +164,7 @@ export class DshPluginManager {
     await this.save(); await this.restart();
     // Keep immutable package copies and DSH_HOME data for recovery; no user data deletion.
   }); }
-  private entry(id: string) { packageName(id); const entry = this.entries.find(p => p.plugin.id === id); if (!entry) throw new Error('DeepSeek Harness 插件不存在。'); return entry; }
+  private entry(id: string) { packageName(id); const entry = this.entries.find(p => p.plugin.id === id); if (!entry) throw new Error('第三方插件不存在。'); return entry; }
   matches(pathname: string) { return pathname.startsWith('/@town-dsh/') || this.snapshot.routes.some(r => r.kind === 'exact' ? pathname === r.path : pathname === r.path || pathname.startsWith(r.path + '/')); }
   async resource(request: Request): Promise<Response> {
     const url = new URL(request.url);
@@ -218,7 +218,7 @@ export class DshPluginManager {
     for (const stream of [child.stdout, child.stderr]) stream?.on('data', chunk => { void import('node:fs/promises').then(async ({ appendFile, stat, truncate }) => { if ((await stat(logFile).catch(() => ({ size: 0 }))).size > 2 * 1024 * 1024) await truncate(logFile); await appendFile(logFile, chunk, { mode: 0o600 }); }).catch(() => {}); });
     try {
       await new Promise<void>((resolve, reject) => {
-        const timer = setTimeout(() => reject(new Error('DeepSeek Harness 插件启动超时。')), 30000);
+        const timer = setTimeout(() => reject(new Error('第三方插件启动超时。')), 30000);
         child.once('error', error => { clearTimeout(timer); reject(error); });
         child.once('exit', () => {
           clearTimeout(timer); this.port = 0;

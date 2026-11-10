@@ -8,8 +8,6 @@ import { useChatViewport } from './hooks/use-chat-viewport';
 import { useMessageSelection } from './hooks/use-message-selection';
 import { useChatShortcuts } from './hooks/use-chat-shortcuts';
 import { LocalFileAction, requestLocalFilePreview } from '../shared/components/local-file-link';
-import { PermissionIcon } from '../shared/icons/permission';
-import { choicesFor } from '../shared/lib/permissions';
 import { SbsControl } from "../shared/components/sbs-control";
 import {useHistoryWindow} from './hooks/use-history-window';
 import { AttachmentMessageContent, hasAttachmentMessage, originalMessageText } from "./components/message-content";
@@ -175,10 +173,27 @@ function ChatView({
   const currentSceneName = sceneName(state.currentScene, state.currentScene);
   const messages = useRef<HTMLDivElement>(null),
     composer = useRef<ComposerHandle>(null),
+    composerArea = useRef<HTMLDivElement>(null),
     fileInput = useRef<HTMLInputElement>(null);
   const messageElements = useRef(new Map<string, HTMLDivElement>());
   const reader = useMessageScroll(visibleItems, messages, messageElements);
   const { scrollLock, releaseAnchor } = reader;
+  useLayoutEffect(() => {
+    const area = composerArea.current, container = messages.current;
+    if (!area || !container) return;
+    let frame = 0;
+    const sync = () => {
+      container.style.setProperty('--chat-composer-height', `${area.getBoundingClientRect().height}px`);
+      cancelAnimationFrame(frame);
+      frame = requestAnimationFrame(() => {
+        if (scrollLock.current) container.scrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+      });
+    };
+    sync();
+    const observer = new ResizeObserver(sync);
+    observer.observe(area);
+    return () => { observer.disconnect(); cancelAnimationFrame(frame); };
+  }, [scrollLock]);
   const scopeScroll = useRef<Partial<Record<HistoryScope, { top: number; locked: boolean }>>>({});
   const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
   const queueShortcut = isMac ? "⌘ Enter / Ctrl Enter" : "Ctrl Enter";
@@ -556,7 +571,13 @@ function ChatView({
             {queuedMessages.map((item, index) => <QueueRow item={item} index={index} allowInterrupt={state.canInterruptQueue && !state.stopping} onEdit={item => { state.draft = item.text; state.changed(); setEditingQueued(item); }} onReorder={(sourceId, targetId) => { const source = queuedMessages.find(candidate => candidate.id === sourceId); void source?.reorderQueued?.(targetId); }} key={item.id} />)}
           </div>
         </div>}
-        <div id="input-area">
+        <div id="input-area" ref={composerArea} onWheel={event => {
+          if (event.deltaY >= 0 || !messages.current) return;
+          const input = event.target instanceof HTMLElement ? event.target.closest('#input') as HTMLElement | null : null;
+          if (input && input.scrollTop > 0) return;
+          event.preventDefault();
+          messages.current.scrollBy({ top: event.deltaY, behavior: 'auto' });
+        }}>
           {state.intelligentUIForMessage && state.intelligentUITargetTitle && <div className="iui-context-target" role="status"><span>修改「{state.intelligentUITargetTitle}」<small>将携带原界面和当前选择</small></span><button type="button" aria-label="取消本条界面修改" onClick={() => state.setIntelligentUIForMessage(false)}>×</button></div>}
           {!state.historyLoading && <JumpToLatest trimHistory={historyWindow.toLatest} status={reader} container={messages} scrollLock={scrollLock} clearAnchor={releaseAnchor} />}
           <div
@@ -593,10 +614,6 @@ function ChatView({
           </div>
           {editingQueued && <div className="composer-editing-queue" role="status"><span>正在编辑排队消息</span><button type="button" onClick={() => { state.draft = ""; state.changed(); setEditingQueued(null); composer.current?.focus(); }}>取消编辑</button></div>}
           <div id="input-row">
-            {parent !== window && location.protocol === 'beings:' && <button type="button" className="btn-icon permission-quick-trigger" data-mode={state.permissionMode} title={`工作权限 · ${choicesFor(state.permissionMode ?? 'auto-review').find(choice => choice.value === state.permissionMode)?.title ?? '加载中'}`} aria-label="快捷设置工作权限" aria-haspopup="menu" aria-expanded={state.permissionMenuOpen} onClick={event => {
-              const rect = event.currentTarget.getBoundingClientRect();
-              bridge.send({ type: 'beings:permission-settings', anchor: { left: rect.left, top: rect.top, bottom: rect.bottom } });
-            }}><PermissionIcon mode={state.permissionMode}/><span>{choicesFor(state.permissionMode ?? 'auto-review').find(choice => choice.value === state.permissionMode)?.title ?? '权限'}</span><Icon name="chevron-down-16" className="permission-chevron" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" /></button>}
             <ChatComposer
               state={state}
               onExamples={openExamples}
@@ -606,7 +623,7 @@ function ChatView({
               id="input"
               rows={1}
               className={state.queued ? "queued" : ""}
-              placeholder="说点什么，或输入 / 选择功能…"
+              placeholder={`给 ${state.name} 发消息`}
               aria-label="message input"
               aria-keyshortcuts={isMac ? "Enter Control+Enter Meta+Enter Shift+Enter" : "Enter Control+Enter Shift+Enter"}
               onCompositionStart={() => {

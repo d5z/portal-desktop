@@ -1,0 +1,63 @@
+@property --drawer-size {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0;
+}
+
+@property --drawer-gap {
+  syntax: '<length>';
+  inherits: false;
+  initial-value: 0;
+}
+
+[data-workspace-drawer][data-drawer-motion] {
+  overflow: clip !important;
+}
+
+[data-workspace-drawer][data-drawer-motion='horizontal'] {
+  flex: 0 0 var(--drawer-size) !important;
+  width: var(--drawer-size) !important;
+  min-width: 0 !important;
+  max-width: none !important;
+  &[data-drawer-edge='right'] { margin-left: var(--drawer-gap) !important; }
+  &[data-drawer-edge='left'] { margin-right: var(--drawer-gap) !important; }
+}
+
+[data-workspace-drawer][data-drawer-motion='vertical'] {
+  flex: 0 0 var(--drawer-size) !important;
+  height: var(--drawer-size) !important;
+  min-height: 0 !important;
+  max-height: none !important;
+  margin-top: var(--drawer-gap) !important;
+}
+
+[data-workspace-drawer][data-drawer-motion='overlay'] {
+  will-change: transform;
+}
+
+:is(.workspace-body, .workspace-stage, .workspace-content, .plugin-place-layout):has(> [data-drawer-surface]) {
+  overflow: clip;
+  overflow-clip-margin: content-box;
+}
+
+[data-workspace-drawer][data-drawer-surface][data-drawer-motion='horizontal'] {
+  flex-basis: var(--drawer-full-size) !important;
+  width: var(--drawer-full-size) !important;
+
+  &[data-drawer-edge='right'] {
+    margin-left: calc(var(--drawer-gap) + var(--drawer-size) - var(--drawer-full-size)) !important;
+    transform: translateX(calc(var(--drawer-full-size) - var(--drawer-size)));
+  }
+
+  &[data-drawer-edge='left'] {
+    margin-right: calc(var(--drawer-gap) + var(--drawer-size) - var(--drawer-full-size)) !important;
+    transform: translateX(calc(var(--drawer-size) - var(--drawer-full-size)));
+  }
+}
+
+[data-workspace-drawer][data-drawer-surface][data-drawer-motion='vertical'] {
+  flex-basis: var(--drawer-full-size) !important;
+  height: var(--drawer-full-size) !important;
+  margin-top: calc(var(--drawer-gap) + var(--drawer-size) - var(--drawer-full-size)) !important;
+  transform: translateY(calc(var(--drawer-full-size) - var(--drawer-size)));
+}

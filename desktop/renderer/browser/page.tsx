@@ -1,3 +1,4 @@
+import { WorkspaceDrawer } from "../shared/components/workspace-drawer";
 import {
   useCallback,
   useEffect,
@@ -27,7 +28,7 @@ export function Browser({ model: app }: { model: AppModel }) {
   const sendBounds = useCallback(() => {
     if (!viewport.current || !app.api) return;
     const rect = viewport.current.getBoundingClientRect();
-    const visible = !dragging.current && !panel.current?.hidden && rect.width > 0 && rect.height > 0 && app.startup === "ready" && !document.querySelector("dialog[open]");
+    const visible = !dragging.current && !panel.current?.dataset.animating && !panel.current?.hidden && rect.width > 0 && rect.height > 0 && app.startup === "ready" && !document.querySelector("dialog[open]");
     const { x, y, width, height } = visible ? rect : { x:0, y:0, width:0, height:0 };
     const bounds = { x, y, width, height, visible };
     const previous = lastBounds.current;
@@ -103,21 +104,23 @@ export function Browser({ model: app }: { model: AppModel }) {
       attributeFilter: ["open"],
     });
     window.addEventListener("resize", layout);
+    window.addEventListener("beings:drawer-motion", layout);
     return () => {
       resize.disconnect();
       mutation.disconnect();
       window.removeEventListener("resize", layout);
+      window.removeEventListener("beings:drawer-motion", layout);
       cancelAnimationFrame(scheduled);
     };
   }, [sendBounds, state.open]);
   const act = (action: BrowserAction) =>
     void app.run(() => app.api.browserAction(action));
   return (
-    <aside
+    <WorkspaceDrawer
       id="browser-panel"
       ref={panel}
       aria-label="内置浏览器"
-      hidden={!state.open}
+      open={state.open}
       style={{ width }}
     >
       <PanelResizeHandle panel={panel} label="调整浏览器宽度" width={width} onResize={setWidth} initial={640} min={280} max={1200} reserve={280} disabled={!state.open} onDraggingChange={setDragging} />
@@ -197,6 +200,6 @@ export function Browser({ model: app }: { model: AppModel }) {
                 : "输入网址，或从更多选项打开原版 Loom、小镇说明。")}
         </p>
       </div>
-    </aside>
+    </WorkspaceDrawer>
   );
 }
