@@ -13,11 +13,12 @@ import { useFileDrop } from './desktop/renderer/chat/hooks/use-file-drop';
 import { useChatViewport } from './desktop/renderer/chat/hooks/use-chat-viewport';
 import { useChatShortcuts } from './desktop/renderer/chat/hooks/use-chat-shortcuts';
 import { useMenuDismiss } from './desktop/renderer/shared/hooks/use-menu-dismiss';
-window.calls = []; window.viewportCommits = 0;
-function Harness({ value, open, targetIndex }) {
+window.calls = []; window.viewportCommits = 0; window.harnessCommits = 0;
+function Harness({ value, open, targetIndex, mobileWeb }) {
   const first = useRef(null), second = useRef(null), menu = useRef(null);
-  const { viewport } = useChatViewport(true);
-  useLayoutEffect(() => { window.viewportCommits++; window.viewportWidth = viewport.width; }, [viewport]);
+  const { viewport, narrow, nativeTouch } = useChatViewport(mobileWeb);
+  useLayoutEffect(() => { window.harnessCommits++; window.narrow = narrow; window.nativeTouch = nativeTouch; });
+  useLayoutEffect(() => { window.viewportCommits++; window.viewportWidth = viewport?.width; window.viewport = viewport; }, [viewport]);
   const { dragging, dropHandlers } = useFileDrop('scene', files => window.calls.push('files:' + files.length));
   useChatShortcuts({ send: message => window.calls.push(message.type) }, value, text => window.calls.push(text), false);
   useMenuDismiss(open, menu, (...args) => { window.closeArgumentCount = args.length; window.calls.push('close:' + value); }, () => window.calls.push('scroll:' + value));
@@ -25,7 +26,7 @@ function Harness({ value, open, targetIndex }) {
   return <div id="drop" {...dropHandlers} data-dragging={dragging}><div id="menu" ref={menu}/><div id="first" ref={first}/><div id="second" ref={second}/></div>;
 }
 function App() {
-  const [props, update] = useState({value:'old',open:false,targetIndex:0});
+  const [props, update] = useState({value:'old',open:false,targetIndex:0,mobileWeb:true});
   window.update = patch => flushSync(() => update(previous => ({...previous,...patch})));
   return <Harness {...props}/>;
 }
@@ -79,6 +80,7 @@ try {
   assert.equal(await page.evaluate(() => viewportCommits), commits, 'Unchanged viewport bursts must not commit');
   const changedWidth = await page.evaluate(() => {
     const start = innerWidth;
+    window.innerWidthDescriptor = Object.getOwnPropertyDescriptor(window, 'innerWidth');
     for(let i=1;i<=50;i++) {
       Object.defineProperty(window, 'innerWidth', { configurable: true, value: start + i });
       window.dispatchEvent(new Event('resize'));
@@ -123,8 +125,41 @@ try {
     await page.evaluate(() => unmount());
     assert.deepEqual((await page.evaluate(() => stats())).active, beforeMount.active, 'Repeated mounts must not accumulate listeners');
   }
+  // Continuous desktop resizing must not rerender the conversation per pixel.
+  await page.evaluate(() => { Object.defineProperty(window, 'innerWidth', innerWidthDescriptor); mount(); update({ mobileWeb: false }); });
+  await page.waitForFunction(() => pendingFrames() === 0);
+  const desktopCommits = await page.evaluate(() => harnessCommits);
+  for (let i = 0; i < 20; i++) {
+    await page.setViewportSize({ width: 1200 + i * 2, height: 800 - i * 2 });
+    await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  }
+  assert.equal(await page.evaluate(() => harnessCommits), desktopCommits, 'Desktop geometry changes must not render React');
+  assert.equal(await page.evaluate(() => viewport), undefined, 'Desktop height is owned by CSS');
+  await page.setViewportSize({ width: 900, height: 760 });
+  await page.waitForFunction(() => narrow === true);
+  assert.equal(await page.evaluate(() => harnessCommits), desktopCommits + 1, 'Entering the overlay breakpoint renders once');
+  await page.setViewportSize({ width: 901, height: 760 });
+  await page.waitForFunction(() => narrow === false);
+  assert.equal(await page.evaluate(() => harnessCommits), desktopCommits + 2, 'Leaving the overlay breakpoint renders once');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.evaluate(() => update({ mobileWeb: true }));
+  await page.waitForFunction(() => nativeTouch && viewport?.height === 844 && pendingFrames() === 0);
+  await page.evaluate(() => {
+    Object.defineProperty(visualViewport, 'height', { configurable: true, value: 360 });
+    Object.defineProperty(visualViewport, 'offsetTop', { configurable: true, value: 48 });
+    visualViewport.dispatchEvent(new Event('resize'));
+    visualViewport.dispatchEvent(new Event('scroll'));
+  });
+  await page.waitForFunction(() => viewport.height === 360 && viewport.offset === 48 && pendingFrames() === 0);
+  await page.evaluate(() => {
+    delete visualViewport.height; delete visualViewport.offsetTop;
+    visualViewport.dispatchEvent(new Event('resize'));
+  });
+  await page.waitForFunction(() => viewport.height === 844 && viewport.offset === 0 && pendingFrames() === 0);
+  await page.evaluate(() => unmount());
+  assert.deepEqual((await page.evaluate(() => stats())).active, beforeMount.active, 'Desktop/mobile mode changes clean up listeners');
   assert.deepEqual(errors, []);
-  console.log('PASS: StrictMode, stable subscriptions, fresh handlers, target replacement, drag/menu cleanup, unchanged viewport bursts and frame cancellation.');
+  console.log('PASS: StrictMode, stable subscriptions, fresh handlers, drag/menu cleanup, viewport coalescing, zero desktop resize renders, overlay breakpoints and mobile keyboard geometry.');
 } finally {
   await browser?.close(); server.closeAllConnections(); await new Promise(resolve => server.close(resolve));
 }

@@ -26,6 +26,7 @@ export function PanelResizeHandle({ panel, label, width, onResize, initial, min 
 }) {
   const handle = useRef<HTMLDivElement>(null);
   const drag = useRef<{ id: number; x: number; width: number } | null>(null);
+  const pending = useRef<{ frame: number; commit: () => void } | null>(null);
   const [limit, setLimit] = useState(max);
   useLayoutEffect(() => {
     const parent = panel.current?.parentElement;
@@ -44,6 +45,8 @@ export function PanelResizeHandle({ panel, label, width, onResize, initial, min 
   const stop = () => {
     const active = drag.current;
     drag.current = null;
+    // Keep the final pointer position even when release precedes the next paint.
+    if (pending.current) { cancelAnimationFrame(pending.current.frame); pending.current.commit(); }
     if (active && handle.current?.hasPointerCapture(active.id)) handle.current.releasePointerCapture(active.id);
     handle.current?.removeAttribute("data-resizing");
     if (active) onDraggingChange?.(false);
@@ -65,7 +68,12 @@ export function PanelResizeHandle({ panel, label, width, onResize, initial, min 
     }}
     onPointerMove={event => {
       const active = drag.current;
-      if (active?.id === event.pointerId) apply(active.width + (event.clientX - active.x) * (edge === "right" ? 1 : -1));
+      if (active?.id !== event.pointerId) return;
+      const next = active.width + (event.clientX - active.x) * (edge === "right" ? 1 : -1);
+      if (pending.current) cancelAnimationFrame(pending.current.frame);
+      // Multiple pointer events in one frame need one render and preference write.
+      const commit = () => { pending.current = null; apply(next); };
+      pending.current = { frame: requestAnimationFrame(commit), commit };
     }}
     onPointerUp={stop} onPointerCancel={stop} onLostPointerCapture={stop}
     onDoubleClick={() => apply(initial)}
