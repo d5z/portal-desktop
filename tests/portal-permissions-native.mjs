@@ -58,7 +58,8 @@ async function stop() {
 async function start(mode) {
   await stop();
   const previous = generation;
-  await writeFile(config, `name = "permissions-fixture"\nworkspace = ${JSON.stringify(workspace)}\nkits_enabled = false\n[subagent]\nenabled = false\n[tools]\ncustom_tools_enabled = ${mode !== 'full-access'}\n`);
+  // The standalone config defaults to full access; Desktop's CLI mode must override it.
+  await writeFile(config, `name = "permissions-fixture"\nworkspace = ${JSON.stringify(workspace)}\nkits_enabled = false\n[subagent]\nenabled = false\n[tools]\ncustom_tools_enabled = ${mode !== 'full-access'}\n[security]\npermission_mode = "full-access"\n`);
   child = spawn(binary, ['--config', config, '--connect', `http://127.0.0.1:${port}/fixture/?token=native-test`, '--permission-mode', mode],
     {windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,USERPROFILE:temporary,HOME:temporary,HEART_PORTAL_CLIENT_MANAGED:'1',HEART_PORTAL_SUPERVISED:'1',HEART_PORTAL_CLIENT_FILE:registration}});
   child.stdout.on('data', bytes => {diagnostics=(diagnostics+bytes).slice(-12000);});

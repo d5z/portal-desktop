@@ -1,4 +1,4 @@
 [submodule "heart-portal"]
 	path = heart-portal
 	url = https://github.com/d5z/heart-portal.git
-	branch = codex/portal-desktop-compat
+	branch = main

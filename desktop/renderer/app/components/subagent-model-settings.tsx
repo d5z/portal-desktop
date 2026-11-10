@@ -102,7 +102,9 @@ export function SubagentModelSettings({ app, embedded = false, inline = false, o
       },
       async applyConfigChange(patch) {
         if (!readable) return { ok: false };
-        const input: SubagentSetup = { enabled: typeof patch.enabled === "boolean" ? patch.enabled : (configEnabled || !state.config?.model), ...(patch.base_url ? { base_url: String(patch.base_url), api: String(patch.api || 'openai-completions') } : { base_url: '', api: '' }), provider: patch.base_url ? 'portal-custom' : String(patch.provider || ''), model: String(patch.model || '').trim(), api_key: String(patch.api_key || ''), thinking: String(patch.thinking || 'medium') };
+        const enabled = typeof patch.enabled === "boolean" ? patch.enabled
+          : staged ? (app.form?.subagentEnabled ?? configEnabled) : (configEnabled || !state.config?.model);
+        const input: SubagentSetup = { enabled, ...(patch.base_url ? { base_url: String(patch.base_url), api: String(patch.api || 'openai-completions') } : { base_url: '', api: '' }), provider: patch.base_url ? 'portal-custom' : String(patch.provider || ''), model: String(patch.model || '').trim(), api_key: String(patch.api_key || ''), thinking: String(patch.thinking || 'medium') };
         if (input.enabled !== false && (!providers.includes(input.provider) || !input.model)) {
           state.configStatus = '请选择服务商并填写模型名称。';
           state.changed();
@@ -143,11 +145,14 @@ export function SubagentModelSettings({ app, embedded = false, inline = false, o
     return { state, runtime, dispose: () => { disposed = true; ++revision; } };
   }, [app, staged, inline]);
   useEffect(() => () => { adapter.dispose(); being.dispose(); }, [adapter, being]);
+  const formRevision = useRef(app.connectionFormRevision);
   useEffect(() => {
-    if (inline && !app.form?.subagentSetup && adapter.state.configStatus.startsWith('已加入待保存配置')) {
+    const rebuilt = formRevision.current !== app.connectionFormRevision;
+    formRevision.current = app.connectionFormRevision;
+    if (inline && !app.form?.subagentSetup && (rebuilt || adapter.state.configStatus.startsWith('已加入待保存配置'))) {
       void adapter.runtime.loadLlmConfig();
     }
-  }, [inline, app.form?.subagentSetup, adapter]);
+  }, [inline, app.form?.subagentSetup, app.connectionFormRevision, adapter]);
   const close = () => { if (!busy) app.closeSubagentSettings(); };
   const switchTarget = (value: "Heart" | "subagent") => {
     if (busy) return;

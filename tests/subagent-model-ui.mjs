@@ -58,7 +58,9 @@ try {
   }
   assert.equal(await page.evaluate(()=>window.panelNode===document.querySelector('#settings-panel') && window.tabNode===document.querySelector('[role=tablist]')),true);
   assert.equal(await page.locator('#settings-panel').count(),1);
-  const bounds=await page.locator('#subagent-model-panel').boundingBox();assert.equal(Math.round(bounds.x+bounds.width),1100);
+  const bounds=await page.locator('#subagent-model-panel').boundingBox();
+  const rightEdge=await page.locator('.workspace-body').evaluate(node=>node.getBoundingClientRect().right-parseFloat(getComputedStyle(node).paddingRight));
+  assert.equal(Math.round(bounds.x+bounds.width),rightEdge);
   await being.click();await page.locator('#Heart-s2-apply').click();
   await page.waitForFunction(()=>window.heartPatches.length===1);
   assert.deepEqual(await page.evaluate(()=>window.heartPatches[0]),{model:'heart-new-model',provider:'openai-responses',base_url:'https://fixture.invalid/v1',api_key:'heart-key'});
@@ -121,6 +123,16 @@ try {
   await subagent.click();
   await page.screenshot({path:'test-results/subagent-disabled-notice.png'});
   await page.getByRole('button',{name:'关闭模型设置'}).click();
+  // First-time model configuration must preserve the staged capability switch.
+  for (const enabled of [false, true]) {
+    await page.evaluate(enabled=>{window.app.form={subagentEnabled:enabled};window.app.api.subagentConfig=async()=>({enabled:false,provider:'',model:'',thinking:'medium'});window.openSettings(true)},enabled);
+    await page.getByRole('button',{name:'自定义',exact:true}).click();
+    await page.locator('#subagent-s2-model').fill('first-staged-model');
+    await page.locator('#subagent-s2-provider').selectOption('openai');
+    await page.getByRole('button',{name:'使用此配置并返回'}).click();
+    await page.waitForFunction(()=>!window.app.subagentSettingsOpen);
+    assert.equal(await page.evaluate(()=>window.app.form.subagentSetup.enabled),enabled);
+  }
   await page.evaluate(()=>{window.app.api.subagentConfig=undefined;window.openSettings(false)});
   await page.getByRole('status').filter({hasText:'客户端接口尚未更新'}).waitFor();
   assert.equal(await page.getByText('正在读取模型…',{exact:true}).count(),0);
