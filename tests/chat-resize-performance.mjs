@@ -119,6 +119,14 @@ try {
   }, { startX, y });
   await page.waitForFunction(width => document.querySelector('#being-info').getBoundingClientRect().width === width, startWidth + 80);
   const burstWrites = await page.evaluate(() => panelWrites);
+  assert.equal(Number(await divider.getAttribute('aria-valuenow')), startWidth + 80, 'Accessible width follows the live drag');
+  for (const delta of [84, 88, 92]) {
+    await divider.evaluate((node, { startX, y, delta }) => {
+      node.dispatchEvent(new PointerEvent('pointermove', { pointerId: window.resizePointer, clientX: startX - delta, clientY: y, bubbles: true }));
+    }, { startX, y, delta });
+    await page.waitForFunction(width => document.querySelector('#being-info').getBoundingClientRect().width === width, startWidth + delta);
+    assert.equal(await page.evaluate(() => panelWrites), 0, 'Continuous dragging paints without preference writes');
+  }
   await divider.evaluate((node, { startX, y }) => {
     node.dispatchEvent(new PointerEvent('pointermove', { pointerId: window.resizePointer, clientX: startX - 100, clientY: y, bubbles: true }));
     node.dispatchEvent(new PointerEvent('pointerup', { pointerId: window.resizePointer, bubbles: true }));
@@ -127,9 +135,9 @@ try {
   await page.waitForFunction(width => document.querySelector('#being-info').getBoundingClientRect().width === width, startWidth + 100);
   console.log(JSON.stringify({ immediateWrites, burstWrites, finalWrites: await page.evaluate(() => panelWrites) }));
   if (!process.env.RESIZE_BASELINE) {
-    assert.equal(immediateWrites, 0, 'Pointer bursts defer synchronous storage until paint');
-    assert.equal(burstWrites, 1, 'One pointer burst commits only its latest width');
-    assert.equal(await page.evaluate(() => panelWrites), 2, 'Pointer release flushes the last pending width once');
+    assert.equal(immediateWrites, 0, 'Pointer bursts do not write preferences');
+    assert.equal(burstWrites, 0, 'Painting the drag does not write preferences');
+    assert.equal(await page.evaluate(() => panelWrites), 1, 'Pointer release commits the final width once');
   }
   assert.equal(await divider.getAttribute('data-resizing'), null, 'Release clears the drag overlay');
   await page.reload();

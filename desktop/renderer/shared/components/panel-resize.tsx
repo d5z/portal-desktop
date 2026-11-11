@@ -25,8 +25,8 @@ export function PanelResizeHandle({ panel, label, width, onResize, initial, min 
   onDraggingChange?: (dragging: boolean) => void;
 }) {
   const handle = useRef<HTMLDivElement>(null);
-  const drag = useRef<{ id: number; x: number; width: number } | null>(null);
-  const pending = useRef<{ frame: number; commit: () => void } | null>(null);
+  const drag = useRef<{ id: number; x: number; width: number; next?: number } | null>(null);
+  const pending = useRef<{ frame: number; value: number } | null>(null);
   const [limit, setLimit] = useState(max);
   useLayoutEffect(() => {
     const parent = panel.current?.parentElement;
@@ -41,12 +41,40 @@ export function PanelResizeHandle({ panel, label, width, onResize, initial, min 
     return () => observer.disconnect();
   }, [panel, max, reserve, disabled]);
   const lower = Math.min(min, limit);
-  const apply = (next: number) => onResize(Math.max(lower, Math.min(limit, next)));
+  const clamp = (next: number) => Math.round(Math.max(lower, Math.min(limit, next)));
+  const preview = (next: number) => {
+    const node = panel.current;
+    if (!node) return;
+    // Width changes are layout work, but keeping them in the DOM avoids
+    // rendering the whole workspace and writing preferences on every move.
+    if (node.id === 'chat-view') {
+      node.style.setProperty('--chat-pane-width', `${next}px`);
+    } else if (node.classList.contains('client-file-viewer')) {
+      node.style.setProperty('--file-preview-width', `${next}px`);
+    } else {
+      node.style.width = `${next}px`;
+      // Only update a basis owned by React; auto/responsive panels keep theirs.
+      if (node.style.flexBasis) node.style.flexBasis = `${next}px`;
+    }
+    handle.current?.setAttribute('aria-valuenow', String(next));
+    handle.current?.setAttribute('aria-valuetext', `${next} 像素`);
+  };
+  const apply = (next: number) => {
+    const value = clamp(next);
+    preview(value);
+    onResize(value);
+  };
   const stop = () => {
     const active = drag.current;
     drag.current = null;
     // Keep the final pointer position even when release precedes the next paint.
-    if (pending.current) { cancelAnimationFrame(pending.current.frame); pending.current.commit(); }
+    if (pending.current) {
+      cancelAnimationFrame(pending.current.frame);
+      preview(pending.current.value);
+      if (active) active.next = pending.current.value;
+      pending.current = null;
+    }
+    if (active?.next !== undefined) onResize(active.next);
     if (active && handle.current?.hasPointerCapture(active.id)) handle.current.releasePointerCapture(active.id);
     handle.current?.removeAttribute("data-resizing");
     if (active) onDraggingChange?.(false);
@@ -69,11 +97,16 @@ export function PanelResizeHandle({ panel, label, width, onResize, initial, min 
     onPointerMove={event => {
       const active = drag.current;
       if (active?.id !== event.pointerId) return;
-      const next = active.width + (event.clientX - active.x) * (edge === "right" ? 1 : -1);
-      if (pending.current) cancelAnimationFrame(pending.current.frame);
-      // Multiple pointer events in one frame need one render and preference write.
-      const commit = () => { pending.current = null; apply(next); };
-      pending.current = { frame: requestAnimationFrame(commit), commit };
+      const next = clamp(active.width + (event.clientX - active.x) * (edge === "right" ? 1 : -1));
+      active.next = next;
+      // Multiple pointer events in one frame need one layout update.
+      if (pending.current) { pending.current.value = next; return; }
+      const frame = requestAnimationFrame(() => {
+        const value = pending.current!.value;
+        pending.current = null;
+        preview(value);
+      });
+      pending.current = { frame, value: next };
     }}
     onPointerUp={stop} onPointerCancel={stop} onLostPointerCapture={stop}
     onDoubleClick={() => apply(initial)}

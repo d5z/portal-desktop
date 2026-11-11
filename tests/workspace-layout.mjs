@@ -502,20 +502,11 @@ try {
   await page.getByRole('button',{name:'资料库',exact:true}).click();
   assert.equal(await page.locator('#being-info').isVisible(),true);
   assert.equal(await page.locator('.topbar #chat-scene-indicator').count(), 0, 'Scene navigation lives in the rail');
-  const chatBeforePreview = await page.locator('#chat-view').boundingBox();
+  const chatBeforeHover = await page.locator('#chat-view').boundingBox();
   await rail.getByRole('button',{name:'对话',exact:true}).hover();
-  await page.locator('#chat-session-panel[data-pinned="false"]').waitFor();
-  assert.equal((await page.locator('#chat-view').boundingBox()).x, chatBeforePreview.x, 'Hover preview does not shift chat');
-  assert.equal(await page.getByRole('searchbox',{name:'搜索场景'}).evaluate(node => node === document.activeElement), false, 'Hover must not steal typing focus');
-  await page.locator('#chat-session-panel').hover();
   await page.waitForTimeout(300);
-  assert.equal(await page.locator('#chat-session-panel').getAttribute('data-open'), 'true', 'Pointer can cross from the rail into the popup');
-  await page.locator('#toggle-being-info').hover();
-  await page.locator('#chat-session-panel').waitFor({state:'detached'});
-  await rail.getByRole('button',{name:'对话',exact:true}).hover();
-  await page.locator('#chat-session-panel').waitFor();
-  await page.keyboard.press('Escape');
-  await page.locator('#chat-session-panel').waitFor({state:'detached'});
+  assert.equal(await page.locator('#chat-session-panel').count(), 0, 'Hover must not open the scene list');
+  assert.equal((await page.locator('#chat-view').boundingBox()).x, chatBeforeHover.x, 'Hover must not shift chat');
   await page.getByRole('button',{name:'展开场景列表',exact:true}).click();
   await page.locator('#toggle-being-info').focus();
   assert.equal(await page.locator('#chat-session-panel').isVisible(),true);
@@ -534,6 +525,14 @@ try {
   await assertPinnedLayout();
   await page.getByRole('separator',{name:'调整场景列表宽度'}).press('ArrowRight');
   assert.equal(Math.round((await page.locator('#chat-session-panel').boundingBox()).width),344);
+  const sceneDivider = page.getByRole('separator',{name:'调整场景列表宽度'});
+  const sceneHandle = await sceneDivider.boundingBox();
+  await page.mouse.move(sceneHandle.x + sceneHandle.width / 2, sceneHandle.y + 200);
+  await page.mouse.down();
+  await page.mouse.move(sceneHandle.x + sceneHandle.width / 2 + 40, sceneHandle.y + 200, {steps:5});
+  await page.mouse.up();
+  assert.equal(Math.round((await page.locator('#chat-session-panel').boundingBox()).width),384);
+  assert.equal(await page.locator('#chat-session-panel').evaluate(node => node.style.flexBasis), '', 'Dragging preserves the scene panel responsive flex basis');
   await assertPinnedLayout();
   for (const width of [1100,760,435]) {
     await page.setViewportSize({width,height:746});

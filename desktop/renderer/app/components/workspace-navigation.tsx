@@ -29,9 +29,9 @@ const destinations = [
   ["town", "小镇广场", "rail-town"],
 ] as const;
 
-function RailButton({ label, children, active, disabled, unread, onClick, className = "", plugin = false, id, expanded, navigationKey, shortcut, onHover, tooltip = true }: {
+function RailButton({ label, children, active, disabled, unread, onClick, className = "", plugin = false, id, expanded, navigationKey, shortcut, tooltip = true }: {
   navigationKey?: string; id?: string; expanded?: boolean; label: string; children: ReactNode; active?: boolean; disabled?: boolean; unread?: boolean;
-  onClick: () => void; className?: string; plugin?: boolean; shortcut?: string; onHover?: (hovered: boolean) => void; tooltip?: boolean;
+  onClick: () => void; className?: string; plugin?: boolean; shortcut?: string; tooltip?: boolean;
 }) {
   const animateIcon = (button: HTMLButtonElement) => {
     if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
@@ -66,7 +66,7 @@ function RailButton({ label, children, active, disabled, unread, onClick, classN
       onPointerDown={event => {
         setTip(null);
         event.currentTarget.querySelector('.rail-icon-line')?.getAnimations().forEach(animation => animation.cancel());
-      }} onMouseEnter={event => { animateIcon(event.currentTarget); if (tooltip) show(event.currentTarget); onHover?.(true); }} onMouseLeave={() => { setTip(null); onHover?.(false); }}
+      }} onMouseEnter={event => { animateIcon(event.currentTarget); if (tooltip) show(event.currentTarget); }} onMouseLeave={() => setTip(null)}
       onFocus={event => {
         if (event.currentTarget.matches(':focus-visible')) animateIcon(event.currentTarget);
         if (tooltip) show(event.currentTarget);
@@ -98,17 +98,6 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
       return Array.isArray(saved) ? saved.filter((key): key is string => typeof key === "string") : [];
     } catch { return []; }
   });
-  const [scenePreview, setScenePreview] = useState(false);
-  const previewTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
-  const showScenePreview = (show: boolean) => {
-    clearTimeout(previewTimer.current);
-    setScenePreview(show);
-  };
-  const hoverScenes = (show: boolean) => {
-    clearTimeout(previewTimer.current);
-    previewTimer.current = setTimeout(() => setScenePreview(show), show ? 160 : 240);
-  };
-  useEffect(() => () => clearTimeout(previewTimer.current), []);
   const [moreOpen, setMoreOpen] = useState(false);
   const morePanel = useRef<HTMLDivElement>(null);
   const closeMore = (restoreFocus = false) => {
@@ -160,7 +149,6 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
   return <nav className="workspace-rail" aria-label="主导航">
     {app.startup === 'ready' && <ChatSceneIndicator
       beingName={name} onHome={() => void app.returnToMainChat()}
-      preview={scenePreview && !sort['data-sorting']} onPreviewChange={showScenePreview} onPreviewLeave={() => hoverScenes(false)}
       createRequest={app.chatSessionCreateRequest}
       scene={app.snapshot?.chatScene} sessions={app.snapshot?.chatSessions} activity={app.chatSceneActivity}
       onSession={(operation, value, sceneId) => app.changeChatSession(operation, value, sceneId)}
@@ -171,7 +159,7 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
     />}
     <div className="rail-links" {...sort}>
       {orderedKeys.map(key => {
-        if (key === "chat") return <RailButton key={key} navigationKey={key} id="rail-chat-trigger" onHover={hoverScenes} tooltip={false} label="对话" shortcut={app.api.platform === 'darwin' ? '⌘1' : 'Ctrl 1'} active={app.view === "chat"} onClick={() => app.navigate("chat")}><NavigationIcon name="rail-chat" /></RailButton>;
+        if (key === "chat") return <RailButton key={key} navigationKey={key} id="rail-chat-trigger" tooltip={false} label="对话" shortcut={app.api.platform === 'darwin' ? '⌘1' : 'Ctrl 1'} active={app.view === "chat"} onClick={() => app.navigate("chat")}><NavigationIcon name="rail-chat" /></RailButton>;
         if (key === "search") return <RailButton key={key} navigationKey={key} id="toggle-chat-search" expanded={app.searchOpen} label="查找对话" shortcut={app.api.platform === 'darwin' ? '⌘F' : 'Ctrl F'} disabled={!app.snapshot?.settings.hasToken} onClick={() => app.openSearch()}><NavigationIcon name="rail-search" /></RailButton>;
         const entry = entries.find(entry => entry.key === key)!;
         return <RailButton key={key} navigationKey={key} label={entry.label} active={entry.active}
