@@ -8,12 +8,9 @@ import type { HistoryScope } from "../../chat/models/scenes";
 import { PanelResizeHandle, usePanelWidth } from "../../shared/components/panel-resize";
 import { Dialog } from "../../shared/components/dialog";
 
-export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connected, scope, scopeReady, onScope, onCopy, onSession, visible = true, onReveal, createRequest = 0, preview = false, onPreviewChange, onPreviewLeave, beingName = "Being", onHome }: {
+export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connected, scope, scopeReady, onScope, onCopy, onSession, visible = true, onReveal, createRequest = 0, beingName = "Being", onHome }: {
   beingName?: string;
   onHome?: () => void;
-  preview?: boolean;
-  onPreviewChange?: (show: boolean) => void;
-  onPreviewLeave?: () => void;
   createRequest?: number;
   activity?: Record<string, ChatSceneActivity>;
   visible?: boolean;
@@ -81,10 +78,9 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
     catch (error) { setError(error instanceof Error ? error.message : String(error)); }
     finally { changing.current = false; setBusy(false); }
   };
-  const expanded = pinned || preview || Boolean(editing || deleting || open || menu);
+  const expanded = pinned || Boolean(editing || deleting || open || menu);
   const pin = (next: boolean) => {
     setPinned(next);
-    onPreviewChange?.(false);
     try { localStorage.setItem("beings:scenes-pinned", String(next)); } catch { /* Keep the session preference. */ }
   };
   const trigger = useRef<HTMLButtonElement>(null);
@@ -97,21 +93,6 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
   const collapse = () => { setMenu(undefined); pin(false); trigger.current?.focus(); };
   const reveal = () => { pin(true); onReveal?.(); };
   useEffect(() => { if (pinned && visible) search.current?.focus(); }, [pinned, visible]);
-  useEffect(() => {
-    if (!expanded || !visible || pinned || editing || deleting || open || menu) return;
-    const dismiss = () => { onPreviewChange?.(false); setMenu(undefined); };
-    const outside = (event: Event) => {
-      if (panel.current?.contains(event.target as Node) || trigger.current?.contains(event.target as Node) || document.getElementById("rail-chat-trigger")?.contains(event.target as Node) || (event.target as Element)?.closest?.("dialog, .chat-session-context-menu")) return;
-      dismiss();
-    };
-    const blur = () => { if (!document.querySelector("dialog[open]")) dismiss(); };
-    const escape = (event: KeyboardEvent) => { if (event.key === "Escape" && !event.defaultPrevented) dismiss(); };
-    document.addEventListener("pointerdown", outside, true);
-    document.addEventListener("focusin", outside, true);
-    window.addEventListener("blur", blur);
-    document.addEventListener("keydown", escape);
-    return () => { document.removeEventListener("keydown", escape); document.removeEventListener("pointerdown", outside, true); document.removeEventListener("focusin", outside, true); window.removeEventListener("blur", blur); };
-  }, [expanded, visible, pinned, editing, deleting, open, menu, onPreviewChange]);
   const matches = (session: ChatScene) => session.scene_meta.scene_label.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
   return (
     <>
@@ -125,8 +106,6 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
         </button>
       </div>
       {panelHost && createPortal(<DrawerPresence open={visible && expanded}><WorkspaceDrawer edge="left" ref={panel} style={{ width }} id="chat-session-panel" className="chat-session-panel" open={visible && expanded} data-pinned={drawerPinned} aria-label="场景列表"
-        onMouseEnter={() => onPreviewChange?.(true)}
-        onMouseLeave={() => { if (!panel.current?.contains(document.activeElement)) onPreviewLeave?.(); }}
         onKeyDown={event => { if (event.key === "Escape" && !editing && !open && !deleting && !menu) { event.preventDefault(); if (options.current?.open) { options.current.open = false; options.current.querySelector("summary")?.focus(); } else collapse(); } }}>
         <PanelResizeHandle panel={panel} label="调整场景列表宽度" width={width} onResize={setWidth} initial={320} min={240} max={480} reserve={48} edge="right" disabled={!pinned} />
         {drawerPinned && <div className="chat-session-titlebar">
