@@ -91,6 +91,12 @@
   background: var(--surface);
 }
 
+.rail-settings-menu #options-trigger svg {
+  width: 28px;
+  height: 28px;
+  fill: none;
+}
+
 @media (max-width: 800px) {
   #conversation-options.rail-settings-menu {
     left: 10px;

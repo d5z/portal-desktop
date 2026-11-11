@@ -4,7 +4,7 @@ import type { ChatItem } from '../models/chat';
 import { firstAfter } from '../models/scroll-position';
 
 /** One controller owns bottom-follow and reading-position compensation. */
-export function useMessageScroll(items: ChatItem[], container: RefObject<HTMLDivElement | null>, elements: RefObject<Map<string, HTMLDivElement>>) {
+export function useMessageScroll(items: ChatItem[], container: RefObject<HTMLDivElement | null>, elements: RefObject<Map<string, HTMLDivElement>>, composer: RefObject<HTMLDivElement | null>) {
   const ordered = useRef<HTMLDivElement[]>([]);
   const snapshot = useRef({ away: false, count: 0 }), listeners = useRef(new Set<() => void>());
   const subscribe = useCallback((listener: () => void) => { listeners.current.add(listener); return () => { listeners.current.delete(listener); }; }, []);
@@ -12,13 +12,17 @@ export function useMessageScroll(items: ChatItem[], container: RefObject<HTMLDiv
   const publish = useCallback(() => {
     const el = container.current;
     if (!el) return;
-    const away = el.clientHeight > 0 && el.scrollHeight - el.scrollTop - el.clientHeight > 2;
-    const bottom = away ? el.getBoundingClientRect().top + el.clientHeight : 0;
+    const viewportBottom = el.getBoundingClientRect().top + el.clientHeight;
+    const bottom = Math.min(viewportBottom, composer.current?.getBoundingClientRect().top ?? viewportBottom);
+    // Bottom padding is not unread content; show the shortcut only when the
+    // timeline extends below the visible area above the composer.
+    const away = el.clientHeight > 0 && el.scrollHeight - el.scrollTop - el.clientHeight > 2 &&
+      (el.lastElementChild?.getBoundingClientRect().bottom ?? 0) > bottom + 2;
     const count = away ? ordered.current.length - firstAfter(ordered.current.length, bottom + 2, index => ordered.current[index].getBoundingClientRect().bottom) : 0;
     if (snapshot.current.away === away && snapshot.current.count === count) return;
     snapshot.current = { away, count };
     listeners.current.forEach(listener => listener());
-  }, [container]);
+  }, [container, composer]);
   const scrollLock = useRef(true), observedTop = useRef<number | null>(null), frame = useRef(0);
   const touchY = useRef(0);
   const reading = useRef<{ node: Element; offset: number; scrollTop: number; width: number } | null>(null);

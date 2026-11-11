@@ -576,7 +576,7 @@ try {
   assert.ok(statusBounds.y >= nameBounds.y + nameBounds.height, 'SBS activity sits beneath the name');
   assert.equal(await page.locator('#chat-view > .topbar').evaluate(node=>getComputedStyle(node).getPropertyValue('-webkit-app-region')), 'drag', 'Header space remains a native window drag region');
   assert.equal(await sbsIdentity.evaluate(node=>getComputedStyle(node).getPropertyValue('-webkit-app-region')), 'no-drag', 'Identity remains clickable inside the drag region');
-  assert.match(await page.locator('#chat-view > .topbar').evaluate(node=>getComputedStyle(node).backgroundImage), /linear-gradient/, 'A fading mask separates controls from scrolling messages');
+  assert.match(await page.locator('#chat-view > .topbar').evaluate(node=>getComputedStyle(node, '::before').backgroundImage), /linear-gradient/, 'A fading mask separates controls from scrolling messages');
   await page.evaluate(()=>{const app=window.fixtureApp;app.chatSbsOrigin=undefined;app.chatSbsPhase=undefined;app.changed();});
   await page.waitForFunction(()=>Number.parseFloat(getComputedStyle(document.querySelector('#chat-frame').contentDocument.querySelector('#messages')).paddingTop) >= 88);
   const retainedFrame = await page.locator('#chat-frame').elementHandle();

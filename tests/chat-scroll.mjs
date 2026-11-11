@@ -59,9 +59,26 @@ try {
   await child().waitForFunction(value => document.querySelector('.chat-root').style.getPropertyValue('--chat-top-inset') === `${value}px`, topInset);
   const jump=frame.locator('#chat-jump-latest');
   await jump.waitFor({state:'hidden'});
+  // Moving through the bottom whitespace does not hide any message.
+  await frame.locator('#messages').evaluate(el=>{
+    const tail=el.lastElementChild.getBoundingClientRect().bottom;
+    const bottom=document.querySelector('#input-area').getBoundingClientRect().top;
+    el.scrollTop-=Math.min(12,(bottom-tail)/2);
+  });
+  await page.waitForTimeout(100);
+  assert.equal(await jump.isVisible(),false,'Latest stays hidden while the last message is fully visible');
+  // Reveal the shortcut once the last message actually passes behind the composer.
+  await frame.locator('#messages').evaluate(el=>{
+    const tail=el.lastElementChild.getBoundingClientRect().bottom;
+    const bottom=document.querySelector('#input-area').getBoundingClientRect().top;
+    el.scrollTop-=bottom-tail+12;
+  });
+  await jump.waitFor({state:'visible'});
+  await jump.click();
+  await jump.waitFor({state:'hidden'});
   await frame.locator('#messages').evaluate(el=>{
     const nodes=el.querySelectorAll('.message');
-    el.scrollTop+=nodes[nodes.length-11].getBoundingClientRect().bottom-el.getBoundingClientRect().top-el.clientHeight+1;
+    el.scrollTop+=nodes[nodes.length-11].getBoundingClientRect().bottom-document.querySelector('#input-area').getBoundingClientRect().top+1;
   });
   await child().waitForFunction(()=>document.querySelector('#chat-jump-latest').textContent==='10条消息');
   assert.equal(await jump.evaluate(node=>getComputedStyle(node).borderWidth),'0px');
@@ -72,7 +89,7 @@ try {
   await child().evaluate(()=>document.documentElement.dataset.theme='light');
   await page.setViewportSize({width:435,height:746});
   await child().waitForFunction(()=>{
-    const el=document.querySelector('#messages'),bottom=el.getBoundingClientRect().top+el.clientHeight;
+    const el=document.querySelector('#messages'),bottom=document.querySelector('#input-area').getBoundingClientRect().top;
     const count=[...el.querySelectorAll('.message')].filter(node=>node.getBoundingClientRect().bottom>bottom+2).length;
     return document.querySelector('#chat-jump-latest').textContent===`${count}条消息`;
   });

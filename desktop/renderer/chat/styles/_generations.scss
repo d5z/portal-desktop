@@ -295,7 +295,7 @@
   min-width: 0;
   width: min(92%, 758px);
   padding: 16px 19px;
-  border-radius: 24px;
+  border-radius: 20px;
   background: var(--chat-reply);
   color: var(--text);
 }
@@ -348,7 +348,6 @@
   .image-generation-answer {
     width: 96%;
     padding: 14px 16px;
-    border-radius: 22px;
   }
 
   .image-generation-answer:has(> .image-generation-message:only-child) {

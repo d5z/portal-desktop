@@ -1,5 +1,5 @@
 :root {
-  --bg: #fcfcfc;
+  --bg: #fff;
   --composer-surface: #fff;
   --bg-soft: #f2f2f3;
   --bg-softer: #ebebed;
@@ -51,21 +51,20 @@
   --header-height: 56px;
   --touch-target: 44px;
   --content-max-width: 800px;
-  --chat-content-width: 820px;
   --panel-width: 380px;
 
   color-scheme: light;
 
   --pressed-overlay: #416f5029;
-  --chat-reply: #f0f1f0;
-  --chat-sent: #e2e9e4;
+  --chat-reply: #f2f2f2;
+  --chat-sent: #3071f8;
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --bg: #1b1c1e;
-  --composer-surface: #27292c;
+  --bg: #141414;
+  --composer-surface: #1f1f1f;
   --bg-soft: #292b30;
   --bg-softer: #34363b;
   --border: #ffffff14;
@@ -82,6 +81,6 @@
   --accent-tint: #ffffff08;
   --accent-border: #597b9e;
   --overlay-backdrop: #0008;
-  --chat-reply: #303237;
-  --chat-sent: #344239;
+  --chat-reply: #292929;
+  --chat-sent: #326eea;
 }

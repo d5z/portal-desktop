@@ -16,8 +16,10 @@
 
   margin-left: var(--panel-gap);
   border: 0;
+  outline: 1px solid var(--panel-border);
+  outline-offset: -1px;
   border-radius: var(--panel-radius);
-  box-shadow: var(--panel-shadow);
+  box-shadow: none;
   overflow: visible;
 }
 
@@ -86,11 +88,6 @@
     color 140ms ease;
 }
 
-.workspace-rail button[aria-current='page'] {
-  background: var(--surface);
-  color: var(--text);
-}
-
 .workspace-rail .rail-button:hover:not(:disabled),
 .workspace-rail .rail-button[aria-expanded='true'] {
   background: var(--surface);
@@ -105,6 +102,12 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
   background: var(--surface);
+}
+
+.workspace-rail .rail-button[aria-current='page'],
+.workspace-rail .rail-button[aria-current='page']:is(:hover, :focus-visible) {
+  background: var(--selected);
+  color: var(--text);
 }
 
 .workspace-rail svg {
@@ -231,7 +234,7 @@ html[data-platform='darwin'] .workspace-stage .topbar {
   min-height: 0;
   height: auto;
   border: 0;
-  box-shadow: var(--panel-shadow);
+  box-shadow: none;
   z-index: 1;
 }
 
@@ -473,9 +476,12 @@ html[data-platform='darwin'] .workspace-stage .topbar {
 }
 
 .workspace-content > :is(#chat-view, #place-panel) {
+  border: 0;
+  outline: 1px solid var(--panel-border);
+  outline-offset: -1px;
   border-radius: var(--panel-radius);
   background: var(--bg);
-  box-shadow: var(--panel-shadow);
+  box-shadow: none;
   overflow: clip;
 }
 
@@ -493,7 +499,6 @@ html[data-platform='darwin'] .workspace-stage .topbar {
   order: 0;
   flex: 0 1 var(--chat-pane-width, 640px);
   min-width: 300px;
-  border: 0;
 }
 
 .workspace-content.split-chat > #place-panel {
@@ -535,7 +540,6 @@ html[data-platform='darwin'] .workspace-stage .topbar {
   .workspace-content.split-chat > #chat-view {
     flex: 1;
     min-width: 0;
-    border-right: 0;
   }
 }
 
@@ -568,21 +572,29 @@ html[data-platform='darwin'] .workspace-stage .topbar {
 }
 
 .workspace-rail .rail-links {
-  justify-content: flex-start;
-  gap: 6px;
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+
+  // Reserve equal space for the avatar and bottom controls without shifting the center.
+  max-height: calc(100% - 240px);
+  justify-content: safe center;
+  gap: 12px;
   padding: 10px 0;
   min-height: 0;
 }
 
 .workspace-rail .rail-being {
   flex: none;
-  background: var(--surface);
-  border: 0;
-  font: 550 20px/1 var(--font-sans);
-  color: var(--text);
+  width: 48px;
+  height: 48px;
+  background: var(--control);
+  border: 1px solid var(--line);
+  font: 400 22px/1 var(--font-sans);
+  color: var(--secondary);
   margin-bottom: 10px;
-  border-radius: 14px;
-  box-shadow: 0 2px 5px color-mix(in srgb, var(--text) 5%, transparent);
+  border-radius: 50%;
+  box-shadow: none;
 }
 
 .workspace-rail .rail-being:hover:not(:disabled) {
@@ -714,6 +726,8 @@ body:has(.rail-links[data-sorting]) .rail-tooltip {
 .chat-session-panel {
   max-width: calc(100% - 48px);
   border: 0;
+  outline: 1px solid var(--panel-border);
+  outline-offset: -1px;
   border-radius: var(--panel-radius);
 }
 

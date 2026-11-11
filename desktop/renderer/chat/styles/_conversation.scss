@@ -36,7 +36,7 @@
   min-height: var(--reply-min-height);
   max-width: 92%;
   padding: var(--reply-padding-y) var(--reply-padding-x);
-  border-radius: 16px;
+  border-radius: 20px;
   background: var(--chat-reply);
 }
 
@@ -44,7 +44,7 @@
   max-width: 85%;
   padding: 12px 16px;
   border: 0;
-  border-radius: 16px;
+  border-radius: 20px;
   background: var(--chat-sent);
 }
 

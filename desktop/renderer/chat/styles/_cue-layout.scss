@@ -1,22 +1,27 @@
 /* Cue-inspired conversation rail: messages and composer share one measured edge. */
-:root {
-  --chat-reply: #f0f1f0;
-  --chat-sent: #3478f6;
-}
-:root[data-theme='dark'] {
-  --chat-reply: #303237;
-  --chat-sent: #416fd0;
+#app {
+  --chat-composer-bottom: 18px;
 }
 
 #messages {
-  padding: calc(24px + var(--chat-top-inset, 0px)) max(20px, calc((100% - var(--chat-content-width)) / 2)) max(120px, calc(var(--chat-composer-height, 99px) + 18px));
+  padding: calc(24px + var(--chat-top-inset, 0px)) var(--chat-inset-right) max(120px, calc(var(--chat-composer-height, 99px) + 18px)) var(--chat-inset-left);
   scroll-padding-top: calc(20px + var(--chat-top-inset, 0px));
   /* Keep programmatic focus jumps above the floating composer and its Muse-like gap. */
   scroll-padding-bottom: max(160px, calc(var(--chat-composer-height, 99px) + 60px));
+  /* Fade the transcript above the composer and keep its entire bottom area clear. */
+  mask-image: linear-gradient(
+    to top,
+    transparent calc(var(--chat-composer-height, 52px) + var(--chat-composer-bottom)),
+    #000 calc(var(--chat-composer-height, 52px) + var(--chat-composer-bottom) + 20px)
+  );
 }
 
 .message-bubble-row {
   width: 100%;
+}
+
+.message.being .message-bubble-body {
+  max-width: 80%;
 }
 
 .message.user .message-bubble-row {
@@ -25,9 +30,9 @@
 
 .message.being .content,
 .message.user .content {
-  border: 1px solid color-mix(in srgb, var(--text) 8%, transparent);
-  border-radius: 18px;
-  box-shadow: 0 2px 8px rgb(0 0 0 / 4%);
+  border: 0;
+  border-radius: 20px;
+  box-shadow: none;
 }
 
 .message.being .content {
@@ -36,7 +41,6 @@
 
 .message.user .content {
   padding: 10px 14px;
-  border-color: color-mix(in srgb, #fff 12%, transparent);
   color: #fff;
 }
 
@@ -103,16 +107,16 @@
 }
 
 #input-area {
-  width: calc(100% - 40px);
+  width: calc(100% - var(--chat-inset-left) - var(--chat-inset-right));
   max-width: var(--chat-content-width);
   position: absolute;
   inset-inline: 0;
-  bottom: 18px;
+  bottom: var(--chat-composer-bottom);
   z-index: 4;
-  margin: 0 auto;
-  padding: 8px 12px 7px;
+  margin: 0 var(--chat-inset-right) 0 var(--chat-inset-left);
+  padding: 8px 12px;
   border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
-  border-radius: 24px;
+  border-radius: 26px;
   background: var(--composer-surface, var(--bg));
   box-shadow: 0 5px 18px rgb(0 0 0 / 6%);
 }
@@ -130,20 +134,40 @@
 }
 
 #input-area #input-row {
-  gap: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-#input-area #input {
-  min-height: 42px;
-  max-height: 112px;
-  padding: 1px 2px 7px;
-  line-height: 1.5;
+#input-area #input-row > .composer-add {
+  order: -1;
+}
+
+#input-area #input-row > .chat-composer {
+  flex: 1;
+}
+
+#input-area #input-row > .composer-queue-hint {
+  position: static;
+  height: 34px;
+  flex-shrink: 0;
+}
+
+#input-area #input-row #input {
+  min-height: 34px;
+  max-height: min(320px, 40vh);
+  padding: 5px 2px;
+  line-height: 24px;
+}
+
+#input-area #input-row [data-slot='composer-highlight'] {
+  padding: 5px 2px;
+  line-height: 24px;
 }
 
 @media (max-width: 680px) {
-  #input-area {
-    width: calc(100% - 40px);
-    bottom: 14px;
+  #app {
+    --chat-composer-bottom: 14px;
   }
 
   #input-area.has-queue {

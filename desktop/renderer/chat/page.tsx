@@ -176,24 +176,23 @@ function ChatView({
     composerArea = useRef<HTMLDivElement>(null),
     fileInput = useRef<HTMLInputElement>(null);
   const messageElements = useRef(new Map<string, HTMLDivElement>());
-  const reader = useMessageScroll(visibleItems, messages, messageElements);
+  const reader = useMessageScroll(visibleItems, messages, messageElements, composerArea);
   const { scrollLock, releaseAnchor } = reader;
   useLayoutEffect(() => {
     const area = composerArea.current, container = messages.current;
     if (!area || !container) return;
-    let frame = 0;
     const sync = () => {
       container.style.setProperty('--chat-composer-height', `${area.getBoundingClientRect().height}px`);
-      cancelAnimationFrame(frame);
-      frame = requestAnimationFrame(() => {
-        if (scrollLock.current) container.scrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
-      });
+      if (scrollLock.current) {
+        releaseAnchor();
+        container.scrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
+      }
     };
     sync();
     const observer = new ResizeObserver(sync);
     observer.observe(area);
-    return () => { observer.disconnect(); cancelAnimationFrame(frame); };
-  }, [scrollLock]);
+    return () => observer.disconnect();
+  }, [scrollLock, releaseAnchor]);
   const scopeScroll = useRef<Partial<Record<HistoryScope, { top: number; locked: boolean }>>>({});
   const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
   const queueShortcut = isMac ? "⌘ Enter / Ctrl Enter" : "Ctrl Enter";
@@ -513,7 +512,7 @@ function ChatView({
               >
                 <div className={`meta${item.consecutive ? " time-only" : ""}`}>
                   {item.role === "system" && <span>系统消息</span>}
-                  {(state.historyScope === "all" || isGlobalBeingMessage(item)) && <span className="message-scene" title={isGlobalBeingMessage(item) ? "Being 发出的无场景消息，在各场景共享显示；包含自主醒来消息" : item.sceneId || "这条历史消息未提供场景标记"}>{isGlobalBeingMessage(item) ? "全局消息" : sceneName(item, state.currentScene, state.sceneNames)}</span>}
+                  {state.historyScope === "all" && !isGlobalBeingMessage(item) && <span className="message-scene" title={item.sceneId || "这条历史消息未提供场景标记"}>{sceneName(item, state.currentScene, state.sceneNames)}</span>}
                 </div>
                 <div className="message-bubble-row" data-copy-group>
                   <div className="message-bubble-body" tabIndex={0} role="group" aria-label={`${item.role === "user" ? "你" : item.label}的消息`} aria-haspopup="menu"
@@ -623,7 +622,7 @@ function ChatView({
               id="input"
               rows={1}
               className={state.queued ? "queued" : ""}
-              placeholder={`给 ${state.name} 发消息`}
+              placeholder="消息"
               aria-label="message input"
               aria-keyshortcuts={isMac ? "Enter Control+Enter Meta+Enter Shift+Enter" : "Enter Control+Enter Shift+Enter"}
               onCompositionStart={() => {

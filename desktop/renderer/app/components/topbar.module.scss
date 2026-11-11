@@ -4,8 +4,17 @@
   position: absolute;
   inset: 0 0 auto;
   height: 88px;
-  background: linear-gradient(to bottom, var(--bg) 0%, var(--bg) 24%, color-mix(in srgb, var(--bg) 90%, transparent) 56%, transparent 100%);
+  background: transparent;
   -webkit-app-region: drag;
+}
+
+.bar::before {
+  content: '';
+  position: absolute;
+  inset: 1px var(--chat-inset-right) 0 var(--chat-inset-left);
+  z-index: -1;
+  background: linear-gradient(to bottom, var(--bg) 0%, var(--bg) 24%, color-mix(in srgb, var(--bg) 90%, transparent) 56%, transparent 100%);
+  pointer-events: none;
 }
 
 .bar button {
@@ -22,28 +31,29 @@
   margin-top: 15px;
 }
 
-// Only the floating controls cast a shadow over the conversation.
 .bar :global([class~='topbar-icon-button']) {
-  background: var(--control);
-  border: 0;
-  box-shadow: var(--panel-shadow);
-}
-
-.bar :global([class~='topbar-icon-button']) {
-  width: 36px;
-  height: 36px;
+  width: 30px;
+  height: 30px;
+  padding: 0;
   border-radius: 50%;
-}
-
-.bar :global([class~='topbar-icon-button']) {
+  background: transparent;
+  border: 0;
+  box-shadow: none;
   transition:
     background-color 150ms ease,
-    box-shadow 150ms ease,
+    color 150ms ease,
     transform 150ms ease;
 
+  svg {
+    width: 18px;
+    height: 18px;
+    stroke-width: 2;
+  }
+
+  &[aria-expanded='true'],
   &:hover:not(:disabled) {
-    background: var(--surface);
-    box-shadow: var(--panel-shadow);
+    background: var(--selected);
+    color: var(--text);
   }
   &:active:not(:disabled) {
     transform: scale(0.97);

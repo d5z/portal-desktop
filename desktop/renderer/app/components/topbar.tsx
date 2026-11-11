@@ -1,5 +1,6 @@
 import { IconButton } from '../../shared/components/icon-button';
 import { Icon } from '../../shared/icons/icon';
+import { NavigationIcon } from '../../shared/icons/navigation';
 import { SbsControl } from "../../shared/components/sbs-control";
 import { createPortal } from "react-dom";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
@@ -158,7 +159,7 @@ function ReadyTopbar({ model: app }: { model: AppModel }) {
             if (app.snapshot) app.applySnapshot(app.snapshot, true);
           }}
         >
-          <Icon name="sync" />
+          <Icon name="refresh" />
         </IconButton>
         {app.view === "chat" && !app.subagentSettingsOpen && <IconButton
           id="toggle-being-info" className="topbar-icon-button" label="资料库"
@@ -231,7 +232,7 @@ function ReadyTopbar({ model: app }: { model: AppModel }) {
               toggle(!expanded);
             }}
           >
-            <Icon name="sliders" />
+            <NavigationIcon name="rail-settings" />
           </summary>
           <div className="options-menu" ref={menu} inert={!expanded}>
             <div id="options-home" hidden={help}>
