@@ -108,11 +108,8 @@ try {
   await page.getByRole('tab',{name:'工作区',exact:true}).click();
   await files.getByRole('button',{name:'项目',exact:true}).waitFor();
   assert.equal(await page.evaluate(()=>window.libraryCalls.length),before+1,'Different Being gets a new library');
-  const activity=page.getByRole('tab',{name:'动态',exact:true});
-  await activity.click();
-  await page.waitForFunction(()=>window.historyCalls===1);
-  await details.click(); await activity.click();
-  assert.equal(await page.evaluate(()=>window.historyCalls),1,'Activity is also retained across tabs');
+  assert.equal(await page.getByRole('tab',{name:'动态',exact:true}).count(),0);
+  assert.equal(await page.evaluate(()=>window.historyCalls),0,'Removed activity tab must not fetch history');
   assert.deepEqual(errors,[]);
   console.log('Being tabs: lazy load, in-flight deduplication, retained path/search/scroll, close/reopen, explicit refresh, preview dismissal and identity invalidation passed.');
 } finally {

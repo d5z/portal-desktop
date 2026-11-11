@@ -19,7 +19,7 @@ import type { HistoryScope } from "../../chat/models/scenes";
 import { CHAT_HISTORY_LIMIT_KEY, DEFAULT_CHAT_HISTORY_LIMIT, chatHistoryLimit, validChatHistoryLimit } from '../../../shared/chat-history';
 import { LocalHistoryReader } from './local-history';
 
-type SettingsRoute = "" | "connection" | "town" | "model" | "portal" | "diagnostics" | "plugins";
+type SettingsRoute = "" | "connection" | "town" | "model" | "portal" | "diagnostics" | "plugins" | "apps";
 
 export class AppModel extends Store {
   permissionSettingsOpen = false;
@@ -573,6 +573,7 @@ export class AppModel extends Store {
     this.changed();
   }
   openPluginSettings() { this.beginSettingsRoute("plugins"); }
+  openAppSettings() { this.beginSettingsRoute("apps"); }
   openPortalSettings() {
     this.beginSettingsRoute("portal");
   }
@@ -611,6 +612,7 @@ export class AppModel extends Store {
     else if (route === "portal") this.openPortalSettings();
     else if (route === "diagnostics") this.openDiagnostics();
     else if (route === "plugins") this.openPluginSettings();
+    else if (route === "apps") this.openAppSettings();
   };
   closeClientSettings = () => {
     this.closeSettings();

@@ -86,6 +86,7 @@ try {
   await npm('chat-scene-loading', ['run', 'test:chat-scene-loading']);
   await npm('chat-render-performance', ['run', 'test:chat-render-performance']);
   await npm('settings-navigation', ['run', 'test:settings-navigation']);
+  await step('connectors-navigation', process.execPath, ['tests/connectors-navigation.mjs']);
   await step('workspace-motion', process.execPath, ['tests/workspace-motion.mjs']);
   await step('panel-layout-performance', process.execPath, ['tests/panel-layout-performance.mjs']);
   await step('chat-resize-performance', process.execPath, ['tests/chat-resize-performance.mjs']);

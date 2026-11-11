@@ -15,6 +15,7 @@ import { dshRuntime } from '../../plugins/dsh/runtime';
 import { PluginCard } from '../../plugins/page';
 import { useManagerFocus } from '../../plugins/dsh/use-manager-focus';
 import { useModel } from '../../shared/hooks/use-model';
+import { ConnectorSettings } from './connectors';
 const baseSettingsTabs = [
   { id: "being", label: "Being", icon: "settings-being" as const },
   { id: "portal", label: "Portal", icon: "settings-portal" as const },
@@ -22,6 +23,7 @@ const baseSettingsTabs = [
   { id: "models", label: "模型", icon: "settings-models" as const },
   { id: "appearance", label: "外观与阅读", icon: "settings-appearance" as const },
   { id: "general", label: "通用", icon: "menu-settings" as const },
+  { id: "apps", label: "应用", icon: "settings-plugins" as const },
 ];
 export const ClientSettings = memo(function ClientSettings({ model }: { model: AppModel }) {
   // A closed dialog retains its form state without reconciling
@@ -78,9 +80,9 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
   }, [open, app.api]);
   const [tab, setTab] = useState("being");
   const body = useRef<HTMLDivElement>(null);
-  const [compact, setCompact] = useState(() => typeof matchMedia !== "undefined" && matchMedia("(max-width:600px)").matches);
+  const [compact, setCompact] = useState(() => typeof matchMedia !== "undefined" && matchMedia("(max-width:720px)").matches);
   useEffect(() => {
-    const media = matchMedia("(max-width:600px)");
+    const media = matchMedia("(max-width:720px)");
     const update = () => setCompact(media.matches);
     update(); media.addEventListener("change", update);
     return () => media.removeEventListener("change", update);
@@ -380,6 +382,14 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
             {app.notificationsError && <p className="form-error" role="alert">{app.notificationsError}</p>}
           </section>
           </div>
+        </div>
+        <div
+          id="settings-panel-apps"
+          role="tabpanel"
+          aria-labelledby="settings-tab-apps"
+          hidden={activeTab !== "apps"}
+        >
+          {open && activeTab === 'apps' && <ConnectorSettings model={app} />}
         </div>
         </div>
         </section>

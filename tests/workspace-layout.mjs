@@ -374,11 +374,11 @@ try {
   await page.getByRole('button',{name:'资料库',exact:true}).click();
   assert.equal(await page.locator('#toggle-being-info').getAttribute('aria-expanded'), 'true');
   const info = page.locator('#being-info');
-  assert.deepEqual(await info.getByRole('tab').allTextContents(), ['详情', '动态', '资料库', '电脑']);
+  assert.deepEqual(await info.getByRole('tab').allTextContents(), ['详情', '资料库', '电脑']);
   assert.equal(await info.getByRole('tab',{name:'资料库',exact:true}).getAttribute('aria-selected'), 'true');
   await info.getByRole('tab',{name:'详情',exact:true}).press('ArrowRight');
-  assert.equal(await info.getByRole('tab',{name:'动态',exact:true}).getAttribute('aria-selected'), 'true');
-  await info.getByRole('tab',{name:'动态',exact:true}).press('Home');
+  assert.equal(await info.getByRole('tab',{name:'资料库',exact:true}).getAttribute('aria-selected'), 'true');
+  await info.getByRole('tab',{name:'资料库',exact:true}).press('Home');
   await info.getByRole('tab',{name:'详情',exact:true}).press('End');
   assert.equal(await info.getByRole('tab',{name:'电脑',exact:true}).getAttribute('aria-selected'), 'true');
   await info.getByText('请在桌面客户端连接 Being Home。',{exact:true}).waitFor();

@@ -1,9 +1,9 @@
 import { ChatSceneIndicator } from "./chat-scene";
 import { NavigationIcon } from '../../shared/icons/navigation';
+import { Icon } from '../../shared/icons/icon';
 import { WorkspaceDrawer } from "../../shared/components/workspace-drawer";
 import { dshRuntime } from "../../plugins/dsh/runtime";
 import { PluginIcon } from "../../plugins/icon";
-import { RecentHistory } from './recent-history';
 import { useNavigationSort } from "./use-navigation-sort";
 import { useEffect, useLayoutEffect, useId, useRef, useState, type ReactNode } from "react";
 import { PrivacyContent } from "../../chat/components/panels";
@@ -14,7 +14,7 @@ import { useModel } from "../../shared/hooks/use-model";
 import { BeingComputer } from "./being-computer";
 import { BeingLibrary } from "./home-library";
 
-const beingTabs = [["profile", "详情"], ["activity", "动态"], ["library", "资料库"], ["computer", "电脑"]] as const;
+const beingTabs = [["profile", "详情"], ["library", "资料库"], ["computer", "电脑"]] as const;
 
 const destinations = [
   ["bonfire", "篝火", "rail-bonfire"],
@@ -231,7 +231,6 @@ export function BeingInfo({ app }: { app: AppModel }) {
     if (!hidden && !privacyOpen && content.current) content.current.scrollTop = scrollPositions.current[tab] || 0;
   }, [tab, hidden, privacyOpen, modelKey]);
   const libraryActive = !hidden && !privacyOpen && tab === 'library';
-  const activityActive = !hidden && !privacyOpen && tab === 'activity';
   const [modelPreview, setModelPreview] = useState({ key: '', label: '' });
   const currentModel = modelPreview.key === modelKey ? modelPreview.label : '';
   const connected = Boolean(app.snapshot?.settings.hasToken);
@@ -281,17 +280,16 @@ export function BeingInfo({ app }: { app: AppModel }) {
     <section id="being-profile-panel" role="tabpanel" tabIndex={0} aria-labelledby="being-profile-tab" hidden={tab !== "profile"}>
       <h3>当前状态</h3>
       <dl className="being-details">
-        <div><dt>当前场景</dt><dd>{app.snapshot?.chatScene?.scene_meta.scene_label || "尚未创建"}</dd></div>
-        <div><dt>自主醒来</dt><dd><button className="being-wake-switch" type="button" role="switch" aria-label="自主醒来" aria-checked={app.sbsKnown && app.sbsEnabled} disabled={!app.snapshot?.settings.hasToken || !app.sbsKnown || app.chatLoading} onClick={() => app.toggleSbs()}>
+        <div><dt><Icon name="chat-outline" />当前场景</dt><dd>{app.snapshot?.chatScene?.scene_meta.scene_label || "尚未创建"}</dd></div>
+        <div><dt><Icon name="sun-20" />自主醒来</dt><dd><button className="being-wake-switch" type="button" role="switch" aria-label="自主醒来" aria-checked={app.sbsKnown && app.sbsEnabled} disabled={!app.snapshot?.settings.hasToken || !app.sbsKnown || app.chatLoading} onClick={() => app.toggleSbs()}>
           <span>{app.sbsKnown ? app.sbsEnabled ? "已开启" : "已关闭" : "待同步"}</span><span className="being-wake-track" aria-hidden="true" />
         </button></dd></div>
       </dl>
-      <button className="being-action-row being-model-entry" disabled={!connected} onClick={() => app.openModelSettings()}><span><strong>模型设置</strong><small>{connected ? currentModel || "正在读取模型…" : "连接后配置模型"}</small></span><span aria-hidden="true">›</span></button>
-      <button ref={privacyEntry} className="being-action-row" onClick={() => setPrivacyOpen(true)}>隐私说明<span aria-hidden="true">›</span></button>
-      <button className="being-action-row being-connect" onClick={() => app.showSettings()}>连接设置 <span aria-hidden="true">›</span></button>
-    </section>
-    <section id="being-activity-panel" role="tabpanel" tabIndex={0} aria-labelledby="being-activity-tab" hidden={tab !== "activity"}>
-      <RetainedBeingTab key={modelKey} active={activityActive}><RecentHistory app={app} visible={activityActive} /></RetainedBeingTab>
+      <h3>配置</h3>
+      <button className="being-action-row" onClick={() => app.openAppSettings()}><Icon name="settings-plugins" /><span className="being-action-copy">应用设置</span><Icon className="being-action-chevron" name="chevron-right-20" /></button>
+      <button className="being-action-row being-model-entry" disabled={!connected} onClick={() => app.openModelSettings()}><Icon name="settings-models" /><span className="being-action-copy"><strong>模型设置</strong><small>{connected ? currentModel || "正在读取模型…" : "连接后配置模型"}</small></span><Icon className="being-action-chevron" name="chevron-right-20" /></button>
+      <button ref={privacyEntry} className="being-action-row" onClick={() => setPrivacyOpen(true)}><Icon name="permission-shield" /><span className="being-action-copy">隐私说明</span><Icon className="being-action-chevron" name="chevron-right-20" /></button>
+      <button className="being-action-row being-connect" onClick={() => app.showSettings()}><Icon name="menu-settings" /><span className="being-action-copy">连接设置</span><Icon className="being-action-chevron" name="chevron-right-20" /></button>
     </section>
     <section id="being-library-panel" role="tabpanel" tabIndex={0} aria-labelledby="being-library-tab" hidden={tab !== "library"}>
       <RetainedBeingTab key={modelKey} active={libraryActive}><BeingLibrary api={app.api.home} active={libraryActive} onConnect={() => setTab('computer')} /></RetainedBeingTab>
