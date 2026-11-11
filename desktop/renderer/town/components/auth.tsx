@@ -93,10 +93,19 @@ export function TownAuth({ model, embedded = false, inline = false, pairPrompt =
           <button type="button" className="text-button" onClick={() => void town.api.copyText(pairPrompt).catch(error => town.toast(error))}>复制请求</button>
         </details>
         </div>
+        <div className="town-pair-actions">
+        <button type="submit" disabled={town.authBusy || town.authLoading} className="primary">
+          {town.autoPairId ? '正在连接…' : town.authManual ? '确认配对' : '自动连接 Town'}
+        </button>
+        {town.autoPairId && <button id="cancel-town-pair" type="button" className="secondary" onClick={() => void town.cancelAutoPair()}>取消自动配对</button>}
         {!town.authLoading && <button id="town-pair-mode" type="button" className="text-button" disabled={town.authBusy || town.authManual && !town.authChatBeing}
           onClick={() => { town.authManual = !town.authManual; town.authError = ''; town.changed(); }}>
           {town.authManual ? '使用自动配对' : '改用手动配对'}
         </button>}
+        </div>
+        <p id="town-auth-error" className="form-error" role="alert">
+          {town.authError}
+        </p>
         <details className="town-advanced-auth">
           <summary><span>高级：使用已有 Town 凭据</span>{embedded && <Icon name="chevron-right-20" />}</summary>
           <SettingsField label="Town 专用凭据" htmlFor="town-token" description="这里接受 Town 凭据，不是 Loom 对话链接中的 token。">
@@ -124,14 +133,10 @@ export function TownAuth({ model, embedded = false, inline = false, pairPrompt =
           </button>
 
         </details>
+        <div className="town-connection-state">
         <p id="town-auth-state" className="field-help" role="status" aria-live="polite">
           {town.authState}
         </p>
-        <p id="town-auth-error" className="form-error" role="alert">
-          {town.authError}
-        </p>
-        </div>
-        <div className="dialog-footer">
           <button
             type="button"
             id="clear-town-token"
@@ -141,10 +146,7 @@ export function TownAuth({ model, embedded = false, inline = false, pairPrompt =
           >
             断开本机配对
           </button>
-          {town.autoPairId && <button id="cancel-town-pair" type="button" className="secondary" onClick={() => void town.cancelAutoPair()}>取消自动配对</button>}
-          <button type="submit" disabled={town.authBusy || town.authLoading} className="primary">
-            {town.autoPairId ? '正在连接…' : town.authManual ? '确认配对' : '自动连接 Town'}
-          </button>
+        </div>
         </div>
       </form>
     </SettingsSurface>

@@ -298,6 +298,16 @@
   min-width: 0;
 }
 
+/* Form label defaults must not replace the shared two-column control layout. */
+#client-settings-dialog label.settings-item {
+  display: grid;
+  margin: 0;
+}
+
+#client-settings-dialog .settings-field > label {
+  margin: 0;
+}
+
 .client-settings-backdrop {
   position: fixed;
   inset: 0;
@@ -372,6 +382,7 @@
 
 #client-settings-dialog .settings-inline-form .dialog-body {
   padding: 0;
+  scrollbar-gutter: auto;
 }
 
 #client-settings-dialog .settings-inline-form .dialog-footer {
@@ -662,8 +673,14 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 #client-settings-dialog .dialog-footer > span {
-  min-width: 200px;
+  min-width: 0;
   line-height: 1.6;
+}
+
+#client-settings-dialog .dialog-footer button,
+#client-settings-dialog .town-pair-actions button,
+#client-settings-dialog .town-connection-state button {
+  flex-shrink: 0;
 }
 
 #client-settings-dialog .settings-inline-form .dialog-footer {
