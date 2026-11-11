@@ -2,7 +2,8 @@ import type { HomeAction, HomeBounds } from '../../shared/home';
 import type { HomeService } from './service';
 import type { HomeViewer } from './viewer';
 import type { HomeFiles } from './files';
-export function registerHomeIpc(handle: (channel: string, callback: (...args: any[]) => unknown) => void, home: HomeService, viewer: HomeViewer, files: HomeFiles) {
+import type { HomeConnectors } from './connectors';
+export function registerHomeIpc(handle: (channel: string, callback: (...args: any[]) => unknown) => void, home: HomeService, viewer: HomeViewer, files: HomeFiles, connectors?: HomeConnectors) {
   handle('beings:home-files-list', (path: unknown) => files.list(path));
   handle('beings:home-files-preview', (path: unknown) => files.preview(path));
   handle('beings:home-files-download', (path: unknown) => files.download(path));
@@ -14,4 +15,22 @@ export function registerHomeIpc(handle: (channel: string, callback: (...args: an
   });
   handle('beings:home-preview', () => { home.contextChanged(); return viewer.preview(); });
   handle('beings:home-bounds', (bounds: HomeBounds) => viewer.setBounds(bounds));
+  if (connectors) {
+    handle('beings:home-connector-catalog', (query: { q?: string; after?: string } = {}) => connectors.catalog(query));
+    handle('beings:home-connector-installations', (after?: string) => connectors.installations(after));
+    handle('beings:home-connector-detail', (releaseId: string) => connectors.detail(releaseId));
+    handle('beings:home-connector-start-oauth', (releaseId: string, installationId?: string) => connectors.startOAuth(releaseId, installationId));
+    handle('beings:home-connector-sync-oauth', (flowId: string, expectedRevision: number) => connectors.syncOAuth(flowId, expectedRevision));
+    handle('beings:home-connector-oauth-state', (flowId: string) => connectors.oauthState(flowId));
+    handle('beings:home-connector-preview', (releaseId: string, input: { connection_id?: string; method?: string; reauthorize?: boolean }) => connectors.preview(releaseId, input));
+    handle('beings:home-connector-confirm', (intentId: string, input: { adopt: boolean; values?: Record<string, string> }) => connectors.confirm(intentId, input));
+    handle('beings:home-connector-state', (intentId: string) => connectors.state(intentId));
+    handle('beings:home-connector-advance', (intentId: string) => connectors.advance(intentId));
+    handle('beings:home-connector-cancel', (intentId: string) => connectors.cancel(intentId));
+    handle('beings:home-connector-open', (url: string) => connectors.openAuthorization(url));
+    handle('beings:home-connector-tools', (installationId: string) => connectors.tools(installationId));
+    handle('beings:home-connector-set-tool', (installationId: string, input: Parameters<HomeConnectors['setTool']>[1]) => connectors.setTool(installationId, input));
+    handle('beings:home-connector-being-access', (installationId: string, enabled: boolean, expectedRevision: number) => connectors.setBeingAccess(installationId, enabled, expectedRevision));
+    handle('beings:home-connector-lifecycle', (installationId: string, action: 'enable' | 'disable' | 'uninstall', expectedRevision: number) => connectors.lifecycle(installationId, action, expectedRevision));
+  }
 }

@@ -7,6 +7,7 @@ import { HomeFiles } from './files';
 import { registerHomeIpc } from './ipc';
 import { HomeService } from './service';
 import { HomeViewer } from './viewer';
+import { HomeConnectors } from './connectors';
 export async function createDesktopHome(options: {
   directory: string; assets: string; secretStorage: SecretStorage; store: SettingsStore;
   window(): BrowserWindow | null; handle: RegisterHandler;
@@ -28,6 +29,7 @@ export async function createDesktopHome(options: {
       return result.canceled ? undefined : result.filePath;
     },
   });
-  registerHomeIpc(handle, home, homeViewer, homeFiles);
+  const connectors = new HomeConnectors(homeClient, url => shell.openExternal(url));
+  registerHomeIpc(handle, home, homeViewer, homeFiles, connectors);
   return home;
 }

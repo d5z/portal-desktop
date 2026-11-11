@@ -2,6 +2,24 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { DesktopAPI, PortalState, TownLiveState } from '../shared/types';
 const api: DesktopAPI = {
   home: {
+    connectors: {
+      catalog: query => ipcRenderer.invoke('beings:home-connector-catalog', query),
+      installations: after => ipcRenderer.invoke('beings:home-connector-installations', after),
+      detail: releaseId => ipcRenderer.invoke('beings:home-connector-detail', releaseId),
+      startOAuth: (releaseId, installationId) => ipcRenderer.invoke('beings:home-connector-start-oauth', releaseId, installationId),
+      syncOAuth: (flowId, expectedRevision) => ipcRenderer.invoke('beings:home-connector-sync-oauth', flowId, expectedRevision),
+      oauthState: flowId => ipcRenderer.invoke('beings:home-connector-oauth-state', flowId),
+      preview: (releaseId, input) => ipcRenderer.invoke('beings:home-connector-preview', releaseId, input),
+      confirm: (intentId, input) => ipcRenderer.invoke('beings:home-connector-confirm', intentId, input),
+      state: intentId => ipcRenderer.invoke('beings:home-connector-state', intentId),
+      advance: intentId => ipcRenderer.invoke('beings:home-connector-advance', intentId),
+      cancel: intentId => ipcRenderer.invoke('beings:home-connector-cancel', intentId),
+      openAuthorization: url => ipcRenderer.invoke('beings:home-connector-open', url),
+      tools: installationId => ipcRenderer.invoke('beings:home-connector-tools', installationId),
+      setTool: (installationId, input) => ipcRenderer.invoke('beings:home-connector-set-tool', installationId, input),
+      setBeingAccess: (installationId, enabled, expectedRevision) => ipcRenderer.invoke('beings:home-connector-being-access', installationId, enabled, expectedRevision),
+      lifecycle: (installationId, action, expectedRevision) => ipcRenderer.invoke('beings:home-connector-lifecycle', installationId, action, expectedRevision),
+    },
     files: {
       list: path => ipcRenderer.invoke('beings:home-files-list', path),
       preview: path => ipcRenderer.invoke('beings:home-files-preview', path),
