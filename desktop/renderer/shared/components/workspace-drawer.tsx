@@ -265,7 +265,9 @@ export function WorkspaceDrawer({
     };
     record.current = item;
     drawers.add(item);
-    const observer = new ResizeObserver(() => {
+    let resizeFrame = 0;
+    const measure = () => {
+      resizeFrame = 0;
       if (item.motion) return;
       const css = getComputedStyle(node);
       item.vertical =
@@ -278,6 +280,9 @@ export function WorkspaceDrawer({
             css[item.vertical ? 'marginTop' : item.edge === 'left' ? 'marginRight' : 'marginLeft'],
           )
         : 0;
+    };
+    const observer = new ResizeObserver(() => {
+      if (!resizeFrame) resizeFrame = requestAnimationFrame(measure);
     });
     observer.observe(node);
     // Idle drawers are already measured by ResizeObserver. Resize events only
@@ -292,6 +297,7 @@ export function WorkspaceDrawer({
       drawers.delete(item);
       pending.delete(item);
       observer.disconnect();
+      cancelAnimationFrame(resizeFrame);
       item.motion?.cancel();
       window.removeEventListener('resize', settle);
       reduced.removeEventListener('change', settle);

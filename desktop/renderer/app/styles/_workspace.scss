@@ -11,6 +11,23 @@
   -webkit-app-region: drag;
 }
 
+// Windows keeps the native caption outside the renderer. The Mac layout
+// reserves that inset inside the frameless content area, so reusing it on
+// Windows leaves an unnecessary blank band above the workspace.
+html[data-platform='win32'] .workspace-rail {
+  padding-top: 10px;
+}
+
+html[data-platform='win32'] .workspace-rail .rail-links {
+  position: static;
+  transform: none;
+  max-height: none;
+}
+
+html[data-platform='win32'] .workspace-stage .topbar {
+  height: 64px;
+}
+
 .workspace-body > :is(.being-info, .client-file-viewer, .cloud-browser-pane, #browser-panel, .plugin-sidebar, #subagent-model-panel) {
   --resize-gap: var(--panel-gap);
 
