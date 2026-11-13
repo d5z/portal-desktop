@@ -72,6 +72,7 @@ export function useChatBridge(
   }, [app, frame, app.snapshot?.settings.endpoint, app.snapshot?.settings.portalConfigPath, app.snapshot?.portal.phase, app.snapshot?.portal.pid, app.chatSource, app.snapshot?.chatSessions?.map(scene => scene.scene_id).join('|')]);
   useEffect(() => {
     let enablingSubagent = false;
+    let connectionNotice = '';
     const receive = (event: MessageEvent) => {
       const target = frame.current;
       if (
@@ -82,6 +83,8 @@ export function useChatBridge(
         return;
       const message = event.data;
       if (!message || typeof message !== "object") return;
+      if (message.revision !== new URL(target.src).searchParams.get("revision"))
+        return;
       if (
         message.type === "beings:connection" &&
         [
@@ -94,11 +97,16 @@ export function useChatBridge(
       ) {
         app.connection = message.state;
         app.workspace.connection(message.state === "online");
+        if (typeof message.notice === 'string' && message.notice.length <= 2000) {
+          if (message.notice) {
+            if (!connectionNotice || !app.toastMessage || app.toastMessage === connectionNotice) app.toast(message.notice);
+          }
+          else if (connectionNotice && app.toastMessage === connectionNotice) app.toast('');
+          connectionNotice = message.notice;
+        }
         app.changed();
         return;
       }
-      if (message.revision !== new URL(target.src).searchParams.get("revision"))
-        return;
       if (message.type === 'beings:appearance-request') {
         app.postAppearance();
         return;

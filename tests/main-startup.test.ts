@@ -8,7 +8,7 @@ const fixture = vi.hoisted(() => ({ directory: '', packaged: false, startup: und
 vi.mock('electron', async () => {
   const { EventEmitter } = await import('node:events');
   const app = Object.assign(new EventEmitter(), {
-    setName: vi.fn(), setAppUserModelId: vi.fn(), setAboutPanelOptions: vi.fn(), setPath: vi.fn(),
+    setName: vi.fn(), setAppUserModelId: vi.fn(), setAboutPanelOptions: vi.fn(), setPath: vi.fn(), setAsDefaultProtocolClient: vi.fn(),
     getPath: (name: string) => { if (name === 'appData') throw new Error("Failed to get 'appData' path"); return fixture.directory; },
     getAppPath: () => fixture.directory, getVersion: () => '0.1.6',
     requestSingleInstanceLock: () => true, quit: vi.fn(),
@@ -63,6 +63,9 @@ it.each(['normal', 'manual installer', 'downloaded update'] as const)('initializ
     // NSIS launch plus updater fallback, or a double click during credential IO.
     app.emit('second-instance', {}, ['portal-desktop.exe']);
     app.emit('activate');
+    const callback = { preventDefault: vi.fn() };
+    app.emit('open-url', callback, 'being-app://connector/complete');
+    expect(callback.preventDefault).toHaveBeenCalledOnce();
     const earlyWindows = protocolReadyAtCreation.length;
     releaseSettings();
     await fixture.startup;
@@ -73,6 +76,14 @@ it.each(['normal', 'manual installer', 'downloaded update'] as const)('initializ
     expect(createMainWindow).toHaveBeenCalledOnce();
     expect(reuse).toHaveBeenCalledWith([]);
     const window = vi.mocked(createMainWindow).mock.results[0].value.window;
+    expect(app.setAsDefaultProtocolClient).toHaveBeenCalledWith('being-app', process.execPath, [process.argv[1]]);
+    window.show.mockClear();
+    app.emit('open-url', { preventDefault() {} }, 'being-app://connector/complete?token=fixture');
+    expect(window.show).not.toHaveBeenCalled();
+    app.emit('open-url', { preventDefault() {} }, 'being-app://connector/complete');
+    app.emit('second-instance', {}, ['portal-desktop.exe', 'being-app://connector/complete']);
+    expect(window.show).toHaveBeenCalledTimes(2);
+    expect(createMainWindow).toHaveBeenCalledOnce();
     window.webContents.mainFrame = { url: 'beings://desktop/' };
     const request = { sender: window.webContents, senderFrame: window.webContents.mainFrame };
     const handlers = new Map(vi.mocked(ipcMain.handle).mock.calls);

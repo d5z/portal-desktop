@@ -332,9 +332,10 @@ export class AppModel extends Store {
     this.changed();
   }
   toast = (error: unknown) => {
-    this.toastMessage = errorText(error);
+    this.toastMessage = error === '' ? '' : errorText(error);
     this.changed();
     clearTimeout(this.toastTimer);
+    if (!this.toastMessage) return;
     this.toastTimer = setTimeout(() => {
       this.toastMessage = "";
       this.changed();
@@ -497,7 +498,7 @@ export class AppModel extends Store {
   get colorScheme() { return renderedColorScheme(this.theme); }
   postAppearance() {
     this.post({ type: 'beings:chat-top-inset', value: this.chatTopInset });
-    this.post({ type: "beings:appearance", theme: this.colorScheme });
+    this.post({ type: "beings:appearance", theme: this.colorScheme, toastHost: true });
     this.post({ type: "beings:reading", size: this.readingSize });
     this.post({ type: "beings:reasoning-display", show: this.showReasoning });
     if (this.chatSource) this.post({ type: 'beings:history-limit', limit: this.chatHistoryLimit, revision: new URL(this.chatSource).searchParams.get('revision') });

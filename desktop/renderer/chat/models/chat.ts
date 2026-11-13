@@ -221,6 +221,7 @@ export class ChatState extends Store {
   attachmentPending = false;
   connection = "connecting";
   banner = "";
+  toastHosted = false;
   dotClass = "reconnecting";
   sbsEnabled = true;
   sbsKnown = false;

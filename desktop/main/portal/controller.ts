@@ -47,11 +47,13 @@ export async function createPortalController(options: {
   };
   let startupDeferred = false;
   let startupNotice = options.startupNotice;
+  let startupConnectionNotice: { endpoint: string; message: string } | undefined;
   let runtimeUpdate: RuntimeUpdateResult = { phase: 'current', message: 'Portal 升级状态将在启动检查后显示。' };
   const verifyConnection = async () => {
     await reusePreviousConfig();
     await verifyBeingConnection(store.connection, net.fetch.bind(net) as typeof fetch);
     startupNotice = undefined;
+    startupConnectionNotice = undefined;
   };
   const externalPortal = new ExternalPortalObserver();
   const orphanPortal = new OrphanPortalRecovery(directory);
@@ -157,7 +159,7 @@ export async function createPortalController(options: {
   const requestPortalStart = async (restart = false) => {
     if (startupDeferred || recoveryBlocked || installIntent) {
       await restoreStartup('manual');
-      if (startupDeferred || recoveryBlocked) throw new Error(startupNotice || runtimeUpdate?.message);
+      if (startupDeferred || recoveryBlocked) throw new Error(startupConnectionNotice?.message || startupNotice || runtimeUpdate?.message);
       return portal.state;
     }
     if (restart && portal.state.managed === false) throw new Error('当前 Portal 由外部管理，请使用原管理方式重启。');
@@ -200,6 +202,12 @@ export async function createPortalController(options: {
   let handlingConflict = false;
   let portalNoticeIdentity = '';
   portal.on('state', state => {
+    // A background Portal can reconnect after the one-off startup check failed.
+    // Retire that check's notice before notifying the renderer to refresh its snapshot.
+    if (startupConnectionNotice && state.phase === 'connected' &&
+        state.beingEndpoint === startupConnectionNotice.endpoint && state.beingEndpoint === store.connection?.endpoint) {
+      startupConnectionNotice = undefined;
+    }
     const identity = JSON.stringify([state.portalName, state.beingEndpoint, state.phase, state.pid]);
     if (identity !== portalNoticeIdentity) { portalNoticeIdentity = identity; proxy.portalStateChanged(); }
     if (state.phase === 'error' || state.phase === 'external') {
@@ -264,9 +272,10 @@ export async function createPortalController(options: {
       try { await verifyConnection(); startupDeferred = false; }
       catch (error) {
         startupDeferred = true;
-        startupNotice = errorLog.report('startup-connection', error, '连接检查失败，请检查设置后重试。');
-        runtimeUpdate = { phase: 'skipped', message: startupNotice };
-        portal.state = { phase: 'stopped', message: startupNotice, logs: [] };
+        const message = errorLog.report('startup-connection', error, '连接检查失败，请检查设置后重试。');
+        startupConnectionNotice = { endpoint: connection.endpoint, message };
+        runtimeUpdate = { phase: 'skipped', message };
+        portal.state = { phase: 'stopped', message, logs: [] };
         // Retain the install intent; it can be resumed or superseded offline.
         return;
       }
@@ -351,7 +360,7 @@ export async function createPortalController(options: {
   };
   return {
     save, connectionDefaults, start: requestPortalStart, forceStart, stop, restoreStartup, shutdown, startPolling,
-    get notice() { return startupNotice; },
+    get notice() { return [startupNotice, startupConnectionNotice?.message].filter(Boolean).join('\n') || undefined; },
     get recoveryBlocked() { return recoveryBlocked; },
     diagnostics: () => ({
       recoveryBlocked, runtime: runtimeUpdate, takeover: takeover.holdMessage,

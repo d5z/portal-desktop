@@ -34,6 +34,7 @@ export class DesktopLifecycle {
   private sessionEnding = false;
   private prepareInstallerShutdown: ((target: string) => void) | undefined;
   private pendingInstallerTarget: string | undefined;
+  private pendingConnectorReturn = false;
 
   constructor(private options: LifecycleOptions) { }
 
@@ -41,6 +42,7 @@ export class DesktopLifecycle {
     app.on('browser-window-created', (_event, window) => { windowPresentation(window); });
     app.on('second-instance', (_event, argv) => {
       const args = argv ?? [];
+      if (args.some(value => this.handleConnectorReturn(value))) return;
       const target = installerTarget(args);
       if (target) {
         if (this.prepareInstallerShutdown) this.prepareInstallerShutdown(target);
@@ -50,7 +52,14 @@ export class DesktopLifecycle {
       if (args.includes('--quit-for-update')) { app.quit(); return; }
       this.showWindow();
     });
-    app.whenReady().then(ready).catch(async error => {
+    app.on('open-url', (event, url) => {
+      event.preventDefault();
+      this.handleConnectorReturn(url);
+    });
+    app.whenReady().then(async () => {
+      for (const value of process.argv) this.handleConnectorReturn(value);
+      await ready();
+    }).catch(async error => {
       dialog.showErrorBox(`${this.options.clientName} 启动失败`, this.options.errorLog.report('client-startup', error, '客户端启动失败，请查看日志后重试。'));
       await this.options.errorLog.flush(); app.quit();
     });
@@ -72,6 +81,17 @@ export class DesktopLifecycle {
         if (this.window && !this.window.isDestroyed()) void dialog.showMessageBox(this.window, { type: 'error', title: '退出未完成', message: this.error, detail, buttons: ['知道了'] }).catch(() => { });
       });
     });
+  }
+
+  /** The OAuth success page only sends this credential-free wake-up URL. */
+  handleConnectorReturn(value: string) {
+    try {
+      const url = new URL(value);
+      if (url.protocol !== 'being-app:' || url.hostname !== 'connector' || url.pathname !== '/complete' || url.username || url.password || url.search || url.hash) return false;
+      if (!this.windowReady) this.pendingConnectorReturn = true;
+      else this.showWindow();
+      return true;
+    } catch { return false; }
   }
 
   setInstallerShutdown(shutdown: (target: string) => Promise<void>) {
@@ -116,6 +136,7 @@ export class DesktopLifecycle {
   openWhenReady() {
     this.windowReady = true;
     this.createWindow();
+    if (this.pendingConnectorReturn) { this.pendingConnectorReturn = false; this.showWindow(); }
   }
 
   readonly showWindow = () => {

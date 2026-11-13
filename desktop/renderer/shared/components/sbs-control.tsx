@@ -11,7 +11,7 @@ export function SbsControl({known, enabled, origin, phase, showContent, allScene
   const trigger=useRef<HTMLButtonElement>(null), panel=useRef<HTMLDivElement>(null), id=useId();
   const [open,setOpen]=useState(false), [position,setPosition]=useState({top:0,left:0});
   const present=useDisclosurePresence(open);
-  const idle=known && enabled && !origin;
+  const idle=known && !origin;
   const status=origin ? phase==='working' ? '正在执行工具' : phase==='replying' ? '正在整理回复'
     : phase==='thinking' ? '正在思考' : '正在执行回调'
     : !known ? 'SBS 状态同步中' : enabled ? 'SBS 待命中' : 'SBS 已关闭';

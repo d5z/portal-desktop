@@ -55,13 +55,14 @@ try {
     };
     window.fixtureApp.changed();
   });
-  const toggle=page.getByRole('button',{name:'资料库',exact:true});
+  const toggle=page.getByRole('button',{name:'资料',exact:true});
   const library=page.getByRole('tab',{name:'资料库',exact:true});
   const details=page.getByRole('tab',{name:'详情',exact:true});
   const files=page.getByRole('list',{name:'工作区文件'});
   assert.deepEqual(await page.evaluate(()=>window.libraryCalls),[], 'Closed library does not fetch');
   await toggle.click();
-  assert.deepEqual(await page.evaluate(()=>window.libraryCalls),[''], 'Person action opens and loads the library directly');
+  assert.equal(await details.getAttribute('aria-selected'),'true', 'Person action opens details by default');
+  assert.deepEqual(await page.evaluate(()=>window.libraryCalls),[], 'Opening details does not load the library');
   await library.click();
   await page.getByRole('tab',{name:'工作区',exact:true}).click();
   await page.getByText('正在读取工作区…',{exact:true}).waitFor();
@@ -79,6 +80,8 @@ try {
   assert.deepEqual(await page.evaluate(()=>window.libraryCalls),['','项目']);
   await page.getByRole('button',{name:'关闭 Being 信息',exact:true}).click();
   await toggle.click();
+  assert.equal(await details.getAttribute('aria-selected'),'true', 'Reopening returns to details');
+  await library.click();
   assert.equal(await page.getByRole('searchbox').inputValue(),'报告');
   assert.equal(await files.locator('li').count(),40);
   assert.equal(await page.locator('.being-info-content').evaluate(e=>e.scrollTop),200);

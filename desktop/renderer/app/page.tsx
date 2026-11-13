@@ -2,6 +2,7 @@ import { WorkspaceDrawer, DrawerPresence } from "../shared/components/workspace-
 import { HomeFileViewer } from './components/home-file-viewer';
 import { IconButton } from '../shared/components/icon-button';
 import { Icon } from '../shared/icons/icon';
+import { Toast } from '../shared/components/toast';
 import { DshPluginSurfaces } from '../plugins/dsh/page';
 import {AttachmentFileViewer} from './components/attachment-file-viewer';
 import {AttachmentImageViewer} from './components/attachment-image-viewer';
@@ -38,6 +39,13 @@ export function App({ model }: { model: AppModel }) {
   const [chatWidth, setChatWidth] = usePanelWidth("chat", 640);
   useChatBridge(app, frame);
   useEffect(() => app.start(), [app]);
+  const previousStartupNotice = useRef('');
+  useEffect(() => {
+    const notice = app.snapshot?.notice || '';
+    if (notice) app.toast(notice);
+    else if (previousStartupNotice.current && app.toastMessage === previousStartupNotice.current) app.toast('');
+    previousStartupNotice.current = notice;
+  }, [app, app.snapshot?.notice]);
   useLayoutEffect(() => {
     presentColorScheme(renderedColorScheme(app.theme));
   }, [app.theme]);
@@ -127,14 +135,6 @@ export function App({ model }: { model: AppModel }) {
             <WorkspaceDrawer as="section" fluid ref={chatPanel} id="chat-view" className="view" open={app.view === "chat" || app.chatSplitOpen}
               style={{ "--chat-pane-width": `${chatWidth}px` } as import("react").CSSProperties}>
               <Topbar model={app} />
-              <p
-                id="startup-notice"
-                className="startup-notice"
-                role="status"
-                hidden={!app.snapshot?.notice}
-              >
-                {app.snapshot?.notice || ""}
-              </p>
               <SceneRibbon model={app.workspace} />
               <PanelResizeHandle panel={chatPanel} label="调整并排对话宽度" edge="right" width={chatWidth} onResize={setChatWidth} initial={640} min={300} max={1000} disabled={app.view === "chat" || !app.chatSplitOpen} />
               <div
@@ -206,7 +206,6 @@ export function App({ model }: { model: AppModel }) {
     </HomeFileViewer>
   );
 }
-
 // Keep the rendered destination stable while its drawer exits. The model can
 // stop background work immediately without replacing the departing page.
 function PlaceContent({ app, view }: { app: AppModel; view: string }) {
@@ -241,24 +240,5 @@ function PlaceContent({ app, view }: { app: AppModel; view: string }) {
         <PluginSidebar model={app.plugins} theme={app.colorScheme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />
       </div>}
     </>
-  );
-}
-
-function Toast({ message }: { message: string }) {
-  const ref = useRef<HTMLDivElement>(null);
-  useLayoutEffect(() => {
-    const toast = ref.current;
-    if (!toast) return;
-    if (message) {
-      if (typeof toast.showPopover === "function" && !toast.matches(":popover-open"))
-        toast.showPopover();
-    } else if (typeof toast.hidePopover === "function" && toast.matches(":popover-open")) {
-      toast.hidePopover();
-    }
-  }, [message]);
-  return (
-    <div ref={ref} id="toast" popover="manual" role="status" aria-live="polite">
-      {message}
-    </div>
   );
 }

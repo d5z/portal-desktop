@@ -42,6 +42,7 @@ const glyphs = {
   'folder-flat': { viewBox: '0 0 24 24', content: (<><path d="M3 6h7l2 2h9v12H3z" /></>) },
   'terminal': { viewBox: '0 0 24 24', content: (<><path d="m5 8 4 4-4 4m8 0h6" /></>) },
   'plugin': { viewBox: '0 0 24 24', content: (<><path d="M8 3h8v5h5v8h-5v5H8v-5H3V8h5z" /></>) },
+  'skill': { viewBox: '0 0 24 24', content: (<path d="m12 3 8 4.5v9L12 21 4 16.5v-9L12 3Zm0 9 8-4.5M12 12v9M4 7.5 12 12" />) },
   'copy': { viewBox: '0 0 24 24', content: (<><rect x="4" y="8" width="12" height="13" rx="3"/><path d="M9 8V6a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v7a3 3 0 0 1-3 3h-2"/></>) },
   'back-20': { viewBox: '0 0 20 20', content: (<><path d="m12.5 4.5-5.5 5.5 5.5 5.5" /></>) },
   'forward-20': { viewBox: '0 0 20 20', content: (<><path d="m7.5 4.5 5.5 5.5-5.5 5.5" /></>) },

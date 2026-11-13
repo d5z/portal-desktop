@@ -371,11 +371,11 @@ try {
   await page.getByRole('dialog',{name:'SBS 自主活动'}).waitFor();
   assert.equal(await page.locator('#being-info').isVisible(), false, 'Name opens SBS settings, not the profile');
   await page.getByRole('button',{name:'关闭 SBS 设置'}).click();
-  await page.getByRole('button',{name:'资料库',exact:true}).click();
+  await page.getByRole('button',{name:'资料',exact:true}).click();
   assert.equal(await page.locator('#toggle-being-info').getAttribute('aria-expanded'), 'true');
   const info = page.locator('#being-info');
   assert.deepEqual(await info.getByRole('tab').allTextContents(), ['详情', '资料库', '电脑']);
-  assert.equal(await info.getByRole('tab',{name:'资料库',exact:true}).getAttribute('aria-selected'), 'true');
+  assert.equal(await info.getByRole('tab',{name:'详情',exact:true}).getAttribute('aria-selected'), 'true');
   await info.getByRole('tab',{name:'详情',exact:true}).press('ArrowRight');
   assert.equal(await info.getByRole('tab',{name:'资料库',exact:true}).getAttribute('aria-selected'), 'true');
   await info.getByRole('tab',{name:'资料库',exact:true}).press('Home');
@@ -392,8 +392,8 @@ try {
     assert.equal(await info.isVisible(), false);
     assert.equal(await page.locator('#toggle-being-info').evaluate(node=>node===document.activeElement), true);
     assert.equal(await page.locator('#conversation-name').isVisible(), true);
-    await page.getByRole('button',{name:'资料库',exact:true}).click();
-    assert.equal(await info.getByRole('tab',{name:'资料库',exact:true}).getAttribute('aria-selected'), 'true');
+    await page.getByRole('button',{name:'资料',exact:true}).click();
+    assert.equal(await info.getByRole('tab',{name:'详情',exact:true}).getAttribute('aria-selected'), 'true');
     await info.getByRole('tab',{name:'电脑',exact:true}).click();
     await info.getByText('请在桌面客户端连接 Being Home。',{exact:true}).waitFor();
     assert.equal(await info.evaluate(node=>node.scrollWidth>node.clientWidth), false);
@@ -409,7 +409,7 @@ try {
   await page.locator('#toggle-being-info').click();
   assert.equal(await info.isVisible(), false);
   await page.locator('#toggle-being-info').click();
-  assert.equal(await info.getByRole('tab',{name:'资料库',exact:true}).getAttribute('aria-selected'), 'true');
+  assert.equal(await info.getByRole('tab',{name:'详情',exact:true}).getAttribute('aria-selected'), 'true');
   await info.getByRole('tab',{name:'详情',exact:true}).click();
   const infoDivider = page.getByRole('separator',{name:'调整 Being 信息宽度'});
   const infoHandle = await infoDivider.boundingBox();
@@ -484,7 +484,7 @@ try {
   assert.ok(await page.locator('#chat-frame').evaluate(node => node.getBoundingClientRect().bottom <= innerHeight));
   await page.waitForFunction(() => { const frame = document.getElementById('chat-frame'); return !frame.src || Math.abs(frame.contentWindow.innerHeight - frame.clientHeight) < 1; });
   await page.screenshot({animations:'disabled',path:'test-results/workspace-split.png'});
-  assert.equal(await page.getByRole('button',{name:'资料库',exact:true}).count(),0);
+  assert.equal(await page.getByRole('button',{name:'资料',exact:true}).count(),0);
   const divider = page.getByRole('separator',{name:'调整并排对话宽度'});
   const splitHandle = await divider.boundingBox();
   const splitChat = await page.locator('#chat-view').boundingBox();
@@ -499,7 +499,7 @@ try {
   await page.getByRole('button',{name:'回到对话',exact:true}).click();
   await page.getByRole('button',{name:'关闭 Being 信息',exact:true}).click();
   assert.equal(await page.locator('#being-info').isVisible(),false);
-  await page.getByRole('button',{name:'资料库',exact:true}).click();
+  await page.getByRole('button',{name:'资料',exact:true}).click();
   assert.equal(await page.locator('#being-info').isVisible(),true);
   assert.equal(await page.locator('.topbar #chat-scene-indicator').count(), 0, 'Scene navigation lives in the rail');
   const chatBeforeHover = await page.locator('#chat-view').boundingBox();

@@ -8,6 +8,7 @@ import { registerChatIpc } from '../chat/ipc';
 import { ChatProxy } from '../chat/proxy';
 import { createDesktopHome } from '../home/desktop';
 import { HomeService } from '../home/service';
+import { ConnectorNetwork } from '../home/network';
 import { downloadFetch } from '../kits/download-fetch';
 import { KitInstaller } from '../kits/install';
 import { registerKitsIpc } from '../kits/ipc';
@@ -49,6 +50,7 @@ export interface DesktopOptions {
 /** Composition root: constructs features and supplies their cross-feature callbacks. */
 export function createDesktopApplication(options: DesktopOptions) {
   const { userData, shellURL } = options;
+  const connectorNetwork = new ConnectorNetwork(shellURL);
   let closePluginSessions = () => { };
   let home: HomeService | undefined;
   let portal: PortalSupervisor;
@@ -93,6 +95,11 @@ export function createDesktopApplication(options: DesktopOptions) {
   const { showWindow, finishQuit } = lifecycle;
 
   async function ready() {
+    // OAuth success pages wake the installed client without carrying credentials.
+    try {
+      if (app.isPackaged) app.setAsDefaultProtocolClient('being-app');
+      else if (process.argv[1]) app.setAsDefaultProtocolClient('being-app', process.execPath, [process.argv[1]]);
+    } catch (error) { errorLog.report('connector-protocol', error); }
     stopResourceMonitor = startResourceMonitor(errorLog);
     if (process.platform === 'win32') {
       try { repairDevelopmentShortcut(app.getPath('appData'), shell); }
@@ -173,7 +180,7 @@ export function createDesktopApplication(options: DesktopOptions) {
         return net.fetch(request, { bypassCustomProtocolHandlers: true });
       });
     }
-    registerLocalProtocol(assets, proxy, plugins, attachmentDownloads, localFiles, dshPlugins);
+    registerLocalProtocol(assets, proxy, plugins, attachmentDownloads, localFiles, dshPlugins, connectorNetwork);
     configureLocalSession(shellURL, () => notifications.state.supported && notifications.state.preferences.enabled);
     const commands = await createDesktopCommands({ directory, store, plugins, chatSessions, errorLog, shellURL, window: () => lifecycle.window });
     const { approvalDialogs } = commands;
@@ -189,7 +196,7 @@ export function createDesktopApplication(options: DesktopOptions) {
       window: () => lifecycle.window, shellURL, isQuitting: () => lifecycle.quitting,
       recoveryBlocked: () => portalController.recoveryBlocked, errorLog
     });
-    home = await createDesktopHome({ directory, assets, secretStorage, store, window: () => lifecycle.window, handle });
+    home = await createDesktopHome({ directory, assets, secretStorage, store, window: () => lifecycle.window, handle, network: connectorNetwork });
     registerShellIpc({
       handle, exclusive, directory, store, localFiles, attachmentDownloads, approvalDialogs,
       window: () => lifecycle.window, browser: () => lifecycle.browser

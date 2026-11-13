@@ -2,6 +2,7 @@ import { HomeFileAction } from '../shared/components/being-files';
 import { requestHomeFilePreview } from '../shared/services/home-file-preview';
 import { formatBytes } from '../shared/lib/format-bytes';
 import { Icon } from '../shared/icons/icon';
+import { Toast } from '../shared/components/toast';
 import useMemoizedFn from 'ahooks/es/useMemoizedFn';
 import { useFileDrop } from './hooks/use-file-drop';
 import { useChatViewport } from './hooks/use-chat-viewport';
@@ -141,6 +142,16 @@ function ChatView({
   mobileWeb: boolean;
 }) {
   useModel(state);
+  const toastHosted = state.toastHosted || (parent !== window && location.protocol === 'beings:');
+  const [connectionNotice, setConnectionNotice] = useState('');
+  useEffect(() => {
+    // Embedded chat sends connection notices to the shell's single toast.
+    if (toastHosted) return;
+    setConnectionNotice(state.banner);
+    if (!state.banner) return;
+    const timer = setTimeout(() => setConnectionNotice(''), 6000);
+    return () => clearTimeout(timer);
+  }, [state.banner, toastHosted]);
   const { viewport, narrow, nativeTouch } = useChatViewport(mobileWeb);
   const [editingQueued, setEditingQueued] = useState<Message | null>(null);
   const timelineItems = replyBubbles(sceneItems(withScheduling(state.items.filter(item => item.kind !== "message" || !item.queued || !!item.attachmentViews?.length || !!item.attachmentUploads?.length), state.sceneTasks), state.historyScope, state.currentScene, state.showSbsMessages));
@@ -557,13 +568,7 @@ function ChatView({
             ),
           )}
         </div>
-        <div
-          id="reconnect-banner"
-          className={state.banner ? "active" : ""}
-          role="status"
-        >
-          {state.banner}
-        </div>
+        {!toastHosted && <Toast message={connectionNotice} />}
         <ChatIndex items={visibleItems.map(item=>item.kind==='message' && hasAttachmentMessage(item) ? {...item,text:originalMessageText(item)} : item)} container={messages} elements={messageElements} scrollLock={scrollLock} clearAnchor={releaseAnchor} highlight={setHighlighted} />
         {queuedMessages.length > 0 && <div className="composer-queue-wrap">
           <div className="composer-queue" aria-label={`待发送消息，共 ${queuedMessages.length} 条`}>

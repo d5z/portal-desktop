@@ -95,7 +95,7 @@ try {
   await chat.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await measure(true);
   // High polling-rate pointers can deliver several moves before the next paint.
-  await page.getByRole('button', { name: '资料库', exact: true }).click();
+  await page.getByRole('button', { name: '资料', exact: true }).click();
   const divider = page.getByRole('separator', { name: '调整 Being 信息宽度', exact: true });
   await divider.evaluate(node => {
     node.addEventListener('pointerdown', event => { window.resizePointer = event.pointerId; }, { once: true });
@@ -141,7 +141,7 @@ try {
   }
   assert.equal(await divider.getAttribute('data-resizing'), null, 'Release clears the drag overlay');
   await page.reload();
-  await page.getByRole('button', { name: '资料库', exact: true }).click();
+  await page.getByRole('button', { name: '资料', exact: true }).click();
   assert.equal(await page.locator('#being-info').evaluate(node => node.getBoundingClientRect().width), startWidth + 100, 'Final drag width is persisted');
   await divider.press('ArrowLeft');
   assert.equal(await page.locator('#being-info').evaluate(node => node.getBoundingClientRect().width), startWidth + 124, 'Keyboard resize stays immediate');

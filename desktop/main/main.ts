@@ -15,7 +15,7 @@ const startedAt = new Date().toISOString();
 const CLIENT_NAME = 'Portal Desktop';
 const CLIENT_ID = 'portal-desktop';
 
-protocol.registerSchemesAsPrivileged([{ scheme: 'beings', privileges: { standard: true, secure: true, supportFetchAPI: true, stream: true } }]);
+protocol.registerSchemesAsPrivileged([{ scheme: 'beings', privileges: { standard: true, secure: true, supportFetchAPI: true, corsEnabled: true, stream: true } }]);
 // Electron uses its internal name for encrypted storage. Keep that identity
 // stable while the bundle, windows, menus and dialogs use the display name.
 let profileError: unknown;

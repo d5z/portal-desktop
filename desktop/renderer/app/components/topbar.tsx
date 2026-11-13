@@ -162,7 +162,7 @@ function ReadyTopbar({ model: app }: { model: AppModel }) {
           <Icon name="refresh" />
         </IconButton>
         {app.view === "chat" && !app.subagentSettingsOpen && <IconButton
-          id="toggle-being-info" className="topbar-icon-button" label="资料库"
+          id="toggle-being-info" className="topbar-icon-button" label="资料"
           aria-controls="being-info" aria-expanded={app.beingInfoOpen} onClick={app.toggleBeingInfo}>
           <Icon name="person" />
         </IconButton>}

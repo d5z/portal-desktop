@@ -40,15 +40,6 @@
   animation: startup-spin 0.9s linear infinite;
 }
 
-.startup-notice {
-  margin: 0;
-  padding: 10px 24px;
-  background: var(--surface);
-  color: var(--secondary);
-  font-size: 12px;
-  border-bottom: 1px solid var(--line);
-}
-
 @keyframes startup-spin {
   to {
     transform: rotate(360deg);

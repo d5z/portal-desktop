@@ -17,13 +17,13 @@ import { useManagerFocus } from '../../plugins/dsh/use-manager-focus';
 import { useModel } from '../../shared/hooks/use-model';
 import { ConnectorSettings } from './connectors';
 const baseSettingsTabs = [
-  { id: "being", label: "Being", icon: "settings-being" as const },
-  { id: "portal", label: "Portal", icon: "settings-portal" as const },
-  { id: "town", label: "Town", icon: "settings-town" as const },
-  { id: "models", label: "模型", icon: "settings-models" as const },
-  { id: "appearance", label: "外观与阅读", icon: "settings-appearance" as const },
-  { id: "general", label: "通用", icon: "menu-settings" as const },
-  { id: "apps", label: "应用", icon: "settings-plugins" as const },
+  { id: "being", label: "Being", group: "connection", icon: "settings-being" as const },
+  { id: "portal", label: "Portal", group: "connection", icon: "settings-portal" as const },
+  { id: "town", label: "Town", group: "connection", icon: "settings-town" as const },
+  { id: "models", label: "模型", group: "workspace", icon: "settings-models" as const },
+  { id: "appearance", label: "外观与阅读", group: "workspace", icon: "settings-appearance" as const },
+  { id: "general", label: "通用", group: "workspace", icon: "menu-settings" as const },
+  { id: "apps", label: "应用", group: "extensions", icon: "web-grid" as const },
 ];
 export const ClientSettings = memo(function ClientSettings({ model }: { model: AppModel }) {
   // A closed dialog retains its form state without reconciling
@@ -40,8 +40,14 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
     return () => { dshRuntime.settingsNavigate = undefined; };
   }, [app]);
   const open = app.clientSettingsOpen || Boolean(app.settingsRoute);
-  const settingsTabs = app.api.dshPlugins ? [...baseSettingsTabs, {id:'plugins', label:'插件', icon:'settings-plugins' as const}] : baseSettingsTabs;
+  const settingsTabs = app.api.dshPlugins ? [...baseSettingsTabs, {id:'plugins', label:'插件', group:'extensions', icon:'settings-plugins' as const}] : baseSettingsTabs;
+  const [tabQuery, setTabQuery] = useState("");
+  const normalizedTabQuery = tabQuery.trim().toLocaleLowerCase();
+  const visibleSettingsTabs = normalizedTabQuery
+    ? settingsTabs.filter(item => item.label.toLocaleLowerCase().includes(normalizedTabQuery))
+    : settingsTabs;
   const route = app.settingsRoute;
+  const [connectorDetail, setConnectorDetail] = useState<SettingsDetail | null>(null);
   const [modelDetail, setModelDetail] = useState<SettingsDetail | null>(null);
   const [generalDetail, setGeneralDetail] = useState<'notifications' | null>(null);
   const [modelBusy, setModelBusy] = useState(false);
@@ -95,13 +101,16 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
     : route === 'diagnostics' ? 'general' : route === 'model' ? 'models' : route;
   useLayoutEffect(() => { if (routeTab) setTab(routeTab); if (routeTab === 'plugins') setPluginKind('dsh'); }, [routeTab]);
   const activeTab = routeTab || tab;
+  useEffect(() => {
+    if (!open || activeTab !== 'apps') setConnectorDetail(null);
+  }, [open, activeTab]);
   useLayoutEffect(() => {
     if (open && compact) document.getElementById(`settings-tab-${activeTab}`)?.scrollIntoView({block:'nearest', inline:'nearest'});
   }, [activeTab, open, compact]);
   useEffect(() => { if (open && activeTab === 'plugins') void dshRuntime.refresh().catch(app.toast); }, [open, activeTab, app]);
   const townPlugin = plugins.library.plugins.find(plugin => plugin.manifest.id === townPluginId);
   const detailId = activeTab === 'plugins' ? (pluginKind === 'dsh' ? dshPluginId : townPlugin?.manifest.id) : undefined;
-  const detail: SettingsDetail | null = activeTab === 'models' ? modelDetail
+  const detail: SettingsDetail | null = activeTab === 'apps' ? connectorDetail : activeTab === 'models' ? modelDetail
     : route === 'connection' && activeTab === 'portal' ? { id: 'connection', title: '本机配置', back: app.returnToClientSettings }
     : route === 'diagnostics' ? { id: 'diagnostics', title: '连接诊断', back: app.returnToClientSettings }
     : activeTab === 'general' && generalDetail ? { id: generalDetail, title: '通知设置', back: () => setGeneralDetail(null) } : null;
@@ -133,6 +142,8 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
   const selectTab = async (next: string) => {
     if (busy || next === activeTab) return;
     if (route && !await leave()) return;
+    setTabQuery('');
+    setConnectorDetail(null);
     setGeneralDetail(null);
     setModelDetail(null);
     setTab(next);
@@ -170,6 +181,16 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
           <div className="dialog-heading-main">
             <h2 id="client-settings-title">设置</h2>
           </div>
+          <label className="settings-nav-search">
+            <Icon name="search-20" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth={1.6} />
+            <input
+              type="search"
+              aria-label="搜索设置"
+              placeholder="搜索设置"
+              value={tabQuery}
+              onChange={event => setTabQuery(event.target.value)}
+            />
+          </label>
           <button
             type="button"
             id="close-client-settings"
@@ -180,16 +201,17 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
           ></button>
         </div>
         <div className="settings-tabs" role="tablist" aria-label="设置分类" aria-orientation={compact ? "horizontal" : "vertical"} onKeyDown={navigateTabs}>
-          {settingsTabs.map((item, index) => <div key={item.id} className="settings-tab-wrap">
-            {[4, 5, 7].includes(index) && <span className="settings-tab-separator" aria-hidden="true" />}
+          {visibleSettingsTabs.map((item, index) => <div key={item.id} className="settings-tab-wrap">
+            {index > 0 && item.group !== visibleSettingsTabs[index - 1]?.group && <span className="settings-tab-separator" aria-hidden="true" />}
             <button id={`settings-tab-${item.id}`} role="tab"
               aria-controls={`settings-panel-${item.id}`} aria-selected={activeTab === item.id}
-              disabled={busy} tabIndex={activeTab === item.id ? 0 : -1} onClick={() => { const action = () => void selectTab(item.id); if (dshRuntime.settingsHost && dshRuntime.requestSettingsLeave) dshRuntime.requestSettingsLeave(action); else action(); }}
+              disabled={busy} tabIndex={activeTab === item.id || index === 0 && !visibleSettingsTabs.some(tab => tab.id === activeTab) ? 0 : -1} onClick={() => { const action = () => void selectTab(item.id); if (dshRuntime.settingsHost && dshRuntime.requestSettingsLeave) dshRuntime.requestSettingsLeave(action); else action(); }}
               >
               <Icon name={item.icon} />
               {item.label}
             </button>
           </div>)}
+          {!visibleSettingsTabs.length && <p className="settings-tabs-empty">没有匹配的设置</p>}
         </div>
         <section className="settings-page">
         <div className="settings-page-heading">
@@ -258,66 +280,64 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
             className="settings-group appearance-settings-group"
             aria-labelledby="settings-appearance"
           >
-            <SettingsItem label={<span id="settings-appearance">主题配色</span>}>
-              <div id="theme-toggle" className="theme-options" role="group" aria-label="主题配色">
-                {(["light", "dark"] as const).map(theme => (
-                  <button key={theme} id={`theme-${theme}`} type="button"
-                    aria-pressed={app.colorScheme === theme}
-                    onClick={() => void app.setTheme(theme)}>
-                    <Icon name={theme === 'light' ? 'sun-20' : 'moon-20'}  />
-                    {theme === "light" ? "浅色" : "深色"}
-                  </button>
-                ))}
-              </div>
-            </SettingsItem>
-            <div className="reading-setting">
-              <label htmlFor="reading-size">
-                阅读字号{" "}
-                <output id="reading-size-value" htmlFor="reading-size">
-                  {app.readingSize} px
-                </output>
-              </label>
-              <input
-                id="reading-size"
-                type="range"
-                min="13"
-                max="21"
-                step="1"
-                value={app.readingSize}
-                style={{ backgroundImage: `linear-gradient(to right, var(--accent) ${(app.readingSize - 13) / 8 * 100}%, var(--line) ${(app.readingSize - 13) / 8 * 100}%)` }}
-                aria-describedby="reading-size-help"
-                onChange={(event) =>
-                  app.setReadingSize(Number(event.target.value))
-                }
-              />
-              <div className="reading-sample" aria-label="阅读字号预览">
-                <span>预览</span><p style={{fontSize:app.readingSize}}>今天，从一个小想法开始。</p>
-              </div>
-              <div className="reading-setting-footer">
-                <p id="reading-size-help">应用于对话与 Town 正文</p>
-                <button
-                  id="reading-reset"
-                  type="button"
-                  onClick={() => app.setReadingSize(16)}
-                >
-                  恢复默认
-                </button>
+            <h3 id="settings-appearance">外观</h3>
+            <div className="settings-section-card">
+              <SettingsItem label="主题配色">
+                <div id="theme-toggle" className="theme-options" role="group" aria-label="主题配色">
+                  {(["light", "dark"] as const).map(theme => (
+                    <button key={theme} id={`theme-${theme}`} type="button"
+                      aria-pressed={app.colorScheme === theme}
+                      onClick={() => void app.setTheme(theme)}>
+                      <Icon name={theme === 'light' ? 'sun-20' : 'moon-20'}  />
+                      {theme === "light" ? "浅色" : "深色"}
+                    </button>
+                  ))}
+                </div>
+              </SettingsItem>
+              <div className="reading-setting">
+                <label htmlFor="reading-size">
+                  阅读字号{" "}
+                  <output id="reading-size-value" htmlFor="reading-size">
+                    {app.readingSize} px
+                  </output>
+                </label>
+                <input
+                  id="reading-size"
+                  type="range"
+                  min="13"
+                  max="21"
+                  step="1"
+                  value={app.readingSize}
+                  style={{ backgroundImage: `linear-gradient(to right, var(--accent) ${(app.readingSize - 13) / 8 * 100}%, var(--line) ${(app.readingSize - 13) / 8 * 100}%)` }}
+                  aria-describedby="reading-size-help"
+                  onChange={(event) => app.setReadingSize(Number(event.target.value))}
+                />
+                <div className="reading-sample" aria-label="阅读字号预览">
+                  <span>预览</span><p style={{fontSize:app.readingSize}}>今天，从一个小想法开始。</p>
+                </div>
+                <div className="reading-setting-footer">
+                  <p id="reading-size-help">应用于对话与 Town 正文</p>
+                  <button id="reading-reset" type="button" onClick={() => app.setReadingSize(16)}>恢复默认</button>
+                </div>
               </div>
             </div>
-            <SettingsItem label="显示思考链路" htmlFor="show-reasoning" descriptionId="show-reasoning-help" description="查看服务端返回的思考过程与工具调用。关闭时，以省略号气泡提示正在处理。">
-              <input id="show-reasoning" type="checkbox" role="switch" aria-label="显示思考链路" aria-describedby="show-reasoning-help"
-                checked={app.showReasoning} onChange={event => app.setShowReasoning(event.target.checked)} />
-            </SettingsItem>
-            <form className="reading-setting history-setting" onSubmit={event => { event.preventDefault(); app.setChatHistoryLimit(Number(historyLimit)); }}>
-              <SettingsItem label="每次加载的历史消息数" descriptionId="chat-history-limit-help" description={`可设为 1–${MAX_CHAT_HISTORY_LIMIT} 条，默认 100 条。保存后用于后续加载，已有记录会保留。`}>
-                <span className="history-setting-input">
-                  <input id="chat-history-limit" aria-label="每次加载的历史消息数" type="number" min="1" max={MAX_CHAT_HISTORY_LIMIT} step="1" required
-                    value={historyLimit} aria-describedby="chat-history-limit-help" onChange={event => setHistoryLimit(event.target.value)} />
-                  <span aria-hidden="true">条</span>
-                </span>
-                <button type="submit" disabled={!validChatHistoryLimit(Number(historyLimit)) || Number(historyLimit) === app.chatHistoryLimit}>保存</button>
+            <h3>阅读与对话</h3>
+            <div className="settings-section-card">
+              <SettingsItem label="显示思考链路" htmlFor="show-reasoning" descriptionId="show-reasoning-help" description="查看服务端返回的思考过程与工具调用。关闭时，以省略号气泡提示正在处理。">
+                <input id="show-reasoning" type="checkbox" role="switch" aria-label="显示思考链路" aria-describedby="show-reasoning-help"
+                  checked={app.showReasoning} onChange={event => app.setShowReasoning(event.target.checked)} />
               </SettingsItem>
-            </form>
+              <form className="reading-setting history-setting" onSubmit={event => { event.preventDefault(); app.setChatHistoryLimit(Number(historyLimit)); }}>
+                <SettingsItem label="每次加载的历史消息数" descriptionId="chat-history-limit-help" description={`可设为 1–${MAX_CHAT_HISTORY_LIMIT} 条，默认 100 条。保存后用于后续加载，已有记录会保留。`}>
+                  <span className="history-setting-input">
+                    <input id="chat-history-limit" aria-label="每次加载的历史消息数" type="number" min="1" max={MAX_CHAT_HISTORY_LIMIT} step="1" required
+                      value={historyLimit} aria-describedby="chat-history-limit-help" onChange={event => setHistoryLimit(event.target.value)} />
+                    <span aria-hidden="true">条</span>
+                  </span>
+                  <button type="submit" disabled={!validChatHistoryLimit(Number(historyLimit)) || Number(historyLimit) === app.chatHistoryLimit}>保存</button>
+                </SettingsItem>
+              </form>
+            </div>
           </section>
         </div>
         <div
@@ -327,59 +347,71 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
           hidden={activeTab !== "general"}
         >
           <div hidden={Boolean(detail)}>
-          <section className="general-settings-group" aria-labelledby="settings-downloads">
-            <SettingsItem label={<span id="settings-downloads">下载位置</span>} description={downloadDirectory || '首次下载时选择保存位置'}>
-            <button className="download-setting-change" type="button" aria-label="设置下载位置" disabled={choosingDownload} onClick={async()=>{
-              setChoosingDownload(true);setDownloadError('');
-              try {const value=await app.api.downloadDirectory?.(true);if(value)setDownloadDirectory(value);}
-              catch {setDownloadError('无法设置下载位置，请重试');}finally{setChoosingDownload(false);}
-            }}>{choosingDownload ? '选择中…' : downloadDirectory ? '更改' : '选择'}</button>
-            </SettingsItem>
-            {downloadError && <p className="general-setting-help" role="alert">{downloadError}</p>}
+          <section className="settings-group general-settings-group" aria-labelledby="settings-downloads-heading">
+            <h3 id="settings-downloads-heading">其他</h3>
+            <div className="settings-section-card">
+              <SettingsItem label={<span id="settings-downloads">下载位置</span>} description={downloadDirectory || '首次下载时选择保存位置'}>
+                <button className="download-setting-change" type="button" aria-label="设置下载位置" disabled={choosingDownload} onClick={async()=>{
+                  setChoosingDownload(true);setDownloadError('');
+                  try {const value=await app.api.downloadDirectory?.(true);if(value)setDownloadDirectory(value);}
+                  catch {setDownloadError('无法设置下载位置，请重试');}finally{setChoosingDownload(false);}
+                }}>{choosingDownload ? '选择中…' : downloadDirectory ? '更改' : '选择'}</button>
+              </SettingsItem>
+              {downloadError && <p className="general-setting-help" role="alert">{downloadError}</p>}
+            </div>
           </section>
-          <button className="settings-page-link" onClick={() => setGeneralDetail('notifications')}><span><strong>通知设置</strong><small>桌面通知、私信、围炉与场景提醒</small></span><Icon name="chevron-right-20" /></button>
-
-          <section className="general-settings-group" aria-label="启动设置">
-            <SettingsItem label="开机自启" htmlFor="client-startup-input" description={app.clientStartup && !app.clientStartup.supported ? app.clientStartup.message : undefined}>
-              <input id="client-startup-input" type="checkbox" role="switch" checked={Boolean(app.clientStartup?.enabled)}
-                disabled={app.startupBusy || !app.clientStartup?.supported} onChange={event => void app.changeClientStartup(event.target.checked)} />
-            </SettingsItem>
-            {app.clientError && <p className="form-error" id="client-settings-error" role="alert">
-              {app.clientError}
-            </p>}
+          <section className="settings-group general-settings-group" aria-labelledby="settings-notifications-link-heading">
+            <h3 id="settings-notifications-link-heading">通知</h3>
+            <div className="settings-section-card">
+              <button className="settings-page-link" onClick={() => setGeneralDetail('notifications')}><span><strong>通知设置</strong><small>桌面通知、私信、围炉与场景提醒</small></span><Icon name="chevron-right-20" /></button>
+            </div>
           </section>
-
-          <button id="open-diagnostics" className="settings-page-link" onClick={() => app.openDiagnostics()}><span><strong>连接诊断</strong><small>检查本机服务与连接，导出诊断报告</small></span><Icon name="chevron-right-20" /></button>
+          <section className="settings-group general-settings-group" aria-labelledby="settings-system-heading">
+            <h3 id="settings-system-heading">系统</h3>
+            <div className="settings-section-card">
+              <SettingsItem label="开机自启" htmlFor="client-startup-input" description={app.clientStartup && !app.clientStartup.supported ? app.clientStartup.message : undefined}>
+                <input id="client-startup-input" type="checkbox" role="switch" checked={Boolean(app.clientStartup?.enabled)}
+                  disabled={app.startupBusy || !app.clientStartup?.supported} onChange={event => void app.changeClientStartup(event.target.checked)} />
+              </SettingsItem>
+              {app.clientError && <p className="form-error" id="client-settings-error" role="alert">
+                {app.clientError}
+              </p>}
+              <button id="open-diagnostics" className="settings-page-link" onClick={() => app.openDiagnostics()}><span><strong>连接诊断</strong><small>检查本机服务与连接，导出诊断报告</small></span><Icon name="chevron-right-20" /></button>
+            </div>
+          </section>
           </div>
           {open && route === 'diagnostics' && <Diagnostics model={app} embedded />}
           <div hidden={route === 'diagnostics' || generalDetail !== 'notifications'}>
-          <section className="general-settings-group" aria-labelledby="settings-notifications">
-            <SettingsItem label={<span id="settings-notifications">桌面通知</span>} htmlFor="notification-enabled"
-              description={app.notificationSettings ? app.notificationSettings.message || '选择允许显示桌面提醒的通知类型。' : '正在读取通知设置…'}>
-              <input id="notification-enabled" type="checkbox" role="switch" aria-label="开启桌面通知"
-                checked={Boolean(app.notificationSettings?.preferences.enabled)} disabled={app.notificationsBusy || !app.notificationSettings?.supported}
-                onChange={event => void app.changeNotifications({ enabled: event.target.checked })} />
-            </SettingsItem>
-            <div className="notification-switches" role="group" aria-label="通知类型">
-              {([
-                ["mail", "私信", "私信通知"],
-                ["firesides", "围炉", "围炉通知"],
-                ["bonfire", "篝火", "篝火通知"],
-                ["scenes", "场景对话完成", "场景对话完成通知"],
-              ] as const).map(([key, title, help]) => (
-                <SettingsItem key={key} label={title} htmlFor={`notification-${key}`}>
-                  <input id={`notification-${key}`} type="checkbox" role="switch"
-                    aria-label={help}
-                    checked={Boolean(app.notificationSettings?.preferences[key])}
-                    disabled={app.notificationsBusy || !app.notificationSettings?.supported || !app.notificationSettings.preferences.enabled}
-                    onChange={event => void app.changeNotifications({ [key]: event.target.checked })} />
-                </SettingsItem>
-              ))}
+          <section className="settings-group general-settings-group" aria-labelledby="settings-notifications">
+            <h3 id="settings-notifications">通知</h3>
+            <div className="settings-section-card">
+              <SettingsItem label="桌面通知" htmlFor="notification-enabled"
+                description={app.notificationSettings ? app.notificationSettings.message || '选择允许显示桌面提醒的通知类型。' : '正在读取通知设置…'}>
+                <input id="notification-enabled" type="checkbox" role="switch" aria-label="开启桌面通知"
+                  checked={Boolean(app.notificationSettings?.preferences.enabled)} disabled={app.notificationsBusy || !app.notificationSettings?.supported}
+                  onChange={event => void app.changeNotifications({ enabled: event.target.checked })} />
+              </SettingsItem>
+              <div className="notification-switches" role="group" aria-label="通知类型">
+                {([
+                  ["mail", "私信", "私信通知"],
+                  ["firesides", "围炉", "围炉通知"],
+                  ["bonfire", "篝火", "篝火通知"],
+                  ["scenes", "场景对话完成", "场景对话完成通知"],
+                ] as const).map(([key, title, help]) => (
+                  <SettingsItem key={key} label={title} htmlFor={`notification-${key}`}>
+                    <input id={`notification-${key}`} type="checkbox" role="switch"
+                      aria-label={help}
+                      checked={Boolean(app.notificationSettings?.preferences[key])}
+                      disabled={app.notificationsBusy || !app.notificationSettings?.supported || !app.notificationSettings.preferences.enabled}
+                      onChange={event => void app.changeNotifications({ [key]: event.target.checked })} />
+                  </SettingsItem>
+                ))}
+              </div>
+              {import.meta.env.DEV && <button id="notification-test" type="button"
+                disabled={app.notificationsBusy || !app.notificationSettings?.supported || !app.notificationSettings.preferences.enabled}
+                onClick={() => void app.testNotification()}>发送测试通知</button>}
+              {app.notificationsError && <p className="form-error" role="alert">{app.notificationsError}</p>}
             </div>
-            {import.meta.env.DEV && <button id="notification-test" type="button"
-              disabled={app.notificationsBusy || !app.notificationSettings?.supported || !app.notificationSettings.preferences.enabled}
-              onClick={() => void app.testNotification()}>发送测试通知</button>}
-            {app.notificationsError && <p className="form-error" role="alert">{app.notificationsError}</p>}
           </section>
           </div>
         </div>
@@ -389,7 +421,7 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
           aria-labelledby="settings-tab-apps"
           hidden={activeTab !== "apps"}
         >
-          {open && activeTab === 'apps' && <ConnectorSettings model={app} />}
+          {open && activeTab === 'apps' && <ConnectorSettings model={app} onDetailChange={setConnectorDetail} />}
         </div>
         </div>
         </section>

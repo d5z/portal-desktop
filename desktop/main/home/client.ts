@@ -72,8 +72,8 @@ export class HomeClient {
       try { return await response.json() as T; } catch { throw new HomeError(502, 'invalid_response'); }
     } finally { clearTimeout(timer); }
   }
-  private tokenRequest(body: Record<string, string>) {
-    return this.raw<OAuthTokens>('/native/oauth/token', { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+  private tokenRequest(body: Record<string, string>, signal?: AbortSignal) {
+    return this.raw<OAuthTokens>('/native/oauth/token', { method: 'POST', signal, headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ client_id: HOME_CLIENT, ...body }).toString() });
   }
   private tokens(response: OAuthTokens, subject: string, previousRefresh = ''): Tokens {
@@ -132,6 +132,7 @@ export class HomeClient {
     if (this.cancelAuth) return;
     if (!this.storage.isEncryptionAvailable()) throw new Error('请先解锁系统密钥库，再连接 Being Home。');
     const generation = ++this.generation;
+    const request = new AbortController();
     const state = randomBytes(32).toString('base64url'), nonce = randomBytes(32).toString('base64url');
     const verifier = randomBytes(48).toString('base64url');
     let finish!: (code: string) => void, fail!: (error: Error) => void;
@@ -150,11 +151,11 @@ export class HomeClient {
       else fail(new Error('登录已取消或未获授权。'));
     });
     const timer = setTimeout(() => fail(new Error('登录等待超时，请重新连接。')), 5 * 60_000);
-    const cancel = () => { this.generation++; fail(new Error('登录已取消。')); };
+    const cancel = () => { this.generation++; request.abort(); fail(new Error('登录已取消。')); };
     this.cancelAuth = cancel; changed();
     try {
       await new Promise<void>((resolve, reject) => { server.once('error', () => reject(new Error('登录回调端口 47831 被占用，请关闭其他登录窗口后重试。'))); server.listen(47831, '127.0.0.1', resolve); });
-      const config = await this.raw<{ client_id: string; redirect_uris: string[]; authorization_endpoint: string; audience: string; scope: string }>('/native/client-config/' + HOME_CLIENT);
+      const config = await this.raw<{ client_id: string; redirect_uris: string[]; authorization_endpoint: string; audience: string; scope: string }>('/native/client-config/' + HOME_CLIENT, { signal: request.signal });
       if (config.client_id !== HOME_CLIENT || !Array.isArray(config.redirect_uris) || !config.redirect_uris.includes(HOME_CALLBACK) || !config.audience || typeof config.scope !== 'string' ||
           HOME_REQUIRED_SCOPE.split(' ').some(scope => !config.scope.split(' ').includes(scope))) throw new Error('Home 桌面客户端注册配置不匹配。');
       const url = homeURL(config.authorization_endpoint);
@@ -164,13 +165,16 @@ export class HomeClient {
       if (generation !== this.generation) throw new Error('登录已取消。');
       await this.openExternal(url.href);
       const code = await callback;
-      const result = await this.tokenRequest({ grant_type: 'authorization_code', code, redirect_uri: HOME_CALLBACK, code_verifier: verifier });
-      const discovery = await this.raw<{ issuer: string; jwks_uri: string }>('/oidc/.well-known/openid-configuration');
+      const result = await this.tokenRequest({ grant_type: 'authorization_code', code, redirect_uri: HOME_CALLBACK, code_verifier: verifier }, request.signal);
+      const discovery = await this.raw<{ issuer: string; jwks_uri: string }>('/oidc/.well-known/openid-configuration', { signal: request.signal });
       if (discovery.issuer !== `${HOME_ORIGIN}/oidc/`) throw new Error('Home 登录签发方不匹配。');
-      const keys = await this.raw<{ keys: JsonWebKey[] }>(homeURL(discovery.jwks_uri).href);
+      const keys = await this.raw<{ keys: JsonWebKey[] }>(homeURL(discovery.jwks_uri).href, { signal: request.signal });
       const subject = verifyIdentityToken(result.id_token || '', keys, nonce);
       if (generation !== this.generation) throw new Error('登录已取消。');
       this.saved = { version: 1, tokens: this.tokens(result, subject) }; await this.persist();
+    } catch (error) {
+      if (request.signal.aborted) throw new Error('登录已取消。');
+      throw error;
     } finally {
       clearTimeout(timer); server.close(); server.closeAllConnections();
       if (this.cancelAuth === cancel) this.cancelAuth = undefined; changed();

@@ -36,6 +36,16 @@ try{
   const frame=page.frameLocator('iframe');
   await frame.locator('.message').nth(history.length - 1).waitFor();
   await mkdir('test-results',{recursive:true});
+  const composerBefore=await frame.locator('#input-area').boundingBox();
+  await page.context().setOffline(true);
+  await frame.locator('#toast:popover-open').waitFor();
+  assert.equal(await frame.locator('#toast').textContent(),'已离线，恢复网络后会自动继续');
+  assert.equal((await frame.locator('#toast').boundingBox()).y,18);
+  assert.equal(await frame.locator('#reconnect-banner').count(),0);
+  assert.deepEqual(await frame.locator('#input-area').boundingBox(),composerBefore);
+  await page.screenshot({path:'test-results/chat-standalone-offline-toast.png'});
+  await page.context().setOffline(false);
+  await frame.locator('#toast').waitFor({state:'hidden'});
   await frame.locator('#file-input').setInputFiles([{name:'很长的附件名称'.repeat(18)+'.txt',mimeType:'text/plain',buffer:Buffer.from('layout fixture')},{name:'第二份附件.txt',mimeType:'text/plain',buffer:Buffer.from('layout fixture')}]);
   await frame.getByRole('button',{name:'移除 第二份附件.txt'}).waitFor();
   for(const width of [1100,640,380,300]){

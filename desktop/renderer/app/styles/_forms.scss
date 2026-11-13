@@ -311,7 +311,7 @@ input[type='checkbox']:where(
 }
 
 .form-error {
-  color: #c5674e;
+  color: var(--error);
   font-size: 12px;
   min-height: 16px;
   white-space: pre-wrap;
@@ -332,27 +332,6 @@ input[type='checkbox']:where(
 .dialog-footer > span {
   font-size: 11px;
   color: var(--muted);
-}
-
-#toast {
-  position: fixed;
-  top: 18px;
-  left: 50%;
-  transform: translateX(-50%);
-  max-width: min(600px, calc(100vw - 32px));
-  margin: 0;
-  border: 1px solid var(--line);
-  background: var(--bg);
-  color: var(--text);
-  padding: 12px 18px;
-  border-radius: 10px;
-  box-shadow: 0 10px 35px #0003;
-  font-size: 12px;
-  z-index: 2147483647;
-}
-
-#toast:not(:popover-open) {
-  display: none;
 }
 
 .eyebrow {

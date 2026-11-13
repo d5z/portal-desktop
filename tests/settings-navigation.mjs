@@ -29,6 +29,15 @@ try {
   await page.evaluate(() => { fixtureApp.startup = 'ready'; fixtureApp.changed(); });
   await page.locator('#options-trigger').waitFor({ state: 'visible' });
   await page.evaluate(()=>fixtureApp.openConnectionSettings('portal'));
+  await settings.getByRole('searchbox', { name: '搜索设置' }).fill('应用');
+  const filteredTab = settings.getByRole('tab', { name: '应用', exact: true });
+  assert.equal(await filteredTab.getAttribute('tabindex'), '0', 'Filtered settings remain reachable when the selected tab is hidden');
+  await settings.locator('#close-client-settings').focus();
+  await page.keyboard.press('Tab');
+  assert(await filteredTab.evaluate(el => el === document.activeElement));
+  await page.keyboard.press('Enter');
+  await settings.getByRole('tab', { name: 'Portal', exact: true }).click();
+  await settings.getByRole('button',{name:'本机配置 名称、工作目录、后台常驻与工具权限',exact:true}).click();
   await settings.locator('#workspace-input').fill('/fixture/retained-draft');
   await settings.getByRole('tab',{name:'外观与阅读',exact:true}).click();
   await settings.getByRole('tab',{name:'Portal',exact:true}).click();

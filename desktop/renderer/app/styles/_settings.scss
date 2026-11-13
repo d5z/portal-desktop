@@ -471,6 +471,12 @@
   font-weight: 700;
 }
 
+.connector-card-icon img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+}
+
 .connector-card-copy {
   display: grid;
   flex: 1;

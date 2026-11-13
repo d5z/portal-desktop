@@ -65,7 +65,7 @@
     "test:chat-history": "npm run build:chat && node tests/chat-history.mjs",
     "test:chat-history-target": "npm run build:chat && node tests/chat-history-target.mjs",
     "test:chat-scene-loading": "npm run build:chat && node tests/chat-scene-loading.mjs",
-    "test:chat-render-performance": "npm run build:chat && node tests/chat-render-performance.mjs && node tests/chat-lazy-resources.mjs",
+    "test:chat-render-performance": "npm run build:chat && node tests/chat-streaming-text.mjs && node tests/chat-render-performance.mjs && node tests/chat-lazy-resources.mjs",
     "test:chat-history-recovery": "npm run build:chat && node tests/history-cache.mjs && node tests/chat-history-recovery.mjs && node tests/chat-history-window.mjs",
     "test:plugins-packaged": "npm run build:chat && node tests/plugins-electron.mjs --packaged",
     "lint:chat-hooks": "eslint desktop/renderer/chat/page.tsx desktop/renderer/chat/hooks desktop/renderer/chat/components/navigation.tsx desktop/renderer/shared/hooks/use-menu-dismiss.ts desktop/renderer/shared/components/message-menu.tsx desktop/renderer/shared/components/context-menu.tsx --max-warnings=0",

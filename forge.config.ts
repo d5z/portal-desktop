@@ -39,6 +39,7 @@ const config: ForgeConfig = {
     // Packager also derives macOS's display name from its executable name.
     executableName: process.platform === 'darwin' ? 'Portal Desktop' : 'portal-desktop',
     appBundleId: signing.clientIdentifier,
+    protocols: [{ name: 'Being App', schemes: ['being-app'] }],
     ...(process.platform === 'darwin' ? {
       osxSign: macSignOptions,
       // Match Heart Portal: Developer ID + hardened runtime + timestamp;

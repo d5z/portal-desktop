@@ -1,9 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import type {
-  HomeConnectorAPI, HomeConnectorCatalogPage, HomeConnectorDetail, HomeConnectorEnableState,
-  HomeConnectorFlow, HomeConnectorInstallationPage, HomeConnectorPreview, HomeConnectorSelectionOptions, HomeConnectorTool,
+  HomeConnectorAPI, HomeConnectorBeingAccess, HomeConnectorCatalogPage, HomeConnectorDetail, HomeConnectorEnableState,
+  HomeConnectorInstallation, HomeConnectorInstallationPage, HomeConnectorPreview, HomeConnectorTool,
 } from '../../shared/home';
 import type { HomeClient } from './client';
+import { HomeError, homeURL } from './protocol';
 
 const json = (body: unknown): RequestInit => ({
   method: 'POST',
@@ -26,27 +27,23 @@ function utf8Prefix(value: string, limit: number) {
   return result;
 }
 
-function flowState(flow: HomeConnectorFlow): HomeConnectorEnableState {
-  return {
-    id: flow.id,
-    revision: flow.revision,
-    release_id: flow.release_id,
-    status: flow.status,
-    installation_id: flow.installation_id,
-    connection_id: flow.connection_id,
-    authorization_url: flow.authorization_url,
-  };
-}
-
-/** Home Connector transport. Credentials never enter this object or local storage. */
+/** Home Connector transport. Credential submissions go directly to Home and are never stored. */
 export class HomeConnectors implements HomeConnectorAPI {
   constructor(private client: HomeClient, private openExternal: (url: string) => Promise<void>) {}
+
+  private iconURL(value: string | null | undefined) {
+    if (!value) return value ?? null;
+    try { return new URL(value, homeURL('/')).href; }
+    catch { return null; }
+  }
 
   catalog(query: { q?: string; after?: string } = {}) {
     const params = new URLSearchParams({ limit: '20' });
     if (query.q?.trim()) params.set('q', utf8Prefix(query.q.trim(), 100));
     if (query.after) params.set('after', requiredId(query.after, '分页游标'));
-    return this.client.request<HomeConnectorCatalogPage>('/v1/me/kit-catalog?' + params.toString());
+    return this.client.request<HomeConnectorCatalogPage>('/v1/me/kit-catalog?' + params.toString()).then(page => ({
+      ...page, items: page.items.map(item => ({ ...item, icon_url: this.iconURL(item.icon_url) })),
+    }));
   }
 
   installations(after?: string) {
@@ -56,30 +53,17 @@ export class HomeConnectors implements HomeConnectorAPI {
   }
 
   detail(releaseId: string) {
-    return this.client.request<HomeConnectorDetail>('/v1/me/kit-releases/' + encodeURIComponent(requiredId(releaseId, 'release_id')) + '/connector');
-  }
-
-  async startOAuth(releaseId: string, installationId?: string) {
-    const id = requiredId(releaseId, 'release_id');
-    const options = await this.client.request<HomeConnectorSelectionOptions>('/v1/me/kit-releases/' + encodeURIComponent(id) + '/installation-options' + (installationId ? '?installation_id=' + encodeURIComponent(requiredId(installationId, 'installation_id')) : ''));
-    const node = options.nodes.find(item => item.accounts.length > 0);
-    const requirement = node?.accounts.find(item => item.required) || node?.accounts[0];
-    if (!node || !requirement) throw new Error('此应用没有可连接的 OAuth2 账号需求。');
-    const flow = await this.client.request<HomeConnectorFlow>('/v1/me/kit-connection-flows', json({
-      request_id: randomUUID(), release_id: options.release_id || id, installation_id: options.installation?.id,
-      dependency_path: node.dependency_path, requirement: requirement.id, auth_type: 'oauth2',
+    return this.client.request<HomeConnectorDetail>('/v1/me/kit-releases/' + encodeURIComponent(requiredId(releaseId, 'release_id')) + '/connector').then(detail => ({
+      ...detail, icon_url: this.iconURL(detail.icon_url),
     }));
-    return flowState(flow);
   }
 
-  async syncOAuth(intentId: string, expectedRevision: number) {
-    const flow = await this.client.request<HomeConnectorFlow>('/v1/me/kit-connection-flows/' + encodeURIComponent(requiredId(intentId, 'flow_id')) + '/sync', json({ expected_revision: expectedRevision }));
-    return flowState(flow);
+  installation(installationId: string) {
+    return this.client.request<HomeConnectorInstallation>('/v1/me/kit-installations/' + encodeURIComponent(requiredId(installationId, 'installation_id')));
   }
 
-  async oauthState(intentId: string) {
-    const flow = await this.client.request<HomeConnectorFlow>('/v1/me/kit-connection-flows/' + encodeURIComponent(requiredId(intentId, 'flow_id')));
-    return flowState(flow);
+  removeAccount(releaseId: string, connectionId: string) {
+    return this.client.request<void>('/v1/me/kit-releases/' + encodeURIComponent(requiredId(releaseId, 'release_id')) + '/connector-accounts/' + encodeURIComponent(requiredId(connectionId, 'connection_id')) + '/remove', { method: 'POST' });
   }
 
   preview(releaseId: string, input: { connection_id?: string; method?: string; reauthorize?: boolean }) {
@@ -128,15 +112,26 @@ export class HomeConnectors implements HomeConnectorAPI {
     });
   }
 
+  beingAccess(installationId: string) {
+    return this.client.request<HomeConnectorBeingAccess>(`/v1/me/kit-installations/${encodeURIComponent(requiredId(installationId, 'installation_id'))}/being-access`);
+  }
+
   setBeingAccess(installationId: string, enabled: boolean, expectedRevision: number) {
-    return this.client.request(`/v1/me/kit-installations/${encodeURIComponent(requiredId(installationId, 'installation_id'))}/being-access`, {
+    return this.client.request<HomeConnectorBeingAccess>(`/v1/me/kit-installations/${encodeURIComponent(requiredId(installationId, 'installation_id'))}/being-access`, {
       method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ enabled: Boolean(enabled), expected_revision: expectedRevision }),
     });
   }
 
-  lifecycle(installationId: string, action: 'enable' | 'disable' | 'uninstall', expectedRevision: number) {
-    return this.client.request(`/v1/me/kit-installations/${encodeURIComponent(requiredId(installationId, 'installation_id'))}/actions`, {
-      ...json({ action, expected_revision: expectedRevision, request_id: randomUUID() }),
-    });
+  async lifecycle(installationId: string, action: 'enable' | 'disable' | 'uninstall', expectedRevision: number, requestId: string = randomUUID()): ReturnType<HomeConnectorAPI['lifecycle']> {
+    try {
+      await this.client.request(`/v1/me/kit-installations/${encodeURIComponent(requiredId(installationId, 'installation_id'))}/actions`, {
+        ...json({ action, expected_revision: expectedRevision, request_id: requiredId(requestId, 'request_id') }),
+      });
+      return { accepted: true };
+    } catch (error) {
+      // HTTP 409 rejects this operation; transport failures may have committed it.
+      if (error instanceof HomeError && error.status === 409) return { accepted: false, message: error.message };
+      throw error;
+    }
   }
 }

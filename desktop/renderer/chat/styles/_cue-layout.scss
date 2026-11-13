@@ -53,6 +53,29 @@
   margin-inline-start: 0;
 }
 
+.message-scene {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.message:has([data-copy-group]:is(:hover, :focus-within)) .message-scene {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+@media (hover: none) {
+  .message-scene {
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .message-scene {
+    transition: opacity 0.15s;
+  }
+}
+
 /* Links keep the Cue contrast on blue bubbles and can break at URL punctuation. */
 .message .content a {
   color: var(--accent);

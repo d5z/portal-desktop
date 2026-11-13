@@ -17,7 +17,10 @@ const server = createServer(async (request, response) => {
   if (url.pathname === '/api/history') return json({ messages: history });
   if (url.pathname === '/api/status') return json({ being_name: 'Willow' });
   if (url.pathname === '/api/llm/config') return json({ sbs_enabled: false });
-  if (url.pathname === '/api/stream/active') { response.writeHead(204); response.end(); return; }
+  if (url.pathname === '/api/stream/active') {
+    if (heldResponse && !heldResponse.writableEnded) return json({ stream_id: 'scroll-fixture', scene_id: 'desktop-fixture', origin: 'human', finished: false, next_seq: 1, events: [] });
+    response.writeHead(204); response.end(); return;
+  }
   if (url.pathname === '/api/chat/stream') {
     for await (const chunk of request) {} // Consume the request before holding the stream open.
     response.writeHead(200, { 'Content-Type': 'text/event-stream' });

@@ -8,6 +8,7 @@ import type { ChatProxy } from '../chat/proxy';
 import type { PluginRegistry } from '../plugins/registry';
 import { remoteImage } from '../chat/remote-image';
 import { HTML_PREVIEW_RUNTIME, htmlPreviewPolicy } from './html-preview';
+import type { ConnectorNetwork } from '../home/network';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -23,10 +24,11 @@ const CHAT_ASSETS = new Set(['loom.html', 'chat.js', 'highlight.css', 'chat.css'
 export function registerLocalProtocol(assets: string, proxy: ChatProxy, plugins?: PluginRegistry, downloads = new AttachmentDownloads(app.getPath('userData'), async current => {
   const result=await dialog.showOpenDialog({title:'选择附件下载位置',defaultPath:current || app.getPath('downloads'),properties:['openDirectory','createDirectory']});
   return result.canceled ? undefined : result.filePaths[0];
-}, file => shell.openPath(file), file => shell.showItemInFolder(file)), localFiles?: LocalFilePreviews, dshPlugins?: DshPluginManager) {
+}, file => shell.openPath(file), file => shell.showItemInFolder(file)), localFiles?: LocalFilePreviews, dshPlugins?: DshPluginManager, connectors?: ConnectorNetwork) {
   proxy.onAttachmentUploaded = (token,endpoint,id,checksum) => downloads.bindSource(token,endpoint,id,checksum);
   protocol.handle('beings', async request => {
     const url = new URL(request.url);
+    if (url.hostname === 'desktop' && url.pathname.startsWith('/api/v1/me/') && connectors) return connectors.handle(request);
     if (url.hostname === 'desktop' && dshPlugins?.matches(url.pathname)) return dshPlugins.resource(request);
     if (url.hostname === 'chat' && url.pathname === '/api/remote-image') return remoteImage(request);
     if (url.hostname === 'preview' && url.pathname === '/runtime.html' && request.method === 'GET') return new Response(HTML_PREVIEW_RUNTIME, { headers: {

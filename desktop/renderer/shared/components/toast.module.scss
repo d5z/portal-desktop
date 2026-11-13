@@ -1,0 +1,25 @@
+.root {
+  position: fixed;
+  inset: 18px auto auto 50%;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: min(600px, calc(100vw - 32px));
+  box-sizing: border-box;
+  margin: 0;
+  border: 1px solid var(--line, var(--border));
+  background: var(--bg);
+  color: var(--text);
+  padding: 12px 18px;
+  border-radius: 10px;
+  box-shadow: 0 10px 35px #0003;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  pointer-events: none;
+  -webkit-app-region: no-drag;
+  z-index: 2147483647;
+}
+
+.root:not(:popover-open) {
+  display: none;
+}

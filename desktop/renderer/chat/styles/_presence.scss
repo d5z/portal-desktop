@@ -216,23 +216,6 @@
   user-select: none;
 }
 
-/* Reconnect banner */
-#reconnect-banner {
-  display: none;
-  padding: 6px 16px;
-  background: rgb(var(--yellow-rgb), 0.1);
-  border-top: 1px solid rgb(var(--yellow-rgb), 0.3);
-  font-size: 12px;
-  color: var(--yellow);
-  text-align: center;
-  flex-shrink: 0;
-  font-family: var(--mono);
-}
-
-#reconnect-banner.active {
-  display: block;
-}
-
 @keyframes breathe {
   0%,
   100% {

@@ -20,7 +20,7 @@ export function useChatSession(connection?: RuntimeOptions['connection']) {
       onSbs: bridge.onSbs,
       onSceneActivity: activity => bridge.send({ type: "beings:scene-activity", activity }),
       onConnection: (value) =>
-        bridge.send({ type: "beings:connection", state: value }),
+        bridge.send({ type: "beings:connection", state: value, notice: state.banner }),
       beforeSend: bridge.beforeSend,
     });
     setSession({ state, runtime, bridge });

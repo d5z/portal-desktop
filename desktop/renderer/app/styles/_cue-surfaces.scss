@@ -322,12 +322,6 @@
     color 140ms ease;
 }
 
-#client-settings-dialog .settings-tabs button:hover:not(:disabled),
-#client-settings-dialog .settings-tabs button:focus-visible {
-  background: var(--settings-hover);
-  color: var(--text);
-}
-
 #client-settings-dialog .settings-tabs button[aria-selected='true'],
 #client-settings-dialog .settings-tabs button[aria-selected='true']:hover:not(:disabled) {
   background: var(--settings-active);
@@ -357,12 +351,6 @@
   transition:
     background-color 140ms ease,
     color 140ms ease;
-}
-
-#client-settings-dialog .settings-page-back:hover:not(:disabled),
-#client-settings-dialog .settings-page-back:focus-visible {
-  background: var(--settings-hover);
-  color: var(--text);
 }
 
 #client-settings-dialog .dialog-body,
@@ -604,6 +592,16 @@
   white-space: normal;
 }
 
+#client-settings-dialog .connector-card-copy .connector-runtime-labels,
+#client-settings-dialog .connector-card-copy .connector-local-status {
+  color: var(--text-muted, var(--secondary));
+  -webkit-line-clamp: 1;
+}
+
+#client-settings-dialog .connector-card-copy .connector-local-status {
+  color: var(--accent, var(--text));
+}
+
 #client-settings-dialog .connector-card.is-installed {
   min-height: 70px;
   padding-block: 12px;
@@ -660,14 +658,18 @@
 }
 
 #client-settings-dialog .connector-detail {
-  max-width: 760px;
+  max-width: none;
   padding-bottom: 40px;
 }
 
 #client-settings-dialog .connector-detail-heading {
-  margin: 8px 0 24px;
-  padding-bottom: 20px;
-  border-bottom: 1px solid var(--line);
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 20px;
+  margin: 8px 0 20px;
+  padding-bottom: 0;
+  border-bottom: 0;
 }
 
 #client-settings-dialog .connector-detail-heading .connector-card-icon {
@@ -708,8 +710,7 @@
 
 #client-settings-dialog .connector-preview,
 #client-settings-dialog .connector-connect-panel,
-#client-settings-dialog .connector-flow,
-#client-settings-dialog .connector-tools {
+#client-settings-dialog .connector-flow {
   margin-top: 18px;
   padding: 20px;
   border: 0;
@@ -743,7 +744,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
-  min-height: 112px;
+  min-height: 48px;
+  margin-top: 14px;
+  padding: 0;
+  background: transparent;
 }
 
 #client-settings-dialog .connector-flow .connector-status {
@@ -770,12 +774,167 @@
   color: var(--text);
 }
 
-#client-settings-dialog .connector-tools-heading strong {
-  font-size: 17px;
+#client-settings-dialog .connector-detail-heading > div:first-child {
+  flex: 1;
+  min-width: 160px;
 }
 
-#client-settings-dialog .connector-tools-heading span,
-#client-settings-dialog .connector-tools-chevron {
+#client-settings-dialog .connector-detail-name {
+  grid-column: 2;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow: hidden;
+}
+
+#client-settings-dialog .connector-detail-name h3 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#client-settings-dialog .connector-detail-description {
+  margin: 0 0 12px;
+  color: var(--secondary);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+#client-settings-dialog .connector-runtime-tabs {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 6px;
+  margin: 0;
+}
+
+#client-settings-dialog .connector-runtime-tab {
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--secondary);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+#client-settings-dialog .connector-detail-actions {
+  grid-column: 3;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+#client-settings-dialog .connector-detail-actions > button {
+  min-height: 36px;
+  padding: 8px 14px;
+  border: 0;
+  border-radius: 24px;
+  background: var(--control);
+  color: var(--text);
+}
+
+#client-settings-dialog .connector-detail-actions > button:hover:not(:disabled) {
+  background: var(--settings-hover);
+}
+
+#client-settings-dialog .connector-detail-actions > button.danger {
+  color: var(--danger, #c83242);
+  background: color-mix(in srgb, var(--danger, #c83242) 9%, var(--settings-page));
+}
+
+#client-settings-dialog .connector-account-row .is-disconnected {
+  color: var(--secondary);
+}
+
+#client-settings-dialog .connector-tools-section,
+#client-settings-dialog .connector-info-section {
+  margin-top: 28px;
+}
+
+#client-settings-dialog :is(.connector-tools-section, .connector-info-section) > h4 {
+  margin: 0 0 10px;
+  color: var(--secondary);
+  font-size: 14px;
+  font-weight: 400;
+}
+
+#client-settings-dialog .connector-tools,
+#client-settings-dialog .connector-info {
+  margin: 0;
+  padding: 0 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--settings-page);
+}
+
+#client-settings-dialog .connector-tools-toggle {
+  min-height: 48px;
+  margin: 0 -16px;
+  padding: 0 16px;
+  border-radius: 14px 14px 0 0;
+  background: var(--utility-surface);
+  font-size: 14px;
+}
+
+#client-settings-dialog .connector-tools-toggle svg {
+  width: 16px;
+  height: 16px;
+  color: var(--secondary);
+}
+
+#client-settings-dialog .connector-tool-list {
+  margin-top: 0;
+  background: var(--settings-page);
+  padding-bottom: 8px;
+}
+
+#client-settings-dialog .connector-tool {
+  min-height: 44px;
+  border-top: 0;
+}
+
+#client-settings-dialog .connector-tool input[type='checkbox'] {
+  width: 48px;
+  height: 28px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--secondary) 70%, var(--settings-page));
+}
+
+#client-settings-dialog .connector-tool input[type='checkbox']:not(:checked):hover:not(:disabled) {
+  background: color-mix(in srgb, var(--secondary) 90%, var(--settings-page));
+}
+
+#client-settings-dialog .connector-tool input[type='checkbox']::after {
+  top: 3px;
+  left: 3px;
+  width: 22px;
+  height: 22px;
+}
+
+#client-settings-dialog .connector-tool input[type='checkbox']:checked {
+  background: #1683f4;
+}
+
+#client-settings-dialog .connector-tool input[type='checkbox']:checked::after {
+  transform: translateX(20px);
+}
+
+#client-settings-dialog .connector-tool span {
+  overflow-wrap: anywhere;
+}
+
+#client-settings-dialog .connector-info > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px 0;
+}
+
+#client-settings-dialog .connector-info dd {
+  margin: 0;
   color: var(--secondary);
 }
 
@@ -854,4 +1013,209 @@
   #client-settings-dialog .connector-option {
     transition: none;
   }
+}
+
+#client-settings-dialog .connector-accounts {
+  display: grid;
+  gap: 0;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--settings-page);
+}
+
+#client-settings-dialog button.connector-account-row {
+  width: 100%;
+  min-height: 58px;
+  padding: 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  text-align: left;
+}
+
+#client-settings-dialog
+  .connector-accounts
+  > .connector-account-row[aria-pressed="true"] {
+  background: transparent;
+}
+
+#client-settings-dialog button.connector-account-row:hover:not(:disabled) {
+  background: var(--settings-hover);
+}
+
+#client-settings-dialog .connector-account-entry {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+
+  > .connector-account-row {
+    flex: 1;
+    min-width: 0;
+  }
+
+  > .connector-account-connect {
+    flex-shrink: 0;
+    min-height: 32px;
+    padding: 4px 12px;
+    border-radius: 16px;
+  }
+}
+
+#client-settings-dialog .connector-account-add {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 48px;
+  padding: 0 8px;
+  border: 0;
+  color: var(--secondary);
+  background: transparent;
+  font-weight: 400;
+  text-align: left;
+}
+
+#client-settings-dialog .connector-account-add:hover:not(:disabled) {
+  background: var(--settings-hover);
+}
+
+#client-settings-dialog .connector-account-add .connector-line-icon {
+  width: 18px;
+  height: 18px;
+  flex: 0 0 18px;
+}
+
+#client-settings-dialog .connector-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+#client-settings-dialog .connector-section-heading h4 {
+  margin: 0;
+}
+
+#client-settings-dialog .connector-app-summary {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+  min-height: 80px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--settings-page);
+}
+
+#client-settings-dialog .connector-app-summary small,
+#client-settings-dialog .connector-apps-heading span {
+  color: var(--secondary);
+  font-weight: 400;
+}
+
+#client-settings-dialog .connector-info-section > .connector-apps-heading {
+  color: var(--text);
+  font-weight: 500;
+}
+
+#client-settings-dialog .connector-skills-section {
+  margin-top: 28px;
+}
+
+#client-settings-dialog .connector-skills-section > h4 {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+#client-settings-dialog .connector-skills-section > h4 span {
+  color: var(--secondary);
+  font-weight: 400;
+}
+
+#client-settings-dialog .connector-skill-list {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--settings-page);
+}
+
+#client-settings-dialog .connector-skill-row {
+  min-width: 0;
+  padding: 12px 20px;
+  overflow-wrap: anywhere;
+}
+
+#client-settings-dialog .connector-skill-copy {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+#client-settings-dialog .connector-skill-copy > svg {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  margin-top: 0;
+  color: var(--secondary);
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+}
+
+#client-settings-dialog .connector-skill-copy h5 {
+  margin: 0 0 4px;
+  font-size: 13px;
+  font-weight: 500;
+}
+
+#client-settings-dialog .connector-skill-copy p {
+  margin: 0;
+  color: var(--secondary);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+#client-settings-dialog .connector-skills-more {
+  width: 100%;
+  padding: 16px 24px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  background: transparent;
+  color: var(--secondary);
+  cursor: pointer;
+  font-size: 13px;
+  text-align: right;
+}
+
+#client-settings-dialog .connector-skills-more:hover {
+  background: var(--settings-hover);
+}
+
+#client-settings-dialog .connector-account-row > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#client-settings-dialog .connector-account-name {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  gap: 6px;
+}
+
+#client-settings-dialog .connector-account-edit {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 16px;
+  color: var(--secondary);
+}
+
+#client-settings-dialog .connector-account-row > strong {
+  flex-shrink: 0;
+  margin-left: 16px;
 }

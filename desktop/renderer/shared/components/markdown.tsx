@@ -8,7 +8,7 @@ import { localFileReference } from '../../../shared/local-file';
 import { IntelligentUI } from "../intelligent-ui/view";
 import hljs from "highlight.js/lib/common";
 import type { Emitter } from "highlight.js";
-import { Fragment, memo, useContext, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { Fragment, memo, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { detectStructuredText, formatJSON } from '../lib/structured-text';
 import { marked, type Token, type Tokens } from "marked";
 import {
@@ -149,7 +149,7 @@ export const Markdown = memo(function Markdown(props: MarkdownProps) {
 
 /** Markdown tokens become React elements. Raw HTML has no execution/rendering path. */
 const MarkdownText = memo(function MarkdownText({
-  content,
+  content: source,
   className = "reading-text",
   onPlace,
   chat = false,
@@ -158,8 +158,51 @@ const MarkdownText = memo(function MarkdownText({
   leadingContent,
   previewMarkdownCode = true,
   intelligentUI = false,
-  streaming = false,
+  streaming: receiving = false,
 }: MarkdownProps) {
+  const [content, setContent] = useState(source);
+  const reveal = useRef({ source: '', text: '', position: 0, receiving: false });
+  useLayoutEffect(() => {
+    const progress = reveal.current;
+    // Smooth only live chat prose. History, replacements and nested Markdown
+    // previews stay immediate; previews already receive the revealed source.
+    const animate = chat && previewMarkdownCode && (receiving || progress.receiving) &&
+      source.startsWith(progress.source) && !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    progress.source = source;
+    progress.receiving = receiving;
+    if (!animate) {
+      progress.text = source;
+      progress.position = source.length;
+      setContent(source);
+      return;
+    }
+    // Show the first character before paint, even when the first packet is large.
+    if (!progress.text && source) {
+      progress.position = source.codePointAt(0)! > 0xffff ? 2 : 1;
+      progress.text = source.slice(0, progress.position);
+    }
+    setContent(progress.text);
+    if (progress.text === source) return;
+    // Keep fractional progress across packets and use elapsed time so speed is
+    // independent of refresh rate. Large bursts catch up within 240 ms, including
+    // the final packet, without pushing animation state into the chat store.
+    const speed = Math.max(0.06, (source.length - progress.position) / 240);
+    let previous = performance.now();
+    let frame = requestAnimationFrame(tick);
+    function tick(now: number) {
+      progress.position = Math.min(source.length, progress.position + (now - previous) * speed);
+      previous = now;
+      let end = Math.floor(progress.position);
+      // Do not expose half of an emoji's UTF-16 surrogate pair.
+      const last = source.charCodeAt(end - 1);
+      if (last >= 0xd800 && last <= 0xdbff && end < source.length) end--;
+      const text = source.slice(0, end);
+      if (text !== progress.text) { progress.text = text; setContent(text); }
+      if (end < source.length) frame = requestAnimationFrame(tick);
+    }
+    return () => cancelAnimationFrame(frame);
+  }, [source, receiving, chat, previewMarkdownCode]);
+  const streaming = receiving || content !== source;
   const previewLocalFile = useContext(LocalFileAction);
   const references = useContext(MarkdownReferences);
   const parser = useMemo(() => new StreamingMarkdown((source) => {

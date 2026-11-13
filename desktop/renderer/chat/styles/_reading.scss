@@ -419,14 +419,6 @@ body {
   background: var(--bg-soft);
 }
 
-#reconnect-banner {
-  width: calc(100% - 64px);
-  max-width: 760px;
-  margin: 0 auto 10px;
-  border-radius: 6px;
-  font-size: 11px;
-}
-
 .pending-file {
   background: var(--bg-softer);
   min-height: 30px;

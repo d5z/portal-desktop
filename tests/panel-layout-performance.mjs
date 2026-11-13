@@ -38,7 +38,7 @@ try {
   await page.goto(origin);
 
   await mkdir('output/playwright',{recursive:true});
-  const toggle=page.getByRole('button',{name:'资料库',exact:true});
+  const toggle=page.getByRole('button',{name:'资料',exact:true});
   await toggle.click();
   await page.waitForFunction(()=>!document.querySelector('#being-info').hasAttribute('data-animating'));
   await page.frameLocator('#chat-frame').locator('.message').nth(9).waitFor();

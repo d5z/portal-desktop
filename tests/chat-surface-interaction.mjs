@@ -23,6 +23,22 @@ try {
  };
  for(const width of [1440,435]){
   await page.setViewportSize({width,height:960});
+  // Connection notices share the shell toast and never change composer geometry.
+  const composerBefore=await frame.locator('#input-area').boundingBox();
+  await page.context().setOffline(true);
+  const toast=page.locator('#toast');
+  await page.waitForFunction(()=>document.querySelector('#toast:popover-open')?.textContent.includes('已离线'));
+  assert.equal(await frame.locator('#reconnect-banner').count(),0);
+  assert.equal(await frame.locator('#toast').count(),0,'Embedded chat must not duplicate the shell toast');
+  assert.deepEqual(await frame.locator('#input-area').boundingBox(),composerBefore,'Offline notice must not move the composer');
+  const toastBounds=await toast.boundingBox();
+  assert.equal(toastBounds.y,18);
+  assert.ok(toastBounds.x>=0&&toastBounds.x+toastBounds.width<=width,'Toast fits narrow windows');
+  await page.screenshot({path:`test-results/chat-offline-toast-${width}.png`});
+  await page.context().setOffline(false);
+  await page.waitForFunction(()=>fixtureApp.connection==='online');
+  await toast.waitFor({state:'hidden'});
+  assert.deepEqual(await frame.locator('#input-area').boundingBox(),composerBefore,'Recovery leaves no bottom notice strip');
   const rect=await page.locator('#chat-frame').boundingBox();
   const point={x:Math.round(rect.x+rect.width-12),y:Math.round(rect.y+rect.height/2)};
   for(let i=0;i<3;i++){
@@ -54,6 +70,25 @@ try {
   await frame.locator('html').evaluate(n=>n.dataset.theme='light');
   await frame.locator('#input').fill('');
  }
+ // Startup notices, action information and errors all use the same top toast.
+ await page.evaluate(()=>{fixtureApp.snapshot.notice='连接检查失败，请检查设置后重试。';fixtureApp.changed();});
+ await page.waitForFunction(()=>document.querySelector('#toast:popover-open')?.textContent==='连接检查失败，请检查设置后重试。');
+ assert.equal(await page.locator('#startup-notice').count(),0);
+ await page.evaluate(()=>{fixtureApp.snapshot.notice=undefined;fixtureApp.changed();});
+ await page.locator('#toast').waitFor({state:'hidden'});
+ for(const failure of [false,true]) {
+  await page.evaluate(failure=>fixtureApp.toast(failure?new Error('操作失败，请重试。'):'设置已保存。'),failure);
+  await page.locator('#toast:popover-open').waitFor();
+  assert.equal(await page.locator('#toast').textContent(),failure?'操作失败，请重试。':'设置已保存。');
+  assert.equal((await page.locator('#toast').boundingBox()).y,18);
+ }
+ await page.context().setOffline(true);
+ await page.waitForFunction(()=>fixtureApp.connection==='offline');
+ await page.evaluate(()=>fixtureApp.toast('设置已保存。'));
+ await page.context().setOffline(false);
+ await page.waitForFunction(()=>fixtureApp.connection==='online');
+ assert.equal(await page.locator('#toast').textContent(),'设置已保存。','Recovery must not clear a newer action notice');
+ await page.locator('#toast').waitFor({state:'hidden',timeout:8000});
  await page.setViewportSize({width:1440,height:960});
  await page.evaluate(()=>fixtureApp.openClientSettings());
  const settings=page.locator('#client-settings-dialog');
@@ -63,6 +98,6 @@ try {
  await page.keyboard.press('Escape');await settings.waitFor({state:'hidden'});
  await unobstructed();
  assert.deepEqual(errors,[]);
- console.log('PASS: blank mouse/touch clicks, outside menu dismissal, reachable composer, compact send states, short settings labels, wide/narrow and light/dark.');
+ console.log('PASS: unified top toasts, offline/recovery without composer movement, startup and action notices, automatic dismissal, blank clicks, menus, send states, wide/narrow and light/dark.');
 
 } finally {await browser?.close();server.kill();}

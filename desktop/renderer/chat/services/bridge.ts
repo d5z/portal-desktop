@@ -241,6 +241,7 @@ export function createChatBridge(state: ChatState) {
           return;
         }
         case "beings:appearance":
+          if (data.toastHost === true) { state.toastHosted = true; state.changed(); }
           if (data.theme === "light" || data.theme === "dark")
             ui.theme(data.theme);
           return;

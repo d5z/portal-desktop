@@ -200,9 +200,9 @@ export function BeingInfo({ app }: { app: AppModel }) {
   const [width, setWidth] = usePanelWidth("being", 320);
   const [browserHost, setBrowserHost] = useState<HTMLElement | null>(null);
   useLayoutEffect(() => { setBrowserHost(panel.current?.parentElement || null); }, []);
-  const [tab, setTab] = useState<typeof beingTabs[number][0]>("library");
+  const [tab, setTab] = useState<typeof beingTabs[number][0]>("profile");
   const [privacyOpen, setPrivacyOpen] = useState(false);
-  useLayoutEffect(() => { if (app.beingInfoOpen) { setTab('library'); setPrivacyOpen(false); } }, [app.beingInfoOpen]);
+  useLayoutEffect(() => { if (app.beingInfoOpen) { setTab('profile'); setPrivacyOpen(false); } }, [app.beingInfoOpen]);
   const privacyEntry = useRef<HTMLButtonElement>(null);
   const privacyBack = useRef<HTMLButtonElement>(null);
   const closePrivacy = () => { setPrivacyOpen(false); requestAnimationFrame(() => privacyEntry.current?.focus()); };
@@ -274,7 +274,7 @@ export function BeingInfo({ app }: { app: AppModel }) {
         </button></dd></div>
       </dl>
       <h3>配置</h3>
-      <button className="being-action-row" onClick={() => app.openAppSettings()}><Icon name="settings-plugins" /><span className="being-action-copy">应用设置</span><Icon className="being-action-chevron" name="chevron-right-20" /></button>
+      <button className="being-action-row" onClick={() => app.openAppSettings()}><Icon name="web-grid" /><span className="being-action-copy">应用设置</span><Icon className="being-action-chevron" name="chevron-right-20" /></button>
       <button className="being-action-row being-model-entry" disabled={!connected} onClick={() => app.openModelSettings()}><Icon name="settings-models" /><span className="being-action-copy"><strong>模型设置</strong><small>{connected ? currentModel || "正在读取模型…" : "连接后配置模型"}</small></span><Icon className="being-action-chevron" name="chevron-right-20" /></button>
       <button ref={privacyEntry} className="being-action-row" onClick={() => setPrivacyOpen(true)}><Icon name="permission-shield" /><span className="being-action-copy">隐私说明</span><Icon className="being-action-chevron" name="chevron-right-20" /></button>
       <button className="being-action-row being-connect" onClick={() => app.showSettings()}><Icon name="menu-settings" /><span className="being-action-copy">连接设置</span><Icon className="being-action-chevron" name="chevron-right-20" /></button>

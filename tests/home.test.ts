@@ -47,6 +47,37 @@ async function loggedIn(scope = registeredScope) {
   return { client, fetcher, dir, auth };
 }
 describe('Home OAuth and credential boundary', () => {
+  it.each(['/being-desktop', '/token', '/openid-configuration', '/keys'])('cancels login during %s and immediately permits a fresh login', async stage => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), 'home-cancel-')); directories.push(dir);
+    let blocked = true, stalledSignal: AbortSignal | undefined, auth = new URL(HOME_ORIGIN);
+    const fetcher = vi.fn<typeof fetch>(async (input, init) => {
+      const pathname = new URL(String(input)).pathname;
+      if (blocked && pathname.endsWith(stage)) return new Promise<Response>((_, reject) => {
+        stalledSignal = init!.signal!;
+        stalledSignal.addEventListener('abort', () => reject(stalledSignal!.reason), { once: true });
+      });
+      if (pathname.endsWith('/being-desktop')) return jsonResponse({ client_id: HOME_CLIENT, redirect_uris: [HOME_CALLBACK], authorization_endpoint: HOME_ORIGIN + '/oidc/oauth2/auth', audience: 'urn:being:home', scope: registeredScope });
+      if (pathname.endsWith('/token')) return jsonResponse({ access_token: 'access', refresh_token: 'refresh', expires_in: 3600, token_type: 'Bearer', id_token: identity(auth.searchParams.get('nonce')!) });
+      if (pathname.endsWith('/openid-configuration')) return jsonResponse({ issuer: HOME_ORIGIN + '/oidc/', jwks_uri: HOME_ORIGIN + '/oidc/keys' });
+      return jsonResponse({ keys: [jwk] });
+    });
+    const client = new HomeClient(dir, storage, async url => {
+      auth = new URL(url);
+      await fetch(HOME_CALLBACK + '?' + new URLSearchParams({ state: auth.searchParams.get('state')!, code: 'fixture' }));
+    }, fetcher);
+    const pending = client.login(() => {});
+    const cancelled = expect(pending).rejects.toThrow('登录已取消');
+    await vi.waitFor(() => expect(stalledSignal).toBeDefined());
+    client.cancelLogin();
+    expect(stalledSignal!.aborted).toBe(true);
+    await cancelled;
+    expect(client.authenticating).toBe(false);
+    expect(client.authenticated).toBe(false);
+    await expect(readFile(path.join(dir, 'home-session.json'))).rejects.toMatchObject({ code: 'ENOENT' });
+    blocked = false;
+    await client.login(() => {});
+    expect(client.authenticated).toBe(true);
+  });
   it('requests every registered permission, including file access and newly advertised scopes', async () => {
     const scope = registeredScope + ' fixture:additional';
     const { auth } = await loggedIn(scope);
@@ -93,7 +124,7 @@ describe('Home OAuth and credential boundary', () => {
   it('does not replay a write after a network failure, and sanitizes remote errors', async () => {
     const { client, fetcher } = await loggedIn(); fetcher.mockReset();
     fetcher.mockRejectedValue(new Error('ticket=secret provider-internal-host'));
-    await expect(client.request('/v1/me/computer/ensure', { method: 'POST' })).rejects.toThrow('检查网络');
+    await expect(client.request('/v1/me/computer/ensure', { method: 'POST' })).rejects.toThrow('连接失败');
     expect(fetcher).toHaveBeenCalledTimes(1);
     fetcher.mockResolvedValue(jsonResponse({ error: 'ticket=secret' }, 500));
     await expect(client.request('/v1/me')).rejects.not.toThrow('secret');

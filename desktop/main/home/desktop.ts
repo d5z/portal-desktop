@@ -8,9 +8,10 @@ import { registerHomeIpc } from './ipc';
 import { HomeService } from './service';
 import { HomeViewer } from './viewer';
 import { HomeConnectors } from './connectors';
+import type { ConnectorNetwork } from './network';
 export async function createDesktopHome(options: {
   directory: string; assets: string; secretStorage: SecretStorage; store: SettingsStore;
-  window(): BrowserWindow | null; handle: RegisterHandler;
+  window(): BrowserWindow | null; handle: RegisterHandler; network: ConnectorNetwork;
 }) {
   const { directory, secretStorage, store, window: getWindow, handle } = options;
   const homeClient = new HomeClient(directory, secretStorage, url => shell.openExternal(url));
@@ -30,6 +31,6 @@ export async function createDesktopHome(options: {
     },
   });
   const connectors = new HomeConnectors(homeClient, url => shell.openExternal(url));
-  registerHomeIpc(handle, home, homeViewer, homeFiles, connectors);
+  registerHomeIpc(handle, home, homeViewer, homeFiles, connectors, options.network);
   return home;
 }

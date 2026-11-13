@@ -219,7 +219,7 @@
   grid-template-columns: 24px minmax(0, 1fr);
   align-items: center;
   gap: 4px 12px;
-  padding: 14px 0;
+  padding: 14px 12px;
   border-bottom: 1px solid var(--line);
 }
 
@@ -559,6 +559,386 @@ html[data-theme='dark'] .town-logo-light {
   background: var(--selected);
 }
 
+/* Settings uses the same quiet panel language as the rest of the client. */
+#client-settings-dialog {
+  --settings-page: color-mix(in srgb, var(--bg) 94%, var(--surface));
+  --settings-sidebar: color-mix(in srgb, var(--surface) 88%, var(--bg));
+  --settings-card: var(--control);
+  --settings-hover: color-mix(in srgb, var(--accent) 7%, var(--settings-card));
+  --settings-active: color-mix(in srgb, var(--accent) 11%, var(--settings-card));
+
+  width: min(1120px, calc(100vw - 48px));
+  height: min(820px, calc(100dvh - 48px));
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: 28px;
+  background: var(--settings-page);
+  box-shadow:
+    0 30px 90px rgb(20 24 32 / 20%),
+    0 8px 24px rgb(20 24 32 / 10%);
+}
+
+#client-settings-dialog .client-settings-content {
+  grid-template-columns: 200px minmax(0, 1fr);
+  grid-template-rows: 88px minmax(0, 1fr);
+  background: var(--settings-page);
+}
+
+#client-settings-dialog .client-settings-content > .dialog-heading,
+#client-settings-dialog .settings-tabs {
+  background: var(--settings-sidebar);
+  border-right: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+}
+
+#client-settings-dialog .client-settings-content > .dialog-heading {
+  padding: 30px 24px 20px;
+}
+
+#client-settings-dialog .dialog-heading h2 {
+  font-size: 24px;
+  letter-spacing: -0.03em;
+}
+
+#client-settings-dialog .settings-tabs {
+  gap: 6px;
+  padding: 12px 14px 28px;
+}
+
+#client-settings-dialog .settings-tab-separator {
+  margin: 14px 10px;
+  background: color-mix(in srgb, var(--line) 88%, transparent);
+}
+
+#client-settings-dialog .settings-tabs button {
+  min-height: 48px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  gap: 12px;
+  font-size: 14px;
+  transition:
+    background-color 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+#client-settings-dialog .settings-tabs button:hover:not(:disabled),
+#client-settings-dialog .settings-tabs button:focus-visible {
+  background: var(--settings-hover);
+  color: var(--text);
+}
+
+#client-settings-dialog .settings-tabs button[aria-selected='true'],
+#client-settings-dialog .settings-tabs button[aria-selected='true']:hover:not(:disabled) {
+  background: var(--settings-active);
+  color: var(--text);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent), 0 2px 8px rgb(20 24 32 / 5%);
+  font-weight: 600;
+}
+
+#client-settings-dialog .settings-tabs button:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+#client-settings-dialog .settings-page-heading {
+  min-height: 96px;
+  padding: 30px 36px 24px;
+  border-bottom: 0;
+  background: var(--settings-page);
+}
+
+#client-settings-dialog .settings-page-title {
+  font-size: 27px;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+}
+
+#client-settings-dialog .settings-page-back {
+  width: 38px;
+  height: 38px;
+  margin-inline-start: -8px;
+  border-radius: 12px;
+}
+
+#client-settings-dialog .settings-page-back:hover:not(:disabled),
+#client-settings-dialog .settings-page-back:focus-visible {
+  background: var(--settings-hover);
+  color: var(--text);
+}
+
+#client-settings-dialog .dialog-body,
+#client-settings-dialog .settings-inline-body {
+  padding: 0 36px 44px;
+  background: var(--settings-page);
+  scrollbar-color: var(--muted) transparent;
+}
+
+#client-settings-dialog .settings-inline-body {
+  padding-top: 2px;
+}
+
+#client-settings-dialog .settings-group,
+#client-settings-dialog .general-settings-group {
+  margin: 0 0 24px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+#client-settings-dialog .settings-group h3,
+#client-settings-dialog .general-settings-group h3 {
+  margin: 0 0 10px;
+  padding-inline: 4px;
+  color: var(--secondary);
+  font-size: 13px;
+  font-weight: 550;
+}
+
+#client-settings-dialog :is(.settings-item, .settings-page-link, .settings-plugin-link) {
+  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+  border-radius: 16px;
+  background: var(--settings-card);
+  box-shadow: 0 2px 8px rgb(20 24 32 / 4%);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+#client-settings-dialog .settings-item {
+  min-height: 76px;
+  margin: 0 0 12px;
+  padding: 17px 20px;
+  border-bottom: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+}
+
+#client-settings-dialog label.settings-item:has(input:enabled):hover,
+#client-settings-dialog .settings-page-link:hover:not(:disabled),
+#client-settings-dialog .settings-plugin-link:hover:not(:disabled) {
+  background: var(--settings-hover);
+}
+
+#client-settings-dialog .settings-page-link,
+#client-settings-dialog .settings-plugin-link {
+  width: 100%;
+  min-height: 76px;
+  margin: 0 0 12px;
+  padding: 17px 20px;
+}
+
+#client-settings-dialog .settings-page-link::after,
+#client-settings-dialog .settings-plugin-link::after {
+  display: none;
+}
+
+#client-settings-dialog .settings-page-link strong,
+#client-settings-dialog .settings-plugin-link strong {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+#client-settings-dialog .settings-page-link small,
+#client-settings-dialog .settings-plugin-link small {
+  margin-top: 5px;
+}
+
+#client-settings-dialog .settings-item-control > button,
+#client-settings-dialog .download-setting-change,
+#client-settings-dialog .theme-options button,
+#client-settings-dialog .history-setting button[type='submit'] {
+  min-height: 38px;
+  padding: 8px 14px;
+  border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
+  border-radius: 12px;
+  background: var(--control);
+  box-shadow: 0 1px 4px rgb(20 24 32 / 5%);
+  color: var(--text);
+  transition:
+    background-color 160ms ease,
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+#client-settings-dialog :is(.settings-item-control > button, .download-setting-change, .theme-options button, .history-setting button[type='submit']):hover:not(:disabled) {
+  background: var(--settings-hover);
+}
+
+#client-settings-dialog :is(.settings-item-control > button, .download-setting-change, .theme-options button, .history-setting button[type='submit']):active:not(:disabled) {
+  transform: scale(0.975);
+  box-shadow: 0 1px 3px rgb(20 24 32 / 5%);
+}
+
+#client-settings-dialog .theme-options {
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+}
+
+#client-settings-dialog .theme-options button {
+  min-height: 38px;
+  border-color: transparent;
+  box-shadow: none;
+}
+
+#client-settings-dialog .theme-options button[aria-pressed='true'] {
+  border-color: var(--line);
+  background: var(--control);
+  box-shadow: 0 2px 7px rgb(20 24 32 / 9%);
+}
+
+#client-settings-dialog .appearance-settings-group > .reading-setting,
+#client-settings-dialog .appearance-settings-group > .history-setting {
+  margin: 0 0 12px;
+  padding: 20px;
+  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+  border-radius: 16px;
+  background: var(--settings-card);
+  box-shadow: 0 2px 8px rgb(20 24 32 / 4%);
+}
+
+#client-settings-dialog .appearance-settings-group > .reading-setting {
+  border-top: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+}
+
+#client-settings-dialog .reading-sample {
+  border-color: var(--line);
+}
+
+#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)) {
+  width: 40px;
+  height: 24px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--secondary) 52%, var(--surface));
+  box-shadow: inset 0 0 0 1px rgb(20 24 32 / 8%);
+  transition: background-color 160ms ease, box-shadow 160ms ease;
+}
+
+#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *))::before {
+  width: 18px;
+  height: 18px;
+  top: 3px;
+  left: 3px;
+  background: var(--control);
+  box-shadow: 0 1px 3px rgb(20 24 32 / 20%);
+  transition: transform 160ms ease;
+}
+
+#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):checked {
+  background: #2f86f6;
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
+}
+
+#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):checked::before {
+  transform: translateX(16px);
+}
+
+#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):hover:not(:disabled) {
+  filter: brightness(0.94);
+}
+
+#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):focus-visible {
+  outline: 2px solid #2f86f6;
+  outline-offset: 2px;
+}
+
+#client-settings-dialog .notification-switches {
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 14px;
+  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+  border-radius: 16px;
+  background: var(--settings-card);
+  box-shadow: 0 2px 8px rgb(20 24 32 / 4%);
+}
+
+#client-settings-dialog .notification-switches .settings-item {
+  min-height: 52px;
+  margin: 0;
+  padding: 10px 8px;
+  border: 0;
+  border-radius: 10px;
+  box-shadow: none;
+}
+
+#client-settings-dialog .notification-switches .settings-item:hover,
+#client-settings-dialog .notification-switches .settings-item:focus-within {
+  border-color: transparent;
+  box-shadow: none;
+}
+
+#client-settings-dialog .settings-unsaved {
+  border-radius: 16px;
+  box-shadow: 0 5px 16px rgb(20 24 32 / 7%);
+}
+
+#client-settings-dialog .settings-unsaved button {
+  border-radius: 11px;
+}
+
+#client-settings-dialog .client-settings-content > .dialog-heading #close-client-settings {
+  right: 22px;
+  top: 22px;
+  border-radius: 12px;
+}
+
+@media (max-width: 720px) {
+  #client-settings-dialog {
+    width: calc(100vw - 24px);
+    height: calc(100dvh - 24px);
+    border-radius: 22px;
+  }
+
+  #client-settings-dialog .client-settings-content {
+    grid-template-columns: 1fr;
+    grid-template-rows: 64px auto minmax(0, 1fr);
+  }
+
+  #client-settings-dialog .client-settings-content > .dialog-heading {
+    padding: 18px 20px;
+    border-right: 0;
+  }
+
+  #client-settings-dialog .dialog-heading h2 {
+    font-size: 21px;
+  }
+
+  #client-settings-dialog .settings-tabs {
+    gap: 6px;
+    padding: 6px 14px 14px;
+    border-right: 0;
+  }
+
+  #client-settings-dialog .settings-tabs button {
+    min-height: 42px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    font-size: 12px;
+  }
+
+  #client-settings-dialog .settings-page-heading {
+    min-height: 76px;
+    padding: 22px 20px 16px;
+  }
+
+  #client-settings-dialog .settings-page-title {
+    font-size: 23px;
+  }
+
+  #client-settings-dialog .dialog-body,
+  #client-settings-dialog .settings-inline-body {
+    padding-inline: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #client-settings-dialog :is(.settings-tabs button, .settings-page-back, .settings-item, .settings-page-link, .settings-plugin-link, .settings-item-control > button, .download-setting-change, .theme-options button, .history-setting button[type='submit'], input[type='checkbox']) {
+    transition: none;
+  }
+}
+
 #client-settings-dialog .settings-page-heading .settings-page-title:focus {
   outline: none;
 }
@@ -871,4 +1251,728 @@ html[data-theme='dark'] .town-logo-light {
 #client-settings-dialog .dsh-config-control > .secondary,
 #client-settings-dialog .plugin-view-placement button {
   min-height: 40px;
+}
+
+/* Compact settings rhythm: keep the information hierarchy while removing oversized rows. */
+#client-settings-dialog .settings-item-list {
+  gap: 8px;
+}
+
+#client-settings-dialog .settings-item {
+  min-height: 58px;
+  margin-bottom: 8px;
+  padding: 12px 16px;
+  border-radius: 14px;
+}
+
+#client-settings-dialog .settings-item-copy {
+  gap: 2px;
+}
+
+#client-settings-dialog .settings-item-label {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+#client-settings-dialog .settings-item-copy small {
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+#client-settings-dialog .settings-page-link,
+#client-settings-dialog .settings-plugin-link {
+  min-height: 62px;
+  margin-bottom: 8px;
+  padding: 13px 16px;
+  border-radius: 14px;
+}
+
+#client-settings-dialog .settings-page-link strong,
+#client-settings-dialog .settings-plugin-link strong {
+  font-size: 13px;
+}
+
+#client-settings-dialog .settings-page-link small,
+#client-settings-dialog .settings-plugin-link small {
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+#client-settings-dialog .appearance-settings-group > .reading-setting,
+#client-settings-dialog .appearance-settings-group > .history-setting {
+  margin-bottom: 8px;
+  padding: 15px 16px;
+  border-radius: 14px;
+}
+
+#client-settings-dialog .reading-setting-footer {
+  min-height: 26px;
+}
+
+#client-settings-dialog .reading-setting-footer p,
+#client-settings-dialog .reading-setting-footer button,
+#client-settings-dialog .history-setting-input,
+#client-settings-dialog .history-setting button[type='submit'] {
+  font-size: 11px;
+}
+
+#client-settings-dialog .reading-setting-footer button,
+#client-settings-dialog .history-setting button[type='submit'] {
+  min-height: 32px;
+  padding: 6px 10px;
+  border-radius: 10px;
+}
+
+#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)) {
+  width: 36px;
+  height: 22px;
+}
+
+#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *))::before {
+  width: 16px;
+  height: 16px;
+  top: 3px;
+  left: 3px;
+}
+
+#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):checked::before {
+  transform: translateX(14px);
+}
+
+#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+
+#client-settings-dialog .notification-switches {
+  gap: 4px 8px;
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-radius: 14px;
+}
+
+#client-settings-dialog .notification-switches .settings-item {
+  min-height: 42px;
+  padding: 7px 6px;
+}
+
+/* Applications list and detail view share a denser, row-based layout. */
+#client-settings-dialog .connector-settings {
+  padding: 0 0 28px;
+}
+
+#client-settings-dialog .connector-toolbar {
+  margin-bottom: 18px;
+}
+
+#client-settings-dialog .connector-search input {
+  height: 38px;
+  min-height: 38px;
+}
+
+#client-settings-dialog .connector-group {
+  margin-bottom: 20px;
+}
+
+#client-settings-dialog .connector-group h3 {
+  margin-bottom: 8px;
+  font-size: 12px;
+  font-weight: 550;
+}
+
+#client-settings-dialog .connector-recommended > h3 {
+  padding-bottom: 6px;
+}
+
+#client-settings-dialog .connector-grid {
+  gap: 8px;
+}
+
+#client-settings-dialog .connector-card,
+#client-settings-dialog .connector-card.is-installed {
+  min-height: 64px;
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: 14px;
+}
+
+#client-settings-dialog .connector-card-copy {
+  gap: 2px;
+}
+
+#client-settings-dialog .connector-card-copy strong {
+  font-size: 13px;
+}
+
+#client-settings-dialog .connector-card-copy small {
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+#client-settings-dialog .connector-card > button.connector-card-action {
+  width: 30px;
+  min-width: 30px;
+  height: 30px;
+  min-height: 30px;
+  padding: 5px;
+}
+
+#client-settings-dialog .connector-card:not(.is-installed) > button.connector-card-action {
+  width: auto;
+  min-width: 48px;
+  padding-inline: 10px;
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+#client-settings-dialog .connector-detail {
+  padding-bottom: 28px;
+}
+
+#client-settings-dialog .connector-detail-heading {
+  gap: 12px;
+  margin: 0 0 12px;
+}
+
+#client-settings-dialog .connector-detail-heading > div:not(.connector-detail-actions) {
+  min-width: 0;
+  flex: 1 1 180px;
+}
+
+#client-settings-dialog .connector-detail-heading h3 {
+  font-size: 22px;
+  letter-spacing: -0.025em;
+}
+
+#client-settings-dialog .connector-detail-actions {
+  gap: 6px;
+}
+
+#client-settings-dialog .connector-detail-actions > button {
+  min-height: 32px;
+  padding: 6px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--control);
+  font-size: 11px;
+}
+
+#client-settings-dialog .connector-detail-actions > button:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--accent) 20%, var(--line));
+  background: var(--settings-hover);
+}
+
+#client-settings-dialog .connector-detail-actions > button.danger {
+  border-color: color-mix(in srgb, var(--danger, #c83242) 18%, var(--line));
+  background: color-mix(in srgb, var(--danger, #c83242) 8%, var(--control));
+}
+
+#client-settings-dialog .connector-detail-description {
+  margin: 0 0 20px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+#client-settings-dialog .connector-account h4,
+#client-settings-dialog :is(.connector-tools-section, .connector-info-section) > h4 {
+  margin-bottom: 7px;
+  font-size: 12px;
+  font-weight: 550;
+}
+
+#client-settings-dialog .connector-accounts {
+  padding: 5px 10px;
+  border-radius: 14px;
+}
+
+#client-settings-dialog button.connector-account-row {
+  min-height: 44px;
+  border-radius: 9px;
+  font-size: 12px;
+}
+
+#client-settings-dialog .connector-account-add {
+  min-height: 38px;
+  font-size: 12px;
+}
+
+#client-settings-dialog .connector-connect-panel,
+#client-settings-dialog .connector-preview,
+#client-settings-dialog .connector-flow {
+  margin-top: 14px;
+  padding: 14px;
+  border-radius: 14px;
+}
+
+#client-settings-dialog .connector-option {
+  margin: 6px 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+}
+
+#client-settings-dialog .connector-preview {
+  display: grid;
+  gap: 10px;
+}
+
+#client-settings-dialog .connector-preview .connector-field {
+  display: grid;
+  gap: 5px;
+}
+
+#client-settings-dialog .connector-preview .connector-field > span,
+#client-settings-dialog .connector-preview .connector-adopt {
+  font-size: 12px;
+}
+
+#client-settings-dialog .connector-preview .connector-field small {
+  font-size: 11px;
+  color: var(--secondary);
+}
+
+#client-settings-dialog .connector-preview input {
+  min-height: 36px;
+  padding: 8px 10px;
+  border-radius: 10px;
+}
+
+#client-settings-dialog .connector-preview .primary {
+  justify-self: start;
+  min-height: 34px;
+  padding: 7px 14px;
+  border-radius: 10px;
+}
+
+#client-settings-dialog .connector-action-row .primary {
+  margin-top: 0;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--button-text);
+}
+
+#client-settings-dialog .connector-empty .connector-action-row {
+  justify-content: center;
+}
+
+#client-settings-dialog .connector-flow {
+  flex-wrap: wrap;
+}
+
+#client-settings-dialog .connector-flow .connector-action-row {
+  margin-top: 0;
+}
+
+#client-settings-dialog .connector-tools-section,
+#client-settings-dialog .connector-info-section {
+  margin-top: 20px;
+}
+
+#client-settings-dialog .connector-tools,
+#client-settings-dialog .connector-info {
+  padding-inline: 12px;
+  border-radius: 14px;
+}
+
+#client-settings-dialog .connector-tools > button.connector-tools-toggle {
+  width: calc(100% + 24px);
+  min-height: 42px;
+  margin-inline: -12px;
+  padding-inline: 12px;
+  border-radius: 13px 13px 0 0;
+  font-size: 12px;
+
+  &[aria-expanded='false'] {
+    border-radius: 13px;
+  }
+}
+
+#client-settings-dialog .connector-tool-list {
+  padding-bottom: 4px;
+}
+
+#client-settings-dialog .connector-tool {
+  min-height: 38px;
+  padding: 8px 0;
+  font-size: 12px;
+}
+
+#client-settings-dialog .connector-tool > span {
+  display: grid;
+  gap: 2px;
+  line-height: 1.35;
+}
+
+#client-settings-dialog .connector-tool > span small {
+  display: block;
+  color: var(--secondary);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+#client-settings-dialog .connector-tool input[type='checkbox'] {
+  width: 36px;
+  height: 22px;
+}
+
+#client-settings-dialog .connector-tool input[type='checkbox']::after {
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+}
+
+#client-settings-dialog .connector-tool input[type='checkbox']:checked::after {
+  transform: translateX(14px);
+}
+
+#client-settings-dialog .connector-app-summary {
+  min-height: 58px;
+  padding: 11px 14px;
+  border-radius: 14px;
+}
+
+#client-settings-dialog .connector-skills-section {
+  margin-top: 20px;
+}
+
+#client-settings-dialog .connector-skill-row {
+  padding: 12px 14px;
+}
+
+#client-settings-dialog .connector-info > div {
+  padding: 10px 0;
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  #client-settings-dialog .settings-item {
+    min-height: 54px;
+    padding: 11px 14px;
+  }
+
+  #client-settings-dialog .connector-grid {
+    grid-template-columns: 1fr;
+  }
+
+  #client-settings-dialog .connector-detail-heading {
+    display: flex;
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  #client-settings-dialog .connector-detail-actions {
+    flex: 1 0 100%;
+    width: 100%;
+  }
+}
+
+/* The sidebar follows the Cue grouping rhythm: search, three logical sections, then open space. */
+#client-settings-dialog .client-settings-content {
+  grid-template-rows: 78px minmax(0, 1fr);
+}
+
+#client-settings-dialog .client-settings-content > .dialog-heading {
+  display: block;
+  padding: 17px 18px 12px;
+}
+
+#client-settings-dialog .dialog-heading-main {
+  min-height: 28px;
+  padding-inline: 4px;
+}
+
+#client-settings-dialog .client-settings-content > .dialog-heading h2 {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+#client-settings-dialog .settings-nav-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 44px;
+  margin-top: 0;
+  padding: 0 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+  border-radius: 20px;
+  background: var(--control);
+  color: var(--secondary);
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+}
+
+/* Grouped cards keep related controls together and let dividers carry the rhythm. */
+#client-settings-dialog .settings-group > h3,
+#client-settings-dialog .general-settings-group > h3 {
+  margin: 0 0 9px;
+  padding-inline: 2px;
+  color: var(--secondary);
+  font-size: 13px;
+  font-weight: 550;
+}
+
+#client-settings-dialog .settings-section-card {
+  margin: 0 0 22px;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+  border-radius: 18px;
+  background: var(--settings-card);
+  box-shadow: 0 2px 8px rgb(20 24 32 / 4%);
+}
+
+#client-settings-dialog .settings-section-card > .settings-item,
+#client-settings-dialog .settings-section-card > .settings-page-link,
+#client-settings-dialog .settings-section-card > .reading-setting,
+#client-settings-dialog .settings-section-card > .history-setting,
+#client-settings-dialog .settings-section-card > .notification-switches {
+  min-height: 0;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+#client-settings-dialog .settings-section-card > .settings-item,
+#client-settings-dialog .settings-section-card > .settings-page-link {
+  min-height: 62px;
+  padding: 13px 12px;
+}
+
+#client-settings-dialog .settings-section-card > .reading-setting,
+#client-settings-dialog .settings-section-card > .history-setting {
+  padding: 14px 12px;
+}
+
+#client-settings-dialog .settings-section-card > :not(:first-child) {
+  border-top: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+}
+
+#client-settings-dialog .settings-section-card > label.settings-item:has(input:enabled):hover,
+#client-settings-dialog .settings-section-card > .settings-page-link:hover:not(:disabled) {
+  background: var(--settings-hover);
+  box-shadow: none;
+}
+
+#client-settings-dialog .settings-inline-body .settings-section-card > .settings-page-link {
+  border-radius: 0;
+}
+
+#client-settings-dialog .settings-section-card > .settings-page-link:focus-visible {
+  outline-offset: -3px;
+}
+
+#client-settings-dialog .settings-section-card > .settings-page-link::after {
+  display: none;
+}
+
+#client-settings-dialog .settings-section-card > .notification-switches {
+  display: grid;
+  gap: 4px 8px;
+  padding: 8px 0;
+}
+
+#client-settings-dialog .settings-section-card .notification-switches .settings-item {
+  min-height: 42px;
+  margin: 0;
+  padding: 7px 12px;
+  border: 0;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+#client-settings-dialog .settings-section-card .notification-switches label.settings-item:has(input:enabled):hover {
+  background: var(--settings-hover);
+}
+
+#client-settings-dialog .settings-section-card .general-setting-help,
+#client-settings-dialog .settings-section-card .form-error {
+  margin: 0;
+  padding: 10px 0 12px;
+  font-size: 11px;
+}
+
+#client-settings-dialog .settings-nav-search > svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+
+#client-settings-dialog .settings-nav-search input {
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  font-size: 13px;
+}
+
+#client-settings-dialog .settings-nav-search input:focus-visible {
+  outline: none;
+}
+
+#client-settings-dialog .settings-nav-search:focus-within {
+  border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+#client-settings-dialog .settings-tabs {
+  padding-top: 16px;
+}
+
+#client-settings-dialog .settings-tabs-empty {
+  margin: 12px 8px;
+  color: var(--secondary);
+  font-size: 12px;
+}
+
+@media (max-width: 720px) {
+  #client-settings-dialog .client-settings-content > .dialog-heading {
+    display: flex;
+    padding: 18px 20px;
+  }
+
+  #client-settings-dialog .client-settings-content > .dialog-heading h2 {
+    position: static;
+    width: auto;
+    height: auto;
+    overflow: visible;
+    clip-path: none;
+    white-space: normal;
+    font-size: 17px;
+  }
+
+  #client-settings-dialog .settings-nav-search {
+    display: none;
+  }
+
+  #client-settings-dialog .settings-tabs {
+    padding-top: 6px;
+  }
+}
+
+/* Final compact rhythm overrides keep the row sizing consistent with the Cue reference. */
+#client-settings-dialog .settings-item {
+  min-height: 50px;
+  margin-bottom: 6px;
+  padding: 7px 14px;
+}
+
+#client-settings-dialog .settings-item-copy {
+  gap: 1px;
+}
+
+#client-settings-dialog .settings-section-card {
+  padding-inline: 0;
+  border-radius: 16px;
+}
+
+#client-settings-dialog .settings-section-card > .settings-item,
+#client-settings-dialog .settings-section-card > .settings-page-link {
+  min-height: 50px;
+  padding-block: 7px;
+}
+
+#client-settings-dialog .settings-section-card > .reading-setting,
+#client-settings-dialog .settings-section-card > .history-setting {
+  padding-block: 11px;
+}
+
+#client-settings-dialog .settings-section-card .history-setting .settings-item {
+  min-height: 50px;
+  padding-block: 7px;
+}
+
+#client-settings-dialog .settings-page-link,
+#client-settings-dialog .settings-plugin-link {
+  min-height: 52px;
+  margin-bottom: 6px;
+  padding-block: 7px;
+}
+
+#client-settings-dialog .settings-page-link small,
+#client-settings-dialog .settings-plugin-link small {
+  margin-top: 2px;
+  line-height: 1.35;
+}
+
+#client-settings-dialog .settings-section-card .notification-switches .settings-item {
+  min-height: 38px;
+  padding-block: 5px;
+}
+
+#client-settings-dialog :is(.settings-item-control > button, .download-setting-change, .theme-options button) {
+  min-height: 30px;
+  padding: 5px 10px;
+  border-radius: 10px;
+}
+
+#client-settings-dialog .history-setting button[type='submit'] {
+  min-height: 28px;
+  padding: 4px 9px;
+  border-radius: 9px;
+}
+
+/* The left rail uses a denser navigation rhythm than the content cards. */
+#client-settings-dialog .client-settings-content {
+  grid-template-rows: 68px minmax(0, 1fr);
+}
+
+#client-settings-dialog .client-settings-content > .dialog-heading {
+  padding: 12px 18px 10px;
+}
+
+#client-settings-dialog .dialog-heading-main {
+  min-height: 0;
+  height: 0;
+}
+
+#client-settings-dialog .settings-nav-search {
+  height: 36px;
+}
+
+#client-settings-dialog .settings-tabs {
+  gap: 2px;
+  padding: 8px 14px 20px;
+}
+
+#client-settings-dialog .settings-tab-separator {
+  margin: 8px 10px;
+}
+
+#client-settings-dialog .settings-tabs button {
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 12px;
+  gap: 10px;
+  font-size: 13px;
+}
+
+@media (max-width: 720px) {
+  #client-settings-dialog .client-settings-content {
+    grid-template-rows: 64px auto minmax(0, 1fr);
+  }
+
+  #client-settings-dialog .settings-tabs {
+    gap: 4px;
+    padding: 6px 14px 14px;
+  }
+
+  #client-settings-dialog .settings-tabs button {
+    min-height: 38px;
+    padding: 7px 10px;
+  }
+
+  #client-settings-dialog .dialog-heading-main {
+    min-height: 28px;
+    height: auto;
+  }
 }

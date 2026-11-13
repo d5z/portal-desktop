@@ -37,7 +37,7 @@ try {
   await page.goto(origin);
 
   await mkdir('output/playwright', {recursive:true});
-  const toggle = page.getByRole('button', {name:'资料库',exact:true});
+  const toggle = page.getByRole('button', {name:'资料',exact:true});
   const panel = page.locator('#being-info');
   const settle = () => page.waitForFunction(() => !document.querySelector('#being-info').hasAttribute('data-animating'));
   await toggle.click();

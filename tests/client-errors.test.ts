@@ -67,6 +67,7 @@ it('shows concise guidance for native failures and strips Electron wrappers with
   expect(publicErrorMessage(new Error('spawn powershell.exe ENOENT'))).toBe('Windows 命令环境不可用，请检查后重试。');
   expect(publicErrorMessage(new Error('EACCES C:\\private\\portal.toml'))).toBe('权限不足，请检查文件或系统权限后重试。');
   expect(publicErrorMessage("Error invoking remote method 'beings:portal-start': Error: " + cliXml)).not.toMatch(/CLIXML|powershell|_x000D_|Config file/);
+  expect(publicErrorMessage("Error invoking remote method 'beings:home-connector-catalog': Error: 连接失败，请重试。", '连接失败，请重试。')).toBe('连接失败，请重试。');
   expect(publicErrorMessage('<Objs><S S="Error">Unexpected details</S></Objs>')).toBe('操作未完成，请重试或查看日志。');
   expect(publicErrorMessage('Error invoking remote method \'beings:save\': Error: 请先输入 Being 链接。')).toBe('请先输入 Being 链接。');
   expect(publicErrorMessage('底层错误\nC:\\private\\x\n堆栈信息')).toBe('操作未完成，请重试或查看日志。');

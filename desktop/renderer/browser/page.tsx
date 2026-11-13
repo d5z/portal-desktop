@@ -28,7 +28,7 @@ export function Browser({ model: app }: { model: AppModel }) {
   const sendBounds = useCallback(() => {
     if (!viewport.current || !app.api) return;
     const rect = viewport.current.getBoundingClientRect();
-    const visible = !dragging.current && !panel.current?.dataset.animating && !panel.current?.hidden && rect.width > 0 && rect.height > 0 && app.startup === "ready" && !document.querySelector("dialog[open]");
+    const visible = state.open && !dragging.current && !panel.current?.dataset.animating && !panel.current?.hidden && rect.width > 0 && rect.height > 0 && app.startup === "ready" && !document.querySelector("dialog[open]");
     const { x, y, width, height } = visible ? rect : { x:0, y:0, width:0, height:0 };
     const bounds = { x, y, width, height, visible };
     const previous = lastBounds.current;
@@ -37,7 +37,7 @@ export function Browser({ model: app }: { model: AppModel }) {
     void app.api
       .browserBounds(bounds)
       .catch(error => { if (lastBounds.current === bounds) lastBounds.current = null; app.toast(error); });
-  }, [app]);
+  }, [app, state.open]);
   const setDragging = useCallback(
     (active: boolean) => {
       dragging.current = active;

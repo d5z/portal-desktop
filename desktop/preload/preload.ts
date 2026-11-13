@@ -1,24 +1,50 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { DesktopAPI, PortalState, TownLiveState } from '../shared/types';
+import { CONNECTOR_NETWORK_METHODS, connectorNetworkPath } from '../shared/home';
+
+async function connectorRequest(operation: keyof typeof CONNECTOR_NETWORK_METHODS, ...args: unknown[]): Promise<any> {
+  const key = await ipcRenderer.invoke('beings:home-connector-network-key');
+  const method = CONNECTOR_NETWORK_METHODS[operation];
+  const requestArgs = [...args];
+  while (requestArgs.length && requestArgs.at(-1) === undefined) requestArgs.pop();
+  const url = new URL(`beings://desktop${connectorNetworkPath(operation, requestArgs)}`);
+  if (method === 'GET' && requestArgs.length) url.searchParams.set('args', JSON.stringify(requestArgs));
+  const response = await fetch(url.href, {
+    method, credentials: 'omit', cache: 'no-store',
+    headers: { 'Content-Type': 'application/json', 'X-Connector-Access': key },
+    ...(method === 'GET' ? {} : { body: JSON.stringify(requestArgs) }),
+  });
+  if (response.status === 204) return;
+  const body = await response.text();
+  if (!body.trim()) throw new Error(response.ok ? 'Connector 返回空响应。' : `Connector 请求失败（HTTP ${response.status}）。`);
+  let value: { error?: unknown; accepted?: boolean };
+  try { value = JSON.parse(body) as { error?: unknown; accepted?: boolean }; }
+  catch { throw new Error('Connector 返回无效响应。'); }
+  if (!response.ok && !(operation === 'lifecycle' && response.status === 409 && value?.accepted === false)) {
+    throw new Error(typeof value?.error === 'string' ? value.error : `Connector 请求失败（HTTP ${response.status}）。`);
+  }
+  return value;
+}
+
 const api: DesktopAPI = {
   home: {
     connectors: {
-      catalog: query => ipcRenderer.invoke('beings:home-connector-catalog', query),
-      installations: after => ipcRenderer.invoke('beings:home-connector-installations', after),
-      detail: releaseId => ipcRenderer.invoke('beings:home-connector-detail', releaseId),
-      startOAuth: (releaseId, installationId) => ipcRenderer.invoke('beings:home-connector-start-oauth', releaseId, installationId),
-      syncOAuth: (flowId, expectedRevision) => ipcRenderer.invoke('beings:home-connector-sync-oauth', flowId, expectedRevision),
-      oauthState: flowId => ipcRenderer.invoke('beings:home-connector-oauth-state', flowId),
-      preview: (releaseId, input) => ipcRenderer.invoke('beings:home-connector-preview', releaseId, input),
-      confirm: (intentId, input) => ipcRenderer.invoke('beings:home-connector-confirm', intentId, input),
-      state: intentId => ipcRenderer.invoke('beings:home-connector-state', intentId),
-      advance: intentId => ipcRenderer.invoke('beings:home-connector-advance', intentId),
-      cancel: intentId => ipcRenderer.invoke('beings:home-connector-cancel', intentId),
+      catalog: query => connectorRequest('catalog', query),
+      installations: after => connectorRequest('installations', after),
+      installation: installationId => connectorRequest('installation', installationId),
+      removeAccount: (releaseId, connectionId) => connectorRequest('remove-account', releaseId, connectionId),
+      detail: releaseId => connectorRequest('detail', releaseId),
+      preview: (releaseId, input) => connectorRequest('preview', releaseId, input),
+      confirm: (intentId, input) => connectorRequest('confirm', intentId, input),
+      state: intentId => connectorRequest('state', intentId),
+      advance: intentId => connectorRequest('advance', intentId),
+      cancel: intentId => connectorRequest('cancel', intentId),
       openAuthorization: url => ipcRenderer.invoke('beings:home-connector-open', url),
-      tools: installationId => ipcRenderer.invoke('beings:home-connector-tools', installationId),
-      setTool: (installationId, input) => ipcRenderer.invoke('beings:home-connector-set-tool', installationId, input),
-      setBeingAccess: (installationId, enabled, expectedRevision) => ipcRenderer.invoke('beings:home-connector-being-access', installationId, enabled, expectedRevision),
-      lifecycle: (installationId, action, expectedRevision) => ipcRenderer.invoke('beings:home-connector-lifecycle', installationId, action, expectedRevision),
+      tools: installationId => connectorRequest('tools', installationId),
+      setTool: (installationId, input) => connectorRequest('set-tool', installationId, input),
+      setBeingAccess: (installationId, enabled, expectedRevision) => connectorRequest('being-access', installationId, enabled, expectedRevision),
+      beingAccess: installationId => connectorRequest('get-being-access', installationId),
+      lifecycle: (installationId, action, expectedRevision, requestId) => connectorRequest('lifecycle', installationId, action, expectedRevision, requestId),
     },
     files: {
       list: path => ipcRenderer.invoke('beings:home-files-list', path),
