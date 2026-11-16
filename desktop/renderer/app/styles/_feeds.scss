@@ -227,19 +227,21 @@
 
 .feed-empty {
   text-align: center;
-  padding: 60px 18px;
+  padding: clamp(24px, 7vh, 56px) 16px;
   color: var(--secondary);
   font-size: 13px;
 }
 
 .feed-empty strong {
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
   color: var(--text);
 }
 
 .feed-empty p {
-  font-size: 12px;
-  margin: 8px 0 16px;
+  font-size: 13px;
+  line-height: 1.6;
+  margin: 6px 0 0;
 }
 
 .fireside-layout {

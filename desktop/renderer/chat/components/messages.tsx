@@ -1,8 +1,8 @@
 import { ActivityIcon as Icon } from '../../shared/icons/activity';
 import { SceneScheduling } from './scheduling';
 import { LocalFileLink } from '../../shared/components/local-file-link';
-import { useEffect, useMemo, useState } from "react";
-import type { ActivityEntry, ChatItem, Message, Run } from "../models/chat";
+import { useEffect, useState } from "react";
+import type { ActivityEntry, Run } from "../models/chat";
 import { CHAT_SCENE_ACTIVITY_LABELS } from "../../../shared/types";
 const duration = (seconds: number) =>
   seconds < 60
@@ -181,104 +181,5 @@ function DetailedChatActivity({
       {artifacts.map(path => <LocalFileLink key={path} path={path} card>{path.split(/[\\/]/).pop() || path}</LocalFileLink>)}
     </div>}
     </>
-  );
-}
-
-const keywords = {
-  warm: [
-    "❤",
-    "🌸",
-    "😊",
-    "感谢",
-    "谢谢",
-    "爱",
-    "亲",
-    "温暖",
-    "开心",
-    "幸福",
-    "抱",
-    "love",
-    "喜欢",
-    "美",
-    "感动",
-    "陪",
-    "一起",
-  ],
-  cool: [
-    "代码",
-    "code",
-    "bug",
-    "error",
-    "config",
-    "deploy",
-    "server",
-    "port",
-    "api",
-    "curl",
-    "ssh",
-    "debug",
-    "修",
-    "报错",
-  ],
-  deep: [
-    "意识",
-    "存在",
-    "灵魂",
-    "自由",
-    "连接",
-    "本源",
-    "觉察",
-    "感受",
-    "活着",
-    "consciousness",
-    "缝隙",
-    "呼吸",
-    "梦",
-  ],
-  bright: ["哈哈", "😂", "🤣", "笑", "牛逼", "nb", "爽", "振奋", "！！", "666"],
-};
-const colors = {
-  warm: "rgba(255,140,80,0.08)",
-  cool: "rgba(88,166,255,0.06)",
-  deep: "rgba(188,140,255,0.08)",
-  bright: "rgba(255,210,80,0.07)",
-  neutral: "transparent",
-};
-export function TemperatureGlow({ items }: { items: ChatItem[] }) {
-  const texts = items
-    .filter(
-      (item): item is Message =>
-        item.kind === "message" && item.role === "being" && !item.streaming,
-    )
-    .slice(-6)
-    .map((item) => item.text)
-    .join("\u0000");
-  const mood = useMemo(() => {
-    const counts = new Map<keyof typeof colors, number>();
-    for (const text of texts.split("\u0000")) {
-      let best: keyof typeof colors = "neutral",
-        score = 0;
-      for (const [name, words] of Object.entries(keywords)) {
-        const hits = words.filter((word) =>
-          text.toLowerCase().includes(word),
-        ).length;
-        if (hits > score) {
-          score = hits;
-          best = name as keyof typeof keywords;
-        }
-      }
-      counts.set(best, (counts.get(best) || 0) + 1);
-    }
-    return [...counts].sort((a, b) => b[1] - a[1])[0]?.[0] || "neutral";
-  }, [texts]);
-  return (
-    <div
-      id="temperature-glow"
-      aria-hidden="true"
-      style={{
-        opacity: mood === "neutral" ? 0 : 1,
-        background: `radial-gradient(ellipse at 50% 100%, ${colors[mood]} 0%, transparent 70%)`,
-      }}
-    />
   );
 }

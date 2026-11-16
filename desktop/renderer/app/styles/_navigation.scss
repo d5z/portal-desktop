@@ -408,22 +408,6 @@ body[data-view='chat'].has-topic .scene-ribbon {
   margin: 10px 0 0;
 }
 
-.welcome-connect {
-  width: auto;
-  min-height: 0;
-  gap: 28px;
-  padding: 12px 18px;
-  border-radius: 24px;
-  box-shadow: none;
-}
-
-.welcome-connect-arrow {
-  width: 24px;
-  height: 24px;
-  font-size: 14px;
-  border-radius: 50%;
-}
-
 @media (max-width: 640px) {
   .topbar {
     padding: 0 12px;

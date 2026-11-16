@@ -4,7 +4,7 @@
 }
 
 #messages {
-  padding: calc(24px + var(--chat-top-inset, 0px)) var(--chat-inset-right) max(120px, calc(var(--chat-composer-height, 99px) + 18px)) var(--chat-inset-left);
+  padding: calc(24px + var(--chat-top-inset, 0px)) var(--chat-inset-right) max(120px, calc(var(--chat-composer-height, 99px) + var(--chat-composer-bottom) + 20px)) var(--chat-inset-left);
   scroll-padding-top: calc(20px + var(--chat-top-inset, 0px));
   /* Keep programmatic focus jumps above the floating composer and its Muse-like gap. */
   scroll-padding-bottom: max(160px, calc(var(--chat-composer-height, 99px) + 60px));
@@ -129,26 +129,23 @@
   z-index: 1;
 }
 
-#input-area {
-  width: calc(100% - var(--chat-inset-left) - var(--chat-inset-right));
-  max-width: var(--chat-content-width);
+.composer-stack {
   position: absolute;
-  inset-inline: 0;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100% - var(--chat-composer-bottom));
+  inset-inline: var(--chat-inset-left) var(--chat-inset-right);
   bottom: var(--chat-composer-bottom);
   z-index: 4;
-  margin: 0 var(--chat-inset-right) 0 var(--chat-inset-left);
+}
+
+#input-area {
+  position: relative;
   padding: 8px 12px;
   border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
   border-radius: 26px;
   background: var(--composer-surface, var(--bg));
   box-shadow: 0 5px 18px rgb(0 0 0 / 6%);
-}
-
-#input-area.has-queue {
-  position: relative;
-  inset-inline: auto;
-  bottom: auto;
-  margin-top: 0;
 }
 
 #input-area:focus-within {
@@ -191,10 +188,5 @@
 @media (max-width: 680px) {
   #app {
     --chat-composer-bottom: 14px;
-  }
-
-  #input-area.has-queue {
-    margin-top: 0;
-    margin-bottom: 14px;
   }
 }

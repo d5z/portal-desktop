@@ -561,25 +561,23 @@ html[data-theme='dark'] .town-logo-light {
 
 /* Settings uses the same quiet panel language as the rest of the client. */
 #client-settings-dialog {
-  --settings-page: color-mix(in srgb, var(--bg) 94%, var(--surface));
-  --settings-sidebar: color-mix(in srgb, var(--surface) 88%, var(--bg));
+  --settings-page: var(--bg);
+  --settings-sidebar: var(--sidebar);
   --settings-card: var(--control);
-  --settings-hover: color-mix(in srgb, var(--accent) 7%, var(--settings-card));
-  --settings-active: color-mix(in srgb, var(--accent) 11%, var(--settings-card));
+  --settings-hover: var(--surface);
+  --settings-active: var(--selected);
 
   width: min(1120px, calc(100vw - 48px));
   height: min(820px, calc(100dvh - 48px));
   border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
-  border-radius: 28px;
+  border-radius: var(--panel-radius);
   background: var(--settings-page);
-  box-shadow:
-    0 30px 90px rgb(20 24 32 / 20%),
-    0 8px 24px rgb(20 24 32 / 10%);
+  box-shadow: var(--popover-shadow);
 }
 
 #client-settings-dialog .client-settings-content {
   grid-template-columns: 200px minmax(0, 1fr);
-  grid-template-rows: 88px minmax(0, 1fr);
+  grid-template-rows: 76px minmax(0, 1fr);
   background: var(--settings-page);
 }
 
@@ -590,12 +588,11 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 #client-settings-dialog .client-settings-content > .dialog-heading {
-  padding: 30px 24px 20px;
+  padding: 24px;
 }
 
 #client-settings-dialog .dialog-heading h2 {
-  font-size: 24px;
-  letter-spacing: -0.03em;
+  font-size: 21px;
 }
 
 #client-settings-dialog .settings-tabs {
@@ -609,16 +606,15 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 #client-settings-dialog .settings-tabs button {
-  min-height: 48px;
-  padding: 12px 14px;
-  border-radius: 14px;
+  min-height: 40px;
+  padding: 8px 12px;
+  border-radius: 8px;
   gap: 12px;
   font-size: 14px;
   transition:
     background-color 160ms ease,
     color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+    border-color 160ms ease;
 }
 
 #client-settings-dialog .settings-tabs button:hover:not(:disabled),
@@ -631,25 +627,19 @@ html[data-theme='dark'] .town-logo-light {
 #client-settings-dialog .settings-tabs button[aria-selected='true']:hover:not(:disabled) {
   background: var(--settings-active);
   color: var(--text);
-  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 8%, transparent), 0 2px 8px rgb(20 24 32 / 5%);
   font-weight: 600;
 }
 
-#client-settings-dialog .settings-tabs button:active:not(:disabled) {
-  transform: scale(0.985);
-}
-
 #client-settings-dialog .settings-page-heading {
-  min-height: 96px;
-  padding: 30px 36px 24px;
+  min-height: 80px;
+  padding: 24px 32px 20px;
   border-bottom: 0;
   background: var(--settings-page);
 }
 
 #client-settings-dialog .settings-page-title {
-  font-size: 27px;
-  font-weight: 650;
-  letter-spacing: -0.035em;
+  font-size: 24px;
+  font-weight: 600;
 }
 
 #client-settings-dialog .settings-page-back {
@@ -667,7 +657,7 @@ html[data-theme='dark'] .town-logo-light {
 
 #client-settings-dialog .dialog-body,
 #client-settings-dialog .settings-inline-body {
-  padding: 0 36px 44px;
+  padding: 0 32px 32px;
   background: var(--settings-page);
   scrollbar-color: var(--muted) transparent;
 }
@@ -694,22 +684,19 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 #client-settings-dialog :is(.settings-item, .settings-page-link, .settings-plugin-link) {
-  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
-  border-radius: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--utility-radius);
   background: var(--settings-card);
-  box-shadow: 0 2px 8px rgb(20 24 32 / 4%);
   transition:
     background-color 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+    border-color 160ms ease;
 }
 
 #client-settings-dialog .settings-item {
-  min-height: 76px;
-  margin: 0 0 12px;
-  padding: 17px 20px;
-  border-bottom: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+  min-height: 64px;
+  margin: 0 0 8px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
 }
 
 #client-settings-dialog label.settings-item:has(input:enabled):hover,
@@ -721,9 +708,9 @@ html[data-theme='dark'] .town-logo-light {
 #client-settings-dialog .settings-page-link,
 #client-settings-dialog .settings-plugin-link {
   width: 100%;
-  min-height: 76px;
-  margin: 0 0 12px;
-  padding: 17px 20px;
+  min-height: 64px;
+  margin: 0 0 8px;
+  padding: 12px 16px;
 }
 
 #client-settings-dialog .settings-page-link::after,
@@ -751,22 +738,14 @@ html[data-theme='dark'] .town-logo-light {
   border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
   border-radius: 12px;
   background: var(--control);
-  box-shadow: 0 1px 4px rgb(20 24 32 / 5%);
   color: var(--text);
   transition:
     background-color 160ms ease,
-    border-color 160ms ease,
-    box-shadow 160ms ease,
-    transform 160ms ease;
+    border-color 160ms ease;
 }
 
 #client-settings-dialog :is(.settings-item-control > button, .download-setting-change, .theme-options button, .history-setting button[type='submit']):hover:not(:disabled) {
   background: var(--settings-hover);
-}
-
-#client-settings-dialog :is(.settings-item-control > button, .download-setting-change, .theme-options button, .history-setting button[type='submit']):active:not(:disabled) {
-  transform: scale(0.975);
-  box-shadow: 0 1px 3px rgb(20 24 32 / 5%);
 }
 
 #client-settings-dialog .theme-options {
@@ -786,17 +765,15 @@ html[data-theme='dark'] .town-logo-light {
 #client-settings-dialog .theme-options button[aria-pressed='true'] {
   border-color: var(--line);
   background: var(--control);
-  box-shadow: 0 2px 7px rgb(20 24 32 / 9%);
 }
 
 #client-settings-dialog .appearance-settings-group > .reading-setting,
 #client-settings-dialog .appearance-settings-group > .history-setting {
   margin: 0 0 12px;
   padding: 20px;
-  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
-  border-radius: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--utility-radius);
   background: var(--settings-card);
-  box-shadow: 0 2px 8px rgb(20 24 32 / 4%);
 }
 
 #client-settings-dialog .appearance-settings-group > .reading-setting {
@@ -827,12 +804,13 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 #client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):checked {
-  background: #2f86f6;
+  background: var(--accent);
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 #client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):checked::before {
   transform: translateX(16px);
+  background: var(--button-text);
 }
 
 #client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):hover:not(:disabled) {
@@ -840,7 +818,7 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 #client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):focus-visible {
-  outline: 2px solid #2f86f6;
+  outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
 
@@ -848,10 +826,9 @@ html[data-theme='dark'] .town-logo-light {
   gap: 12px;
   margin: 0 0 12px;
   padding: 14px;
-  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
-  border-radius: 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--utility-radius);
   background: var(--settings-card);
-  box-shadow: 0 2px 8px rgb(20 24 32 / 4%);
 }
 
 #client-settings-dialog .notification-switches .settings-item {
@@ -870,7 +847,7 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 #client-settings-dialog .settings-unsaved {
-  border-radius: 16px;
+  border-radius: var(--utility-radius);
   box-shadow: 0 5px 16px rgb(20 24 32 / 7%);
 }
 
@@ -1720,10 +1697,9 @@ html[data-theme='dark'] .town-logo-light {
   margin: 0 0 22px;
   padding: 0;
   overflow: hidden;
-  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
-  border-radius: 18px;
+  border: 1px solid var(--line);
+  border-radius: var(--utility-radius);
   background: var(--settings-card);
-  box-shadow: 0 2px 8px rgb(20 24 32 / 4%);
 }
 
 #client-settings-dialog .settings-section-card > .settings-item,
@@ -1868,11 +1844,6 @@ html[data-theme='dark'] .town-logo-light {
 
 #client-settings-dialog .settings-item-copy {
   gap: 1px;
-}
-
-#client-settings-dialog .settings-section-card {
-  padding-inline: 0;
-  border-radius: 16px;
 }
 
 #client-settings-dialog .settings-section-card > .settings-item,

@@ -122,7 +122,8 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 0 36px 100px;
+  padding: 24px clamp(20px, 7%, 64px) clamp(24px, 8vh, 80px);
+  overflow: auto;
 }
 
 .welcome-intro {
@@ -134,46 +135,47 @@
   width: 88px;
   height: 88px;
   object-fit: contain;
-  margin-bottom: 22px;
+  margin-bottom: 24px;
   vertical-align: middle;
 }
 
 .welcome-intro h1 {
-  font-size: 29px;
-  font-weight: 500;
-  letter-spacing: -1px;
-  margin-bottom: 10px;
+  font: 600 clamp(26px, 4.5vw, 40px) / 1.25 'Songti SC', 'Noto Serif CJK SC', Georgia, serif;
+  margin-bottom: 12px;
 }
 
 .welcome-intro p {
-  font-size: 14px;
-  color: var(--muted);
-  margin-bottom: 32px;
+  max-width: 32em;
+  color: var(--secondary);
+  line-height: 1.7;
+  text-wrap: pretty;
+  margin-bottom: 24px;
 }
 
 .welcome-connect {
-  display: flex;
-  justify-content: space-between;
+  display: inline-flex;
+  justify-content: center;
   align-items: center;
-  width: min(100%, 590px);
-  min-height: 90px;
-  border: 1px solid var(--line);
-  border-radius: 18px;
-  padding: 24px;
-  color: var(--secondary);
+  min-height: 44px;
+  gap: 12px;
+  border-radius: 10px;
+  padding: 10px 16px;
+  color: var(--button-text);
   font-size: 14px;
-  box-shadow: 0 3px 12px #00000004;
-  background: var(--control);
+  font-weight: 550;
+  background: var(--accent);
 }
 
-.welcome-connect-arrow {
-  display: grid;
-  place-items: center;
-  background: var(--accent);
-  color: var(--button-text);
-  width: 32px;
-  height: 32px;
-  font-size: 18px;
+.welcome-connect:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--accent) 86%, var(--bg));
+}
+
+@media (max-height: 440px) {
+  .welcome-logo {
+    width: 52px;
+    height: 52px;
+    margin-bottom: 12px;
+  }
 }
 
 .welcome-shortcuts {

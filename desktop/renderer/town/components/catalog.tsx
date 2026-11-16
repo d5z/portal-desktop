@@ -1,4 +1,4 @@
-import { Icon } from '../../shared/icons/icon';
+import { Icon, type IconName } from '../../shared/icons/icon';
 import { catalogPage } from '../models/pagination';
 import { groveEntryKind, pluginReleaseUrl } from '../../../shared/plugins';
 import { Fragment, useEffect, useRef, useState } from "react";
@@ -36,18 +36,19 @@ export function TownHome({ town, data }: { town: TownModel; data: Data }) {
       service: record(raw),
     }))
     .filter(({ key }) => key !== "beings" && (key !== 'portal' || town.supportsLocalKits));
-  const routes: Record<string, [string, string, string]> = {
-    grove: ["◇", "Grove 工具市集", "kits"],
-    bonfire: ["♧", "篝火", "bonfire"],
-    fireside: ["◎", "围炉", "firesides"],
-    messages: ["✉", "私信", "mail"],
-    announcements: ["⚑", "公告", "announcements"],
-    contacts: ["◎", "通讯录", "contacts"],
-    garden: ["♧", "种子花园 · Seed Garden", "seeds"],
-    seeds: ["♧", "种子花园 · Seed Garden", "seeds"],
-    ember: ["▤", "书架", "embers"],
-    scroll: ["≡", "卷轴", "scrolls"],
-    portal: ["⌘", "Portal 设置", "portal"],
+  const routes: Record<string, [IconName, string, string]> = {
+    grove: ["rail-kits", "Grove 工具市集", "kits"],
+    bonfire: ["rail-bonfire", "篝火", "bonfire"],
+    fireside: ["rail-firesides", "围炉", "firesides"],
+    messages: ["rail-mail", "私信", "mail"],
+    announcements: ["rail-announcements", "公告", "announcements"],
+    contacts: ["rail-contacts", "通讯录", "contacts"],
+    garden: ["rail-seeds", "种子花园 · Seed Garden", "seeds"],
+    seeds: ["rail-seeds", "种子花园 · Seed Garden", "seeds"],
+    ember: ["rail-embers", "书架", "embers"],
+    scroll: ["rail-scrolls", "卷轴", "scrolls"],
+    scrolls: ["rail-scrolls", "卷轴", "scrolls"],
+    portal: ["settings-portal", "Portal 设置", "portal"],
   };
   const labels: Record<string, string> = {
     browse: "浏览器",
@@ -66,20 +67,19 @@ export function TownHome({ town, data }: { town: TownModel; data: Data }) {
             ? [
                 <article className="service-card" key={name}>
                   <span className="service-icon" aria-hidden="true">
-                    {known?.[0] || "◦"}
+                    <Icon name={known?.[0] || "file"} />
                   </span>
                   <h2>{title}</h2>
                   <p>{str(service.what)}</p>
-                  <button
+                  {(known || /^\/api\/[a-z]+\/help$/.test(help)) && <button
                     className="card-link"
                     onClick={() => {
                       if (known) town.navigate(known[2]);
-                      else if (/^\/api\/[a-z]+\/help$/.test(help))
-                        void town.run(() => town.api.openTownLink(help));
+                      else void town.run(() => town.api.openTownLink(help));
                     }}
                   >
-                    {known ? "打开" : "说明 ↗"}
-                  </button>
+                    {known ? "打开" : "说明"}
+                  </button>}
                 </article>,
               ]
             : [];
@@ -97,7 +97,7 @@ export function TownHome({ town, data }: { town: TownModel; data: Data }) {
     <>
       <div className="town-summary">
         <span>{services.length} 项服务</span>
-        <span>Town {str(data.version)}</span>
+        {str(data.version) && <span>Town {str(data.version)}</span>}
       </div>
       <div
         className={`service-grid${town.tab === "services" ? " service-directory" : ""}`}
@@ -125,8 +125,8 @@ function KitInstallationNotice({ town }: { town: TownModel }) {
   </div>;
 }
 const groveStages: Record<string, string> = {
-  grown: "🌳 已长成", growing: "🌿 成长中", sprouting: "🌱 发芽中",
-  unmaintained: "🥀 已停维护", rot: "🥀 已停维护",
+  grown: "已长成", growing: "成长中", sprouting: "发芽中",
+  unmaintained: "已停维护", rot: "已停维护",
 };
 function groveStage(data: Data) {
   return groveStages[str(data.status)] || "成长阶段未标注";
@@ -147,7 +147,7 @@ function GroveMaturity({ data }: { data: Data }) {
         <span style={{ width: `${progress}%` }} />
       </div>}
     </div>}
-    {str(maturity.vitality_label) && <span className="card-meta">{maturity.vitality === "active" ? "🟢" : maturity.vitality === "quiet" || maturity.vitality === "idle" ? "🟡" : "⚪"}{str(maturity.vitality_label)}</span>}
+    {str(maturity.vitality_label) && <span className="card-meta">{str(maturity.vitality_label)}</span>}
   </>;
 }
 function groveRepo(data: Data) {
@@ -179,12 +179,12 @@ export function Catalog({ town, data }: { town: TownModel; data: Data }) {
             }
           >
             <span className="catalog-title">
-              {kit && `${entry.kind === "app" ? "📱" : "🧩"} `}{str(entry.name, str(entry.title))}
+              {str(entry.name, str(entry.title))}
             </span>
-            <span className="card-meta">
-              {kit ? groveAuthor(entry) : str(entry.display_name, str(entry.being_id))} ·{" "}
-              {kit ? "v" + str(entry.version) : date(entry.updated_at)}
-            </span>
+            <span className="card-meta">{[
+              kit ? groveAuthor(entry) : str(entry.display_name, str(entry.being_id)),
+              kit ? str(entry.version) && `v${entry.version}` : date(entry.updated_at),
+            ].filter(Boolean).join(" · ")}</span>
             {kit ? (
               <>
                 <p>{str(entry.description)}</p>
@@ -224,12 +224,13 @@ export function Pagination({ town }: { town: TownModel }) {
     (town.view !== 'kits' && (!town.data || town.error))) return null;
   const page = town.pagination();
   const loading = town.loading && !(town.view === 'kits' && town.localOnly);
+  if (!loading && page.total === 0) return null;
   return <>
     <div className="pagination-controls">
       <button className="pagination-arrow" aria-label="← 上一页" title="上一页" disabled={loading || page.page <= 1} onClick={() => town.turnPage(-1)}>
         <Icon name="chevron-left-20" />
       </button>
-      <span className="pagination-page" aria-live="polite">{loading ? '正在读取…' : page.total ? `第 ${page.page} / ${page.pages} 页` : '暂无结果'}</span>
+      <span className="pagination-page" aria-live="polite">{loading ? '正在读取…' : `第 ${page.page} / ${page.pages} 页`}</span>
       <button className="pagination-arrow" aria-label="下一页 →" title="下一页" disabled={loading || page.page >= page.pages} onClick={() => town.turnPage(1)}>
         <Icon name="chevron-right-20" />
       </button>
@@ -463,7 +464,7 @@ export function KitDetail({ town, data }: { town: TownModel; data: Data }) {
         </div>
         <p className="kit-description">{str(data.description)}</p>
         <GroveMaturity data={data} /><GroveEvidence data={data} />
-        <p className="card-meta grove-stats">🤝 {groveCount(data.adopter_count)} beings 在用 · ⚡ {groveCount(data.total_calls)} 次使用 · 📦 {groveCount(data.install_count)} 次安装{data.community_verified === true ? " · ⭐ 社区验证" : ""}{str(data.updated_at) ? ` · 更新于 ${date(data.updated_at)}` : ""}</p>
+        <p className="card-meta grove-stats">{groveCount(data.adopter_count)} 个 Being 在用 · {groveCount(data.total_calls)} 次使用 · {groveCount(data.install_count)} 次安装{data.community_verified === true ? " · 社区验证" : ""}{str(data.updated_at) ? ` · 更新于 ${date(data.updated_at)}` : ""}</p>
       </div>
       <div className="kit-actions">
         <button className="secondary" onClick={() => town.seedWall(str(data.name))}>
@@ -606,7 +607,7 @@ export function LocalKits({ town }: { town: TownModel }) {
       </p>
       {!library.kits.length ? (
         <div className="empty-state">
-          <div className="empty-symbol">◇</div>
+          <div className="empty-symbol"><Icon name="rail-kits" /></div>
           <h2>给 Being 添一件工具</h2>
           <p>尚未发现本机 Kit。去 Grove 查看工具，或导入你已有的 Kit 目录。</p>
           <button className="primary" onClick={() => town.selectTab("grove")}>

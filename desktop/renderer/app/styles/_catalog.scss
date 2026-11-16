@@ -161,8 +161,8 @@
 }
 
 .service-card h2 {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
 }
 
 .service-card p {
@@ -175,7 +175,7 @@
 
 .service-directory .service-card {
   display: grid;
-  grid-template-columns: 30px minmax(0, 1fr) auto;
+  grid-template-columns: 36px minmax(0, 1fr) auto;
   align-content: start;
   gap: 5px 12px;
 }
@@ -184,8 +184,10 @@
   grid-row: 1 / span 2;
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: var(--surface);
   color: var(--secondary);
   font-size: 18px;
 }
@@ -216,10 +218,11 @@
 .card-link {
   grid-column: 3;
   grid-row: 1;
-  font-size: 11px;
-  color: var(--muted);
-  padding: 2px 4px;
-  border-radius: 4px;
+  font-size: 12px;
+  color: var(--secondary);
+  padding: 4px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
   align-self: center;
 }
 
@@ -240,9 +243,23 @@
 }
 
 .empty-symbol {
-  font-size: 32px;
-  color: var(--muted);
-  margin-bottom: 20px;
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--secondary);
+  margin-bottom: 16px;
+}
+
+.empty-symbol svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentcolor;
+  stroke-width: 1.5;
 }
 
 .empty-state h2 {
@@ -304,8 +321,8 @@
 }
 
 .catalog-title {
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 15px;
+  font-weight: 600;
   overflow-wrap: anywhere;
 }
 

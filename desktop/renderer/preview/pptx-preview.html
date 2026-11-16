@@ -1,3 +1,21 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'unsafe-inline'; img-src data: blob:; font-src data: blob:; connect-src 'none'; base-uri 'none'; form-action 'none'"><style>
-*{box-sizing:border-box}html,body{height:100%;margin:0;background:#191919;color:#ddd;font:13px system-ui}body{display:flex;flex-direction:column}main{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;position:relative;padding:32px}#stage{width:100%;max-height:100%;overflow:auto}button{cursor:pointer;color:inherit;border:0;background:#363636}button:hover{background:#555}button:focus-visible{outline:2px solid #78baff;outline-offset:2px}button:disabled{opacity:.25;cursor:default}.arrow{position:absolute;top:50%;border-radius:50%;width:28px;height:28px;font-size:22px;z-index:2}#previous{left:2px}#next{right:2px}#status{text-align:center;padding:8px;flex:none}#thumbs{display:flex;gap:12px;overflow-x:auto;padding:12px 20px;min-height:88px;flex:none}#thumbs button{flex:none;width:104px;height:64px;padding:0;overflow:hidden;border:2px solid transparent;border-radius:5px;background:#444}#thumbs button[aria-current=true]{border-color:#78baff}
+  :root { color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: #141414; color: #eceef1; font: 13px system-ui; }
+  body { display: flex; flex-direction: column; }
+  main { flex: 1; min-height: 0; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); place-items: center; position: relative; padding: 12px 38px; }
+  #stage { width: 100%; max-width: 100%; max-height: 100%; overflow: auto; }
+  button { cursor: pointer; color: inherit; border: 0; background: #262626; }
+  button:hover:not(:disabled) { background: #303030; }
+  button:focus-visible { outline: 2px solid #a5cef6; outline-offset: 2px; }
+  button:disabled { opacity: .45; cursor: default; }
+  .arrow { position: absolute; top: 50%; transform: translateY(-50%); border-radius: 8px; width: 28px; height: 32px; font-size: 20px; z-index: 2; }
+  #previous { left: 6px; }
+  #next { right: 6px; }
+  #status { text-align: center; padding: 8px; flex: none; color: #b0b3b9; font-variant-numeric: tabular-nums; }
+  #thumbs { display: flex; gap: 8px; overflow-x: auto; padding: 8px 12px; flex: none; border-top: 1px solid #ffffff14; }
+  #thumbs:empty { display: none; }
+  #thumbs button { flex: none; width: 104px; height: 64px; padding: 0; overflow: hidden; border: 2px solid transparent; border-radius: 6px; }
+  #thumbs button > * { pointer-events: none; }
+  #thumbs button[aria-current="true"] { border-color: #a5cef6; }
 </style></head><body><main><div id="stage"></div><button class="arrow" id="previous" aria-label="上一张">‹</button><button class="arrow" id="next" aria-label="下一张">›</button></main><div id="status" role="status">正在加载幻灯片…</div><nav id="thumbs" aria-label="幻灯片缩略图"></nav><script src="pptx-preview.js"></script></body></html>

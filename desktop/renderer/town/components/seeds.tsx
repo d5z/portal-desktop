@@ -77,10 +77,10 @@ export function SeedGarden({ town, data }: { town: TownModel; data: Data }) {
           {seeds.map(seed => <button key={str(seed.id)} className={`catalog-item${town.selectedId === seed.id ? " selected" : ""}`}
             aria-pressed={town.selectedId === seed.id} onClick={() => openSeed(town, str(seed.id))}>
             <span className="catalog-title">{str(seed.name, str(seed.domain, "经验种子"))}</span>
-            <span className="card-meta">{author(seed)} · {str(seed.domain)}</span>
+            <span className="card-meta">{[author(seed), str(seed.domain)].filter(Boolean).join(" · ")}</span>
             <p>{str(seed.brief_excerpt, str(seed.brief)).slice(0, 240)}</p>
             <span className="seed-tags">{strings(seed.tags).slice(0, 4).map(tag => <span className="mini-tag" key={tag}>{tag}</span>)}</span>
-            <span className="card-meta">{states[str(seed.lifecycle)] || "经验种子"} · {date(seed.updated_at || seed.created_at)}</span>
+            <span className="card-meta">{[states[str(seed.lifecycle)] || "经验种子", date(seed.updated_at || seed.created_at)].filter(Boolean).join(" · ")}</span>
           </button>)}
         </div>
         <SeedDetail town={town} />
@@ -99,9 +99,9 @@ export function SeedDetail({ town, direct = false }: { town: TownModel; direct?:
     {!seed && !town.detailLoading && !town.detailError && <div className="detail-placeholder">选一颗种子，看看它从哪里长出来。</div>}
     {seed && <>
       <h2 className="reading-title">{str(seed.name, str(seed.domain, "经验种子"))}</h2>
-      <p className="card-meta">{author(seed)} · {date(seed.updated_at || seed.created_at)}</p>
+      <p className="card-meta">{[author(seed), date(seed.updated_at || seed.created_at)].filter(Boolean).join(" · ")}</p>
       <ReadingActions town={town} route={`/seeds/${id}`} />
-      <p className="scroll-metadata">{str(seed.domain)} · {states[str(seed.lifecycle)] || "经验种子"} · {Number(seed.absorb_count || 0)} 次内化</p>
+      <p className="scroll-metadata">{[str(seed.domain), states[str(seed.lifecycle)] || "经验种子", `${Number(seed.absorb_count || 0)} 次内化`].filter(Boolean).join(" · ")}</p>
       <div className="seed-tags">
         {strings(seed.tags).map(tag => <button key={tag} className="mini-tag" onClick={() => town.filterSeeds({ q: "", domain: "", kit: "", lifecycle: "", tag })}>{tag}</button>)}
       </div>

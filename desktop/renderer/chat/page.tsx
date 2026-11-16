@@ -50,7 +50,7 @@ import { canUseComposerCommand, parseComposerCommands } from './models/composer-
 import {useMessageMenu} from '../shared/components/message-menu';
 import {startsTimeGroup,messageTimeLabel} from '../shared/lib/message-time';
 import { CopyMessage } from '../shared/components/copy-message';
-import { TemperatureGlow, ChatActivity } from "./components/messages";
+import { ChatActivity } from "./components/messages";
 import { SceneLoading } from './components/scene-loading';
 import { ChatSettings } from "./components/settings";
 import { ChatInfoPanels } from "./components/panels";
@@ -123,7 +123,7 @@ function QueueRow({ item, index, allowInterrupt, onEdit, onReorder }: { item: Me
     <span className="composer-queue-content" title={item.text}>{item.text}</span>
     {item.queueNotice && <span className="composer-queue-notice" role="status" title={item.queueNotice} aria-label={item.queueNotice}>!</span>}
     <button className="composer-queue-text-action" type="button" aria-label={`编辑排队消息：${item.text}`} title="在输入框编辑" onClick={() => onEdit(item)} disabled={!item.editQueued}>编辑</button>
-    {item.retry && <button type="button" onClick={() => void item.retry?.()}>{item.retryLabel}</button>}
+    {item.retry && <button className="composer-queue-text-action" type="button" onClick={() => void item.retry?.()}>{item.retryLabel}</button>}
     <button className="composer-queue-steer" type="button" aria-label="调整方向" disabled={!allowInterrupt || !item.canInterruptQueued} title="调整方向：立即打断并发送这条消息" onClick={() => void item.interruptQueued?.()}><Icon name="turn-right" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /><span>调整方向</span></button>
     <button type="button" title="删除排队消息" aria-label={`取消排队：${item.text}`} onClick={() => item.cancelQueued?.()}>×</button>
   </div>;
@@ -406,7 +406,6 @@ function ChatView({
         }
       }}
     >
-      {!mobileWeb && <TemperatureGlow items={visibleItems} />}
       <div id="drop-zone" className={dragging ? "active" : ""}>
         松开以添加附件
       </div>
@@ -431,7 +430,7 @@ function ChatView({
             title="Beings Town"
             aria-label="Beings Town"
           >
-            ⌂
+            <Icon name="settings-town" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" />
           </a>
           <button
             className="btn-icon"
@@ -439,7 +438,7 @@ function ChatView({
             onClick={() => setPanel("privacy")}
             aria-label="隐私说明"
           >
-            🛡
+            <Icon name="permission-shield" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" />
           </button>
           <button
             id="settings-btn"
@@ -448,7 +447,7 @@ function ChatView({
             onClick={() => parent !== window && location.protocol === "beings:" ? bridge.send({ type: "beings:model-settings" }) : setPanel("model")}
             aria-label="模型设置"
           >
-            ⚙
+            <Icon name="settings-models" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" />
           </button>
         </header>
         {parent === window && <div className="chat-history-scope">
@@ -478,7 +477,9 @@ function ChatView({
           {!state.historyLoading && state.historyRefreshing && <div className="chat-refresh-overlay"><div className="chat-refresh-status" role="status"><span aria-hidden="true" />正在刷新对话…</div></div>}
           {!state.historyLoading && !state.historyRefreshing && !visibleItems.some(item => item.kind === "message") && !state.thinking && (
             <div className="chat-scope-empty">
-              {state.historyScope === "current" ? "当前场景还没有对话。" : "暂无对话记录。"}
+              <Icon name="chat-outline" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" />
+              <strong>{state.historyScope === "current" ? "当前场景还没有对话。" : "暂无对话记录。"}</strong>
+              <p>在下方发一条消息，开始对话。</p>
               {state.historyScope === "current" && <button type="button" onClick={() => changeScope("all")}>显示全部场景上下文</button>}
             </div>
           )}
@@ -570,122 +571,122 @@ function ChatView({
         </div>
         {!toastHosted && <Toast message={connectionNotice} />}
         <ChatIndex items={visibleItems.map(item=>item.kind==='message' && hasAttachmentMessage(item) ? {...item,text:originalMessageText(item)} : item)} container={messages} elements={messageElements} scrollLock={scrollLock} clearAnchor={releaseAnchor} highlight={setHighlighted} />
-        {queuedMessages.length > 0 && <div className="composer-queue-wrap">
-          <div className="composer-queue" aria-label={`待发送消息，共 ${queuedMessages.length} 条`}>
-            {queuedMessages.map((item, index) => <QueueRow item={item} index={index} allowInterrupt={state.canInterruptQueue && !state.stopping} onEdit={item => { state.draft = item.text; state.changed(); setEditingQueued(item); }} onReorder={(sourceId, targetId) => { const source = queuedMessages.find(candidate => candidate.id === sourceId); void source?.reorderQueued?.(targetId); }} key={item.id} />)}
-          </div>
-        </div>}
-        <div id="input-area" ref={composerArea} onWheel={event => {
-          if (event.deltaY >= 0 || !messages.current) return;
-          const input = event.target instanceof HTMLElement ? event.target.closest('#input') as HTMLElement | null : null;
-          if (input && input.scrollTop > 0) return;
-          event.preventDefault();
-          messages.current.scrollBy({ top: event.deltaY, behavior: 'auto' });
-        }}>
-          {state.intelligentUIForMessage && state.intelligentUITargetTitle && <div className="iui-context-target" role="status"><span>修改「{state.intelligentUITargetTitle}」<small>将携带原界面和当前选择</small></span><button type="button" aria-label="取消本条界面修改" onClick={() => state.setIntelligentUIForMessage(false)}>×</button></div>}
+        <div className="composer-stack" ref={composerArea}>
           {!state.historyLoading && <JumpToLatest trimHistory={historyWindow.toLatest} status={reader} container={messages} scrollLock={scrollLock} clearAnchor={releaseAnchor} />}
-          <div
-            id="pending-files"
-            className={state.files.length ? "active" : ""}
-          >
-            {state.files.map((file, i) => (
-              <div className="pending-file" key={`${file.name}-${i}`}>
-                {/^image\/(png|jpeg|gif|webp)$/.test(file.type) && (file.previewUrl || file.base64) ? (
-                  <img
-                    className="pending-file-preview"
-                    src={file.previewUrl || `data:${file.type};base64,${file.base64}`}
-                    alt=""
-                  />
-                ) : (
-                  <span className="pending-file-icon" aria-hidden="true">
-                    {file.type.startsWith("image/") ? "🖼️" : "📄"}
-                  </span>
-                )}
-                <span>
-                  <strong>{file.name}</strong>
-                  <small>{formatBytes(file.size)} · {file.loading ? '正在读取…' : '待发送'}</small>
-                </span>{" "}
-                <button
-                  className="remove"
-                  type="button"
-                  aria-label={`移除 ${file.name}`}
-                  onClick={() => runtime.removePending(i)}
-                >
-                  ✕
-                </button>
-              </div>
-            ))}
-          </div>
-          {editingQueued && <div className="composer-editing-queue" role="status"><span>正在编辑排队消息</span><button type="button" onClick={() => { state.draft = ""; state.changed(); setEditingQueued(null); composer.current?.focus(); }}>取消编辑</button></div>}
-          <div id="input-row">
-            <ChatComposer
-              state={state}
-              onExamples={openExamples}
-              onConfigureSubagent={configureSubagent}
-              key={state.currentScene.sceneId || "global"}
-              textareaRef={composer}
-              id="input"
-              rows={1}
-              className={state.queued ? "queued" : ""}
-              placeholder="消息"
-              aria-label="message input"
-              aria-keyshortcuts={isMac ? "Enter Control+Enter Meta+Enter Shift+Enter" : "Enter Control+Enter Shift+Enter"}
-              onCompositionStart={() => {
-                composing.current = true;
-              }}
-              onCompositionEnd={() => {
-                composing.current = false;
-                compositionEnd.current = Date.now();
-              }}
-              onKeyDown={(event) => {
-                if (
-                  event.key !== "Enter" ||
-                  event.shiftKey ||
-                  event.altKey ||
-                  composing.current ||
-                  event.nativeEvent.isComposing ||
-                  event.keyCode === 229 ||
-                  Date.now() - compositionEnd.current < 50
-                )
-                  return;
-                event.preventDefault();
-                if (event.repeat) return;
-                sendDraft(event.ctrlKey || (isMac && event.metaKey) ? undefined : "interrupt");
+          {queuedMessages.length > 0 && <div className="composer-queue" role="group" aria-label={`待发送消息，共 ${queuedMessages.length} 条`}>
+            {queuedMessages.map((item, index) => <QueueRow item={item} index={index} allowInterrupt={state.canInterruptQueue && !state.stopping} onEdit={item => { state.draft = item.text; state.changed(); setEditingQueued(item); }} onReorder={(sourceId, targetId) => { const source = queuedMessages.find(candidate => candidate.id === sourceId); void source?.reorderQueued?.(targetId); }} key={item.id} />)}
+          </div>}
+          <div id="input-area" onWheel={event => {
+            if (event.deltaY >= 0 || !messages.current) return;
+            const input = event.target instanceof HTMLElement ? event.target.closest('#input') as HTMLElement | null : null;
+            if (input && input.scrollTop > 0) return;
+            event.preventDefault();
+            messages.current.scrollBy({ top: event.deltaY, behavior: 'auto' });
+          }}>
+            {state.intelligentUIForMessage && state.intelligentUITargetTitle && <div className="iui-context-target" role="status"><span>修改「{state.intelligentUITargetTitle}」<small>将携带原界面和当前选择</small></span><button type="button" aria-label="取消本条界面修改" onClick={() => state.setIntelligentUIForMessage(false)}>×</button></div>}
+            <div
+              id="pending-files"
+              className={state.files.length ? "active" : ""}
+            >
+              {state.files.map((file, i) => (
+                <div className="pending-file" key={`${file.name}-${i}`}>
+                  {/^image\/(png|jpeg|gif|webp)$/.test(file.type) && (file.previewUrl || file.base64) ? (
+                    <img
+                      className="pending-file-preview"
+                      src={file.previewUrl || `data:${file.type};base64,${file.base64}`}
+                      alt=""
+                    />
+                  ) : (
+                    <span className="pending-file-icon" aria-hidden="true">
+                      <Icon name={file.type.startsWith("image/") ? "image-rounded" : "file"} width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" />
+                    </span>
+                  )}
+                  <span>
+                    <strong>{file.name}</strong>
+                    <small>{formatBytes(file.size)} · {file.loading ? '正在读取…' : '待发送'}</small>
+                  </span>{" "}
+                  <button
+                    className="remove"
+                    type="button"
+                    aria-label={`移除 ${file.name}`}
+                    onClick={() => runtime.removePending(i)}
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+            {editingQueued && <div className="composer-editing-queue" role="status"><span>正在编辑排队消息</span><button type="button" onClick={() => { state.draft = ""; state.changed(); setEditingQueued(null); composer.current?.focus(); }}>取消编辑</button></div>}
+            <div id="input-row">
+              <ChatComposer
+                state={state}
+                onExamples={openExamples}
+                onConfigureSubagent={configureSubagent}
+                key={state.currentScene.sceneId || "global"}
+                textareaRef={composer}
+                id="input"
+                rows={1}
+                className={state.queued ? "queued" : ""}
+                placeholder="消息"
+                aria-label="message input"
+                aria-keyshortcuts={isMac ? "Enter Control+Enter Meta+Enter Shift+Enter" : "Enter Control+Enter Shift+Enter"}
+                onCompositionStart={() => {
+                  composing.current = true;
+                }}
+                onCompositionEnd={() => {
+                  composing.current = false;
+                  compositionEnd.current = Date.now();
+                }}
+                onKeyDown={(event) => {
+                  if (
+                    event.key !== "Enter" ||
+                    event.shiftKey ||
+                    event.altKey ||
+                    composing.current ||
+                    event.nativeEvent.isComposing ||
+                    event.keyCode === 229 ||
+                    Date.now() - compositionEnd.current < 50
+                  )
+                    return;
+                  event.preventDefault();
+                  if (event.repeat) return;
+                  sendDraft(event.ctrlKey || (isMac && event.metaKey) ? undefined : "interrupt");
+                }}
+              />
+              <ComposerAddMenu state={state} onUpload={() => fileInput.current?.click()} onSelect={() => requestAnimationFrame(() => composer.current?.focus())}
+                onConfigureSubagent={configureSubagent}
+                onEnableSubagent={parent !== window && location.protocol === 'beings:' ? () => { void enableSubagent(); } : undefined}
+                subagentEnabling={subagentEnabling} subagentEnableFailed={subagentEnableFailed}/>
+              {state.sendWillQueue && !editingQueued && (state.draft.trim() || state.files.length > 0) && <div className="composer-queue-hint"><button type="button" title={`加入队列（${queueShortcut}）`} aria-label="加入队列" disabled={state.stopping} onClick={() => sendDraft()}>排队 <span aria-hidden="true">{isMac ? "⌘ ↵" : "Ctrl ↵"}</span></button></div>}
+              <button
+                className={`btn-icon${showStop ? " stop" : ""}`}
+                id="send-btn"
+                type="button"
+                title={showStop ? "停止处理" : `${sendLabel}（Enter）；${queueShortcut} 排队，Shift Enter 换行`}
+                aria-label={state.stopping ? "正在停止" : showStop ? "停止处理" : sendLabel}
+                disabled={state.stopping || (!showStop && !state.draft.trim() && !state.files.length)}
+                aria-busy={state.stopping}
+                onClick={() => {
+                  if (showStop) void runtime.stopCurrentTurn();
+                  else sendDraft("interrupt");
+                  composer.current?.focus();
+                }}
+              >
+                <Icon name={showStop ? 'stop' : 'send'}  />
+              </button>
+            </div>
+            <input
+              ref={fileInput}
+              type="file"
+              id="file-input"
+              multiple
+              hidden
+              onChange={(event) => {
+                if (event.target.files) runtime.handleFiles(event.target.files);
+                event.target.value = "";
               }}
             />
-            <ComposerAddMenu state={state} onUpload={() => fileInput.current?.click()} onSelect={() => requestAnimationFrame(() => composer.current?.focus())}
-              onConfigureSubagent={configureSubagent}
-              onEnableSubagent={parent !== window && location.protocol === 'beings:' ? () => { void enableSubagent(); } : undefined}
-              subagentEnabling={subagentEnabling} subagentEnableFailed={subagentEnableFailed}/>
-            {state.sendWillQueue && !editingQueued && (state.draft.trim() || state.files.length > 0) && <div className="composer-queue-hint"><button type="button" title={`加入队列（${queueShortcut}）`} aria-label="加入队列" disabled={state.stopping} onClick={() => sendDraft()}>排队 <span aria-hidden="true">{isMac ? "⌘ ↵" : "Ctrl ↵"}</span></button></div>}
-            <button
-              className={`btn-icon${showStop ? " stop" : ""}`}
-              id="send-btn"
-              type="button"
-              title={showStop ? "停止处理" : `${sendLabel}（Enter）；${queueShortcut} 排队，Shift Enter 换行`}
-              aria-label={state.stopping ? "正在停止" : showStop ? "停止处理" : sendLabel}
-              disabled={state.stopping || (!showStop && !state.draft.trim() && !state.files.length)}
-              aria-busy={state.stopping}
-              onClick={() => {
-                if (showStop) void runtime.stopCurrentTurn();
-                else sendDraft("interrupt");
-                composer.current?.focus();
-              }}
-            >
-              <Icon name={showStop ? 'stop' : 'send'}  />
-            </button>
           </div>
-          <input
-            ref={fileInput}
-            type="file"
-            id="file-input"
-            multiple
-            hidden
-            onChange={(event) => {
-              if (event.target.files) runtime.handleFiles(event.target.files);
-              event.target.value = "";
-            }}
-          />
         </div>
       </div>
       {showIntelligentUI && <IntelligentUIExamples example={uiExample} overlay={narrow} onSelect={setUIExample} onClose={closeExamples}

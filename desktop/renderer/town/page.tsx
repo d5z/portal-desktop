@@ -130,9 +130,9 @@ export function Town({ model, visible = model.visible }: { model: TownModel; vis
             }}
           >
             <option value="">全部阶段（含停维护）</option>
-            <option value="grown">🌳 已长成</option>
-            <option value="growing">🌿 成长中</option>
-            <option value="sprouting">🌱 发芽中</option>
+            <option value="grown">已长成</option>
+            <option value="growing">成长中</option>
+            <option value="sprouting">发芽中</option>
           </select>
           {town.view === "announcements" && !town.directId && <select aria-label="公告分类" value={town.announcementCategory}
             onChange={event => { town.announcementCategory = event.target.value; town.offset = 0; void town.load(); }}>
@@ -244,7 +244,7 @@ function TownBody({ town }: { town: TownModel }) {
   if (town.error)
     return (
       <div className="empty-state">
-        <div className="empty-symbol">{town.error.auth ? "⌑" : "↻"}</div>
+        <div className="empty-symbol"><Icon name={town.error.auth ? "settings-town" : "refresh"} /></div>
         <h2>{town.error.auth ? "连接 Town，继续阅读" : "暂时未能读取内容"}</h2>
         <p>{town.error.message}</p>
         <button

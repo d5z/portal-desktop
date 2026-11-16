@@ -121,6 +121,13 @@ try {
       if (slug==='firesides') {
         const thread = await page.locator('.fireside-thread').boundingBox();
         assert.ok(thread.height >= 220, 'Compact room list leaves usable reading space');
+        if (viewport.width === 435) {
+          const chat = page.locator('.workspace-content.split-chat > #chat-view');
+          await chat.waitFor();
+          await page.frameLocator('#chat-frame').locator('#input').click({trial:true});
+          const bounds = await chat.boundingBox();
+          assert.ok(bounds.y + bounds.height <= thread.y, 'Chat and room reading remain separate in the vertical split');
+        }
         await page.locator('.fireside-thread').evaluate(node => { node.scrollTop=200; });
         const header = await page.locator('.fireside-thread-heading').boundingBox(), filters = await page.locator('.feed-controls').boundingBox();
         assert.ok(filters.y >= header.y+header.height-1, 'Sticky title and filters must not overlap');

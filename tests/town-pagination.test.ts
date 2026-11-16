@@ -50,7 +50,7 @@ describe('filtered Town pagination', () => {
       expect(town.pagination()).toMatchObject({ total: 1, pages: 1, page: 1 });
       town.setSearch('no-match');
       expect(town.pagination()).toMatchObject({ total: 0, pages: 0, page: 0 });
-      expect(renderToStaticMarkup(createElement(Pagination, { town }))).toContain('共 0 项');
+      expect(renderToStaticMarkup(createElement(Pagination, { town }))).toBe('');
     }
   });
   it('counts a local Plugin once after merging with a matching remote entry on page two', async () => {

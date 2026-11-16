@@ -122,8 +122,10 @@ try {
   await page.screenshot({animations:'disabled',path:'output/playwright/being-files-preview.png'});
   const stageBounds=await page.locator('.workspace-stage').boundingBox();
   const panelBounds=await dialog.boundingBox();
-  assert(stageBounds.width>=280 && Math.abs(stageBounds.x+stageBounds.width-panelBounds.x)<2);
   const handle=dialog.getByRole('separator');
+  const handleBounds=await handle.boundingBox();
+  assert(stageBounds.width>=280 && Math.abs(handleBounds.x+handleBounds.width/2-(stageBounds.x+stageBounds.width+panelBounds.x)/2)<2,
+    'File preview and chat share the resize gutter');
   await handle.focus();await handle.press('ArrowRight');
   assert((await dialog.boundingBox()).width<panelBounds.width);
   await dialog.getByRole('button',{name:'展开全部',exact:true}).click();
@@ -162,7 +164,7 @@ try {
   await page.evaluate(()=>window.dispatchEvent(new MessageEvent('message',{origin:'beings://chat',source:document.querySelector('#chat').contentWindow,data:{type:'beings:home-file-download',revision:'one',path:'artifacts/20261104-delivery-v5/index.html'}})));
   await page.waitForFunction(expected=>window.downloads.length===expected,downloadCount+1);
   assert.equal(await page.evaluate(()=>window.calls.length),count);
-  assert.equal(await page.locator('.client-file-viewer').count(),0);
+  assert.equal(await dialog.isVisible(),false,'Downloading a file does not reopen its preview');
   await page.evaluate(()=>window.dispatchEvent(new MessageEvent('message',{origin:'beings://chat',source:document.querySelector('#chat').contentWindow,data:{type:'beings:home-file-preview',revision:'one',path:'artifacts/20261104-delivery-v5/index.html'}})));
   await dialog.waitFor();
   await page.keyboard.press('Escape');

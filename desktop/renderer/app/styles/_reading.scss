@@ -102,13 +102,13 @@ body:is([data-view='bonfire'], [data-view='firesides'], [data-view='mail']) .soc
   box-sizing: border-box;
 }
 
-#place-panel .catalog-split:has(> .catalog-list > .empty-inline):not(:has(.catalog-item)) {
+#place-panel .catalog-split:has(> .catalog-list > :is(.empty-inline, .feed-empty)):not(:has(.catalog-item)) {
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr);
 }
 
 #place-panel
-  .catalog-split:has(> .catalog-list > .empty-inline):not(:has(.catalog-item))
+  .catalog-split:has(> .catalog-list > :is(.empty-inline, .feed-empty)):not(:has(.catalog-item))
   > .catalog-detail {
   display: none;
 }

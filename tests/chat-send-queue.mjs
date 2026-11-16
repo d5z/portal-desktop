@@ -63,9 +63,39 @@ try{
   await input.fill('平台快捷键排队');await page.waitForTimeout(60);await input.press('ControlOrMeta+Enter');
   await page.locator('.composer-queue-item').filter({hasText:'平台快捷键排队'}).waitFor();
   assert.equal(sends.length,before);
+  const queuePanel = page.locator('.composer-queue');
+  const inputArea = page.locator('#input-area');
+  for (const [width, height] of [[1280,800], [375,800], [363,204]]) {
+    await page.setViewportSize({width,height});
+    const queue = await queuePanel.boundingBox();
+    const composer = await inputArea.boundingBox();
+    assert.ok(queue.x > composer.x && queue.x + queue.width < composer.x + composer.width, 'Queue is inset inside both composer edges');
+    assert.ok(queue.y < composer.y && queue.y + queue.height > composer.y, 'Queue tucks under the top edge of the composer');
+    await input.fill('草稿第一行\n草稿第二行\n草稿第三行');
+    const expandedQueue = await queuePanel.boundingBox();
+    const expandedComposer = await inputArea.boundingBox();
+    assert.ok(expandedComposer.y < composer.y, 'A multiline draft grows upward');
+    assert.equal(queue.y - expandedQueue.y, composer.y - expandedComposer.y, 'Queue moves with the composer');
+    assert.ok(expandedQueue.y >= 0, 'Queue remains visible above a multiline draft in a short split panel');
+    assert.ok(expandedComposer.y + expandedComposer.height < height, 'Composer remains inside the viewport');
+    await queuePanel.getByRole('button',{name:'取消排队：平台快捷键排队',exact:true}).click({trial:true});
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+    await input.fill('');
+  }
+  const queuedText = '平台快捷键排队';
+  await queuePanel.getByRole('button',{name:`编辑排队消息：${queuedText}`,exact:true}).click();
+  await input.fill('多行修改\n'.repeat(12) + '最后一行');
+  const editingQueueBounds = await queuePanel.boundingBox();
+  assert.ok(editingQueueBounds.y >= 0, 'Editing a long queued message keeps the queue inside a short split panel');
+  await queuePanel.getByRole('button',{name:`取消排队：${queuedText}`,exact:true}).click({trial:true});
+  await page.getByRole('button',{name:'取消编辑',exact:true}).click();
+  await mkdir('test-results',{recursive:true});
+  await page.locator('.composer-stack').screenshot({path:'test-results/chat-send-queue-short.png'});
   await page.setViewportSize({width:375,height:800});
-  await mkdir('test-results',{recursive:true});await page.screenshot({path:'test-results/chat-send-queue.png',fullPage:true});
-  assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
+  await page.screenshot({path:'test-results/chat-send-queue.png',fullPage:true});
+  await page.setViewportSize({width:1280,height:800});
+  await page.locator('html').evaluate(el => el.dataset.theme = 'dark');
+  await page.locator('.composer-stack').screenshot({path:'test-results/chat-send-queue-dark.png'});
   assert.deepEqual(errors,[]);
   console.log('PASS: same-scene queue, cancel, interrupt, single echo, preserved draft and mobile layout');
 }finally{stream?.end();await browser?.close();server.closeAllConnections();await new Promise(r=>server.close(r));}

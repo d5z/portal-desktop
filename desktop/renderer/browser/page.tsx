@@ -1,4 +1,5 @@
 import { WorkspaceDrawer } from "../shared/components/workspace-drawer";
+import { Icon } from "../shared/icons/icon";
 import {
   useCallback,
   useEffect,
@@ -133,14 +134,14 @@ export function Browser({ model: app }: { model: AppModel }) {
           disabled={!state.address}
           onClick={() => act("external")}
         >
-          ↗
+          <Icon name="arrow-up-right-16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" />
         </button>
         <button
           id="browser-close"
           aria-label="关闭浏览器"
           onClick={() => act("close")}
         >
-          ×
+          <Icon name="close" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" />
         </button>
       </div>
       <form
@@ -159,7 +160,7 @@ export function Browser({ model: app }: { model: AppModel }) {
           disabled={!state.canGoBack}
           onClick={() => act("back")}
         >
-          ←
+          <Icon name="chevron-left-20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" />
         </button>
         <button
           type="button"
@@ -168,7 +169,7 @@ export function Browser({ model: app }: { model: AppModel }) {
           disabled={!state.canGoForward}
           onClick={() => act("forward")}
         >
-          →
+          <Icon name="chevron-right-20" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.6" />
         </button>
         <button
           type="button"
@@ -176,7 +177,7 @@ export function Browser({ model: app }: { model: AppModel }) {
           aria-label={state.loading ? "停止加载" : "刷新网页"}
           onClick={() => act(state.loading ? "stop" : "reload")}
         >
-          {state.loading ? "×" : "↻"}
+          <Icon name={state.loading ? "close" : "refresh"} width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" />
         </button>
         <input
           id="browser-address"

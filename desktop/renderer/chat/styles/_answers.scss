@@ -538,26 +538,6 @@
   outline-offset: 2px;
 }
 
-.composer-queue-wrap {
-  width: calc(100% - 56px);
-  max-width: 780px;
-  margin: 0 auto;
-}
-
-.composer-queue {
-  display: block;
-  width: calc(100% - 56px);
-  max-width: 100%;
-  margin: 0 auto;
-  box-sizing: border-box;
-  padding: 0;
-  max-height: 120px;
-  overflow: hidden auto;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--bg-soft);
-}
-
 .composer-queue-item {
   display: flex;
   align-items: center;
@@ -568,10 +548,6 @@
   font-size: 13px;
   min-width: 0;
   color: var(--text);
-}
-
-.composer-queue-item {
-  touch-action: none;
   transition:
     background 0.18s ease,
     box-shadow 0.18s ease;
@@ -657,13 +633,6 @@
   font: inherit;
 }
 
-.composer-queue-text-action {
-  width: auto !important;
-  min-width: 38px !important;
-  white-space: nowrap !important;
-  padding: 4px 7px !important;
-}
-
 .composer-queue-notice {
   flex-shrink: 0;
   cursor: help;
@@ -688,6 +657,13 @@
   place-items: center;
   width: 28px;
   height: 28px;
+}
+
+.composer-queue button.composer-queue-text-action {
+  width: auto;
+  min-width: 38px;
+  white-space: nowrap;
+  padding: 4px 7px;
 }
 
 .composer-queue button.composer-queue-steer {
@@ -726,12 +702,6 @@
   justify-content: flex-end;
   z-index: 1;
   white-space: nowrap;
-}
-
-@media (max-width: 680px) {
-  .composer-queue-wrap {
-    width: calc(100% - 36px);
-  }
 }
 
 #input-area #input-row {

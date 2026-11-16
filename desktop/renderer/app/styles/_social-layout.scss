@@ -93,8 +93,8 @@ body:is([data-view='bonfire'], [data-view='firesides'], [data-view='mail'])
 }
 
 #place-panel .fireside-room {
-  padding: 14px 12px;
-  border-radius: 12px;
+  padding: 12px;
+  border-radius: 10px;
 }
 
 #place-panel .fireside-room.selected {
@@ -184,7 +184,7 @@ body:is([data-view='bonfire'], [data-view='firesides'], [data-view='mail'])
 @container stage (max-width:800px) {
   #place-panel .fireside-layout {
     grid-template-columns: minmax(0, 1fr);
-    gap: 16px;
+    gap: 12px;
   }
 
   #place-panel .fireside-rooms {
@@ -216,7 +216,7 @@ body:is([data-view='bonfire'], [data-view='firesides'], [data-view='mail'])
 
   #place-panel .fireside-room {
     flex: 0 0 160px;
-    padding: 10px 12px;
+    padding: 8px 12px;
   }
 
   #place-panel .fireside-rooms .empty-inline {

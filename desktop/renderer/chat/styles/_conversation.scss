@@ -62,9 +62,6 @@
 }
 
 #input-area {
-  width: calc(100% - 40px);
-  max-width: 820px;
-  margin: 0 auto 24px;
   padding: 12px 16px 8px;
   border: 1px solid var(--border);
   border-radius: 30px;
@@ -113,8 +110,6 @@
   }
 
   #input-area {
-    width: calc(100% - 28px);
-    margin-bottom: 14px;
     padding: 10px 12px 7px;
   }
 
@@ -131,16 +126,6 @@
   #input-area {
     transition: none;
   }
-}
-
-/* The outbox is visually attached to the composer, like one combined card. */
-.composer-queue-wrap .composer-queue {
-  border-radius: 18px 18px 0 0;
-  box-shadow: 0 3px 12px #00000004;
-}
-
-#input-area.has-queue {
-  border-radius: 0 0 18px 18px;
 }
 
 /* Keep the composer inside a resized iframe while viewport events settle. */

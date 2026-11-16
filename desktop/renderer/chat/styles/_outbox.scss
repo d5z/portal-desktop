@@ -1,29 +1,14 @@
-/* Queue and composer share an edge and read as one fused control. */
-.composer-queue-wrap {
-  position: relative;
-  z-index: 1;
-  width: calc(100% - 40px);
-  max-width: 880px;
-  margin: 0 auto -1px;
-}
-
-.composer-queue-wrap .composer-queue {
-  border-radius: 22px 22px 0 0;
+/* Reserve at least one 36px row plus borders when the composer grows. */
+.composer-queue {
+  margin: 0 12px -8px;
+  min-height: 45px;
+  max-height: min(127px, 36dvh);
+  overflow: hidden auto;
+  overscroll-behavior: contain;
+  border: 1px solid var(--border);
+  border-bottom: 8px solid transparent;
+  border-radius: 16px 16px 0 0;
   background: var(--bg-soft);
-  box-shadow: 0 5px 22px #0000000b;
-}
-
-#input-area.has-queue {
-  position: relative;
-  z-index: 0;
-  border-top-color: transparent;
-  border-radius: 0 0 30px 30px;
-}
-
-@media (max-width: 680px) {
-  .composer-queue-wrap {
-    width: calc(100% - 28px);
-  }
 }
 
 .chat-local-file-link {

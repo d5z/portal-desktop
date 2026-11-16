@@ -289,7 +289,6 @@
   --settings-sidebar: var(--surface);
   --settings-page: var(--bg);
   --settings-hover: color-mix(in srgb, var(--selected) 58%, transparent);
-  --settings-active: color-mix(in srgb, var(--selected) 82%, var(--control));
   --settings-radius: 14px;
 
   width: min(960px, calc(100vw - 48px));
@@ -320,13 +319,6 @@
   transition:
     background-color 140ms ease,
     color 140ms ease;
-}
-
-#client-settings-dialog .settings-tabs button[aria-selected='true'],
-#client-settings-dialog .settings-tabs button[aria-selected='true']:hover:not(:disabled) {
-  background: var(--settings-active);
-  color: var(--text);
-  font-weight: 600;
 }
 
 #client-settings-dialog .settings-tabs button:active:not(:disabled) {

@@ -264,23 +264,17 @@
 .time-gap {
   text-align: center;
   color: var(--text-ghost);
-  font-size: 10px;
+  font-size: 11px;
   padding: 16px 0 8px;
-  font-family: var(--mono);
-  letter-spacing: 2px;
-  text-transform: uppercase;
-  opacity: 0.5;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Autonomous SBS breath markers are separators, not chat bubbles. */
 .breath-marker {
   text-align: center;
   color: var(--text-ghost);
-  font-size: 10px;
+  font-size: 11px;
   padding: 12px 0 8px;
-  font-family: var(--mono);
-  letter-spacing: 1px;
-  opacity: 0.65;
 }
 
 .message.system .retry-btn {
@@ -316,17 +310,4 @@
 
 #drop-zone.active {
   display: flex;
-}
-
-/* Temperature glow */
-#temperature-glow {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  height: 200px;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity 2s ease;
-  z-index: 0;
 }

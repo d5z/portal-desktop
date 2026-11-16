@@ -57,8 +57,10 @@ dialog[open]:has(
 }
 
 .dialog-heading h2 {
-  font-size: 21px;
-  font-weight: 550;
+  font-size: 20px;
+  font-weight: 600;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
   margin: 0;
 }
 

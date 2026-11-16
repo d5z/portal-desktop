@@ -1,26 +1,26 @@
 :root {
   color-scheme: light;
 
-  --bg: #fff;
-  --sidebar: #fafafa;
-  --workspace-frame: #fafafa;
+  --bg: #fcfcfc;
+  --sidebar: #f2f3f5;
+  --workspace-frame: #e9ecf1;
   --panel-gap: 8px;
   --panel-radius: 16px;
-  --panel-border: #e8e8e8;
-  --panel-shadow: 0 2px 6px #1c24300a, 0 1px 2px #1c243006;
+  --panel-border: #dfe2e6;
+  --panel-shadow: 0 1px 3px #1c24300c;
   --popover-shadow: 0 8px 28px #1c243018, 0 2px 6px #1c24300a;
-  --surface: #f5f5f5;
+  --surface: #f1f2f4;
   --text: #202322;
   --secondary: #62666b;
   --muted: #666b72;
-  --line: #e9e9eb;
+  --line: #e2e5e9;
   --accent: #30343b;
   --hover: #2023220a;
   --pressed: #20232214;
-  --selected: #f0f0f0;
+  --selected: #e6e9ee;
   --control: #fff;
-  --button-text: #fffef9;
-  --code: #efefe7;
+  --button-text: #fff;
+  --code: #f1f1f2;
   --green: #36935c;
   --error: #c83242;
   --selection-face: #fff;
@@ -28,7 +28,7 @@
   --selection-shadow: 0 1px 4px #00000012;
   --selection-row: #eef0f4;
   --selection-mark: #697586;
-  --utility-surface: #f3f3f3;
+  --utility-surface: #eff1f3;
   --message-surface: #eeeeef;
   --utility-radius: 12px;
 }
@@ -36,24 +36,24 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --bg: #141414;
-  --sidebar: #141414;
-  --workspace-frame: #141414;
-  --panel-border: #ffffff1f;
-  --panel-shadow: 0 2px 8px #0003, 0 1px 2px #0002;
+  --bg: #1b1c1e;
+  --sidebar: #17181a;
+  --workspace-frame: #121315;
+  --panel-border: #ffffff20;
+  --panel-shadow: 0 1px 3px #0004;
   --popover-shadow: 0 8px 28px #0005, 0 2px 6px #0003;
-  --surface: #1f1f1f;
+  --surface: #25272a;
   --text: #eceef1;
   --secondary: #b0b3b9;
   --muted: #a0a5ae;
-  --line: #ffffff12;
-  --accent: #e8edf6;
+  --line: #ffffff19;
+  --accent: #eceef1;
   --hover: #ffffff12;
   --pressed: #ffffff20;
-  --selected: #3d3d3d;
-  --control: #1f1f1f;
+  --selected: #34383e;
+  --control: #222427;
   --button-text: #202124;
-  --code: #27332c;
+  --code: #262626;
   --green: #7fc797;
   --error: #ff858d;
   --selection-face: #454a54;

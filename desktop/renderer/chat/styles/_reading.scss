@@ -281,9 +281,6 @@ body {
 }
 
 #input-area {
-  position: relative;
-  max-width: 780px;
-  margin: 0 auto 24px;
   padding: 14px 16px 12px;
   border-radius: 18px;
   box-shadow: 0 3px 12px #00000004;
@@ -441,8 +438,6 @@ body {
   }
 
   #input-area {
-    width: calc(100% - 36px);
-    margin-bottom: 18px;
     padding: 12px;
   }
 }

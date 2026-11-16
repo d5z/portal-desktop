@@ -91,7 +91,7 @@ html[data-platform='win32'] .workspace-stage .topbar {
   padding: 8px 0;
 }
 
-.workspace-rail button {
+.workspace-rail .rail-button {
   display: grid;
   place-items: center;
   flex-shrink: 0;
@@ -127,7 +127,7 @@ html[data-platform='win32'] .workspace-stage .topbar {
   color: var(--text);
 }
 
-.workspace-rail svg {
+.workspace-rail .rail-button > svg {
   width: 28px;
   height: 28px;
 }
@@ -479,7 +479,7 @@ html[data-platform='darwin'] .workspace-stage .topbar {
     animation: none;
   }
 
-  .workspace-rail button {
+  .workspace-rail .rail-button {
     transition: none;
   }
 }
@@ -555,8 +555,9 @@ html[data-platform='darwin'] .workspace-stage .topbar {
   }
 
   .workspace-content.split-chat > #chat-view {
-    flex: 1;
+    flex: 0 1 28%;
     min-width: 0;
+    min-height: 160px;
   }
 }
 

@@ -85,13 +85,16 @@ try{
   await bubble.locator('.image-generation-answer').screenshot({path:'test-results/image-generations/skeleton-dark.png',animations:'allow'});
   await page.evaluate(()=>document.documentElement.dataset.theme='light');
   await page.emulateMedia({reducedMotion:'reduce'});
-  const motion=await page.locator('.image-generation-placeholder[data-active=true]').evaluateAll(nodes=>nodes.flatMap(node=>[...node.querySelectorAll('.generation-aurora,.generation-shimmer,.generation-skeleton-glyph,.generation-status-dot')].map(el=>getComputedStyle(el).animationName)));
-  assert.ok(motion.length>0&&motion.every(name=>name==='none'),'reduced motion disables all skeleton animation');
-  assert.equal(await page.locator('.image-generation-placeholder [aria-valuenow]').count(),0,'skeleton does not invent percentage progress');
+  const running=page.locator('.image-generation-placeholder[data-phase=running]');
+  assert.ok(await running.getByRole('status').count(),'the placeholder describes the current phase');
+  assert.ok(await running.getByRole('progressbar').count(),'indeterminate progress is exposed to assistive technology');
+  assert.equal(await running.locator('progress[value]').count(),0,'the placeholder does not invent percentage progress');
+  assert.ok(await running.evaluateAll(nodes=>nodes.every(node=>node.getAnimations({subtree:true}).length===0)),'there is no motion in the placeholder');
   await page.emulateMedia({reducedMotion:'no-preference'});
   completed.add('1');
   await page.getByText('已生成 1 / 3 张',{exact:true}).waitFor();
   assert.equal(await page.locator('.image-generation-images img').count(),1);
+  await page.locator('.image-generation-images img').scrollIntoViewIfNeeded();
   await page.waitForFunction(()=>document.querySelector('.image-generation-images img')?.naturalWidth>0);
   const frames=await page.locator('.image-generation-card').evaluateAll(cards=>cards.map(card=>{
     const frame=card.querySelector('[data-slot="image-thumbnail"], .image-generation-placeholder').getBoundingClientRect();
@@ -153,7 +156,7 @@ try{
   await page.keyboard.press('ArrowRight');
   await page.getByRole('dialog',{name:'图片预览：暹罗猫 · 沙发暖阳',exact:true}).waitFor();
   await page.waitForFunction(()=>document.querySelector('dialog[aria-label^="图片预览："] img')?.naturalWidth>0);
-  assert.equal(await page.getByLabel('缩放比例',{exact:true}).textContent(),'100%','switching resets zoom');
+  await page.getByLabel('缩放比例',{exact:true}).filter({hasText:/^100%$/}).waitFor(); // Wait for the newly loaded image to reset zoom.
   assert.ok((await page.locator('dialog[aria-label^="图片预览："] img').getAttribute('src')).includes('/image/2?'));
   const secondDownload=page.waitForEvent('download');
   await page.getByRole('button',{name:'下载原图',exact:true}).click();

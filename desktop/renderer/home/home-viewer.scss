@@ -1,15 +1,17 @@
 :root {
-  --bg: #fcfcfc;
-  --text: #242424;
-  --secondary: #62676d;
+  --bg: #fff;
+  --text: #202322;
+  --secondary: #62666b;
+  --focus: #286197;
   --mask: rgb(128 128 128 / 40%);
 
   color-scheme: light;
 }
 :root[data-theme='dark'] {
-  --bg: #202124;
+  --bg: #141414;
   --text: #eceef1;
   --secondary: #b0b3b9;
+  --focus: #a5cef6;
 
   color-scheme: dark;
 }
@@ -43,7 +45,7 @@ button:disabled {
   opacity: 0.45;
 }
 button:focus-visible {
-  outline: 2px solid #669cdb;
+  outline: 2px solid var(--focus);
   outline-offset: 3px;
 }
 #viewport {
@@ -88,9 +90,8 @@ button:focus-visible {
   display: none;
 }
 #loading svg {
-  width: 42px;
-  height: 42px;
-  animation: breathe 1.8s ease-in-out infinite;
+  width: 28px;
+  height: 28px;
 }
 #preview-overlay {
   display: none;
@@ -113,8 +114,9 @@ button:focus-visible {
   align-items: center;
   justify-content: center;
   gap: 8px;
-  border-radius: 24px;
-  padding: 9px 16px;
+  min-height: 36px;
+  border-radius: 8px;
+  padding: 8px 12px;
   background: var(--text);
   color: var(--bg);
 }
@@ -152,8 +154,8 @@ footer {
   align-items: center;
   gap: 12px;
   border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
-  border-radius: 28px;
-  padding: 4px 4px 4px 16px;
+  border-radius: 12px;
+  padding: 4px 4px 4px 12px;
   background: var(--bg);
 }
 #status {
@@ -174,17 +176,6 @@ footer {
 .preview #notice {
   bottom: 12px;
 }
-@keyframes breathe {
-  0%,
-  100% {
-    opacity: 0.45;
-    transform: scale(0.96);
-  }
-  50% {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
 @media (hover: none) {
   .preview #preview-overlay {
     opacity: 1;
@@ -193,8 +184,5 @@ footer {
 @media (prefers-reduced-motion: reduce) {
   #preview-overlay {
     transition: none;
-  }
-  #loading svg {
-    animation: none;
   }
 }

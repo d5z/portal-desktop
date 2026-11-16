@@ -189,22 +189,24 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
           <button className="danger" type="button" disabled={busy} onClick={() => { if (deleting) void change("delete", deleting.scene_id); }}>{busy ? "删除中…" : "确认删除"}</button>
         </div>
       </Dialog>
-      <Dialog id="chat-session-editor" className="utility-dialog" open={editing !== null} busy={busy}
+      <Dialog id="chat-session-editor" open={editing !== null} busy={busy}
         aria-labelledby="chat-session-title" onClose={() => setEditing(null)} dismissOnBackdrop>
-        <form onSubmit={event => { event.preventDefault(); if (editing && !busy) void change(editing, name, editing === "bind" ? bindingId : target?.scene_id); }}>
+        <form className="dialog-form" onSubmit={event => { event.preventDefault(); if (editing && !busy) void change(editing, name, editing === "bind" ? bindingId : target?.scene_id); }}>
           <div className="dialog-heading">
             <h2 id="chat-session-title">{editing === "bind" ? "绑定已有场景" : editing === "create" ? "新建场景" : "重命名场景"}</h2>
             <button className="close" type="button" aria-label="关闭场景编辑" disabled={busy} onClick={() => setEditing(null)} />
           </div>
-          <p className="utility-subtitle">{editing === "bind" ? "填入同一 Being 在其他客户端的场景 ID，即可继续该场景的对话。" : editing === "create" ? "与同一个 Being 开始一个独立的对话场景。" : "修改名称不会改变场景的历史记录。"}</p>
-          {editing === "bind" && <label className="chat-session-field">场景 ID
-            <input value={bindingId} maxLength={256} placeholder="粘贴其他客户端的场景 ID" disabled={busy} onChange={event => setBindingId(event.target.value)} />
-          </label>}
-          <label className="chat-session-field">场景名称
-            <input autoFocus value={name} maxLength={128} placeholder="例如：方案讨论" disabled={busy} onChange={event => setName(event.target.value)} />
-          </label>
-          {editing === "bind" && <p className="chat-session-hint">名称仅在本机显示；已绑定的场景将直接打开。</p>}
-          {error && <p role="alert" className="chat-session-error">{error}</p>}
+          <div className="dialog-body">
+            <p className="utility-subtitle">{editing === "bind" ? "填入同一 Being 在其他客户端的场景 ID，即可继续该场景的对话。" : editing === "create" ? "与同一个 Being 开始一个独立的对话场景。" : "修改名称不会改变场景的历史记录。"}</p>
+            {editing === "bind" && <label className="chat-session-field">场景 ID
+              <input autoFocus name="scene-id" autoComplete="off" value={bindingId} maxLength={256} placeholder="粘贴其他客户端的场景 ID" disabled={busy} onChange={event => setBindingId(event.target.value)} />
+            </label>}
+            <label className="chat-session-field">场景名称
+              <input autoFocus={editing !== "bind"} name="scene-name" autoComplete="off" value={name} maxLength={128} placeholder="例如：方案讨论" disabled={busy} onChange={event => setName(event.target.value)} />
+            </label>
+            {editing === "bind" && <p className="chat-session-hint">名称仅在本机显示；已绑定的场景将直接打开。</p>}
+            {error && <p role="alert" className="chat-session-error">{error}</p>}
+          </div>
           <div className="files-footer">
             <button type="button" disabled={busy} onClick={() => setEditing(null)}>取消</button>
             <button type="submit" disabled={busy || !name.trim() || (editing === "bind" && !bindingId.trim())}>{busy ? "保存中…" : editing === "bind" ? "绑定并进入" : editing === "create" ? "创建并进入" : "保存名称"}</button>

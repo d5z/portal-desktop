@@ -14,14 +14,8 @@
     touch-action: manipulation;
   }
 
-  #messages {
-    padding: 20px 16px 12px;
-  }
-
   #input-area {
     padding: 6px 8px;
-    margin-bottom: 12px;
-    width: calc(100% - 20px);
     border-radius: 16px;
   }
 
@@ -129,9 +123,11 @@
     padding-right: 20px;
   }
 
+  .composer-stack {
+    inset-inline: 16px;
+  }
+
   #input-area {
-    width: calc(100% - 32px);
-    margin-bottom: 14px;
     padding: 8px;
   }
 }

@@ -96,16 +96,21 @@ try {
   await slides.locator('#stage').evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await page.screenshot({ path: 'output/playwright/home-pptx-desktop.png' });
   assert.equal(await slides.getByRole('status').innerText(), '2 / 2');
+  const firstThumbnail = slides.getByRole('button', { name: '第 1 张幻灯片' });
+  await firstThumbnail.hover();
+  await slides.locator('#thumbs button[data-index="0"]:hover').waitFor();
+  await firstThumbnail.click();
+  await slides.getByRole('status').filter({ hasText: '1 / 2' }).waitFor();
   await panel.getByRole('button', { name: '展开全部' }).click();
   await fillsPanel('iframe[title="幻灯片预览"]');
   await panel.getByRole('button', { name: '恢复对话' }).click();
   await page.setViewportSize({ width: 800, height: 700 });
   await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
   await fillsPanel('iframe[title="幻灯片预览"]');
-  await slides.getByRole('button', { name: '第 1 张幻灯片' }).hover();
-  await slides.locator('#thumbs button[data-index="0"]:hover').waitFor();
-  await slides.getByRole('button', { name: '第 1 张幻灯片' }).click();
-  await slides.locator('#stage').getByText('Being — slide 1').waitFor();
+  // The sandboxed iframe has unreliable pointer hit testing after a headless
+  // viewport resize. Cover pointer selection above and keyboard selection here.
+  await slides.getByRole('button', { name: '第 2 张幻灯片' }).press('Space');
+  await slides.locator('#stage').getByText('Being — slide 2').waitFor();
   await page.screenshot({ path: 'output/playwright/home-pptx-narrow-dark.png' });
   await open('overview.xlsx');
   await page.getByRole('tab', { name: '概览' }).waitFor();

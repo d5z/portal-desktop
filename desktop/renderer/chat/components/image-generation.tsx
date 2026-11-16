@@ -1,5 +1,5 @@
 import { Icon } from '../../shared/icons/icon';
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { type GenerationSnapshot, type ImageGenerationJob, type ImageGenerationReceipt } from '../../../shared/image-generation';
 import { imageGenerationBlocks } from '../../../shared/image-generation-blocks';
 import { Markdown } from '../../shared/components/markdown';
@@ -12,20 +12,6 @@ import { useNearViewport } from '../../shared/hooks/use-near-viewport';
 const labels: Record<GenerationSnapshot['status'],string> = {queued:'排队中', running:'生成中', uncertain:'结果待核对', succeeded:'生成成功', failed:'生成失败', cancelled:'已取消'};
 function PictureIcon() {
   return <Icon name="image-rounded" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />;
-}
-function GenerationSkeleton({label, phase}: {label:string;phase:'running'|'queued'}) {
-  return <>
-    <div className="image-generation-skeleton" aria-hidden="true">
-      <div className="generation-aurora"/><div className="generation-aurora generation-aurora-secondary"/>
-      <div className="generation-skeleton-frame"><span className="generation-skeleton-tag"/><span className="generation-skeleton-corner"/>
-        <div className="generation-skeleton-glyph"><Icon name="sparkles" width="34" height="34" fill="none" /></div>
-        <div className="generation-skeleton-lines"><i/><i/></div>
-      </div>
-      <div className="generation-shimmer"/>
-    </div>
-    <div className="generation-skeleton-status" role="status"><span className="generation-status-dot" aria-hidden="true"/>{label}</div>
-    <span className="generation-skeleton-accessible" role="progressbar" aria-label={`${phase==='running'?'图片生成':'图片排队'}，进度未知`}/>
-  </>;
 }
 function ImageGenerationCard({job, endpoint, being, report}: {job:ImageGenerationJob; endpoint:string; being:string; report:(key:string, snapshot:GenerationSnapshot | undefined)=>void}) {
   const { ref, ready } = useNearViewport<HTMLElement>();
@@ -47,9 +33,12 @@ function ImageGenerationCard({job, endpoint, being, report}: {job:ImageGeneratio
   const label = snapshot ? snapshot.status === 'running' && snapshot.stage === 'validate_convert' ? '正在校验图片' : labels[snapshot.status] : job.submission === 'unknown' ? '正在核对提交结果' : job.submission === 'rejected' ? '提交未受理' : '正在查询';
   return <section ref={ref} className="image-generation-card" aria-label={job.title} data-generation-id={snapshot?.id || job.generation_id || undefined}>
     {outputs.length > 0 && !imageFailed ? <div className="image-generation-images">{outputs.map(output => <div className="image-generation-photo" key={`${output.id}:${imageAttempt}`}><RemoteImage src={output.view_url} name={job.title} onError={()=>setImageFailed(true)} /><ImageGenerationDownload src={output.view_url} name={job.title}/><span className="image-generation-zoom" aria-hidden="true">查看大图 ↗</span></div>)}</div>
-      : <div className="image-generation-placeholder" data-active={active} data-phase={snapshot?.status==='running'?'running':'queued'} aria-busy={active}
-        style={{'--generation-offset':`${job.index * -1.3}s`} as CSSProperties}>
-        {active ? <GenerationSkeleton label={label} phase={snapshot?.status==='running'?'running':'queued'}/> :
+      : <div className="image-generation-placeholder" data-active={active} data-phase={snapshot?.status==='running'?'running':'queued'} aria-busy={active}>
+        {active ? <>
+          <PictureIcon />
+          <span role="status">{label}</span>
+          <progress className="generation-progress" aria-label={snapshot?.status === 'running' ? '图片生成进度' : '图片排队进度'} />
+        </> :
         <span role="status">{imageFailed ? '图片加载失败，生成任务已成功。' : snapshot?.status === 'succeeded' ? snapshot.availability === 'expired' ? '图片已不可用。' : '生成已完成，图片暂不可用。' : label}</span>}
       </div>}
     <div className="image-generation-caption-row"><span className="image-generation-number" aria-hidden="true">{String(job.index).padStart(2,'0')}</span><p className="image-generation-caption" title={job.title}>{job.title}</p></div>

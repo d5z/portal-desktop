@@ -538,6 +538,22 @@ try {
     await page.setViewportSize({width,height:746});
     await assertPinnedLayout();
   }
+  await page.evaluate(() => {
+    const app = window.fixtureApp;
+    app.chatSessionCreateRequest++;
+    app.changed();
+  });
+  const sceneEditor = page.getByRole('dialog', {name:'新建场景'});
+  await sceneEditor.waitFor();
+  assert.equal(await sceneEditor.evaluate(el => el.scrollHeight - el.clientHeight), 0);
+  for (const name of ['取消', '创建并进入']) {
+    assert.equal(await sceneEditor.getByRole('button', {name, exact:true}).evaluate(el => {
+      const label = document.createRange();
+      label.selectNodeContents(el);
+      return label.getClientRects().length;
+    }), 1, `${name} stays on one line inside the scene dialog`);
+  }
+  await sceneEditor.getByRole('button', {name:'取消', exact:true}).click();
   await page.setViewportSize({width:1440,height:960});
 
   assert.equal(await page.locator('#chat-session-panel .chat-session-titlebar').getByRole('button',{name:'收起场景列表',exact:true}).count(), 1, 'Collapse belongs to the list header');

@@ -16,8 +16,8 @@
 .browser-heading {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px 12px 6px;
+  gap: 4px;
+  padding: 8px 12px 4px;
   -webkit-app-region: drag;
 }
 
@@ -28,6 +28,7 @@
   text-overflow: ellipsis;
   white-space: nowrap;
   font-size: 13px;
+  font-weight: 600;
 }
 
 #browser-panel button,
@@ -36,15 +37,28 @@
 }
 
 #browser-panel button {
-  padding: 6px 9px;
-  flex-shrink: 0;
+  display: inline-grid;
+  place-items: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 8px;
+  flex: none;
+  border-radius: 8px;
+  color: var(--secondary);
+  white-space: nowrap;
+}
+
+#browser-panel button:hover:not(:disabled) {
+  background: var(--surface);
+  color: var(--text);
 }
 
 #browser-address-form {
   display: flex;
   gap: 4px;
   align-items: center;
-  padding: 6px 10px 10px;
+  padding: 4px 12px 8px;
+  border-bottom: 1px solid var(--line);
   margin: 0;
 }
 
@@ -52,7 +66,8 @@
   min-width: 0;
   flex: 1;
   width: 0;
-  padding: 8px;
+  height: 32px;
+  padding: 4px 8px;
   font-size: 12px;
 }
 
@@ -70,6 +85,6 @@
   padding: 32px 24px;
   line-height: 1.7;
   font-size: 13px;
-  opacity: 0.7;
+  color: var(--secondary);
   text-align: center;
 }

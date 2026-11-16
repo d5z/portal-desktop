@@ -151,7 +151,7 @@ export function App({ model }: { model: AppModel }) {
                   />
                   <img className="welcome-logo town-logo-dark" src={logoWhite} alt="Portal Desktop" width={88} height={88} />
                   <h1>从一个想法开始</h1>
-                  <p>连接你的 Being，继续对话。</p>
+                  <p>连接你的 Being，在同一个工作台里对话、读资料、逛小镇。</p>
                 </div>
                 <button
                   className="welcome-connect"
@@ -159,9 +159,7 @@ export function App({ model }: { model: AppModel }) {
                   onClick={() => app.showSettings()}
                 >
                   <span>连接我的 Being</span>
-                  <span className="welcome-connect-arrow" aria-hidden="true">
-                    ↗
-                  </span>
+                  <Icon name="arrow-up-right-16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" />
                 </button>
               </div>
               <iframe

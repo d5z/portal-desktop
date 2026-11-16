@@ -35,8 +35,8 @@ describe('Grove catalog presentation', () => {
     };
     const model = town(kit);
     const listing = renderToStaticMarkup(createElement(Catalog, { town: model, data: { kits: [kit] } }));
-    expect(listing).toContain('🌿 成长中');
-    expect(listing).toContain('9 beings 在用');
+    expect(listing).toContain('成长中');
+    expect(listing).toContain('9 个 Being 在用');
     expect(listing).toContain('aria-valuenow="37"');
     expect(listing).toContain('最近还在用');
     const detail = renderToStaticMarkup(createElement(CatalogDetail, { town: model }));
@@ -46,7 +46,7 @@ describe('Grove catalog presentation', () => {
 
   it('distinguishes unmaintained kits and never offers App bundle installation', () => {
     const oldKit = { id: 'old', kind: 'kit', name: 'old-kit', status: 'unmaintained', version: '1.0' };
-    expect(renderToStaticMarkup(createElement(Catalog, { town: town(oldKit), data: { kits: [oldKit] } }))).toContain('🥀 已停维护');
+    expect(renderToStaticMarkup(createElement(Catalog, { town: town(oldKit), data: { kits: [oldKit] } }))).toContain('已停维护');
     const app = {
       id: 'app-1', name: 'voice-memo', version: '1.0', kind: 'app', status: 'sprouting',
       repo_url: 'https://github.com/example/voice-memo', release_tag: 'v1.0', has_bundle: true,

@@ -402,9 +402,6 @@
 }
 
 #input-area {
-  max-width: 720px;
-  width: calc(100% - 56px);
-  margin-bottom: 28px;
   padding: 16px 0 0;
   border: 0;
   border-top: 1px solid var(--border);
@@ -429,9 +426,7 @@
   }
 
   #input-area {
-    width: calc(100% - 48px);
     padding: 14px 0 0;
-    margin-bottom: 20px;
   }
 }
 

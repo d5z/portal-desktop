@@ -1,24 +1,27 @@
 /* Session editor uses one aligned column and clear primary actions. */
-#chat-session-editor {
-  box-sizing: border-box;
-  padding: 24px;
+#chat-session-editor .dialog-heading {
+  padding: 20px 24px 12px;
 }
 
-#chat-session-editor .dialog-heading {
-  padding: 0;
-  margin: 0 0 20px;
+#chat-session-editor .dialog-body {
+  padding: 4px 24px;
+  scrollbar-gutter: auto;
 }
 
 #chat-session-editor .utility-subtitle {
   line-height: 1.7;
-  margin: 16px 0 20px;
+  margin: 0 0 16px;
 }
 
 #chat-session-editor .chat-session-field {
-  margin: 16px 0;
+  margin: 0;
   gap: 8px;
   font-size: 12px;
   color: var(--secondary);
+}
+
+#chat-session-editor .chat-session-field + .chat-session-field {
+  margin-top: 12px;
 }
 
 #chat-session-editor .chat-session-field input {
@@ -34,8 +37,10 @@
 }
 
 #chat-session-editor .files-footer {
+  flex-shrink: 0;
   justify-content: flex-end;
-  margin: 24px 0 0;
+  margin: 0;
+  padding: 20px 24px 24px;
   gap: 8px;
 }
 
@@ -46,6 +51,7 @@
   border-radius: 8px;
   background: transparent;
   font-size: 12px;
+  white-space: nowrap;
 }
 
 #chat-session-editor .files-footer button[type='submit'] {
