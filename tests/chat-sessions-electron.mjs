@@ -112,7 +112,7 @@ try {
   await page.waitForFunction(() => window.fixtureApp.subagentSettingsOpen === true);
   await page.evaluate(() => window.fixtureApp.closeSubagentSettings());
   // Both pickers and direct submissions must open setup without touching the draft or posting.
-  const commandInput = chat.getByRole('textbox',{name:'message input'});
+  const commandInput = chat.getByRole('textbox',{name:'消息输入框'});
   for (const trigger of ['plus', 'slash', 'enter', 'send', 'queue']) {
     const draft = trigger === 'plus' ? '保留已有要求' : trigger === 'slash' ? '/sub' : '/子代理 保留已有要求';
     // Let the rich editor handle paste through its transaction pipeline.
@@ -144,6 +144,8 @@ try {
   await subagentSetup.click();
   assert.equal(await commandInput.evaluate(el => el.value ?? el.editor.getMarkdown()),'/subagent 保留已有要求');
   assert.equal(await page.evaluate(() => window.fixtureApp.subagentSettingsOpen),false);
+  await commandInput.press('ControlOrMeta+a');
+  await commandInput.press('Backspace');
   await commandInput.fill('/sub');
   await commandInput.press('Tab');
   assert.equal((await commandInput.evaluate(el => el.value ?? el.editor.getMarkdown())).trim(),'/subagent');
@@ -195,18 +197,20 @@ try {
   assert.equal(await chat.locator('#input').evaluate(el => el.value ?? el.editor.getMarkdown()),'方案草稿');
   await page.getByRole('button',{name:'切换到场景：方案讨论'}).click({button:'right'});
   await page.getByRole('menuitem',{name:'重命名',exact:true}).click();
-  const rename = page.getByRole('navigation',{name:'切换场景'}).getByRole('textbox',{name:'场景名称'});
-  await rename.waitFor();
-  assert.equal(await rename.evaluate(input => input === document.activeElement && input.selectionEnd - input.selectionStart === input.value.length),true);
-  await rename.fill('取消这次改名');
-  await rename.press('Escape');
-  await rename.waitFor({state:'hidden'});
-  assert.equal(await page.getByRole('button',{name:'切换到场景：方案讨论'}).count(),1);
-  await page.getByRole('button',{name:'切换到场景：方案讨论'}).click({button:'right'});
+  const renameInput = page.getByRole('navigation',{name:'切换场景'}).getByRole('textbox',{name:'场景名称'});
+  await renameInput.waitFor();
+  assert.equal(await page.locator('#chat-session-editor').isVisible(),false);
+  assert.equal(await renameInput.evaluate(input => input === document.activeElement && input.selectionStart === 0 && input.selectionEnd === input.value.length),true);
+  await renameInput.fill('取消这次改名');
+  await renameInput.press('Escape');
+  const discussionRow = page.getByRole('button',{name:'切换到场景：方案讨论'});
+  await discussionRow.waitFor();
+  await page.waitForFunction(() => document.activeElement?.getAttribute('aria-label') === '切换到场景：方案讨论');
+  await discussionRow.click({button:'right'});
   await page.getByRole('menuitem',{name:'重命名',exact:true}).click();
-  await rename.fill('技术方案');
-  await rename.press('Enter');
-  await rename.waitFor({state:'hidden'});
+  await renameInput.fill('技术方案');
+  await renameInput.press('Enter');
+  await renameInput.waitFor({state:'hidden'});
   const persisted = await page.evaluate(() => window.beings.snapshot());
   assert.equal(persisted.chatScene.scene_id,discussion);
   assert.equal(persisted.chatScene.scene_meta.scene_label,'技术方案');
@@ -259,7 +263,7 @@ try {
   await page.waitForFunction(scene => !window.fixtureApp.chatLoading && window.fixtureApp.snapshot.chatScene.scene_id === scene, original);
   await chat.locator('#input').fill('并发 A');
   await chat.locator('#send-btn').click();
-  await chat.getByText('【新消息来自 scene「桌面·测试设备 · ID: '+original+'」】',{exact:true}).waitFor();
+  await chat.locator('.message.user').getByText('并发 A',{exact:true}).waitFor();
   const emit = async (scene, text, close = false) => application.evaluate((_, {scene,text,close}) => {
     const stream = globalThis.fixture.streams.get(scene);
     assertStream(stream);
@@ -293,7 +297,7 @@ try {
   const queuedScene = await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id);
   const localQueueStatus = chat.locator('.composer-queue-item').filter({hasText:'排队 C'});
   await localQueueStatus.waitFor();
-  assert.equal(await localQueueStatus.getByRole('button',{name:'调整方向',exact:true}).isDisabled(),true,'Cannot interrupt another scene');
+  assert.equal(await localQueueStatus.getByRole('button',{name:'引导',exact:true}).isDisabled(),true,'Cannot steer another scene');
   assert.equal(await chat.locator('#messages .message.user').filter({hasText:'排队 C'}).count(),0,'Unsent queue stays beside the composer');
   await page.locator(`[data-scene-id="${queuedScene}"] [data-status="queued"]`).waitFor();
   await page.screenshot({animations:'disabled',path:'test-results/chat-sessions-activity.png'});
@@ -349,9 +353,9 @@ try {
   await page.getByRole('menu',{name:'场景操作'}).waitFor();
   assert.equal(await page.getByRole('menu',{name:'编辑菜单'}).count(),0,'Session context menu must suppress the global edit menu');
   await page.getByRole('menuitem',{name:'重命名',exact:true}).click();
-  await rename.fill('旧会话');
+  await renameInput.fill('旧会话');
   await page.getByRole('button',{name:'保存名称'}).click();
-  await rename.waitFor({state:'hidden'});
+  await renameInput.waitFor({state:'hidden'});
   assert.equal(await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id),discussion);
   const oldScene = page.getByRole('button',{name:'切换到场景：旧会话'});
   await oldScene.click({button:'right'});
@@ -423,7 +427,7 @@ try {
   await visibleQuestion.waitFor();
   assert.equal(await visibleQuestion.locator('.content').innerText(), '独立问题');
   assert.equal(await visibleQuestion.locator('.scene-scheduling').count(), 0);
-  const schedulingRun = visibleQuestion.locator('xpath=following-sibling::details[contains(@class,"run-activity")][1]');
+  const schedulingRun = visibleQuestion.locator('xpath=following-sibling::div[@class="chat-run"][1]').locator(':scope > details.run-activity');
   await schedulingRun.waitFor();
   assert.equal(await schedulingRun.getAttribute('open'), null);
   assert.equal(await schedulingRun.locator('.scene-scheduling').count(), 0, 'Collapsed activity does not mount process details');
