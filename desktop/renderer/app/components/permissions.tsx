@@ -56,7 +56,6 @@ export function PermissionSettings({ app }: { app: AppModel }) {
     {choicesFor(mode).map(choice => <button key={choice.value} type="button" role="menuitemradio" aria-checked={choice.value === mode}
       tabIndex={choice.value === mode ? 0 : -1} data-mode={choice.value} disabled={busy || !app.snapshot?.settings.hasToken} onClick={() => void apply(choice.value)}>
       <PermissionIcon mode={choice.value}/><span className={styles.copy}><strong>{choice.title}</strong><small>{choice.detail}</small></span>
-      <span className={styles.check} aria-hidden="true">{choice.value === mode ? '✓' : ''}</span>
     </button>)}
     <div className={styles.menuNote} role="status">{busy ? '正在切换…' : '切换会重启运行时，中断当前本机任务'}</div>
     {error && <p role="alert" className={styles.menuError}>{error}</p>}

@@ -22,6 +22,8 @@
 }
 
 .client-file-viewer {
+  --panel-radius: 7px;
+
   position: relative;
   display: flex;
   flex-direction: column;

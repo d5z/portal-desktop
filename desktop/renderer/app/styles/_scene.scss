@@ -8,6 +8,9 @@
   gap: 0;
   padding: var(--panel-gap) var(--panel-gap) var(--panel-gap) 0;
   background: var(--workspace-frame);
+  border-radius: 11px;
+  outline: 1px solid var(--workspace-frame-border);
+  outline-offset: -1px;
 }
 
 .workspace-stage {

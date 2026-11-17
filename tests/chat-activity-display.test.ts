@@ -24,7 +24,7 @@ it('removes the successful thinking bubble while retaining generated files', () 
 it.each(['error','timeout','stopped'] as const)('keeps the %s notice visible with reasoning hidden', status => {
   const html = render({...run,end:2,status,outcome:status,hint:'需要确认任务结果'});
   expect(html).toContain('需要确认任务结果');
-  expect(html).toContain(`data-status="${status}"`);
+  expect(html).toContain(`data-tone="${status === 'stopped' ? 'stopped' : 'error'}"`);
   expect(html).not.toContain('thinking-dots');
 });
 it('can render the full activity when the preference is enabled', () => {
@@ -38,7 +38,7 @@ it('shows only the latest progress per scene without losing errors or artifacts'
   const html = renderToStaticMarkup(createElement(ChatActivity, {run,showDetails:false,showProgress:false}));
   expect(html).not.toContain('thinking-dots');
   expect(html).toContain('report.html');
-  expect(renderToStaticMarkup(createElement(ChatActivity, {run:{...run,status:'error'},showDetails:false,showProgress:false}))).toContain('needs-attention');
+  expect(renderToStaticMarkup(createElement(ChatActivity, {run:{...run,status:'error'},showDetails:false,showProgress:false}))).toContain('data-tone="error"');
 });
 
 it('replaces typing dots with streamed text and restores them for an interrupt or tool stage', () => {
@@ -51,9 +51,9 @@ it('replaces typing dots with streamed text and restores them for an interrupt o
 
 it('uses the durable stop marker instead of another status row while preserving artifacts', () => {
   const stopped = {...run,end:2,status:'stopped' as const,stopHistorySeq:3};
-  expect(render(stopped,false)).not.toContain('quiet-activity-status-icon');
+  expect(render(stopped,false)).not.toContain('chat-status-row');
   expect(render(stopped,false)).toContain('report.html');
-  expect(render({...stopped,status:'error'},false)).toContain('needs-attention');
+  expect(render({...stopped,status:'error'},false)).toContain('data-tone="error"');
   const notice:any={kind:'message',role:'system',id:'stop-notice',text:'停止尚未确认',notice:'stop',statusRunId:run.id};
   expect([...quietProgressRuns([run,notice])]).toEqual([]);
 });

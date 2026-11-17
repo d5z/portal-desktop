@@ -3,9 +3,10 @@
   z-index: 5;
   position: absolute;
   inset: 0 0 auto;
-  height: 88px;
+  height: 72px;
   background: transparent;
   -webkit-app-region: drag;
+  user-select: none;
 }
 
 .bar::before {
@@ -13,7 +14,7 @@
   position: absolute;
   inset: 1px var(--chat-inset-right) 0 var(--chat-inset-left);
   z-index: -1;
-  background: linear-gradient(to bottom, var(--bg) 0%, var(--bg) 24%, color-mix(in srgb, var(--bg) 90%, transparent) 56%, transparent 100%);
+  background: linear-gradient(to bottom, var(--workspace-panel) 0%, var(--workspace-panel) 24%, color-mix(in srgb, var(--workspace-panel) 90%, transparent) 56%, transparent 100%);
   pointer-events: none;
 }
 

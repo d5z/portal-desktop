@@ -218,9 +218,7 @@ select option:focus-visible {
 }
 
 select option::checkmark {
-  order: 1;
-  margin-inline-start: auto;
-  color: var(--accent);
+  display: none;
 }
 
 .field-help {

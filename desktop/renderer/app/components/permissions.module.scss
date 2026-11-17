@@ -43,6 +43,10 @@
   color: var(--text);
 }
 
+.menu > button[aria-checked='true'] {
+  background: var(--selected);
+}
+
 .menu > button:hover,
 .menu > button:focus-visible {
   background: var(--hover);
@@ -77,12 +81,6 @@
   font-size: 11px;
   color: var(--secondary);
   line-height: 1.4;
-}
-
-.check {
-  width: 16px;
-  flex: none;
-  font-size: 15px;
 }
 
 .menu > button[data-mode='full-access'],

@@ -260,11 +260,8 @@ body[data-view='chat'].has-topic .scene-ribbon {
 
 #place-panel #view-title {
   display: block;
-  font:
-    600 26px/1.4 Georgia,
-    'Songti SC',
-    serif;
-  letter-spacing: 0;
+  font: 500 20px/28px 'Being Noto Sans SC', var(--font-sans);
+  letter-spacing: -0.3px;
   margin: 0;
   overflow-wrap: anywhere;
 }
