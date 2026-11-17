@@ -9,15 +9,15 @@ import type { HomeLibrary } from '../models/home-library';
 import styles from './home-library.module.scss';
 const FileContent = lazy(() => import('./home-file-preview').then(module => ({ default: module.HomeFileContent })));
 /** The library and conversation receipts share one preview and download surface. */
-export function HomeFilePanel({ store }: { store: HomeLibrary }) {
+export function HomeFilePanel({ store, openerPort }: { store: HomeLibrary; openerPort?: MessagePort }) {
   const model = useModel(store);
-  return <DrawerPresence open={!!model.selected}>{model.selected && <SelectedFilePanel key={model.selected.path} model={model} />}</DrawerPresence>;
+  return <DrawerPresence open={!!model.selected}>{model.selected && <SelectedFilePanel key={model.selected.path} model={model} openerPort={openerPort} />}</DrawerPresence>;
 }
-function SelectedFilePanel({ model }: { model: HomeLibrary }) {
+function SelectedFilePanel({ model, openerPort }: { model: HomeLibrary; openerPort?: MessagePort }) {
   const [source, setSource] = useState(false);
   const selected = model.selected!;
   const html = /\.html?$/i.test(selected.path);
-  return <FilePreviewPanel portal name={selected.name} path={selected.path} onClose={() => model.closePreview()}
+  return <FilePreviewPanel portal name={selected.name} path={selected.path} onClose={() => model.closePreview()} openerPort={openerPort}
     actions={<>
       {html && model.preview && <FilePreviewModes source={source} onChange={setSource} />}
       <IconButton className="file-preview-icon" label="下载文件" disabled={model.busy} onClick={() => void model.download(selected.path)}><Icon name="download-wide" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" /></IconButton>

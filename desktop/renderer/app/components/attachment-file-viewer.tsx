@@ -1,3 +1,4 @@
+import { ErrorIndicator } from '../../shared/components/error-indicator';
 import { DrawerPresence } from "../../shared/components/workspace-drawer";
 import { LocalFileAction } from '../../shared/components/local-file-link';
 import { homeRecentFiles } from '../models/home-recent-files';
@@ -16,16 +17,18 @@ import {AttachmentDownload} from '../../chat/components/attachment-download';
 import {Markdown} from '../../shared/components/markdown';
 import {validFilePreview} from '../lib/file-preview-data';
 import { TextFile, FileImage } from './file-preview-content';
-type FileView={id:string;name:string;extension:string;blob?:Blob;text?:string;segments?:{label:string;text:string}[];endpoint:string;path?:string;url?:string};
+type FileView={id:string;name:string;extension:string;blob?:Blob;text?:string;segments?:{label:string;text:string}[];endpoint:string;path?:string;url?:string;openerPort?:MessagePort};
 export function AttachmentFileViewer({frame,children,scope}:{frame:RefObject<HTMLIFrameElement|null>;children?:ReactNode;scope?:string}) {
   const [file,setFile]=useState<FileView|null>(null);
   const [localPath,setLocalPath]=useState<string|null>(null),[error,setError]=useState(''),[busy,setBusy]=useState(false),[source,setSource]=useState(false);
+  const [localOpenerPort,setLocalOpenerPort]=useState<MessagePort>();
   const [revealError,setRevealError]=useState('');
   const sequence=useRef(0);
-  const loadLocal=useCallback(async(path:string)=>{
+  const loadLocal=useCallback(async(path:string, openerPort?: MessagePort)=>{
     const ticket=++sequence.current;
     const available=await checkLocalFiles(window.beings,[path]);
     if(ticket!==sequence.current)return;
+    setLocalOpenerPort(openerPort);
     if(available?.[0]!==true){
       setFile(null);setLocalPath(path);setBusy(false);setError('文件已不存在或无法读取。');
       const target=frame.current;
@@ -39,7 +42,6 @@ export function AttachmentFileViewer({frame,children,scope}:{frame:RefObject<HTM
       const result=await window.beings.previewLocalFile(path);
       if(ticket!==sequence.current){void window.beings.releaseLocalFilePreview?.(result.id);return;}
       setFile({...result,endpoint:'',blob:result.bytes ? new Blob([new Uint8Array(result.bytes)],{type:result.mime}) : undefined});
-      setLocalPath(result.path);
       homeRecentFiles.recordLocal(result);
     }catch{if(ticket===sequence.current)setError('文件已不存在、无法读取或不支持预览。');}
     finally{if(ticket===sequence.current)setBusy(false);}
@@ -47,7 +49,7 @@ export function AttachmentFileViewer({frame,children,scope}:{frame:RefObject<HTM
   useEffect(()=>{sequence.current++;setFile(null);setLocalPath(null);setBusy(false);setError('');},[scope]);
   useEffect(()=>()=>{sequence.current++;},[]);
   useEffect(()=>{if(!file?.path)return;const id=file.id;return()=>{void window.beings.releaseLocalFilePreview?.(id);};},[file?.id,file?.path]);
-  const close=useCallback(()=>{sequence.current++;setFile(null);setLocalPath(null);setBusy(false);setError('');frame.current?.focus();},[frame]);
+  const close=useCallback(()=>{sequence.current++;setFile(null);setLocalPath(null);setBusy(false);setError('');},[]);
   useEffect(()=>{
     const receive=(event:MessageEvent)=>{
       const target=frame.current,data=event.data;
@@ -60,10 +62,10 @@ export function AttachmentFileViewer({frame,children,scope}:{frame:RefObject<HTM
           if(frame.current===target && target.src===source.href)target.contentWindow?.postMessage({type:'beings:local-files-checked',id:data.id,revision:data.revision,available},'beings://chat');
         });return;
       }
-      if(data.type==='beings:local-file-preview'){const path=localFileReference(data.path);if(path){void loadLocal(path);}return;}
+      if(data.type==='beings:local-file-preview'){const path=localFileReference(data.path);if(path){void loadLocal(path,event.ports[0]);}return;}
       if(!validFilePreview(data))return;
       sequence.current++;setLocalPath(null);setBusy(false);setError('');setSource(false);
-      setFile({...data,endpoint:source.searchParams.get('history_scope') || ''});
+      setFile({...data,endpoint:data.endpoint ?? (source.searchParams.get('history_scope') || ''),openerPort:event.ports[0]});
     };
     window.addEventListener('message',receive);
     const target=frame.current;
@@ -79,19 +81,20 @@ export function AttachmentFileViewer({frame,children,scope}:{frame:RefObject<HTM
   const reveal=async()=>{
     if(!localPath)return;
     const ticket=sequence.current;
-    const message=await revealLocalFile(window.beings,localPath);
+    const message=await revealLocalFile(window.beings,file?.path || localPath);
     if(ticket===sequence.current)setRevealError(message);
   };
-  return <LocalFileAction.Provider value={loadLocal}><DrawerPresence open={!!(file || localPath)}>{(file || localPath) && <FilePreviewPanel key={localPath || file?.id} name={name} path={localPath || undefined} onClose={close}
+  return <LocalFileAction.Provider value={loadLocal}><DrawerPresence open={!!(file || localPath)}>{(file || localPath) && <FilePreviewPanel key={localPath || file?.id} name={name} path={file?.path || localPath || undefined} onClose={close} openerPort={localPath ? localOpenerPort : file?.openerPort}
     actions={localPath ? <>
       {html && <FilePreviewModes source={source} onChange={setSource} />}
-      <IconButton className="file-preview-icon" label="刷新" disabled={busy} onClick={()=>void loadLocal(localPath)}><Icon name="refresh-library" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" /></IconButton>
+      <IconButton className="file-preview-icon" label="刷新" disabled={busy} onClick={()=>void loadLocal(localPath,localOpenerPort)}><Icon name="refresh-library" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" /></IconButton>
       {file && <IconButton className="file-preview-icon" label="打开所在文件夹" onClick={()=>void reveal()}><Icon name="directory" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" /></IconButton>}
     </> : undefined}>
     {file && !localPath && <div className="client-file-actions"><span>{file.segments?'内容预览 · 不保留原版排版':'原文件预览'}</span><AttachmentDownload key={JSON.stringify([file.endpoint,file.id])} request={request} endpoint={file.endpoint} id={file.id} name={file.name}>下载原件</AttachmentDownload></div>}
-    {localPath && revealError && <div role="alert">{revealError}</div>}
+    {localPath && revealError && <ErrorIndicator description={revealError} retry={{ label: '重新打开所在文件夹', run: () => void reveal() }} />}
     {busy && <div className="client-file-body" role="status">正在读取本地文件…</div>}
-    {error && <div className="client-file-body" role="alert">{error}</div>}
+    {error && <div className="client-file-body"><ErrorIndicator description={error}
+      retry={localPath ? { label: '重试读取', run: () => void loadLocal(localPath,localOpenerPort) } : undefined} /></div>}
     {file && (html && !source ? <iframe key={file.id} title="HTML 文件预览" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads" referrerPolicy="no-referrer" src={file.url}/> :
       file.blob?.type.startsWith('image/') ? <FileImage blob={file.blob} name={file.name}/> :
       file.extension==='xlsx'?<XlsxPreview key={file.id} blob={file.blob!}/>:file.extension==='pptx'?<PptxPreview key={file.id} blob={file.blob!}/>:file.extension==='pdf'?<PdfPreview key={file.id} blob={file.blob!}/>:<div className="client-file-body">{file.segments?file.segments.map((s,i)=><section key={i}>{s.label && <h3>{s.label}</h3>}<Markdown content={s.text} intelligentUI={false}/></section>):<TextFile extension={file.extension} text={file.text || ''}/>}</div>)}

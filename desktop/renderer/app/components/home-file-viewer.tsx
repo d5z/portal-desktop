@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, type ReactNode, type RefObject } from 'react';
+import { useCallback, useEffect, useMemo, useState, type ReactNode, type RefObject } from 'react';
 import type { HomeAPI } from '../../../shared/home';
 import { workspacePath } from '../../../shared/being-files';
 import { HomeFileAction } from '../../shared/components/being-files';
@@ -14,7 +14,8 @@ export function HomeFileViewer({ api, frame, scope, children, onNotice }: {
     preview: async () => { throw new Error('请更新客户端后访问 Home 文件。'); },
     download: async () => { throw new Error('请更新客户端后访问 Home 文件。'); },
   }), [api]);
-  const open = useCallback((path: string, action: 'preview' | 'download' = 'preview') => {
+  const [openerPort, setOpenerPort] = useState<MessagePort>();
+  const open = useCallback((path: string, action: 'preview' | 'download' = 'preview', port?: MessagePort) => {
     if (action === 'download') {
       if (store.busy) return;
       void store.download(path).then(() => {
@@ -23,6 +24,7 @@ export function HomeFileViewer({ api, frame, scope, children, onNotice }: {
       });
       return;
     }
+    setOpenerPort(port);
     void store.open({ path, name: path.split('/').pop()!, type: 'file', size: 0 });
   }, [store, onNotice]);
   useEffect(() => {
@@ -46,10 +48,10 @@ export function HomeFileViewer({ api, frame, scope, children, onNotice }: {
           !['beings:home-file-preview', 'beings:home-file-download'].includes(message?.type) || message.revision !== new URL(target.src).searchParams.get('revision')) return;
       let path: string;
       try { path = workspacePath(message.path); } catch { return; }
-      open(path, message.type === 'beings:home-file-download' ? 'download' : 'preview');
+      open(path, message.type === 'beings:home-file-download' ? 'download' : 'preview', event.ports[0]);
     };
     window.addEventListener('message', receive);
     return () => window.removeEventListener('message', receive);
   }, [frame, open]);
-  return <HomeFileAction.Provider value={open}>{children}<HomeFilePanel store={store} /></HomeFileAction.Provider>;
+  return <HomeFileAction.Provider value={open}>{children}<HomeFilePanel store={store} openerPort={openerPort} /></HomeFileAction.Provider>;
 }
