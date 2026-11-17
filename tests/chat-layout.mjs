@@ -31,12 +31,18 @@ if(process.env.CHAT_LAYOUT_PREVIEW){console.log(origin);await new Promise(()=>{}
 let browser;
 try{
   browser=await chromium.launch({channel:'chrome',headless:true});
-  const page=await browser.newPage({reducedMotion:'reduce'});
+  const page=await browser.newPage({reducedMotion:'reduce',viewport:{width:1440,height:900}});
   await page.goto(origin);
   const frame=page.frameLocator('iframe');
   await frame.locator('.message').nth(history.length - 1).waitFor();
   await mkdir('test-results',{recursive:true});
   const composerBefore=await frame.locator('#input-area').boundingBox();
+  assert.equal(composerBefore.width, 760, 'Desktop Prompt has the Figma maximum width');
+  const columnWidth = await frame.locator('#messages').evaluate(el => {
+    const style = getComputedStyle(el);
+    return el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+  });
+  assert.ok(columnWidth > 900 && columnWidth <= 920, 'Desktop conversation aligns within the 920px column');
   await page.context().setOffline(true);
   await frame.locator('#toast:popover-open').waitFor();
   assert.equal(await frame.locator('#toast').textContent(),'已离线，恢复网络后会自动继续');
@@ -62,10 +68,15 @@ try{
       const copy = row.getByRole('button', { name: '复制正文', exact: true });
       await bubble.hover();
       const before = await bubble.boundingBox();
+      const scrollBefore = await frame.locator('#messages').evaluate(el => el.scrollTop);
       const button = await copy.boundingBox();
-      assert.ok(role === 'user' ? button.x + button.width <= before.x : button.x >= before.x + before.width, 'Copy stays outside the bubble');
+      assert.ok(width <= 520 ? button.y >= before.y + before.height - 1
+        : role === 'user' ? button.x + button.width <= before.x : button.x >= before.x + before.width, 'Copy stays outside the bubble');
       await copy.hover();
-      assert.deepEqual(await bubble.boundingBox(), before, 'Hover does not resize or move the bubble');
+      const after = await bubble.boundingBox();
+      const scrollAfter = await frame.locator('#messages').evaluate(el => el.scrollTop);
+      assert.deepEqual({ ...after, y: after.y + scrollAfter - scrollBefore }, before,
+        `Hover does not resize or move the ${role} bubble at ${width}px`);
       assert.equal(await copy.evaluate(el => getComputedStyle(el).opacity), '1');
     }
     const overflow=await frame.locator('#messages, .message, .message .content, .code-block, .table-wrap, #input-area, #pending-files, .pending-file').evaluateAll(nodes=>nodes.filter(n=>n.scrollWidth>n.clientWidth+1).map(n=>({element:n.id||n.className,width:n.clientWidth,contentWidth:n.scrollWidth})));
@@ -91,7 +102,7 @@ try{
   await touchCopy.waitFor();
   assert.equal(await touchCopy.evaluate(el => getComputedStyle(el).opacity), '1', 'Touch users can discover Copy without hovering');
   assert.equal(await touchCopy.evaluate(el => getComputedStyle(el).pointerEvents), 'auto');
-  assert.equal((await touchCopy.boundingBox()).width, 32);
+  assert.equal((await touchCopy.boundingBox()).width, 44);
   await touchPage.close();
   console.log('PASS: chat Markdown, attachments and composer fit 1100/640/380/300px, with intact code and vertical reading.');
 }finally{await browser?.close();await new Promise(r=>server.close(r));}

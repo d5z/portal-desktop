@@ -129,6 +129,7 @@ export function App({ model }: { model: AppModel }) {
       </section>
       <main id="client-main" hidden={app.startup !== "ready"}>
         <div className="workspace-body">
+          {app.api.platform === 'darwin' && <div className="workspace-window-drag" aria-hidden="true" />}
           <WorkspaceNavigation app={app} />
           <div className="workspace-stage">
             <div className={`workspace-content${app.view !== "chat" && app.chatSplitOpen ? " split-chat" : ""}`}>

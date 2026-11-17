@@ -11,6 +11,53 @@
   -webkit-app-region: drag;
 }
 
+html[data-platform='darwin'] .workspace-window-drag {
+  position: absolute;
+  inset: 0 var(--panel-gap) auto 76px;
+  z-index: 90;
+  height: var(--panel-gap);
+  -webkit-app-region: drag;
+  user-select: none;
+}
+
+html[data-platform='darwin'] :is(.chat-session-titlebar, #place-panel > .place-sheet-heading) {
+  -webkit-app-region: drag;
+  user-select: none;
+
+  :is(button, a) {
+    -webkit-app-region: no-drag;
+  }
+}
+
+@media (prefers-reduced-transparency: no-preference) {
+  html[data-platform='darwin'] {
+    --workspace-glass: light-dark(rgb(246 246 246 / 78%), rgb(26 26 26 / 62%));
+
+    &,
+    body,
+    #client-main {
+      background: transparent;
+    }
+
+    .workspace-body {
+      background: var(--workspace-glass);
+    }
+
+    .chat-session-panel[data-pinned='true'] {
+      background: transparent;
+      outline-color: transparent;
+    }
+
+    @container stage (max-width: 700px) {
+      .chat-session-panel[data-pinned='true'] {
+        background: light-dark(rgb(246 246 246 / 78%), rgb(26 26 26 / 80%));
+        backdrop-filter: blur(50px);
+        outline-color: var(--panel-border);
+      }
+    }
+  }
+}
+
 // Windows keeps the native caption outside the renderer. The Mac layout
 // reserves that inset inside the frameless content area, so reusing it on
 // Windows leaves an unnecessary blank band above the workspace.

@@ -95,7 +95,8 @@ export function clientWindowOptions(): BrowserWindowConstructorOptions {
   return {
     width: 1280, height: 860, minWidth: 920, minHeight: 640, title: CLIENT_NAME,
     icon: systemIcon(false),
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#212121' : '#ffffff',
+    backgroundColor: process.platform === 'darwin' ? '#00000000' : nativeTheme.shouldUseDarkColors ? '#212121' : '#ffffff',
+    ...(process.platform === 'darwin' ? { vibrancy: 'hud' as const } : {}),
     ...(process.platform === 'win32' ? { backgroundMaterial: 'none' as const } : {}),
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'default',
     autoHideMenuBar: process.platform === 'win32',

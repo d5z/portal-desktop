@@ -34,6 +34,25 @@ try{
   await page.locator('.composer-queue-item').filter({hasText:'稍后发送'}).waitFor();
   await input.fill('优先处理');await page.getByRole('button',{name:'加入队列',exact:true}).click();
   await page.locator('.composer-queue-item').filter({hasText:'优先处理'}).waitFor();
+  const firstHandle = page.locator('.composer-queue-item').filter({ hasText: '优先处理' }).locator('.composer-queue-drag-handle');
+  const firstBounds = await firstHandle.boundingBox();
+  const dropBounds = await page.locator('.composer-queue-item').filter({ hasText: '稍后发送' }).boundingBox();
+  await page.mouse.move(firstBounds.x + firstBounds.width / 2, firstBounds.y + firstBounds.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(firstBounds.x + firstBounds.width / 2, dropBounds.y + dropBounds.height / 2, { steps: 10 });
+  await page.mouse.up();
+  await page.waitForFunction(() => document.querySelector('.composer-queue-item')?.textContent.includes('优先处理'), null, { timeout: 2500 });
+  await page.getByRole('button', { name: '调整排队顺序：稍后发送', exact: true }).focus();
+  await page.keyboard.press('Space');
+  await page.locator('.composer-queue-item.dragging').waitFor();
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  await page.keyboard.press('ArrowUp');
+  await page.waitForFunction(() => {
+    const [target, moved] = document.querySelectorAll('.composer-queue-item');
+    return moved.getBoundingClientRect().top < target.getBoundingClientRect().top;
+  }, null, { timeout: 2500 });
+  await page.keyboard.press('Space');
+  await page.waitForFunction(() => document.querySelector('.composer-queue-item')?.textContent.includes('稍后发送'), null, { timeout: 2500 });
   assert.equal(sends.length,1);
   assert.equal(await page.locator('.message.user').count(),1);
   await page.getByRole('button',{name:'取消排队：稍后发送',exact:true}).click();
@@ -97,5 +116,5 @@ try{
   await page.locator('html').evaluate(el => el.dataset.theme = 'dark');
   await page.locator('.composer-stack').screenshot({path:'test-results/chat-send-queue-dark.png'});
   assert.deepEqual(errors,[]);
-  console.log('PASS: same-scene queue, cancel, interrupt, single echo, preserved draft and mobile layout');
+  console.log('PASS: same-scene queue, pointer and keyboard reorder, cancel, interrupt, single echo, preserved draft and mobile layout');
 }finally{stream?.end();await browser?.close();server.closeAllConnections();await new Promise(r=>server.close(r));}

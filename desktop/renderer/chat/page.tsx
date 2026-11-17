@@ -45,6 +45,7 @@ import { useModel } from "../shared/hooks/use-model";
 import { CodeClipboard } from "../shared/components/markdown";
 import { type ComposerHandle } from "../shared/components/rich-composer";
 import { ChatComposer } from "./components/composer";
+import { ComposerQueue } from "./components/composer-queue";
 import { ComposerAddMenu } from './components/composer-add-menu';
 import { canUseComposerCommand, parseComposerCommands } from './models/composer-commands';
 import {useMessageMenu} from '../shared/components/message-menu';
@@ -58,6 +59,8 @@ import { EditContextMenu } from "../shared/components/context-menu";
 import { ChatIndex, JumpToLatest } from "./components/navigation";
 import type { ChatBridge } from "./services/bridge";
 import { useChatSession } from "./hooks/use-chat-session";
+
+const actionClock = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
 
 class ChatErrorBoundary extends Component<
   { children: ReactNode },
@@ -87,46 +90,6 @@ export function ChatApp({ connection, keywordNavigation = true, mobileWeb = fals
       {session ? <ChatView {...session} keywordNavigation={keywordNavigation} mobileWeb={mobileWeb} /> : <div role="status">正在连接…</div>}
     </ChatErrorBoundary>
   );
-}
-let activeQueueDragId: string | null = null;
-let activeQueueTargetId: string | null = null;
-function QueueRow({ item, index, allowInterrupt, onEdit, onReorder }: { item: Message; index: number; allowInterrupt: boolean; onEdit: (item: Message) => void; onReorder: (sourceId: string, targetId: string) => void }) {
-  const rowRef = useRef<HTMLDivElement>(null);
-  const previousRect = useRef<DOMRect | null>(null);
-  useLayoutEffect(() => {
-    const row = rowRef.current;
-    if (!row) return;
-    const nextRect = row.getBoundingClientRect();
-    const previous = previousRect.current;
-    if (previous && Math.abs(previous.top - nextRect.top) > 1) {
-      row.animate([{ transform: `translateY(${previous.top - nextRect.top}px)` }, { transform: 'translateY(0)' }], { duration: 180, easing: 'cubic-bezier(.2,.8,.2,1)' });
-    }
-    previousRect.current = nextRect;
-  }, [index]);
-  const clearDrag = () => { activeQueueDragId = null; activeQueueTargetId = null; rowRef.current?.classList.remove('dragging'); };
-  return <div ref={rowRef} className="composer-queue-item" key={item.id} data-queue-id={item.id} draggable onDragStart={event => {
-    if (!(event.target as HTMLElement).closest('.composer-queue-drag-handle')) { event.preventDefault(); return; }
-    activeQueueDragId = item.id; activeQueueTargetId = item.id;
-    event.dataTransfer.effectAllowed = 'move';
-    event.dataTransfer.setData('text/plain', item.id);
-    const ghost = document.createElement('span'); ghost.style.cssText = 'position:fixed;left:-9999px;top:-9999px;width:1px;height:1px;opacity:0'; document.body.appendChild(ghost);
-    event.dataTransfer.setDragImage(ghost, 0, 0); requestAnimationFrame(() => ghost.remove());
-    rowRef.current?.classList.add('dragging');
-  }} onDragOver={event => {
-    event.preventDefault(); event.dataTransfer.dropEffect = 'move';
-    const sourceId = activeQueueDragId || event.dataTransfer.getData('text/plain');
-    if (!sourceId || sourceId === item.id || sourceId === activeQueueTargetId) return;
-    activeQueueTargetId = item.id;
-    onReorder(sourceId, item.id);
-  }} onDrop={event => { event.preventDefault(); clearDrag(); }} onDragEnd={clearDrag}>
-    <span className="composer-queue-drag-handle" title="拖动排序" aria-label="拖动排序"><Icon name="grip" className="composer-queue-icon" width="16" height="20" fill="currentColor" /></span>
-    <span className="composer-queue-content" title={item.text}>{item.text}</span>
-    {item.queueNotice && <span className="composer-queue-notice" role="status" title={item.queueNotice} aria-label={item.queueNotice}>!</span>}
-    <button type="button" aria-label={`编辑排队消息：${item.text}`} title="在输入框编辑" onClick={() => onEdit(item)} disabled={!item.editQueued}><Icon name="chat-edit" width="15" height="15" /></button>
-    {item.retry && <button className="composer-queue-text-action" type="button" onClick={() => void item.retry?.()}>{item.retryLabel}</button>}
-    <button className="composer-queue-steer" type="button" aria-label="调整方向" disabled={!allowInterrupt || !item.canInterruptQueued} title="调整方向：立即打断并发送这条消息" onClick={() => void item.interruptQueued?.()}><Icon name="turn-right" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /><span>调整方向</span></button>
-    <button type="button" title="删除排队消息" aria-label={`取消排队：${item.text}`} onClick={() => item.cancelQueued?.()}><Icon name="chat-close" width="15" height="15" /></button>
-  </div>;
 }
 function ChatView({
   state,
@@ -252,7 +215,7 @@ function ChatView({
       : "light",
   );
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
-  const messageMenu=useMessageMenu(bridge.copyText,JSON.stringify([state.currentScene.sceneId,state.historyScope]));
+  const messageMenu=useMessageMenu(bridge.copyText,JSON.stringify([state.currentScene.sceneId,state.historyScope]),'chat');
   const { selection, setSelection, addToChat } = useMessageSelection(messages, composer, nativeTouch);
   useChatShortcuts(bridge, !contextMenuOpen && !messageMenu.isOpen && !nativeTouch ? selection?.text : undefined, addToChat, isMac);
   const [subagentEnabling, setSubagentEnabling] = useState(false);
@@ -554,7 +517,17 @@ function ChatView({
                       onPlace={item.role === "system" || !keywordNavigation ? undefined : openPlace}
                     />}</ImageGenerationAnswer>}
                   </div>
-                  <CopyMessage appearance="chat" text={splitSchedulingHint(originalMessageText(item)).text} copy={bridge.copyText} />
+                  <div className="message-row-actions">
+                    {item.createdAt !== undefined && Number.isFinite(item.createdAt) && <time className="message-action-time">{actionClock.format(item.createdAt)}</time>}
+                    <CopyMessage appearance="chat" text={splitSchedulingHint(originalMessageText(item)).text} copy={bridge.copyText} />
+                    <button type="button" className="message-more" data-message-more={item.id} aria-label="更多消息操作"
+                      aria-haspopup="menu" aria-expanded={messageMenu.trigger === item.id}
+                      onClick={event => messageMenu.showMenu(event.currentTarget, {
+                        text: splitSchedulingHint(originalMessageText(item)).text, time: item.createdAt, fallbackTime: item.timestamp,
+                      })}>
+                      <Icon name="chat-more" width="14" height="14" fill="currentColor" stroke="none" />
+                    </button>
+                  </div>
                 </div>
                 {hasAttachmentMessage(item) ? item.retry && <div className="attachment-message-actions">
                   {item.queueNotice && <span className="attachment-error" role="alert">{item.queueNotice}</span>}
@@ -573,9 +546,8 @@ function ChatView({
         <ChatIndex items={visibleItems.map(item=>item.kind==='message' && hasAttachmentMessage(item) ? {...item,text:originalMessageText(item)} : item)} container={messages} elements={messageElements} scrollLock={scrollLock} clearAnchor={releaseAnchor} highlight={setHighlighted} />
         <div className="composer-stack" ref={composerArea}>
           {!state.historyLoading && <JumpToLatest trimHistory={historyWindow.toLatest} status={reader} container={messages} scrollLock={scrollLock} clearAnchor={releaseAnchor} />}
-          {queuedMessages.length > 0 && <div className="composer-queue" role="group" aria-label={`待发送消息，共 ${queuedMessages.length} 条`}>
-            {queuedMessages.map((item, index) => <QueueRow item={item} index={index} allowInterrupt={state.canInterruptQueue && !state.stopping} onEdit={item => { state.draft = item.text; state.changed(); setEditingQueued(item); }} onReorder={(sourceId, targetId) => { const source = queuedMessages.find(candidate => candidate.id === sourceId); void source?.reorderQueued?.(targetId); }} key={item.id} />)}
-          </div>}
+          {queuedMessages.length > 0 && <ComposerQueue items={queuedMessages} allowInterrupt={state.canInterruptQueue && !state.stopping}
+            onEdit={item => { state.draft = item.text; state.changed(); setEditingQueued(item); }} />}
           <div id="input-area" onWheel={event => {
             if (event.deltaY >= 0 || !messages.current) return;
             const input = event.target instanceof HTMLElement ? event.target.closest('#input') as HTMLElement | null : null;

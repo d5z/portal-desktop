@@ -47,7 +47,7 @@ try{
  const bubble=page.locator('[data-history-seq="2"] .message-bubble-body');
  await bubble.click({button:'right'});
  const menu=page.getByRole('menu',{name:'消息操作'});
- await menu.waitFor();assert.equal(await menu.evaluate(n=>getComputedStyle(n).borderRadius),'20px');assert.match(await menu.locator('time').innerText(),/10月29日.*15:31/);
+ await menu.waitFor();assert.equal(await menu.evaluate(n=>getComputedStyle(n).borderRadius),'12px');assert.match(await menu.locator('time').innerText(),/10月29日.*15:31/);
  assert.doesNotMatch(await menu.locator('time').innerText(),/2026|15:31:00/);
  assert.deepEqual(await menu.getByRole('menuitem').allTextContents(),['复制']);
  assert.equal(await menu.locator('small').count(),0);
@@ -58,6 +58,14 @@ try{
  await menu.getByRole('menuitem',{name:'复制',exact:true}).click();
  await menu.waitFor({state:'detached'});
  assert.equal(await page.evaluate(()=>copied.at(-1)),history[1].content);
+ const more = page.locator('[data-history-seq="2"]').getByRole('button', { name: '更多消息操作' });
+ await bubble.hover();
+ assert.equal(await more.evaluate(el => el.getBoundingClientRect().width), 24);
+ await more.click();
+ await menu.waitFor();
+ await page.keyboard.press('Escape');
+ await menu.waitFor({ state: 'detached' });
+ assert.equal(await more.evaluate(el => el === document.activeElement), true);
  await bubble.focus();await page.keyboard.press('Shift+F10');await menu.waitFor();
  await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
  await menu.waitFor({state:'detached'});assert.equal(await page.evaluate(()=>copied.at(-1)),history[1].content);

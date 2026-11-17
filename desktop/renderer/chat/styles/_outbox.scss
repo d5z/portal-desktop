@@ -1,13 +1,13 @@
 /* Reserve at least one 36px row plus borders when the composer grows. */
 .composer-queue {
-  margin: 0 12px -8px;
-  min-height: 45px;
+  margin: 0 13px -13px;
+  min-height: 50px;
   max-height: min(127px, 36dvh);
   overflow: hidden auto;
   overscroll-behavior: contain;
   border: 1px solid var(--border);
-  border-bottom: 8px solid transparent;
-  border-radius: 18px 18px 0 0;
+  border-bottom: 13px solid transparent;
+  border-radius: 22px 22px 0 0;
   background: var(--chat-queue-surface);
 }
 

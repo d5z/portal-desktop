@@ -36,16 +36,22 @@
 }
 
 .chat {
-  flex: 0 0 32px;
-  width: 32px;
-  height: 32px;
-  padding: 8px;
-  border-radius: 7px;
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  padding: 5px;
+  border-radius: 4px;
   color: var(--text-muted);
 
   svg {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
+  }
+
+  @media (pointer: coarse) {
+    flex-basis: var(--touch-target);
+    width: var(--touch-target);
+    height: var(--touch-target);
   }
 
   @media (prefers-reduced-motion: no-preference) {

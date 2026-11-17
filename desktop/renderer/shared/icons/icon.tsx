@@ -8,6 +8,16 @@ const glyphs = {
     <rect x="8" y="8" width="14" height="14" rx="2" />
     <path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2" />
   </>) },
+  'chat-more': { viewBox: '0 0 14 14', content: (<>
+    <circle cx="2.917" cy="7" r="1.167" />
+    <circle cx="7" cy="7" r="1.167" />
+    <circle cx="11.083" cy="7" r="1.167" />
+  </>) },
+  'chat-queue-grip': { viewBox: '0 0 14 14', content: (<>
+    <circle cx="5.25" cy="2.917" r="1.167" /><circle cx="8.75" cy="2.917" r="1.167" />
+    <circle cx="5.25" cy="7" r="1.167" /><circle cx="8.75" cy="7" r="1.167" />
+    <circle cx="5.25" cy="11.083" r="1.167" /><circle cx="8.75" cy="11.083" r="1.167" />
+  </>) },
   'chat-download': { viewBox: '0 0 24 24', content: <><path d="M12 15V3" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5" /></> },
   'chat-image': { viewBox: '0 0 24 24', content: (<><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></>) },
   'chat-file': { viewBox: '0 0 24 24', content: (<><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></>) },

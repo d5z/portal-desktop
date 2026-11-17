@@ -545,7 +545,8 @@
   height: 36px;
   box-sizing: border-box;
   padding: 2px 8px;
-  font-size: 13px;
+  font-size: 14px;
+  line-height: 20px;
   min-width: 0;
   color: var(--text);
   transition:
@@ -560,12 +561,12 @@
   user-select: none;
 }
 
-.composer-queue-drag-handle {
-  display: grid;
-  place-items: center;
-  flex: 0 0 26px;
-  height: 26px;
-  border-radius: 6px;
+.composer-queue button.composer-queue-drag-handle {
+  flex: 0 0 24px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border-radius: 4px;
   color: var(--text-dim);
   cursor: grab;
   touch-action: none;
@@ -604,11 +605,6 @@
 
 .composer-queue-item + .composer-queue-item {
   border-top: 1px solid var(--border);
-}
-
-.composer-queue-icon {
-  flex-shrink: 0;
-  color: var(--text-dim);
 }
 
 .composer-queue-content {

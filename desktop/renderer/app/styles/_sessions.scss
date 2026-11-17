@@ -409,7 +409,7 @@
 }
 
 .chat-session-panel .chat-session-select[aria-current='true'] {
-  background: var(--selected);
+  font-weight: 550;
 }
 
 .chat-session-item:has(.chat-session-grip) > .chat-session-select {
@@ -544,7 +544,7 @@
   }
 }
 
-.chat-session-panel button:hover:not(:disabled):where(:not(.chat-session-select[aria-current='true'])) {
+.chat-session-panel button:hover:not(:disabled) {
   background: var(--hover);
 }
 

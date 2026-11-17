@@ -56,7 +56,7 @@
   color-scheme: light;
 
   --pressed-overlay: #20232214;
-  --chat-reply: #f0f0f0;
+  --chat-reply: #f6f6f6;
   --chat-sent: #0a8dfe;
   --chat-send-hover: #087fe9;
   --chat-send-pressed: #086fd1;
@@ -66,7 +66,7 @@
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --bg: #1b1c1e;
+  --bg: #141414;
   --composer-surface: #242629;
   --bg-soft: #25272a;
   --bg-softer: #303238;
@@ -84,7 +84,7 @@
   --accent-tint: #ffffff08;
   --accent-border: #597b9e;
   --overlay-backdrop: #0008;
-  --chat-reply: #2b2d31;
+  --chat-reply: #202020;
   --chat-sent: #0071f1;
   --chat-send-hover: #0081eb;
   --chat-send-pressed: #0069e8;
