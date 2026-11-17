@@ -13,8 +13,7 @@
 
 html[data-platform='darwin'] .workspace-window-drag {
   position: absolute;
-  inset: 0 var(--panel-gap) auto 76px;
-  z-index: 90;
+  inset: 0 var(--panel-gap) auto var(--workspace-rail-width);
   height: var(--panel-gap);
   -webkit-app-region: drag;
   user-select: none;
@@ -24,7 +23,7 @@ html[data-platform='darwin'] :is(.chat-session-titlebar, #place-panel > .place-s
   -webkit-app-region: drag;
   user-select: none;
 
-  :is(button, a) {
+  button {
     -webkit-app-region: no-drag;
   }
 }

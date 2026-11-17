@@ -16,31 +16,8 @@ import { CHAT_SCENE_ACTIVITY_LABELS, type ChatSceneActivity } from "../../../sha
 import type { HistoryScope } from "../../chat/models/scenes";
 import { PanelResizeHandle, usePanelWidth } from "../../shared/components/panel-resize";
 import { Dialog } from "../../shared/components/dialog";
-import doneGlyph from '../assets/scene-status/done.svg';
-import errorGlyph from '../assets/scene-status/error.svg';
-import queuedGlyph from '../assets/scene-status/queued.svg';
-import reconnectingGlyph from '../assets/scene-status/reconnecting.svg';
-import replyingGlyph from '../assets/scene-status/replying.svg';
-import stoppedGlyph from '../assets/scene-status/stopped.svg';
-import thinkingGlyph from '../assets/scene-status/thinking.svg';
-import timeoutGlyph from '../assets/scene-status/timeout.svg';
-import waitingGlyph from '../assets/scene-status/waiting.svg';
-import workingGlyph from '../assets/scene-status/working.svg';
 
 const sceneTooltipAppearance = { ...shellTooltipAppearance, side: 'top' as const, gap: 8 };
-const sceneActivityGlyphs: Record<ChatSceneActivity, string> = {
-  done: doneGlyph,
-  error: errorGlyph,
-  queued: queuedGlyph,
-  reconnecting: reconnectingGlyph,
-  replying: replyingGlyph,
-  stopped: stoppedGlyph,
-  thinking: thinkingGlyph,
-  timeout: timeoutGlyph,
-  waiting: waitingGlyph,
-  working: workingGlyph,
-};
-
 class SceneKeyboardSensor {
   static activators = KeyboardSensor.activators;
   autoScrollEnabled = false;
@@ -118,75 +95,63 @@ function SceneActivityIcon({ activity }: { activity: ChatSceneActivity }) {
   }, [playing, activity]);
 
   return <>
-    <span className="chat-session-activity-icon" data-mark-playing={showMark || undefined}
-      style={{ maskImage: `url(${JSON.stringify(sceneActivityGlyphs[activity])})` }} />
+    <span className="chat-session-activity-icon" data-mark-playing={showMark || undefined} />
     {!reduceMotion && (activity === 'working' || showMark) && <span className="chat-session-status-mark" data-playing={showMark || undefined}>
       <StatusMark status={activity === 'error' ? 'failed' : activity === 'done' ? 'done' : 'running'}
-        progress={0.75} size={16} strokeWidth={1.8} fillOpacity={0} drawDuration={sceneMarkDrawDuration}
-        color="currentColor" doneColor="currentColor" errorColor="currentColor" />
+        progress={0.75} size={11} strokeWidth={2.8} fillOpacity={0} drawDuration={sceneMarkDrawDuration}
+        color="var(--accent)" doneColor="var(--green)" errorColor="var(--danger, #b34b43)" />
     </span>}
   </>;
 }
 
-function SceneRow({ session, selected, activity, disabled, sortable, onSelect, onContextMenu, rename }: {
-  session: ChatScene;
-  selected: boolean;
-  activity?: ChatSceneActivity;
-  disabled: boolean;
-  sortable: boolean;
-  onSelect: () => void;
-  onContextMenu: (event: MouseEvent<HTMLButtonElement>) => void;
-  rename?: SceneRename;
+function SceneRow({ session, selected, activity, disabled, sortable, onSelect, onMenu, rename }: {
+  session: ChatScene; selected: boolean; activity?: ChatSceneActivity; disabled: boolean; sortable: boolean;
+  onSelect: () => void; onMenu: (event: MouseEvent<HTMLButtonElement>) => void;
+  rename?: { error: string; save: (name: string) => void; cancel: (restoreFocus: boolean) => void };
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
-    id: session.scene_id, disabled: !sortable || disabled || Boolean(rename),
+    id: session.scene_id, disabled: !sortable || disabled || !!rename,
   });
   const renameInput = useRef<HTMLInputElement>(null);
   const renaming = Boolean(rename);
   useLayoutEffect(() => {
-    if (!renaming) return;
-    renameInput.current?.focus();
-    renameInput.current?.select();
+    if (renaming) {
+      renameInput.current?.focus();
+      renameInput.current?.select();
+    }
   }, [renaming]);
   const label = session.scene_meta.scene_label;
-  const activityLabel = activity && CHAT_SCENE_ACTIVITY_LABELS[activity];
   return <div ref={setNodeRef} className="chat-session-item" data-reordering={isDragging || undefined}
     style={{ transform: CSS.Translate.toString(transform), transition }}>
-    {sortable && <button ref={setActivatorNodeRef} type="button" className="chat-session-grip" {...attributes} {...listeners} disabled={disabled || renaming}
-      aria-label={`调整场景顺序：${label}`} title="拖动调整顺序">
+    {sortable && <button ref={setActivatorNodeRef} type="button" className="chat-session-grip"
+      {...attributes} {...listeners} disabled={disabled || renaming} aria-label={`调整场景顺序：${label}`}>
       <Icon name="chat-grip" width="14" height="14" />
     </button>}
     {rename ? <>
-      <form className="chat-session-select chat-session-rename" aria-current={selected ? 'true' : undefined} aria-busy={disabled}
+      <form className="chat-session-select chat-session-rename" aria-current={selected ? "true" : undefined} aria-busy={disabled}
         onSubmit={event => {
           event.preventDefault();
-          const name = renameInput.current!.value.trim();
-          if (!disabled && name) rename.save(name);
-        }}
-        onBlur={event => {
+          if (!disabled && renameInput.current) rename.save(renameInput.current.value.trim());
+        }} onBlur={event => {
           if (!disabled && !event.currentTarget.contains(event.relatedTarget)) rename.cancel(false);
-        }}
-        onKeyDown={event => {
+        }} onKeyDown={event => {
           if (event.key !== 'Escape') return;
           event.stopPropagation();
           if (!disabled && !event.nativeEvent.isComposing) { event.preventDefault(); rename.cancel(true); }
         }}>
-        <input ref={renameInput} aria-label="场景名称" aria-describedby={rename.error ? 'chat-session-rename-error' : undefined}
-          defaultValue={label} maxLength={128} readOnly={disabled} required />
+        <input ref={renameInput} aria-label="场景名称" aria-describedby={rename.error ? "chat-session-rename-error" : undefined}
+          defaultValue={label} maxLength={128} readOnly={disabled} />
         <button type="submit" aria-label="保存名称" title="保存名称" disabled={disabled}>
-          <Icon name="check-16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" />
+          <Icon name="check-16" width="16" height="16" />
         </button>
       </form>
       {rename.error && <p id="chat-session-rename-error" className="chat-session-error" role="alert">{rename.error}</p>}
-    </> : <button className="chat-session-select" data-scene-id={session.scene_id} type="button"
-      aria-label={`切换到场景：${label}`} aria-current={selected ? "true" : undefined}
-      aria-description={activityLabel}
-      title={activity ? undefined : label} disabled={disabled} onClick={onSelect} onContextMenu={onContextMenu}>
-      <span title={activity ? label : undefined}>{label}</span>
-      {activity && <span className="chat-session-activity" data-status={activity} aria-hidden="true">
-        <SceneActivityIcon activity={activity} />
-        <span className="chat-session-activity-label">{activityLabel}</span>
-      </span>}
+    </> : <button type="button" className="chat-session-select" data-scene-id={session.scene_id} aria-label={`切换到场景：${label}`}
+      aria-current={selected ? "true" : undefined} aria-description={activity && CHAT_SCENE_ACTIVITY_LABELS[activity]}
+      title={label} disabled={disabled} onClick={onSelect} onContextMenu={onMenu}>
+      <span>{label}</span>
+      {activity && <span className="chat-session-activity" data-status={activity} aria-hidden="true"
+        title={CHAT_SCENE_ACTIVITY_LABELS[activity]}><SceneActivityIcon activity={activity} /></span>}
     </button>}
   </div>;
 }
@@ -248,7 +213,7 @@ function SceneList({ sessions, selected, activity, query, disabled, orderKey, on
         {visible.map(session => <SceneRow key={session.scene_id} session={session} selected={selected === session.scene_id}
           activity={activity[session.scene_id]} disabled={disabled} sortable={sortable} onSelect={() => onSelect(session.scene_id)}
           rename={rename?.id === session.scene_id ? rename : undefined}
-          onContextMenu={event => onContextMenu(event, session)} />)}
+          onMenu={event => onContextMenu(event, session)} />)}
       </SortableContext>
     </DndContext>
     {!!sessions.length && !visible.length && <p className="chat-session-caption" role="status">没有找到匹配的对话</p>}
@@ -393,7 +358,11 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
         <div className="chat-session-group"><span>场景对话</span><button id="new-chat-session" type="button" aria-label="新建场景" data-warm-tooltip="新建场景" title="新建场景" disabled={!connected || busy || !sessions.length} onClick={() => edit("create")}><Icon name="plus" /></button></div>
         <SceneList key={orderKey} orderKey={orderKey} sessions={sessions} selected={scene?.scene_id} activity={activity}
           query={query} disabled={busy || !connected} onSelect={id => void change("select", id)}
-          rename={renaming ? { id: renaming, error, save: name => void change("rename", name, renaming),
+          rename={renaming ? { id: renaming, error, save: next => {
+              if (!next) { setError("请输入场景名称。"); return; }
+              if (next === sessions.find(session => session.scene_id === renaming)?.scene_meta.scene_label) finishRename(renaming, true);
+              else void change("rename", next, renaming);
+            },
             cancel: restoreFocus => finishRename(renaming, restoreFocus) } : undefined}
           onReordering={dragging => { if (dragging) setMenu(undefined); setReordering(dragging); }}
           onContextMenu={(event, session) => {
