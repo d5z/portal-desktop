@@ -11,5 +11,6 @@ export function FileTypeIcon({ path, className = '', glyph }: { path: string; cl
         : ['html', 'htm', 'json', 'js', 'ts', 'tsx', 'jsx', 'css', 'py', 'rs', 'sh', 'sql', 'xml', 'yaml', 'yml', 'toml'].includes(extension) ? 'code' : 'generic';
   const icon: IconName = kind === 'slides' ? 'file-slides' : kind === 'sheet' ? 'file-sheet'
         : kind === 'image' ? 'image-rounded' : kind === 'code' ? 'terminal' : 'file';
-  return <span className={`${styles.fileIcon} ${styles[kind]} ${className}`} aria-hidden="true"><Icon name={glyph || icon} width="28" height="28" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" strokeLinecap="round" /></span>;
+  const size = glyph ? 24 : 28;
+  return <span className={`${styles.fileIcon} ${styles[kind]} ${className}`} aria-hidden="true"><Icon name={glyph ?? icon} width={size} height={size} fill="none" stroke="currentColor" strokeWidth={glyph ? 2 : 1.5} strokeLinejoin="round" strokeLinecap="round" /></span>;
 }

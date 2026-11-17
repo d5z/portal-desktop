@@ -1,5 +1,6 @@
 import { createContext, useContext, useRef, useState } from 'react';
 import { IntelligentUI, type UIActions } from './view';
+import { ErrorIndicator } from '../components/error-indicator';
 import { blockKey, surfaceRepairPrompt, type SurfaceBlock } from './surfaces';
 
 export const SurfaceContext = createContext<{
@@ -18,9 +19,10 @@ export function SurfaceArtifact({ messageId, blockId, source, streaming, ...acti
   const latest = surface.versions.at(-1);
   const anchor = `iui-surface-${encodeURIComponent(surface.scope + ':' + surface.id)}`;
   if (!entry.owner) return <div className="iui-update-reference" role="status">
-    {entry.error ? `界面未更新：${entry.error}` : entry.pending ? '正在更新原界面…' : `已更新「${latest?.doc.title || '交互界面'}」`}
+    {entry.error ? <ErrorIndicator description={`界面未更新：${entry.error}`} retry={actions.onContinue && {
+      label: '让 Being 修正', run: () => actions.onContinue?.(surfaceRepairPrompt(surface, entry.error)),
+    }} /> : entry.pending ? '正在更新原界面…' : `已更新「${latest?.doc.title || '交互界面'}」`}
     {' '}<button type="button" onClick={() => document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}>查看原界面</button>
-    {entry.error && actions.onContinue && <button type="button" onClick={() => actions.onContinue?.(surfaceRepairPrompt(surface, entry.error))}>让 Being 修正</button>}
   </div>;
   const version = surface.versions.find(v => v.revision === selectedRevision) || latest;
   const activate = () => {

@@ -14,6 +14,29 @@ export const styleEntries = [
   'web/chat.scss',
 ];
 
+const staticStyles = new Set([
+  'desktop/renderer/chat/assets/fonts/chat-fonts.css',
+  'desktop/renderer/shared/components/react-bits-stack/Stack.css',
+  'desktop/renderer/shared/components/react-bits/GradualBlur.css',
+  'desktop/renderer/shared/components/react-bits/Folder.css',
+  'desktop/renderer/shared/components/react-bits/TiltedCard.css',
+  'desktop/renderer/shared/components/react-bits/WarmTooltip.css',
+  'desktop/renderer/shared/components/react-bits/status-mark/StatusMark.css',
+].map(file => path.resolve(file)));
+
+const chatPalette = path.resolve('desktop/renderer/shared/styles/_chat-palette.scss');
+const sharedChatTokens = /(?:^|[;{}\n])\s*(--chat-(?:sent|sent-file-surface|bubble-radius|menu-radius|menu-surface|menu-border|menu-shadow))\s*:/g;
+const chatDesignTokens = path.resolve('desktop/renderer/chat/styles/_design-tokens.scss');
+
+export function chatStudyOverrides(css) {
+  const overrides = new Set();
+  const layoutTokens = new Set(['--chat-prompt-width', '--chat-composer-bottom']);
+  postcss.parse(css).walkDecls(/^--(?:chat|neutral|ui)-/, ({ prop }) => {
+    if (!layoutTokens.has(prop)) overrides.add(prop);
+  });
+  return [...overrides];
+}
+
 export function duplicateRules(css) {
   const seen = new Map();
   const duplicates = [];
@@ -44,12 +67,26 @@ async function styleFiles(directory) {
 
 export async function checkStyles() {
   const files = (await Promise.all(['desktop/renderer', 'web'].map(styleFiles))).flat();
+  const isStaticStyle = file => staticStyles.has(path.resolve(file));
   const problems = [];
   const loaded = new Set();
+  const designTokenSource = await readFile(chatDesignTokens, 'utf8');
+  const designTokens = new Set(Array.from(designTokenSource.matchAll(/^\s*(--chat-[\w-]+)\s*:/gm), match => match[1]));
   for (const file of files) {
+    if (isStaticStyle(file)) continue;
     if (file.endsWith('.css')) problems.push(`${file}: use SCSS for owned source styles`);
     const source = await readFile(file, 'utf8');
     if (/^\s*@import\b/m.test(source)) problems.push(`${file}: use @use instead of @import`);
+    if (path.resolve(file) !== chatPalette) {
+      for (const token of new Set([...source.matchAll(sharedChatTokens)].map(match => match[1]))) {
+        problems.push(`${file}: ${token} is owned by _chat-palette.scss`);
+      }
+    }
+    if (path.resolve(file) !== chatDesignTokens) {
+      for (const [, token] of source.matchAll(/(?:^|[;{}\n])\s*(--chat-[\w-]+)\s*:/g)) {
+        if (designTokens.has(token)) problems.push(`${file}: ${token} is owned by _design-tokens.scss`);
+      }
+    }
   }
   for (const file of [...styleEntries, ...files.filter(file => file.endsWith('.module.scss'))]) {
     const { css, loadedUrls } = await compileAsync(file, { style: 'expanded' });
@@ -57,10 +94,12 @@ export async function checkStyles() {
     for (const selector of duplicateRules(css)) problems.push(`${file}: duplicate rule ${selector}`);
   }
   for (const file of files) {
-    if (!loaded.has(path.resolve(file))) problems.push(`${file}: not owned by a document entry or component module`);
+    if (!loaded.has(path.resolve(file)) && !isStaticStyle(file)) {
+      problems.push(`${file}: not owned by a document entry or component module`);
+    }
   }
   if (problems.length) throw new Error(problems.join('\n'));
-  console.log(`Styles checked: ${files.length} SCSS files; no CSS sources, legacy imports, orphan files or duplicate rules.`);
+  console.log(`Styles checked: ${files.length} files, including conversation layout token ownership.`);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {

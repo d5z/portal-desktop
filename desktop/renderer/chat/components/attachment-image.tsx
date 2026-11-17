@@ -21,9 +21,9 @@ export function AttachmentGalleryPreview({ items, selectedId, endpoint, onClose,
   const image = items[index];
   const requestImage = useCallback<typeof fetch>((input, init) => request!(image.id, input, init), [request, image.id]);
 
-  return <ImageViewer src={image.src} name={image.name} onClose={onClose} appearance="attachment"
+  return <ImageViewer src={image.src} name={image.name} onClose={onClose}
     navigation={items.length > 1 ? {
-      index, total: items.length, thumbnails: { items, select: setIndex },
+      index, total: items.length, items, select: setIndex,
       previous: () => setIndex(index - 1), next: () => setIndex(index + 1),
     } : undefined}
     actions={<AttachmentDownload iconOnly key={image.id} endpoint={endpoint} id={image.id} name={image.name}

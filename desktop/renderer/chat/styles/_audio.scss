@@ -80,18 +80,18 @@
 }
 
 .attachment-audio-card .attachment-download:has(> small),
-.attachment-audio-card .attachment-download:has(> progress) {
+.attachment-audio-card .attachment-download:has(> .attachment-download-progress) {
   flex-wrap: wrap;
 }
 
-:is(.audio-menu > div, .audio-floating-menu, .audio-speed-viewport > [data-navigation-menu-content]) > button {
+:is(.audio-menu > div, .audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button {
   height: auto;
   border-radius: 6px;
   background: transparent;
   color: var(--text);
 }
 
-:is(.audio-menu > div, .audio-floating-menu, .audio-speed-viewport > [data-navigation-menu-content]) > button:hover {
+:is(.audio-menu > div, .audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button:hover {
   background: var(--hover-overlay);
 }
 
@@ -119,143 +119,6 @@
   min-width: 30px;
   text-align: right;
   color: #999;
-}
-
-#messages .message.user .attachment-audio-card {
-  --chat-wave-played: light-dark(#086bc6, #87bfff);
-  --chat-wave-unplayed: light-dark(#8ba3b9, #6b8095);
-
-  padding: 9px 16px;
-  border: 0;
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--chat-sent) 9%, var(--chat-reply));
-  color: var(--text);
-
-  .attachment-audio-filename {
-    margin: 0 0 6px;
-    color: inherit;
-    font-weight: 500;
-  }
-
-  .attachment-audio {
-    gap: 8px;
-    padding: 0;
-    background: transparent;
-    color: var(--text-dim);
-
-    > button {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: var(--chat-sent);
-      color: #fff;
-    }
-
-    > span,
-    .audio-menu-trigger {
-      color: var(--text-dim);
-    }
-  }
-
-  .attachment-audio-transcript:not(:empty) {
-    margin: 8px 0 0;
-    padding: 6px 0 0;
-    border-top: 1px solid var(--border);
-    background: transparent;
-    color: inherit;
-    font-size: 12px;
-    line-height: 18px;
-  }
-}
-
-[data-chat-host='desktop'] #messages .message:is(.user, .being) .attachment-audio-card {
-  --chat-wave-played: var(--chat-bubble-link);
-  --chat-wave-unplayed: var(--chat-bubble-secondary);
-
-  position: relative;
-  width: 185.9px;
-  padding: 9px 16px;
-  border: 0;
-  border-radius: 16px;
-  background: color-mix(in srgb, var(--chat-bubble-link) 9%, light-dark(#fff, #202020));
-  color: var(--chat-bubble-ink);
-
-  &:has(.attachment-audio-transcript .attachment-transcript, .audio-waveform > input:not(:disabled)) { width: 308px; }
-
-  .attachment-audio-filename {
-    margin: 0 0 6px;
-    padding: 0;
-    color: inherit;
-    font-weight: 500;
-    font-size: 13px;
-    line-height: 21px;
-  }
-
-  .attachment-audio {
-    position: relative;
-    gap: 8px;
-    padding: 0;
-    background: transparent;
-    color: var(--chat-bubble-secondary);
-
-    > button {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: var(--chat-sent);
-      color: #fff;
-
-      &:hover:not(:disabled) { background: var(--chat-send-hover); }
-      &:active:not(:disabled) { background: var(--chat-send-pressed); }
-    }
-
-    > span {
-      color: inherit;
-      font-family: system-ui, 'PingFang SC', 'Being Noto Sans SC', sans-serif;
-      font-size: 12px;
-      font-weight: 500;
-      line-height: var(--lh-reading);
-      white-space: nowrap;
-    }
-
-    .audio-menu-trigger {
-      width: 24px;
-      height: 24px;
-      margin: 0;
-      border-radius: 4px;
-      background: transparent;
-      color: inherit;
-
-      &:is(:hover, [aria-expanded='true']) { background: var(--chat-bubble-hover); }
-      &:active { background: var(--chat-bubble-pressed); }
-    }
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .attachment-audio > .attachment-download:has(> .audio-menu-trigger):not(:has(> :is(small, p, progress))) {
-      position: absolute;
-      inset-block-end: 100%;
-      inset-inline-end: 0;
-    }
-
-    &:not(:hover, :focus-within) .audio-menu-trigger:not([aria-expanded='true']) {
-      opacity: 0;
-      pointer-events: none;
-    }
-  }
-
-  .attachment-audio-caption,
-  .attachment-audio-transcript:not(:empty) {
-    margin: 8px 0 0;
-    padding: 6px 0 0;
-    border: 0;
-    border-top: 1px solid var(--chat-bubble-edge);
-    border-radius: 0;
-    background: transparent;
-    color: inherit;
-    font-size: 12px;
-    line-height: 18px;
-  }
 }
 
 .audio-waveform {
@@ -311,7 +174,7 @@
   bottom: calc(100% + 8px);
   right: -2px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 22px;
   box-shadow: 0 8px 30px #0003;
 }
 
@@ -321,7 +184,7 @@
 }
 
 .audio-settings svg,
-:is(.audio-menu > div, .audio-floating-menu, .audio-speed-viewport > [data-navigation-menu-content]) > button svg {
+:is(.audio-menu > div, .audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button svg {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
@@ -360,7 +223,7 @@
 }
 
 .audio-settings .audio-speed-toggle,
-:is(.audio-menu > div, .audio-floating-menu, .audio-speed-viewport > [data-navigation-menu-content]) > button {
+:is(.audio-menu > div, .audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -380,10 +243,8 @@
 }
 
 .audio-speed-chevron {
-  margin-left: auto;
+  margin-inline-start: auto;
   color: var(--text-dim);
-  font-size: 22px;
-  line-height: 18px;
 }
 
 .audio-speed-options {
@@ -422,7 +283,7 @@
   flex: 1 1 auto;
 }
 
-:is(.audio-menu > div, .audio-floating-menu, .audio-speed-viewport > [data-navigation-menu-content]) > button {
+:is(.audio-menu > div, .audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button {
   white-space: nowrap;
 }
 
@@ -439,14 +300,12 @@
   max-width: 100%;
   padding: 12px 16px;
   background: var(--chat-sent);
-  border-radius: 22px;
+  border-radius: 22px 5px 22px 22px;
 }
 
 .attachment-message-copy:empty {
   display: none;
 }
-
-.attachment-audio-transcript:empty { display: none; }
 
 .attachment-message .attachment-message-copy .attachment-original-text {
   padding: 0;
@@ -460,13 +319,18 @@
   overflow-wrap: anywhere;
 }
 
-.attachment-transcript button {
+.attachment-transcript button,
+.attachment-transcript-error button {
   border: 0;
   padding: 4px 0;
   background: none;
   color: inherit;
   text-decoration: underline;
   cursor: pointer;
+}
+
+.attachment-transcript-error {
+  font-size: 12px;
 }
 
 /* Legacy inline speed selection; floating menus size to their actual actions. */
@@ -500,18 +364,6 @@
   font-size: 14px;
 }
 
-.attachment-message .attachment-processing-status {
-  align-self: flex-end;
-  padding: 4px 2px;
-  min-height: 20px;
-  gap: 6px;
-  font-size: 12px;
-}
-
-.attachment-message .attachment-processing-status small {
-  font-size: 11px;
-}
-
 .audio-floating-menu[popover] {
   position: fixed;
   inset: auto;
@@ -520,7 +372,7 @@
   box-sizing: border-box;
   padding: 12px 14px;
   border: 0;
-  border-radius: 12px;
+  border-radius: 22px;
   background: var(--bg);
   color: var(--text);
   box-shadow: 0 8px 30px #0003;
@@ -578,15 +430,11 @@
   color: #0879ed;
 }
 
-.audio-floating-menu:has(.audio-speed-options) > button {
-  visibility: visible;
-}
-
 .audio-floating-menu button:hover {
   background: var(--bg-soft);
 }
 
-:is(.audio-floating-menu, .audio-speed-viewport > [data-navigation-menu-content]) > button,
+:is(.audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button,
 .audio-floating-menu .audio-speed-toggle {
   border: 0;
   cursor: pointer;
@@ -606,13 +454,13 @@
 .audio-floating-menu .audio-settings .audio-speed-toggle:hover,
 .audio-floating-menu .audio-settings .audio-speed-toggle[aria-expanded='true'],
 .audio-floating-menu .audio-settings .audio-speed-options button:hover,
-:is(.audio-floating-menu, .audio-speed-viewport > [data-navigation-menu-content]) > button:hover {
+:is(.audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button:hover {
   background: var(--bg-soft);
 }
 
 .audio-floating-menu .audio-settings .audio-speed-options button:focus-visible,
 .audio-floating-menu .audio-settings .audio-speed-toggle:focus-visible,
-:is(.audio-floating-menu, .audio-speed-viewport > [data-navigation-menu-content]) > button:focus-visible {
+:is(.audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button:focus-visible {
   background: var(--bg-soft);
   outline: 2px solid var(--accent);
   outline-offset: -2px;
@@ -628,46 +476,4 @@
 .audio-floating-menu .audio-settings .audio-speed-options button[aria-pressed='true'] {
   color: #0879ed;
   font-weight: 500;
-}
-
-.audio-floating-menu[data-menu-popover-motion] {
-  transition: display 220ms allow-discrete, overlay 220ms allow-discrete;
-}
-
-.audio-floating-menu .audio-settings .audio-speed-options {
-  transform-origin: var(--submenu-origin);
-}
-
-.audio-floating-menu[data-submenu-stacked] {
-  .audio-speed-viewport > [data-navigation-menu-content] { display: flow-root; }
-
-  &[data-speed-page] > .glide-select__pill { visibility: hidden; }
-
-  .audio-settings .audio-speed-options {
-    position: relative;
-    inset: auto;
-    width: 100%;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    box-shadow: none;
-    max-height: calc(100dvh - 32px);
-    overflow: auto;
-    transform-origin: top left;
-
-    &::before { content: none; }
-    .audio-speed-back { display: block; }
-  }
-}
-
-.audio-floating-menu .glide-select__pill {
-  position: absolute;
-  z-index: -1;
-  top: 0;
-  inset-inline: 0;
-  border-radius: 6px;
-  background: var(--bg-soft);
-  opacity: 0;
-  pointer-events: none;
-  transition: transform var(--ui-motion-surface) var(--ui-ease), opacity var(--ui-motion-fast) ease;
 }

@@ -1,4 +1,3 @@
-@use '../styles/mixins';
 @use '../styles/chat-menu';
 
 .menu {
@@ -11,19 +10,21 @@
   max-width: calc(100vw - 16px);
   max-height: calc(100dvh - 16px);
   overflow: auto;
-  padding: 8px;
-  background: var(--bg);
+  padding: 4px;
+  background: var(--chat-menu-surface, var(--bg));
   color: var(--text);
-  border: 0;
-  border-radius: 20px;
-  box-shadow: 0 8px 28px #0002;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--chat-menu-shadow, 0 5px 14px #0002);
   font-family: inherit;
-  font-size: 14px;
+  font-size: 13px;
   line-height: 1.5;
+
+  &[data-extra-actions] { width: min(248px, calc(100vw - 16px)); }
 }
 
 .info {
-  padding: 6px 12px 8px;
+  padding: 4px 8px;
   color: var(--secondary, var(--text-dim));
   overflow-wrap: anywhere;
 }
@@ -32,39 +33,21 @@
   font-size: 12px;
 }
 
-.menu button {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  min-height: 44px;
-  padding: 10px 12px;
-  border: 0;
-  border-radius: 12px;
-  text-align: left;
-  font: inherit;
-  background: transparent;
-  color: inherit;
-  cursor: pointer;
+:global(:root[data-chat-host='desktop']) .menu {
+  @include chat-menu.surface;
+
+  padding: var(--chat-menu-inset);
+
 }
 
-.menu button:hover:not(:disabled),
-.menu button:focus-visible {
-  background: var(--hover, var(--hover-overlay));
+.menu [role='menuitem'] {
+  @include chat-menu.action-row;
 }
 
-.menu button:focus-visible {
-  @include mixins.focus-ring(var(--accent), -2px);
-}
-
-.menu button:disabled {
-  opacity: 0.4;
-  cursor: default;
-}
-
-.menu svg {
-  width: 20px;
-  height: 20px;
+.menu > button svg,
+.attachments [role='menuitem'] svg {
+  width: 16px;
+  height: 16px;
   fill: none;
   stroke: currentcolor;
   stroke-width: 1.5;
@@ -73,11 +56,31 @@
   flex: none;
 }
 
-.error {
-  padding: 8px 12px;
+.attachments,
+.attachments > [role='group'] { display: grid; gap: 2px; }
+
+.attachments:empty { display: none; }
+
+.menu:not([data-extra-actions]) > button + .attachments:not(:empty),
+.attachments > [role='group'] + [role='group'] {
+  margin-top: 4px;
+  padding-top: 4px;
+  border-top: 1px solid var(--chat-edge, var(--border));
+}
+
+.attachments > [role='group'] > strong {
+  display: block;
   margin: 0;
-  color: var(--red, #b33);
-  font-size: 12px;
+  padding: 4px var(--space-sm, 8px);
+  color: var(--chat-secondary, var(--text-dim));
+  font: 500 var(--chat-meta-text-size, 12px)/var(--chat-meta-line-height, 18px) var(--chat-reading-font, var(--font-sans));
+  overflow-wrap: anywhere;
+}
+
+.attachments > [role='group']:only-child > strong { display: none; }
+
+:global(:root[data-chat-host='desktop']) .menu[data-gliding] .attachments [role='menuitem']:hover:not(:disabled, :active) {
+  background-color: transparent;
 }
 
 .notice {
@@ -93,25 +96,4 @@
   box-shadow: 0 4px 20px #0002;
   font-size: 12px;
   pointer-events: none;
-}
-
-.chatMenu {
-  @include chat-menu.surface;
-
-  padding: 4px;
-  font-size: 13px;
-
-  .info {
-    padding: 4px 8px;
-  }
-
-  button {
-    @include chat-menu.action-row;
-  }
-
-  svg {
-    width: 16px;
-    height: 16px;
-  }
-
 }

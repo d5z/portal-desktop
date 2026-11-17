@@ -1,12 +1,18 @@
+import { ChatStatusRow } from './status-row';
 import { Icon } from '../../shared/icons/icon';
-import { useEffect, useRef, useState } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { MAX_REMOTE_IMAGE_BYTES, REMOTE_IMAGE_MIME, remoteImageName, remoteImageSource } from '../../../shared/remote-image';
+import { ChatActionTooltip } from '../../shared/components/chat-action-tooltip';
+import { MessageAction, MessageActionSlot } from '../../shared/components/message-action-slot';
 
-/** A sibling of the preview button, so saving never opens the image viewer. */
-export function ImageGenerationDownload({src, name}: {src:string; name:string}) {
+export function ImageGenerationDownload({src, name, inMenu}: {src:string; name:string; inMenu:boolean}) {
+  const slot = useContext(MessageActionSlot);
+  const register = slot?.registerExtraActions;
   const pending = useRef<AbortController | null>(null);
   const [saving, setSaving] = useState(false);
   const [failed, setFailed] = useState(false);
+  useLayoutEffect(() => inMenu && !failed ? register?.() : undefined, [failed, inMenu, register]);
   useEffect(() => () => { pending.current?.abort(); }, [src]);
   async function download() {
     if (pending.current) return;
@@ -31,11 +37,15 @@ export function ImageGenerationDownload({src, name}: {src:string; name:string}) 
       if (!controller.signal.aborted) setSaving(false);
     }
   }
-  return <button type="button" className="image-generation-download" data-busy={saving} data-failed={failed}
-    aria-label={`下载原图 ${name}`} aria-busy={saving} disabled={saving}
-    title={failed ? '下载失败，点击重试' : '下载原图'}
-    onClick={event => { event.preventDefault(); event.stopPropagation(); void download(); }}>
-    <Icon name="download" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
-    <span role="status">{saving ? '下载中…' : failed ? '重试下载' : '下载'}</span>
+  if (failed) return <ChatStatusRow title="原图下载失败" detail={name} tone="error" inActions
+    retry={{ label: `重新下载 ${name}`, run: () => void download() }} />;
+  const label = `下载原图 ${name}`;
+  const menuItem = inMenu && !!slot;
+  const button = <button type="button" role={menuItem ? 'menuitem' : undefined}
+    aria-label={label} aria-busy={saving} disabled={saving} onClick={() => void download()}>
+    <Icon name={saving ? 'chat-busy' : 'chat-download'} />
+    {menuItem && label}
   </button>;
+  if (menuItem) return slot.menu ? createPortal(button, slot.menu) : null;
+  return <MessageAction><ChatActionTooltip content="下载原图" disabled={saving}>{button}</ChatActionTooltip></MessageAction>;
 }

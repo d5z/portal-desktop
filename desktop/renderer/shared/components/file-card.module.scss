@@ -4,7 +4,7 @@
   max-width: 380px;
   position: relative;
   overflow: hidden;
-  margin-block: 8px;
+  margin-block: var(--file-card-margin, 8px);
   border: 1px solid var(--line, var(--border));
   border-radius: 12px;
   background: var(--surface, var(--bg-soft));
@@ -22,10 +22,10 @@
 .file .open {
   display: flex;
   align-items: center;
-  gap: 12px;
-  min-height: 76px;
+  gap: var(--file-card-gap, 12px);
+  min-height: var(--file-card-height, 76px);
   width: 100%;
-  padding: 16px 52px 16px 16px;
+  padding: var(--file-card-padding, 16px 52px 16px 16px);
   border: 0;
   border-radius: inherit;
   background: transparent;

@@ -1,3 +1,4 @@
+import { ErrorIndicator } from '../components/error-indicator';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { compileUI, type UIDocument, type Value } from './runtime';
 import { loadUIState, saveUIState } from './storage';
@@ -86,9 +87,12 @@ export function LocalApp({ code, storageKey, label, onRepair, render }: { code: 
     return () => clearInterval(timer);
   }, [running, error, source, animated]);
   return <div ref={root} className="iui-app">
-    <div className="iui-app-actions"><span>{label || '交互工具'}</span>{!outputError && <>{animated && <button type="button" disabled={!!error} onClick={() => setRunning(v => !v)}>{running ? '暂停' : '播放'}</button>}<button type="button" onClick={() => { setRevision(v => v + 1); setRunning(true); }}>重新启动</button></>}{outputError && onRepair && <button type="button" onClick={() => onRepair(`请修正刚才生成的交互界面。客户端校验错误：${error}。请保留原任务，修正不符合协议的组件；如果需要绘制 SVG，请使用 diagram 图元，而不是 image 中的 SVG 字符串。重新输出完整的 intelligent-ui 界面。`)}>让 Being 修正</button>}</div>
+    <div className="iui-app-actions"><span>{label || '交互工具'}</span>{error
+      ? <ErrorIndicator description={outputError ? `生成内容格式不符合要求：${error}` : error} retry={outputError ? onRepair && {
+        label: '让 Being 修正', run: () => onRepair(`请修正刚才生成的交互界面。客户端校验错误：${error}。请保留原任务，修正不符合协议的组件；如果需要绘制 SVG，请使用 diagram 图元，而不是 image 中的 SVG 字符串。重新输出完整的 intelligent-ui 界面。`),
+      } : { label: '重新启动', run: () => { setRevision(v => v + 1); setRunning(true); } }} />
+      : <>{animated && <button type="button" onClick={() => setRunning(v => !v)}>{running ? '暂停' : '播放'}</button>}<button type="button" onClick={() => { setRevision(v => v + 1); setRunning(true); }}>重新启动</button></>}</div>
     {source && <iframe ref={frame} key={revision + code} title="隔离计算运行时" sandbox="allow-scripts" src={new URL('iui-runtime.html', window.location.href).href} onLoad={() => frame.current?.contentWindow?.postMessage({ type: 'init', code: source }, '*')} hidden />}
-    {error && <p role="status" className="iui-notice">{outputError ? '生成内容格式不符合要求：' : ''}{error}。{outputError ? '需要修改生成内容，重新启动无法修复。' : doc ? '已保留最近的界面。' : '可以点击重新启动重试。'}</p>}
     {doc ? render(doc, (key, value) => frame.current?.contentWindow?.postMessage({ type: 'event', event: { key, value } }, '*')) : !error && <p className="iui-notice">正在准备交互体验…</p>}
   </div>;
 }

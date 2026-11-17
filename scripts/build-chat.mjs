@@ -5,6 +5,9 @@ import { writeThirdPartyLicenses } from './third-party-licenses.mjs';
 
 const output = path.resolve("desktop/generated");
 await mkdir(output, { recursive: true });
+for (const file of ['chat-fonts.css', 'NotoSansSC.ttf', 'OFL.txt']) await copyFile('desktop/renderer/chat/assets/fonts/' + file, path.join(output, file));
+await copyFile('desktop/renderer/shared/components/react-bits-stack/LICENSE.md', path.join(output, 'React-Bits-LICENSE.md'));
+await copyFile('desktop/renderer/shared/components/animate-ui.LICENSE.md', path.join(output, 'Animate-UI-LICENSE.md'));
 await copyFile('node_modules/pdfjs-dist/build/pdf.worker.min.mjs',path.join(output,'pdf.worker.min.js'));
 await cp('node_modules/pdfjs-dist/cmaps',path.join(output,'pdf-cmaps'),{recursive:true});
 await cp('node_modules/pdfjs-dist/standard_fonts',path.join(output,'pdf-fonts'),{recursive:true});

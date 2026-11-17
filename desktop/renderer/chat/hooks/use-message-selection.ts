@@ -28,10 +28,18 @@ export function useMessageSelection(messages: RefObject<HTMLDivElement | null>, 
       setSelection(null); return;
     }
     const text = selected.toString().trim(), rect = selected.getRangeAt(0).getBoundingClientRect();
+    const visibleTop = messages.current.getBoundingClientRect().top;
+    const visibleBottom = document.getElementById('input-area')?.getBoundingClientRect().top ?? innerHeight;
+    const above = rect.top - 48;
+    const below = rect.bottom + 8;
+    if (above < visibleTop + 8 && below + 40 > visibleBottom - 8) {
+      setSelection(null);
+      return;
+    }
     const next = {
       text: text.length > 2000 ? text.slice(0, 2000) + '\n[引用已截取]' : text,
       left: Math.max(8, Math.min(rect.left + rect.width / 2 - 100, innerWidth - 200)),
-      top: Math.max(8, Math.min(rect.top >= 54 ? rect.top - 48 : rect.bottom + 8, innerHeight - 48)),
+      top: above >= visibleTop + 8 ? above : below,
     };
     setSelection(previous => previous?.text === next.text && previous.left === next.left && previous.top === next.top ? previous : next);
   }, { target: document, enable: !nativeTouch });

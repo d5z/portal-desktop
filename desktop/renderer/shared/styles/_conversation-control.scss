@@ -1,30 +1,27 @@
 // Floating controls at the edges of the desktop conversation.
 @mixin surface {
-  --floating-face: light-dark(#fff, #202020);
-  --floating-ink: light-dark(#5c5c5c, #c9c9c9);
-
   border: 0;
   border-radius: 999px;
-  background: var(--floating-face);
-  color: var(--floating-ink);
-  box-shadow: 0 2px 8px light-dark(rgb(0 0 0 / 8%), rgb(0 0 0 / 24%));
+  background: var(--neutral-raised);
+  color: var(--neutral-secondary);
+  box-shadow: var(--ui-floating-control-shadow);
   transition: background-color var(--ui-motion-fast) ease;
 
   &:is(:hover, [aria-expanded='true']) {
-    background: color-mix(in srgb, var(--floating-face), var(--floating-ink) 5%);
+    background: color-mix(in srgb, var(--neutral-raised), var(--neutral-text) 5%);
   }
 
   &:active {
-    background: color-mix(in srgb, var(--floating-face), var(--floating-ink) 9%);
+    background: color-mix(in srgb, var(--neutral-raised), var(--neutral-text) 9%);
   }
 
   &:focus-visible {
-    outline: 2px solid var(--floating-ink);
+    outline: 2px solid var(--neutral-secondary);
     outline-offset: 2px;
   }
 
   @media (prefers-contrast: more) {
-    border: 1px solid var(--floating-ink);
+    border: 1px solid var(--neutral-secondary);
     box-shadow: none;
   }
 }

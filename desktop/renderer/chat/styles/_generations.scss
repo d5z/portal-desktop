@@ -76,27 +76,32 @@
   min-width: 0;
 }
 
-.image-generation-placeholder {
-  box-sizing: border-box;
-  width: 100%;
-  aspect-ratio: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
+.image-generation-placeholder,
+.image-generation-photo[data-loaded='false'],
+.image-generation-status-frame {
   position: relative;
-  background: var(--bg-soft);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  color: var(--text-dim);
-  font-size: 12px;
-  line-height: 1.6;
-  text-align: center;
-  padding: 20px;
+  overflow: hidden;
+  aspect-ratio: var(--chat-generation-preview-ratio, 4 / 3);
+  border-radius: 12px;
+  background: var(--chat-subtle-surface, var(--bg-soft));
 }
 
-.generation-progress {
+.image-generation-dither {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  color: var(--text-dim);
+}
+
+.image-generation-loading {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+
+.image-generation-progress {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -106,77 +111,72 @@
 
 .image-generation-images {
   display: grid;
+  align-items: start;
   gap: 8px;
 }
 
 .image-generation-photo {
-  position: relative;
-  border-radius: 14px;
-  isolation: isolate;
-  box-shadow: 0 2px 8px #00000005;
+  min-width: 0;
 }
 
-.image-generation-zoom {
-  position: absolute;
-  pointer-events: none;
-  right: 10px;
-  bottom: 10px;
-  border-radius: 20px;
-  padding: 6px 10px;
-  background: #20242bbd;
-  color: white;
-  font-size: 11px;
-  opacity: 0;
-  transform: translateY(3px);
-  transition:
-    opacity 0.18s,
-    transform 0.18s;
-}
+.image-generation-photo[data-loaded='false'] [data-slot='image-thumbnail'] { visibility: hidden; }
 
-.image-generation-photo:hover .image-generation-zoom,
-.image-generation-photo:focus-within .image-generation-zoom {
-  opacity: 1;
-  transform: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .image-generation-zoom {
-    transition: none;
+@media (prefers-reduced-motion: no-preference) {
+  .image-generation-photo[data-loaded='true'] [data-slot='image-thumbnail'] {
+    animation: image-generation-reveal 120ms cubic-bezier(0.22, 1, 0.36, 1);
   }
 }
 
-/* Let the decoded image size its frame: preserve the full composition without letterboxing. */
+@keyframes image-generation-reveal {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .image-generation-images [data-slot='image-thumbnail'] {
-  position: relative;
   display: block;
-  width: 100%;
+  width: fit-content;
+  max-width: 100%;
   overflow: hidden;
-  border-radius: 14px;
-  background: transparent;
+  border-radius: var(--chat-bubble-radius, 16px);
 }
 
 .image-generation-images img {
   display: block;
-  width: 100%;
+  width: auto;
   height: auto;
-  min-height: 0;
-  max-height: none;
+  max-width: 100%;
+  max-height: var(--chat-image-max-height, 360px);
 }
 
 .image-generation-caption-row {
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  margin: 10px 2px 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 8px 0 0;
 }
 
-.image-generation-number {
+.image-generation-state {
+  display: inline-flex;
   flex: none;
-  font-size: 10px;
-  font-variant-numeric: tabular-nums;
-  color: var(--text-muted);
-  opacity: 0.7;
+  align-items: center;
+  gap: 5px;
+  color: var(--text);
+  font-size: 11px;
+
+  i {
+    width: 11px;
+    height: 11px;
+    background: radial-gradient(circle, currentColor 1px, transparent 1.3px) 0 0 / 5.5px 5.5px;
+    opacity: 0.7;
+  }
 }
+
+.image-generation-card:has([data-phase='running'], [data-phase='refining']) .image-generation-state i {
+  animation: image-generation-mark 2.4s ease-in-out infinite;
+}
+
+@keyframes image-generation-mark { to { transform: rotate(1turn); } }
 
 .image-generation-caption {
   display: -webkit-box;
@@ -235,67 +235,9 @@
   font-size: 12px;
 }
 
-.image-generation-download {
-  position: absolute;
-  z-index: 1;
-  left: 10px;
-  bottom: 10px;
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  border: 1px solid #ffffff25;
-  border-radius: 20px;
-  padding: 6px 10px;
-  background: #20242bbd;
-  backdrop-filter: blur(8px);
-  color: white;
-  font: inherit;
-  font-size: 11px;
-  line-height: 1.4;
-  cursor: pointer;
-  opacity: 0;
-  pointer-events: none;
-  transform: translateY(3px);
-  transition:
-    opacity 0.18s,
-    transform 0.18s,
-    background 0.18s;
-}
-
-.image-generation-photo:hover .image-generation-download,
-.image-generation-photo:focus-within .image-generation-download,
-.image-generation-download[data-busy='true'],
-.image-generation-download[data-failed='true'] {
-  opacity: 1;
-  pointer-events: auto;
-  transform: none;
-}
-
-.image-generation-download:hover {
-  background: #20242bed;
-}
-
-.image-generation-download:focus-visible {
-  outline: 2px solid white;
-  outline-offset: 2px;
-}
-
-.image-generation-download:disabled {
-  cursor: wait;
-}
-
-@media (hover: none) {
-  .image-generation-download {
-    opacity: 1;
-    pointer-events: auto;
-    transform: none;
-  }
-}
-
 @media (prefers-reduced-motion: reduce) {
-  .image-generation-download {
-    transition: none;
-  }
+  .image-generation-photo[data-loaded='true'] [data-slot='image-thumbnail'],
+  .image-generation-card:has([data-phase='running'], [data-phase='refining']) .image-generation-state i { animation: none; }
 }
 
 /* Prose and generated media share one reply bubble; inner Markdown keeps only typography. */

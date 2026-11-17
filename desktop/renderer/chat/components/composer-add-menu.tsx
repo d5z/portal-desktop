@@ -1,14 +1,16 @@
 import { dropdownMenuPopover } from '../../shared/components/animate-ui/dropdown-menu-motion';
+import { ChatActionTooltip } from '../../shared/components/chat-action-tooltip';
 import { Icon } from '../../shared/icons/icon';
+import { clearMenuGlide, menuGlide } from '../../shared/components/react-bits/GlideSelectMotion';
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { canUseComposerCommand, composerCommands, insertComposerCommand } from '../models/composer-commands';
 import { ComposerMenuIcon } from '../../shared/icons/composer-menu';
 import type { ChatState } from '../models/chat';
 
 
-export function ComposerAddMenu({ state, onUpload, onSelect, onConfigureSubagent, onEnableSubagent, subagentEnabling, subagentEnableFailed }: {
+export function ComposerAddMenu({ state, onUpload, onSelect, subagentAction }: {
   state: ChatState; onUpload: () => void; onSelect: () => void;
-  onConfigureSubagent?: () => void; onEnableSubagent?: () => void; subagentEnabling?: boolean; subagentEnableFailed?: boolean;
+  subagentAction?: { label: string; run(): void };
 }) {
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -16,9 +18,12 @@ export function ComposerAddMenu({ state, onUpload, onSelect, onConfigureSubagent
   const [open, setOpen] = useState(false);
   const close = () => { if (menu.current?.matches(':popover-open')) menu.current.hidePopover(); };
   const position = () => {
-    const element = menu.current!, anchor = trigger.current!.getBoundingClientRect(), composer = trigger.current!.closest('#input-area')?.getBoundingClientRect(), bounds = element.getBoundingClientRect();
-    element.style.left = `${Math.max(8, Math.min(composer?.left ?? anchor.left, innerWidth - bounds.width - 8))}px`;
-    element.style.top = `${(composer?.top ?? anchor.top) - bounds.height - 10 >= 8 ? (composer?.top ?? anchor.top) - bounds.height - 10 : Math.max(8, Math.min(anchor.bottom + 8, innerHeight - bounds.height - 8))}px`;
+    const element = menu.current!, anchor = trigger.current!.getBoundingClientRect(), composer = trigger.current!.closest('#input-area')?.getBoundingClientRect();
+    const left = Math.max(8, Math.min(composer?.left ?? anchor.left, innerWidth - element.offsetWidth - 8));
+    const above = (composer?.top ?? anchor.top) - element.offsetHeight - 10 >= 8;
+    element.style.left = `${left}px`;
+    element.style.top = `${above ? (composer?.top ?? anchor.top) - element.offsetHeight - 10 : Math.max(8, Math.min(anchor.bottom + 8, innerHeight - element.offsetHeight - 8))}px`;
+    element.style.transformOrigin = `${anchor.left + anchor.width / 2 - left}px ${above ? 'bottom' : 'top'}`;
   };
   const toggle = () => {
     const element = menu.current!;
@@ -36,12 +41,18 @@ export function ComposerAddMenu({ state, onUpload, onSelect, onConfigureSubagent
     return () => { observer.disconnect(); window.removeEventListener('resize', close); window.removeEventListener('blur', close); };
   }, [open]);
   return <div className="composer-add">
-    <button ref={trigger} type="button" className="btn-icon composer-add-trigger" aria-label="添加附件和工具" data-warm-tooltip={state.intelligentUIForMessage ? '添加附件和工具 · 本条已开启智能 UI' : '添加附件和工具'}
-      popoverTarget={id} onClick={event => { event.preventDefault(); toggle(); }} aria-haspopup="menu" aria-expanded={open} data-active={state.intelligentUIForMessage}>
-      <Icon name="plus" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-      {state.intelligentUIForMessage && <span className="composer-add-dot" aria-hidden="true"/>}
-    </button>
-    <div id={id} ref={menu} popover="auto" role="menu" aria-label="添加附件和工具" className="composer-add-menu" {...dropdownMenuPopover} onToggle={event => setOpen(event.newState === 'open')}
+    <ChatActionTooltip content={state.intelligentUIForMessage ? '添加附件和工具 · 本条已开启智能 UI' : '添加附件和工具'} disabled={open}>
+      <button ref={trigger} type="button" className="btn-icon composer-add-trigger" aria-label="添加附件和工具"
+        popoverTarget={id} onClick={event => { event.preventDefault(); toggle(); }} aria-haspopup="menu" aria-expanded={open} data-active={state.intelligentUIForMessage}>
+        <Icon name="chat-plus" width="18" height="18" />
+        {state.intelligentUIForMessage && <span className="composer-add-dot" aria-hidden="true"/>}
+      </button>
+    </ChatActionTooltip>
+    <div id={id} ref={menu} popover="auto" role="menu" aria-label="添加附件和工具" className="composer-add-menu" {...menuGlide} {...dropdownMenuPopover}
+      onToggle={event => {
+        if (event.newState !== 'open') clearMenuGlide(event.currentTarget);
+        setOpen(event.newState === 'open');
+      }}
       onKeyDown={event => {
         if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
         event.preventDefault();
@@ -50,15 +61,15 @@ export function ComposerAddMenu({ state, onUpload, onSelect, onConfigureSubagent
         const next = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1 : (index + (event.key === 'ArrowUp' ? -1 : 1) + items.length) % items.length;
         items[next]?.focus();
       }}>
-      <button type="button" role="menuitem" title="图片、文档和其他文件" onClick={() => { close(); onUpload(); }}><ComposerMenuIcon kind="file"/><span className="composer-menu-copy"><strong>上传附件</strong></span></button>
+      <span className="glide-select__pill" aria-hidden="true" />
+      <button type="button" role="menuitem" title="图片、文档和其他文件" onClick={() => { close(); onUpload(); }}><ComposerMenuIcon chat kind="file"/><span className="composer-menu-copy"><strong>上传附件</strong></span></button>
       <div role="separator"/>
       {composerCommands.map(command => <button key={command.id} className="composer-command-main" type="button" role="menuitem" title={command.description} onClick={() => {
         close();
-        if (!canUseComposerCommand(command.id, state, onConfigureSubagent)) return;
+        if (!canUseComposerCommand(command.id, state, subagentAction?.run)) return;
         state.draft = insertComposerCommand(state.draft, command.id);
         state.changed(); onSelect();
-      }}><ComposerMenuIcon kind={command.id}/><span className="composer-menu-copy"><strong>{command.label}</strong>{command.id === 'subagent' && onConfigureSubagent && state.subagentConfigured !== true && <small>需配置</small>}</span></button>)}
-      {onEnableSubagent && state.subagentConfigured && state.subagentEnabled === false && <button type="button" role="menuitem" disabled={subagentEnabling} onClick={onEnableSubagent}><ComposerMenuIcon kind="subagent"/><span className="composer-menu-copy"><strong>{subagentEnabling ? '正在开启 Subagent…' : subagentEnableFailed ? '重试开启 Subagent' : '开启 Subagent'}</strong></span></button>}
+      }}><ComposerMenuIcon chat kind={command.id}/><span className="composer-menu-copy"><strong>{command.label}</strong>{command.id === 'subagent' && subagentAction && <small>{subagentAction.label}</small>}</span></button>)}
     </div>
   </div>;
 }

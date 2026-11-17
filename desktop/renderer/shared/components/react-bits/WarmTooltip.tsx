@@ -30,6 +30,7 @@ import {
   type Variants
 } from 'motion/react';
 
+import './WarmTooltip.css';
 
 export type WarmTooltipSide = 'top' | 'bottom' | 'left' | 'right';
 export type WarmTooltipSize = 'sm' | 'md' | 'lg';

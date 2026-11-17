@@ -1,180 +1,66 @@
-@use '../styles/mixins';
-
 .viewer {
   position: fixed;
   inset: 0;
-  margin: 0;
   box-sizing: border-box;
-  width: 100vw;
-  height: 100vh;
+  width: 100%;
+  height: 100%;
   max-width: none;
   max-height: none;
-  padding: 80px 24px 100px;
+  margin: 0;
+  padding: 66px 24px 64px;
   border: 0;
   background: transparent;
   color: white;
   overflow: hidden;
-}
 
-.viewer[open] {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  &:focus-visible { outline: none; }
+  &:has(.thumbnails) { padding-bottom: 88px; }
 }
 
 .viewer::backdrop {
-  background: rgb(25 28 32 / 80%);
-  backdrop-filter: blur(12px);
+  background: rgb(25 25 27 / 86%);
 }
 
 .toolbar {
   position: absolute;
-  top: 24px;
-  left: 24px;
-  right: 24px;
+  top: 16px;
+  right: 16px;
   display: flex;
   align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 6px;
   -webkit-app-region: no-drag;
 }
 
-.viewer button,
-.viewer a {
-  color: white;
-  font: inherit;
-}
-
-.viewer button {
-  padding: 8px 16px;
-  border: 0;
-  border-radius: 20px;
-  background: #ffffff25;
-  cursor: pointer;
-}
-
-.viewer button:hover {
-  background: #ffffff45;
-}
-
-.viewer button:focus-visible {
-  @include mixins.focus-ring(white);
-}
-
-.viewer button:disabled {
-  opacity: 0.5;
-  cursor: default;
-}
-
-.toolbar > button {
-  padding: 0;
-  width: 36px;
-  height: 36px;
-  flex: none;
-  font-size: 26px;
-  line-height: 1;
-}
-
-.actions {
-  display: flex;
-  justify-content: flex-end;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.actions [role='alert'] {
-  flex-basis: 100%;
-  text-align: right;
-  font-size: 13px;
-}
-
-/* AttachmentDownload is a legacy consumer supplied through the actions slot. */
-/* stylelint-disable-next-line selector-class-pattern */
+.actions,
 .actions :global(.attachment-download) {
   display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  max-width: 280px;
-  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
 }
 
-/* stylelint-disable-next-line selector-class-pattern */
-.actions :global(.attachment-download) :is(small, progress) {
-  width: 100%;
-  font-size: 12px;
-}
-
-.name {
-  min-width: 0;
-  flex: 1;
-  align-self: center;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 14px;
-  opacity: 0.85;
-}
-
-.position {
-  align-self: center;
-  flex: none;
-  padding: 6px 12px;
-  border: 1px solid #ffffff26;
-  border-radius: 20px;
-  background: #2228;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-  white-space: nowrap;
-}
-
-.navigation button {
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
+.viewer :where(button:not(:global(.chat-error-indicator) > button)) {
   display: grid;
   place-items: center;
-  width: 44px;
-  height: 44px;
-  padding: 0 0 4px;
-  border: 1px solid #ffffff30;
-  border-radius: 50%;
-  background: #222b;
-  backdrop-filter: blur(12px);
-  font-size: 36px;
-  line-height: 1;
+  flex: none;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 9%);
+  color: white;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color var(--ui-motion-fast, 120ms) ease;
+
+  &:hover:not(:disabled) { background-color: rgb(255 255 255 / 18%); }
+  &:active:not(:disabled) { background-color: rgb(255 255 255 / 26%); }
+  &:focus-visible { outline: 1px solid white; outline-offset: 2px; }
+  &:disabled { opacity: 0.4; cursor: default; }
 }
 
-.navigation .previous {
-  left: 24px;
-}
-
-.navigation .next {
-  right: 24px;
-}
-
-.navigation button:disabled {
-  opacity: 0.25;
-}
-
-@media (max-width: 600px) {
-  .toolbar {
-    gap: 8px;
-    left: 12px;
-    right: 12px;
-  }
-
-  .position {
-    padding: 6px 8px;
-  }
-
-  .navigation .previous {
-    left: 12px;
-  }
-
-  .navigation .next {
-    right: 12px;
-  }
+.toolbar button,
+.controls button {
+  width: 34px;
+  height: 34px;
 }
 
 .stage {
@@ -183,7 +69,7 @@
   overflow: auto;
   overscroll-behavior: contain;
   touch-action: none;
-  scrollbar-width: thin;
+  scrollbar-width: none;
 }
 
 .canvas {
@@ -197,173 +83,113 @@
   max-height: none;
   object-fit: contain;
   user-select: none;
+  cursor: zoom-in;
 }
 
-.stage.canPan {
-  cursor: grab;
-}
-
-.stage.isDragging {
-  cursor: grabbing;
-}
+.stage[data-zoomed] img { cursor: zoom-out; }
+.stage.canPan img { cursor: grab; }
+.stage.isDragging, .stage.isDragging img { cursor: grabbing; }
 
 .notice {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  text-align: center;
 }
 
-.controls {
+.spinner {
+  display: block;
+  animation: spin 0.85s linear infinite;
+}
+
+@keyframes spin { to { transform: rotate(1turn); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner { animation: none; }
+}
+
+.footer {
   position: absolute;
-  bottom: 42px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 6px;
-  border: 1px solid #ffffff26;
-  border-radius: 30px;
-  background: #222b;
-  backdrop-filter: blur(16px);
-  white-space: nowrap;
-}
-
-.controls button {
-  background: transparent;
-  min-width: 36px;
-  padding: 8px 12px;
-}
-
-.controls output {
-  min-width: 56px;
-  text-align: center;
-  font-size: 13px;
-  font-variant-numeric: tabular-nums;
-}
-
-.controlDivider {
-  height: 18px;
-  width: 1px;
-  background: #ffffff40;
-  margin: 0 6px;
-}
-
-.hint {
-  position: absolute;
-  bottom: 16px;
-  left: 0;
-  right: 0;
-  text-align: center;
-  color: #fffb;
-  font-size: 11px;
+  inset: auto 16px 16px;
+  display: grid;
+  grid-template-columns: 114px minmax(0, 1fr) 114px;
+  align-items: end;
+  gap: 12px;
   pointer-events: none;
 }
 
-html[data-platform='darwin'] .toolbar {
-  top: 60px;
+.controls,
+.thumbnails {
+  display: flex;
+  gap: 6px;
+  pointer-events: auto;
 }
 
-html[data-platform='darwin'] .viewer {
-  padding-top: 112px;
-}
-
-.viewer.attachment {
-  padding: 66px 24px 64px;
-
-  &::backdrop { background: rgb(25 25 27 / 86%); backdrop-filter: none; }
-  &:has(.thumbnails) { padding-bottom: 88px; }
-
-  .toolbar {
-    top: 16px;
-    left: auto;
-    right: 16px;
-    gap: 6px;
-
-    > button { order: 1; }
-  }
-
-  .name, .position, .hint, .controls output, .controlDivider { display: none; }
-  .stage { scrollbar-width: none; }
-
-  .controls {
-    inset: auto 16px 16px auto;
-    transform: none;
-    gap: 6px;
-    padding: 0;
-    border: 0;
-    background: transparent;
-    backdrop-filter: none;
-  }
-
-  :is(.toolbar, .controls) button:not(:global(.message-feedback) > button) {
-    display: grid;
-    place-items: center;
-    width: 34px;
-    height: 34px;
-    min-width: 0;
-    padding: 0;
-    border-radius: 8px;
-    background: rgb(255 255 255 / 9%);
-    font: inherit;
-
-    &:hover:not(:disabled) { background: rgb(255 255 255 / 18%); }
-    &:active:not(:disabled) { background: rgb(255 255 255 / 26%); }
-  }
-
-  @media (pointer: coarse) {
-    :is(.toolbar, .controls) button:not(:global(.message-feedback) > button) {
-      width: 44px;
-      height: 44px;
-    }
-  }
-
-  @media (max-width: 520px) {
-    &:has(.thumbnails) { padding-bottom: 116px; }
-    .controls { right: 50%; transform: translateX(50%); }
-    .thumbnails { bottom: 60px; max-width: calc(100% - 32px); }
-  }
+.controls {
+  grid-column: 3;
 }
 
 .thumbnails {
-  position: absolute;
-  bottom: 16px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
-  gap: 6px;
-  max-width: calc(100% - 276px);
+  grid-column: 2;
+  justify-self: center;
+  max-width: 100%;
   padding: 3px;
   overflow: auto hidden;
   scrollbar-width: thin;
-
-  > button {
-    position: relative;
-    flex: none;
-    width: 56px;
-    height: 42px;
-    padding: 0;
-    overflow: hidden;
-    border-radius: 6px;
-    opacity: 0.68;
-
-    &:is(:hover, :focus-visible, [aria-current='true']) { opacity: 1; }
-    &[aria-current='true']::after {
-      position: absolute;
-      inset: 0;
-      border: 1px solid white;
-      border-radius: inherit;
-      content: '';
-      pointer-events: none;
-    }
-  }
-
-  img { display: block; width: 100%; height: 100%; object-fit: cover; }
 }
 
-html[data-platform='darwin'] .viewer.attachment {
-  padding-top: 100px;
-  .toolbar { top: 56px; }
+.thumbnails > button {
+  position: relative;
+  width: 56px;
+  height: 42px;
+  overflow: hidden;
+  border-radius: 6px;
+  opacity: 0.68;
+
+  &:hover,
+  &:focus-visible,
+  &[aria-current='true'] { opacity: 1; }
+
+  &[aria-current='true']::after {
+    position: absolute;
+    inset: 0;
+    border: 1px solid white;
+    border-radius: inherit;
+    content: '';
+    pointer-events: none;
+  }
+
+  img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+}
+
+html[data-platform='darwin'] .toolbar { top: 56px; }
+html[data-platform='darwin'] .viewer { padding-top: 100px; }
+
+@media (max-width: 520px) {
+  .viewer { padding-inline: 10px; }
+  .viewer:has(.thumbnails) { padding-bottom: 116px; }
+  .footer { grid-template-columns: minmax(0, 1fr); gap: 8px; }
+  .thumbnails, .controls { grid-column: 1; }
+  .controls { justify-self: center; }
+}
+
+@media (pointer: coarse) {
+  html[data-platform='darwin'] .viewer { padding-top: 110px; }
+
+  .toolbar button,
+  .controls button { width: 44px; height: 44px; }
+
+  .thumbnails > button { min-height: 44px; }
+
+  .footer { grid-template-columns: 144px minmax(0, 1fr) 144px; }
+}
+
+@media (pointer: coarse) and (max-width: 520px) {
+  .viewer:has(.thumbnails) { padding-bottom: 128px; }
+  .footer { grid-template-columns: minmax(0, 1fr); }
 }

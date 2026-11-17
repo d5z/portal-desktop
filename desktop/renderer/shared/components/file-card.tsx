@@ -11,9 +11,9 @@ export function FileCard({ path, name, size, title, disabled, localPath, classNa
 }) {
   const extension = path.split(/[\\/]/).pop()!.split('.').slice(1).pop()?.toUpperCase() || '文件';
   return <span className={`${styles.file} ${className}`} data-slot="file-card">
-    <button type="button" className={styles.open} disabled={disabled} data-local-file={localPath} data-slot="file-card-open"
+    <button type="button" className={styles.open} data-slot="file-card-open" disabled={disabled} data-local-file={localPath}
       aria-label={`预览文件：${name}`} title={title} onClick={onOpen}>
-      <FileTypeIcon path={path} glyph="chat-file" />
+      <FileTypeIcon path={path} glyph={document.documentElement.dataset.chatHost === 'desktop' ? 'chat-file' : undefined} />
       <span className={styles.details}>
         <FileName name={name} />
         <span className={styles.metadata}>{extension}{size !== undefined && ` · ${formatBytes(size)}`}</span>

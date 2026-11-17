@@ -54,14 +54,18 @@ export interface Message extends MessageScene {
   retryLabel?: string;
   notice?: 'stop';
   statusRunId?: string;
+  /** Message whose bubble owns this feedback. Without one, the notice stays in the timeline. */
+  statusMessageId?: string;
   queued?: boolean;
-  queuePhase?: import('../services/scene-queue').SavedSceneSend['phase'];
+  queuePhase?: 'queued' | 'preparing' | 'sending' | 'failed';
   queueBusy?: boolean;
+  queueNoticeTone?: 'neutral' | 'error';
   queueNotice?: string;
   cancelQueued?: () => void;
   canInterruptQueued?: boolean;
   interruptQueued?: () => void | Promise<void>;
-  editQueued?: (text: string) => void | Promise<void>;
+  setQueuedEditing?: (editing: boolean) => boolean;
+  editQueued?: (text: string) => boolean | Promise<boolean>;
   moveQueued?: (offset: number) => void | Promise<void>;
   reorderQueued?: (targetId: string) => void | Promise<void>;
 }
@@ -154,6 +158,7 @@ export interface Soul {
 export class ChatState extends Store {
   historyLoading = true;
   historyRefreshing = false;
+  historyLoadFailed = false;
   intelligentUISnapshots: Record<string, string> = {};
   private uiSnapshotStore = new UISnapshotStore();
   recordIntelligentUISnapshot(scene: string, text: string, active = false) {

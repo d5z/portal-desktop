@@ -136,8 +136,7 @@ export function AttachmentAudioMenu({ name, children, controls }: { name: string
     {children}
   </>;
   return <>
-    <MessageAction><button ref={trigger} className="audio-menu-trigger" type="button" aria-label={`${name} 音频操作`}
-      data-warm-tooltip={open ? undefined : '音频操作'}
+    <MessageAction><button ref={trigger} className="audio-menu-trigger" type="button" aria-label={`${name} 音频操作`} title="音频操作"
       aria-haspopup="dialog" aria-expanded={open} aria-controls={id} popoverTarget={id} onClick={place}><Icon name="sliders" width="16" height="16" /></button></MessageAction>
     {createPortal(<div ref={popup} id={id} popover="auto" className="audio-floating-menu" data-submenu-stacked={stacked || undefined}
       data-speed-page={stacked && speedOpen || undefined} style={position} {...menuGlide} {...dropdownMenuPopover} onToggle={event => {

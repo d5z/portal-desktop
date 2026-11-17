@@ -1,0 +1,103 @@
+// Desktop conversation values consumed by the shared components and both layouts.
+:root[data-chat-host='desktop'] {
+  --chat-reading-font: system-ui, 'PingFang SC', 'Being Noto Sans SC', sans-serif;
+  --chat-message-line-height: 1.5;
+  --chat-reading-line-height: var(--lh-body);
+  --chat-ui-text-size: 13px;
+  --chat-ui-line-height: 20px;
+  --chat-meta-text-size: 12px;
+  --chat-meta-line-height: 18px;
+  --chat-icon-compact: 14px;
+  --chat-icon-action: 16px;
+  --chat-icon-primary: 18px;
+  --chat-icon-target: 24px;
+  --chat-attachment-menu-target: 28px;
+
+  --chat-bubble-padding-inline: 16px;
+  --chat-bubble-padding-block: 10px;
+  --chat-text-bubble-radius: 22px;
+  --chat-text-bubble-max-width: 70%;
+  --chat-attachment-width: 320px;
+  --chat-recorded-audio-width: 279px;
+  --chat-attachment-gap: 6px;
+  --chat-attachment-photo-height: 196px;
+  --chat-media-card-surface: var(--chat-attachment-surface);
+  --chat-sent-audio-surface: color-mix(in srgb, var(--chat-link) 9%, var(--chat-reply-surface));
+  --chat-file-width: 156px;
+  --chat-file-height: 48px;
+  --chat-file-name-max-width: 66px;
+  --chat-file-radius: var(--chat-bubble-radius);
+  --chat-file-surface: light-dark(#eaeaea, #343434);
+  --chat-file-text: light-dark(#202020, #f0f0f0);
+  --chat-file-meta: light-dark(#595959, #bcbcbc);
+  --chat-file-icon: light-dark(#545454, #cbcbcb);
+  --chat-image-max-height: 360px;
+  --chat-image-grid-gap: var(--space-sm);
+  --chat-image-grid-row-height: 104px;
+  --chat-image-grid-min-column: 144px;
+  --chat-generation-preview-ratio: 4 / 3;
+  --chat-menu-inset: var(--space-xs);
+  --chat-menu-row-radius: calc(var(--chat-menu-radius) - var(--chat-menu-inset));
+  --chat-content-card-radius: var(--radius-sm);
+  --chat-table-divider-neutral: color-mix(in srgb, var(--chat-edge) 40%, transparent);
+  --chat-table-divider-sent: rgb(255 255 255 / 20%);
+  --chat-content-divider-width: 1px;
+  --chat-queue-divider: light-dark(#ededed, color-mix(in oklab, var(--chat-edge) 80%, transparent));
+  --chat-queue-surface: light-dark(#fcfcfc, var(--neutral-inset));
+  --chat-queue-thumbnail-size: 24px;
+  --chat-queue-preview-width: 432px;
+  --chat-queue-max-height: 30dvh;
+  --chat-composer-primary-surface: var(--chat-ink);
+  --chat-composer-primary-foreground: var(--chat-reply-surface);
+
+  --chat-turn-gap: 40px;
+  --chat-message-group-gap: var(--space-lg);
+  --chat-message-sequence-gap: var(--space-sm);
+  --chat-run-copy-gap: var(--space-sm);
+  --chat-run-summary-max-width: 256px;
+  --chat-result-gap: 14px;
+  --chat-time-divider-before: var(--space-xl);
+  --chat-time-divider-after: var(--space-lg);
+  --chat-history-preview-width: 288px;
+
+  --chat-prompt-shadow: inset 0 0 0 1px var(--chat-edge),
+    0 2px 8px var(--chat-prompt-shadow-near), 0 4px 80px 8px var(--chat-prompt-shadow-far);
+  --chat-prompt-shadow-near: color-mix(in srgb, var(--chat-ink) 4%, transparent);
+  --chat-prompt-shadow-far: color-mix(in srgb, var(--chat-ink) 2.4%, transparent);
+  --chat-prompt-radius: 22px;
+  --chat-prompt-inset: 8px;
+  --chat-prompt-row-gap: var(--space-xs);
+  --chat-prompt-control-size: 34px;
+  --chat-prompt-control-gap: var(--space-xs);
+  --chat-prompt-plus-ink-width: 12px;
+  --chat-prompt-text-size: 14px;
+  --chat-prompt-line-height: 20px;
+  --chat-prompt-inline-text-inset: 2px;
+  --chat-prompt-single-text-padding: 7px var(--chat-prompt-inline-text-inset);
+  --chat-prompt-inline-text-start: calc(var(--chat-prompt-control-size) + var(--chat-prompt-control-gap) + var(--chat-prompt-inline-text-inset));
+  --chat-prompt-expanded-text-inset: var(--space-xs);
+  --chat-prompt-attachment-radius: var(--radius-md);
+  --chat-prompt-attachment-inner-padding: 10px;
+  --chat-prompt-attachment-action-radius: 6px;
+  --chat-prompt-attachment-height: 48px;
+  --chat-prompt-file-width: 184px;
+  --chat-prompt-photo-width: 64px;
+  --chat-prompt-attachment-label-gap: var(--space-sm);
+  --chat-prompt-photo-remove-inset: var(--space-xs);
+  --chat-prompt-attachment-overflow-width: 124px;
+
+  --chat-layer-inline-action: 1;
+  --chat-layer-prompt: 4;
+  --chat-layer-fixed-control: 15;
+
+  .message.user {
+    --chat-file-surface: light-dark(#e9f4ff, #17304b);
+    --chat-file-text: light-dark(#16273c, #ecf5ff);
+    --chat-file-meta: light-dark(#466787, #b4cde6);
+    --chat-file-icon: light-dark(#086bc6, #87bfff);
+  }
+
+  @media (pointer: coarse) {
+    #app #input-area { --chat-prompt-control-size: var(--touch-target); }
+  }
+}

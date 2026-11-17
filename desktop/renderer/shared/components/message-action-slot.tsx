@@ -3,8 +3,8 @@ import { createPortal } from 'react-dom';
 
 export const MessageActionSlot = createContext<{
   actions: HTMLElement | null;
-  fileMenu: HTMLElement | null;
-  registerFile(name: string): () => void;
+  menu: HTMLElement | null;
+  registerExtraActions(): () => void;
 } | null>(null);
 
 export function MessageAction({ children }: { children: ReactNode }) {

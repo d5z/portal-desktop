@@ -9,6 +9,7 @@ import {
   type MouseEvent,
   type ReactNode
 } from 'react';
+import './TiltedCard.css';
 
 type Axis = 'both' | 'horizontal' | 'vertical';
 

@@ -53,6 +53,8 @@
 #soul-role {
   font-size: 12px;
   color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 2px;
   margin-bottom: 16px;
 }
 
@@ -94,7 +96,9 @@
 
 .soul-stat .label {
   color: var(--text-muted);
-  font-size: 11px;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
 }
 
 #soul-born {

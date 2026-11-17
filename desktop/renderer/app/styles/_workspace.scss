@@ -29,35 +29,6 @@ html[data-platform='darwin'] :is(.chat-session-titlebar, #place-panel > .place-s
   }
 }
 
-@media (prefers-reduced-transparency: no-preference) {
-  html[data-platform='darwin'] {
-    --workspace-glass: light-dark(rgb(246 246 246 / 78%), rgb(26 26 26 / 62%));
-
-    &,
-    body,
-    #client-main {
-      background: transparent;
-    }
-
-    .workspace-body {
-      background: var(--workspace-glass);
-    }
-
-    .chat-session-panel[data-pinned='true'] {
-      background: transparent;
-      outline-color: transparent;
-    }
-
-    @container stage (max-width: 700px) {
-      .chat-session-panel[data-pinned='true'] {
-        background: light-dark(rgb(246 246 246 / 78%), rgb(26 26 26 / 80%));
-        backdrop-filter: blur(50px);
-        outline-color: var(--panel-border);
-      }
-    }
-  }
-}
-
 // Windows keeps the native caption outside the renderer. The Mac layout
 // reserves that inset inside the frameless content area, so reusing it on
 // Windows leaves an unnecessary blank band above the workspace.

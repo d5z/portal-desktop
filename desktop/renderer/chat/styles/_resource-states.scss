@@ -108,29 +108,109 @@
   height: 16px;
 }
 
-.chat-inline-notice {
+.chat-status-row {
+  --status-accent: var(--text-muted);
+
   display: flex;
-  align-items: baseline;
+  align-items: center;
   flex-wrap: wrap;
-  gap: 8px 16px;
-  margin: 8px 0 16px;
+  gap: 4px 8px;
+  padding-block: 4px;
   color: var(--text-dim);
   font-size: 13px;
-  line-height: 1.6;
+  line-height: 1.5;
+  text-align: start;
 }
 
-.chat-inline-notice button {
-  padding: 4px 0;
+.chat-status-row[data-tone='error'] {
+  --status-accent: var(--chat-error-icon, var(--red));
+  width: fit-content;
+  padding: 0;
+}
+
+.chat-status-row > svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--status-accent);
+}
+
+.chat-status-copy {
+  display: grid;
+  gap: 2px;
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.chat-status-copy strong {
+  color: var(--text-dim);
+  font-weight: 500;
+}
+
+.chat-status-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.message.system {
+  margin-block: 4px 12px;
+}
+
+.message:has(+ .message.system) {
+  margin-bottom: 6px;
+}
+
+.message.system > .chat-status-row {
+  width: fit-content;
+  max-width: min(100%, 560px);
+}
+
+.message-feedback {
+  width: fit-content;
+  max-width: min(100%, 560px);
+
+  .chat-status-row[data-tone='stopped'] > svg > rect {
+    x: 6px;
+    y: 6px;
+    width: 12px;
+    height: 12px;
+    rx: 1.5px;
+  }
+}
+
+.message-feedback:not(:empty) {
+  margin-block-start: 4px;
+}
+
+.message.user > .message-feedback {
+  margin-inline-start: auto;
+}
+
+.chat-status-actions button {
+  min-height: 24px;
+  padding: 2px 4px;
   background: transparent;
   border: 0;
+  border-radius: 4px;
   color: var(--accent);
   font: inherit;
-  text-decoration: underline;
-  text-underline-offset: 3px;
   cursor: pointer;
 }
 
-.chat-inline-notice button:focus-visible {
+.chat-status-actions button:hover:not(:disabled) {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.chat-status-actions button:disabled {
+  opacity: 0.65;
+  cursor: default;
+}
+
+.chat-status-actions button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
 }
@@ -153,12 +233,15 @@
   gap: 12px;
   min-height: 40px;
   padding: 8px 16px;
-  border: 0;
-  border-radius: 24px;
-  background: var(--bg);
-  font-size: 14px;
+  border: var(--chat-menu-border, 1px solid var(--border));
+  border-radius: 12px;
+  background: var(--chat-menu-surface, var(--bg));
+  font-size: 13px;
   font-weight: 500;
-  box-shadow: 0 6px 22px #0002;
+  box-shadow: var(--chat-menu-shadow, 0 5px 14px #0002);
+
+  &:hover { background: var(--chat-menu-hover, var(--bg-soft)); }
+  &:focus-visible { outline: 2px solid var(--chat-link, var(--accent)); }
 }
 
 #scene-selection-action kbd {
@@ -174,6 +257,11 @@
   outline: 2px solid var(--accent);
   outline-offset: 4px;
   border-radius: 16px;
+}
+
+:root[data-chat-host='desktop'] .message-bubble-body:focus-visible {
+  outline: 1px solid var(--chat-link);
+  outline-offset: 2px;
 }
 
 /* Menus share the active plugin palette with messages and the composer. */

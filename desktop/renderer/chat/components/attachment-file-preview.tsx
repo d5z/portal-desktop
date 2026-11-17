@@ -4,8 +4,7 @@ import {parsedPage} from '../services/attachment-view';
 import {AttachmentDownload} from './attachment-download';
 import {AttachmentDetails} from './attachment-details';
 import {useAttachmentDownloadBridge} from './use-attachment-download-bridge';
-import { MessageAction } from '../../shared/components/message-action-slot';
-import { MessageError } from './message-error';
+import { postFilePreview } from '../../shared/services/file-preview-bridge';
 export function AttachmentFilePreview({part,endpoint}:{part:AttachmentPart;endpoint:string}) {
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
   const controller=useRef(new AbortController());
@@ -15,6 +14,7 @@ export function AttachmentFilePreview({part,endpoint}:{part:AttachmentPart;endpo
   const supported=['pdf','txt','md','csv','json','docx','xlsx','pptx'].includes(extension);
   async function preview() {
     if(busy)return;
+    const opener = document.activeElement as HTMLElement | null;
     setBusy(true);setError('');
     try {
       let blob:Blob|undefined,text:string|undefined,segments:{text:string;label:string}[]|undefined;
@@ -37,12 +37,15 @@ export function AttachmentFilePreview({part,endpoint}:{part:AttachmentPart;endpo
           blob=new Blob([blob],{type:'application/pdf'});
         }else text=await response.text();
       }
-      window.parent.postMessage({type:'beings:file-preview',revision:new URLSearchParams(location.search).get('revision'),id:part.attachment_id,name:part.name,extension,blob,text,segments},'*');
+      postFilePreview({type:'beings:file-preview',id:part.attachment_id,name:part.name,endpoint,extension,blob,text,segments}, opener);
     }catch(e){if(!controller.current.signal.aborted)setError(e instanceof Error?e.message:'预览失败');}
     finally{if(!controller.current.signal.aborted)setBusy(false);}
   }
-  return <><AttachmentDownload onDownloaded={()=>setError('')} endpoint={endpoint} id={part.attachment_id} name={part.name} file={{size:part.size,mime:part.mime}} onPreview={supported?()=>void preview():undefined} details={part.parse_result_id?<AttachmentDetails key={JSON.stringify([endpoint,part.attachment_id,part.parse_result_id])} part={part} endpoint={endpoint}/>:undefined}>下载原件</AttachmentDownload>
-    {busy && <MessageAction><small className="message-action-status" role="status">正在准备预览…</small></MessageAction>}
-    {error && <MessageAction><MessageError reason={`${part.name} · ${error}`} retryLabel="重新预览" retry={() => void preview()} /></MessageAction>}
-  </>;
+  return <AttachmentDownload onDownloaded={() => setError('')} endpoint={endpoint} id={part.attachment_id} name={part.name}
+    file={{ size: part.size, mime: part.mime, parseFailed: part.parse_status === 'failed' }}
+    onPreview={supported ? () => void preview() : undefined} previewing={busy}
+    previewFailure={error ? { detail: error, run: () => void preview() } : undefined}
+    details={part.parse_result_id ? <AttachmentDetails key={JSON.stringify([endpoint,part.attachment_id,part.parse_result_id])} part={part} endpoint={endpoint} /> : undefined}>
+    下载原件
+  </AttachmentDownload>;
 }

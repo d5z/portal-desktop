@@ -1,13 +1,15 @@
-import { useEffect, useId, useRef, useState } from 'react';
-import { Icon } from '../../shared/icons/icon';
 import { AnimatePresence } from 'motion/react';
 import { DropdownMenuMotion } from '../../shared/components/animate-ui/dropdown-menu-motion';
+import { useEffect, useId, useRef, useState } from 'react';
+import { ChatActionTooltip } from '../../shared/components/chat-action-tooltip';
+import { Icon } from '../../shared/icons/icon';
 
-export function ComposerSend({ label, action, stopping, disabled, alternate, onSubmit }: {
+export function ComposerSend({ label, action, stopping, disabled, alternate, mobileWeb, onSubmit }: {
   label: string;
   action: 'send' | 'stop' | 'steer' | 'queue';
   stopping: boolean;
   disabled: boolean;
+  mobileWeb: boolean;
   alternate?: { label: string; shortcut: string; key: string; run(): void };
   onSubmit(): void;
 }) {
@@ -19,6 +21,8 @@ export function ComposerSend({ label, action, stopping, disabled, alternate, onS
   const popupId = useId();
   const hasChoices = !!alternate && !disabled;
   const visible = hasChoices && !!openedBy;
+  const submitIcon = mobileWeb ? 'chat-arrow-up' : 'chat-send';
+  const stopIcon = mobileWeb ? 'chat-composer-stop' : 'chat-composer-stop-compact';
   if (!hasChoices && openedBy) setOpenedBy(undefined);
   useEffect(() => {
     if (hasChoices && matchMedia('(hover: hover)').matches && trigger.current?.matches(':hover')) {
@@ -64,9 +68,9 @@ export function ComposerSend({ label, action, stopping, disabled, alternate, onS
     }}
     onFocus={() => clearTimeout(closeTimer.current)}
     onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpenedBy(undefined); }}>
+    <ChatActionTooltip content={label} shortcut={!disabled && action !== 'stop' ? '↵' : undefined} disabled={hasChoices || stopping}>
       <button ref={trigger} className={`btn-icon${action === 'stop' ? ' stop' : ''}`} id="send-btn" type="button"
         data-action={action}
-        data-warm-tooltip={hasChoices ? undefined : label}
         aria-label={label} aria-busy={stopping} disabled={disabled}
         aria-expanded={hasChoices ? visible : undefined}
         aria-controls={visible ? popupId : undefined}
@@ -91,15 +95,16 @@ export function ComposerSend({ label, action, stopping, disabled, alternate, onS
           if (wasTouch && hasChoices) setOpenedBy('touch');
           else act(onSubmit);
         }}>
-        <Icon name={action === 'stop' ? 'stop' : 'send'} />
+        <Icon name={stopping ? 'chat-busy' : action === 'stop' ? stopIcon : submitIcon} />
       </button>
+    </ChatActionTooltip>
     <AnimatePresence>{visible && alternate && <DropdownMenuMotion className="composer-queue-tip" id={popupId} role="group" aria-label="发送选项">
       <div className="composer-queue-tip-surface">
         <button type="button" aria-label={label} aria-keyshortcuts="Enter"
-          onClick={() => act(onSubmit)}>引导<kbd aria-hidden="true">↵</kbd></button>
+          onClick={() => act(onSubmit)}>{label}<kbd aria-hidden="true">↵</kbd></button>
         <button type="button" aria-label={alternate.label} aria-keyshortcuts={alternate.key}
           onClick={() => act(alternate.run)}>
-          排队<kbd aria-hidden="true">{alternate.shortcut}</kbd>
+          {alternate.label}<kbd aria-hidden="true">{alternate.shortcut}</kbd>
         </button>
       </div>
     </DropdownMenuMotion>}</AnimatePresence>

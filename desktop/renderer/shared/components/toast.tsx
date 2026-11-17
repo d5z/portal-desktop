@@ -1,7 +1,8 @@
+import { CopySuccessText } from './copy-feedback';
 import { useLayoutEffect, useRef } from 'react';
 import styles from './toast.module.scss';
 
-export function Toast({ message }: { message: string }) {
+export function Toast({ message, copied }: { message: string; copied?: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const toast = ref.current;
@@ -10,5 +11,5 @@ export function Toast({ message }: { message: string }) {
       if (!toast.matches(':popover-open')) toast.showPopover();
     } else if (toast.matches(':popover-open')) toast.hidePopover();
   }, [message]);
-  return <div ref={ref} id="toast" className={styles.root} popover="manual" role="status" aria-live="polite" aria-atomic="true">{message}</div>;
+  return <div ref={ref} id="toast" className={styles.root} popover="manual" role="status" aria-live="polite" aria-atomic="true">{copied && message ? <CopySuccessText>{message}</CopySuccessText> : message}</div>;
 }

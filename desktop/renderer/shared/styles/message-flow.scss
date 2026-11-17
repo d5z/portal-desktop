@@ -1,11 +1,11 @@
 :root {
-  --chat-content-width: 920px;
+  --chat-content-width: 960px;
   --chat-inset-left: max(48px, calc((100% - var(--chat-content-width)) / 2));
   --chat-inset-right: max(20px, calc((100% - var(--chat-content-width)) / 2));
 }
 
-.chat-root[data-chat-host='desktop'],
-#chat-view {
+:root[data-chat-host='desktop'] {
+  --chat-content-width: 920px;
   --chat-gutter: clamp(20px, calc(20vw - 84px), clamp(44px, 4.4vw, 56px));
   --chat-inset-left: max(var(--chat-gutter), calc((100% - var(--chat-content-width)) / 2));
   --chat-inset-right: var(--chat-inset-left);

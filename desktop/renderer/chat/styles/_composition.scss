@@ -620,17 +620,6 @@
   stroke-linejoin: round;
 }
 
-.scene-loading-spark {
-  position: absolute;
-  width: 9px;
-  height: 9px;
-  border: 2px solid var(--bg);
-  border-radius: 50%;
-  background: var(--accent);
-  right: -3px;
-  top: 5px;
-}
-
 .scene-loading-heading h2 {
   font-size: 17px;
   font-weight: 550;
@@ -648,11 +637,6 @@
   font-size: 12px;
   line-height: 1.7;
   color: var(--text-dim);
-}
-
-.scene-loading-heading p > span {
-  margin: 0 8px;
-  color: var(--text-muted);
 }
 
 .scene-loading-transcript {
@@ -745,37 +729,6 @@
   animation: scene-loading-breathe 2.8s ease-in-out infinite;
 }
 
-.scene-loading-caption {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 9px;
-  color: var(--text-dim);
-  font-size: 11px;
-  letter-spacing: 0.04em;
-}
-
-.scene-loading-dots {
-  display: flex;
-  gap: 4px;
-}
-
-.scene-loading-dots i {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: currentcolor;
-  animation: scene-loading-dot 1.6s ease-in-out infinite;
-}
-
-.scene-loading-dots i:nth-child(2) {
-  animation-delay: 0.2s;
-}
-
-.scene-loading-dots i:nth-child(3) {
-  animation-delay: 0.4s;
-}
-
 @keyframes scene-loading-breathe {
   0%,
   100% {
@@ -783,18 +736,6 @@
   }
 
   50% {
-    opacity: 1;
-  }
-}
-
-@keyframes scene-loading-dot {
-  0%,
-  80%,
-  100% {
-    opacity: 0.25;
-  }
-
-  40% {
     opacity: 1;
   }
 }
@@ -828,8 +769,7 @@
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .scene-loading-transcript,
-  .scene-loading-dots i {
+  .scene-loading-transcript {
     animation: none;
   }
 }
@@ -889,11 +829,6 @@
   overflow-wrap: anywhere;
 }
 
-.iui-context-target small {
-  margin-left: 8px;
-  color: var(--text-dim);
-}
-
 .iui-context-target > button {
   flex: none;
   width: 28px;
@@ -904,4 +839,36 @@
   color: var(--text-dim);
   cursor: pointer;
   font-size: 18px;
+}
+
+
+:root[data-chat-host='desktop'] {
+  .scene-loading-mark {
+    border: 0;
+    background: var(--chat-being-bubble);
+    color: var(--chat-secondary);
+  }
+
+  .scene-loading-bubble {
+    border: 0;
+    border-radius: 16px;
+    background: var(--chat-being-bubble);
+  }
+
+  .scene-loading-sent .scene-loading-bubble {
+    border-radius: 16px;
+    background: color-mix(in srgb, var(--chat-action) 12%, var(--chat-being-bubble));
+
+    i { color: var(--chat-action); opacity: 0.2; }
+  }
+
+  .scene-loading-reply .scene-loading-bubble { border-radius: 16px; }
+
+  .chat-refresh-status {
+    padding: 5px 10px;
+    border-color: var(--chat-edge);
+    background: var(--chat-menu-surface);
+    box-shadow: var(--chat-menu-shadow);
+    font-size: 12px;
+  }
 }

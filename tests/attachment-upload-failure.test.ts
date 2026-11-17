@@ -5,8 +5,7 @@ import {ChatProxy} from '../desktop/main/chat/proxy';
 import {parseConnection} from '../desktop/main/chat/connection';
 import {uploadAttachment, type UploadProgress} from '../desktop/renderer/chat/services/attachment-transfer';
 import {attachmentError} from '../desktop/shared/attachment-error';
-import {AttachmentImageUpload} from '../desktop/renderer/chat/components/attachment-image-upload';
-import {AttachmentMessageContent} from '../desktop/renderer/chat/components/message-content';
+import {AttachmentMessageContent, AttachmentMessageStatus} from '../desktop/renderer/chat/components/message-content';
 import type {Message} from '../desktop/renderer/chat/models/chat';
 
 const connection = parseConnection('https://echo.beings.town/alice/?token=secret');
@@ -55,14 +54,19 @@ it('sanitizes the queue error as well as the card error',async()=>{
   await expect(uploadAttachment(async()=>{throw new Error('failed https://example.org/?signature=private');},'/upload',{},p=>events.push(p))).rejects.toThrow('failed [服务地址]');
   expect(events.at(-1)?.error).not.toContain('private');
 });
-it('shows failure instead of progress on image cards',()=>{
-  const html=renderToStaticMarkup(createElement(AttachmentImageUpload,{src:'',name:'a.png',percent:0,complete:false,phase:'failed',error:'HTTP 403'}));
-  expect(html).toContain('上传失败'); expect(html).toContain('HTTP 403');
+it('keeps failed image cards free of message-level upload feedback',()=>{
+  const message = {role:'user',text:'查看图片',attachmentEndpoint:connection.endpoint,attachmentUploads:[{
+    name:'a.png',mime:'image/png',size:12,blob:new Blob(['png']),progress:{phase:'failed',loaded:0,total:12}
+  }]} as Message;
+  const html=renderToStaticMarkup(createElement(AttachmentMessageContent,{message}));
+  expect(html).not.toContain('上传失败');
   expect(html).not.toContain('<progress'); expect(html).not.toContain('正在上传');
 });
-it('shows failure instead of progress on file cards',()=>{
+it('shows upload failure with its filename and reason below the bubble',()=>{
   const message = {role:'user',text:'查看内容',attachmentEndpoint:connection.endpoint,attachmentUploads:[{name:'service.log',size:12,progress:{phase:'failed',loaded:0,total:12,error:'ECONNREFUSED'}}]} as Message;
   const html=renderToStaticMarkup(createElement(AttachmentMessageContent,{message}));
-  expect(html).toContain('上传失败'); expect(html).toContain('ECONNREFUSED');
+  expect(html).not.toContain('上传失败'); expect(html).not.toContain('ECONNREFUSED');
   expect(html).not.toContain('<progress'); expect(html).not.toContain('正在上传');
+  const status=renderToStaticMarkup(createElement(AttachmentMessageStatus,{message}));
+  expect(status).toContain('附件上传失败'); expect(status).toContain('service.log · ECONNREFUSED');
 });

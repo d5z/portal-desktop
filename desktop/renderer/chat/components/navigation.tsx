@@ -1,3 +1,4 @@
+import { ChatActionTooltip } from '../../shared/components/chat-action-tooltip';
 import { Icon } from '../../shared/icons/icon';
 import useMemoizedFn from 'ahooks/es/useMemoizedFn';
 import { useEffect, useSyncExternalStore, useMemo, useRef, useLayoutEffect, useState, type CSSProperties, type RefObject } from "react";
@@ -16,18 +17,20 @@ export function JumpToLatest({ container, scrollLock, clearAnchor, status, trimH
 }) {
   const {away,count}=useSyncExternalStore(status.subscribe,status.getSnapshot);
   const label=count?`${count}条消息`:'最新消息';
-  return <button id="chat-jump-latest" type="button" hidden={!away}
-    aria-label="回到底部" aria-description={count?`下方还有${count}条消息`:undefined} title={count?`下方还有${count}条消息`:'回到底部'}
-    onClick={() => {
-      clearAnchor();
-      scrollLock.current = true;
-      trimHistory();
-      container.current?.scrollTo({ top: container.current.scrollHeight,
-        behavior: "instant" });
-    }}>
-    <span>{label}</span>
-    <Icon name="chevron-down-centered-20" />
-  </button>;
+  return <ChatActionTooltip className="chat-jump-tip" disabled={!away} content={count ? `下方还有 ${count} 条消息` : '回到底部'}>
+    <button id="chat-jump-latest" type="button" hidden={!away}
+      aria-label="回到底部" aria-description={count?`下方还有${count}条消息`:undefined}
+      onClick={() => {
+        clearAnchor();
+        scrollLock.current = true;
+        trimHistory();
+        container.current?.scrollTo({ top: container.current.scrollHeight,
+          behavior: "instant" });
+      }}>
+      <span>{label}</span>
+      <Icon name="chat-chevron-down" />
+    </button>
+  </ChatActionTooltip>;
 }
 
 export function ChatIndex({

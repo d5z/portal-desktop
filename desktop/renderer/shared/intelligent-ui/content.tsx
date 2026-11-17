@@ -24,7 +24,7 @@ export function Checklist({ node, values, onChange }: { node: UINode; values: Re
   const groups = [...new Set(items.map(item => item.group || ''))];
   async function copy() {
     const text = [node.label, ...groups.flatMap(group => [group, ...items.filter(item => (item.group || '') === group).map(item => `${item.bind && values[item.bind] ? '[✓]' : '[ ]'} ${item.label}${item.value !== undefined ? ` · ${displayValue(evaluate(item.value, values))}` : ''}${item.description ? ` — ${item.description}` : ''}`)])].filter(Boolean).join('\n');
-    try { await copyText(text); notify('已复制'); } catch { notify('复制失败，请重试'); }
+    try { await copyText(text); notify('已复制', true); } catch { notify('复制失败，请重试'); }
   }
   return <section className={`iui-timeline${checkable ? ' iui-checklist' : ' iui-numbered-timeline'}`}>
     <div className="iui-checklist-heading"><div>{node.label && <h4>{node.label}</h4>}{node.description && <p className="iui-task-description">{node.description}</p>}</div>{node.copyable && <button type="button" onClick={() => void copy()}>复制清单</button>}{checkable && <span role="status" aria-live="polite">{done} / {items.length} 已完成</span>}</div>

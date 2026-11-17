@@ -19,3 +19,10 @@
     @include mixins.focus-ring(currentColor, 4px);
   }
 }
+
+.unavailable {
+  display: flex;
+  align-items: flex-end;
+  width: 100%;
+  height: 100%;
+}

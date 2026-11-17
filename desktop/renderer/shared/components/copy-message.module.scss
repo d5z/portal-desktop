@@ -36,22 +36,16 @@
 }
 
 .chat {
-  flex: 0 0 24px;
-  width: 24px;
-  height: 24px;
-  padding: 5px;
-  border-radius: 4px;
+  flex: 0 0 32px;
+  width: 32px;
+  height: 32px;
+  padding: 7px;
+  border-radius: 8px;
   color: var(--text-muted);
 
   svg {
-    width: 14px;
-    height: 14px;
-  }
-
-  @media (pointer: coarse) {
-    flex-basis: var(--touch-target);
-    width: var(--touch-target);
-    height: var(--touch-target);
+    width: 18px;
+    height: 18px;
   }
 
   @media (prefers-reduced-motion: no-preference) {
@@ -61,10 +55,25 @@
 
 // Hosts opt into hover/focus reveal without exposing their private class names.
 [data-copy-group]:is(:hover, :focus-within) .button,
-[data-copy-group]:has(:global(.attachment-menu-trigger[aria-expanded='true'])) .chat,
 .button:focus-visible {
   opacity: 1;
   pointer-events: auto;
+}
+
+[data-message-actions] .button {
+  opacity: 1;
+  pointer-events: inherit;
+
+  svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+:global(html[data-chat-host='desktop']) [data-message-actions] .chat svg {
+  width: 14px;
+  height: 14px;
+  stroke-width: 1.95;
 }
 
 @media (hover: none) {

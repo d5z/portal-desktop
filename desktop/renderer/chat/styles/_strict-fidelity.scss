@@ -1,0 +1,33 @@
+:root[data-chat-host='desktop'] #input-area #input-row {
+  :is(.composer-add-trigger, #send-btn, [data-queue-save]) > svg {
+    display: block;
+    width: var(--chat-icon-primary);
+    height: var(--chat-icon-primary);
+    stroke-width: 2;
+  }
+
+  #send-btn > svg { stroke-width: 1.33; }
+
+  :is(.composer-add-trigger, #send-btn):focus-visible {
+    outline: 1px solid var(--chat-link);
+    outline-offset: 2px;
+  }
+}
+
+:root[data-chat-host='desktop'] #input-area #input-row #input.markdown-input {
+  padding: var(--chat-prompt-single-text-padding);
+  line-height: var(--chat-prompt-line-height);
+
+  p { margin-bottom: 4px; }
+  > :last-child { margin-bottom: 0; }
+}
+
+:root[data-chat-host='desktop'] #input-area:is([data-long-draft], [data-queue-editing], :has(#pending-files.active, .iui-context-target)) #input-row #input.markdown-input {
+  min-height: 0;
+  padding: var(--chat-prompt-expanded-text-inset) 0;
+}
+
+:root[data-chat-host='desktop'] .warm-tooltip__box {
+  border: var(--chat-menu-border);
+  box-shadow: var(--chat-menu-shadow);
+}

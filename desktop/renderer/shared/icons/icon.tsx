@@ -1,37 +1,6 @@
 import type { ComponentProps } from 'react';
 
 const glyphs = {
-  'chat-edit': { viewBox: '0 0 24 24', content: (<><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /></>) },
-  'chat-close': { viewBox: '0 0 24 24', content: (<><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></>) },
-  'chat-chevron-down': { viewBox: '0 0 24 24', content: <path d="m6 9 6 6 6-6" /> },
-  'chat-chevron-right': { viewBox: '0 0 24 24', content: <path d="m9 18 6-6-6-6" /> },
-  'chat-clock': { viewBox: '0 0 24 24', content: <><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></> },
-  'chat-copy': { viewBox: '0 0 24 24', content: (<>
-    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
-    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
-  </>) },
-  'chat-more': { viewBox: '0 0 24 24', content: (<>
-    <circle cx="5" cy="12" r="1" />
-    <circle cx="12" cy="12" r="1" />
-    <circle cx="19" cy="12" r="1" />
-  </>) },
-  'chat-queue-grip': { viewBox: '0 0 14 14', content: (<>
-    <circle cx="5.25" cy="2.917" r="1.167" /><circle cx="8.75" cy="2.917" r="1.167" />
-    <circle cx="5.25" cy="7" r="1.167" /><circle cx="8.75" cy="7" r="1.167" />
-    <circle cx="5.25" cy="11.083" r="1.167" /><circle cx="8.75" cy="11.083" r="1.167" />
-  </>) },
-  'chat-grip': { viewBox: '0 0 24 24', content: (<><circle cx="9" cy="12" r="1" /><circle cx="9" cy="5" r="1" /><circle cx="9" cy="19" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="5" r="1" /><circle cx="15" cy="19" r="1" /></>) },
-  'chat-queue': { viewBox: '0 0 20 20', content: <path d="M3.33 3.33V11q0 4 4 4h9.33m-2.08-2.08L16.66 15l-2.08 2.08M7.5 5h6.67M7.5 9.58h4.17" strokeWidth="1.33" /> },
-  'chat-busy': { viewBox: '0 0 24 24', content: <path d="M21 12a9 9 0 1 1-6.219-8.56" /> },
-  'chat-stop': { viewBox: '0 0 24 24', content: <rect width="18" height="18" x="3" y="3" rx="2" fill="currentColor" stroke="none" /> },
-  'chat-error': { viewBox: '0 0 24 24', content: (<><circle cx="12" cy="12" r="10" /> <line x1="12" x2="12" y1="8" y2="12" /> <line x1="12" x2="12.01" y1="16" y2="16" /></>) },
-  'chat-play': { viewBox: '0 0 24 24', content: (<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" fill="currentColor" stroke="none" />) },
-  'chat-pause': { viewBox: '0 0 24 24', content: (<><rect x="14" y="3" width="5" height="18" rx="1" /> <rect x="5" y="3" width="5" height="18" rx="1" /></>) },
-  'chat-retry': { viewBox: '0 0 24 24', content: <><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></> },
-  'chat-download': { viewBox: '0 0 24 24', content: <><path d="M12 15V3" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5" /></> },
-  'chat-external-link': { viewBox: '0 0 24 24', content: <><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></> },
-  'chat-image': { viewBox: '0 0 24 24', content: (<><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></>) },
-  'chat-file': { viewBox: '0 0 24 24', content: (<><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></>) },
   // Official Lucide geometry used by Being Home, https://lucide.dev/license.
   'lucide-message-circle': { viewBox: '0 0 24 24', content: <path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /> },
   'lucide-sun': { viewBox: '0 0 24 24', content: (<>
@@ -91,6 +60,58 @@ const glyphs = {
     <path d="M3 6h18" />
     <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
   </>) },
+  // Chat glyph geometry from Lucide (ISC), https://lucide.dev/license.
+  'chat-more': { viewBox: '0 0 24 24', content: (
+    <>
+      <circle cx="5" cy="12" r="1" />
+      <circle cx="12" cy="12" r="1" />
+      <circle cx="19" cy="12" r="1" />
+    </>
+  ) },
+  'chat-copy': { viewBox: '0 0 24 24', content: (
+    <>
+      <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+      <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
+    </>
+  ) },
+  'chat-plus': { viewBox: '0 0 24 24', content: (<><path d="M5 12h14" /> <path d="M12 5v14" /></>) },
+  // Center the inset Lucide paths and keep their rendered stroke at 1.5px.
+  'chat-send': { viewBox: '0 0 24 24', content: (
+    <g transform="translate(0.1 3.26) scale(0.86)" strokeWidth="1.5">
+      <path vectorEffect="non-scaling-stroke" d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" />
+      <path vectorEffect="non-scaling-stroke" d="m21.854 2.147-10.94 10.939" />
+    </g>
+  ) },
+  'chat-stop': { viewBox: '0 0 24 24', content: (<><rect width="18" height="18" x="3" y="3" rx="2" fill="currentColor" stroke="none" /></>) },
+  // Composer controls use the 20 px geometry from the Codex desktop reference.
+  'chat-arrow-up': { viewBox: '0 0 20 20', content: <path d="M10 16.667V3.333m-5.833 5.834L10 3.333l5.833 5.834" strokeWidth="1.33" /> },
+  'chat-composer-stop': { viewBox: '0 0 20 20', content: <rect width="11" height="11" x="4.5" y="4.5" rx="1.25" fill="currentColor" stroke="none" /> },
+  'chat-composer-stop-compact': { viewBox: '0 0 18 18', content: <rect width="6" height="6" x="6" y="6" rx="1" fill="currentColor" stroke="none" /> },
+  'chat-queue': { viewBox: '0 0 20 20', content: <path d="M3.33 3.33V11q0 4 4 4h9.33m-2.08-2.08L16.66 15l-2.08 2.08M7.5 5h6.67M7.5 9.58h4.17" strokeWidth="1.33" /> },
+  'chat-file': { viewBox: '0 0 24 24', content: (<><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></>) },
+  'chat-image': { viewBox: '0 0 24 24', content: (<><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></>) },
+  'chat-audio': { viewBox: '0 0 24 24', content: <path d="M2 10v3M6 6v11M10 3v18M14 8v7M18 5v13M22 10v3" /> },
+  'chat-close': { viewBox: '0 0 24 24', content: (<><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></>) },
+  'chat-edit': { viewBox: '0 0 24 24', content: (<><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /></>) },
+  'chat-grip': { viewBox: '0 0 24 24', content: (<><circle cx="9" cy="12" r="1" /> <circle cx="9" cy="5" r="1" /> <circle cx="9" cy="19" r="1" /> <circle cx="15" cy="12" r="1" /> <circle cx="15" cy="5" r="1" /> <circle cx="15" cy="19" r="1" /></>) },
+  'chat-flash': { viewBox: '0 0 24 24', content: (<><path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z" /></>) },
+  'chat-upload': { viewBox: '0 0 24 24', content: (<><path d="M12 3v12" /> <path d="m17 8-5-5-5 5" /> <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /></>) },
+  'chat-spark': { viewBox: '0 0 24 24', content: (<><path d="M11.017 2.814a1 1 0 0 1 1.966 0l1.051 5.558a2 2 0 0 0 1.594 1.594l5.558 1.051a1 1 0 0 1 0 1.966l-5.558 1.051a2 2 0 0 0-1.594 1.594l-1.051 5.558a1 1 0 0 1-1.966 0l-1.051-5.558a2 2 0 0 0-1.594-1.594l-5.558-1.051a1 1 0 0 1 0-1.966l5.558-1.051a2 2 0 0 0 1.594-1.594z" /> <path d="M20 2v4" /> <path d="M22 4h-4" /> <circle cx="4" cy="20" r="2" /></>) },
+  'chat-screen': { viewBox: '0 0 24 24', content: (<><rect width="20" height="14" x="2" y="3" rx="2" /> <line x1="8" x2="16" y1="21" y2="21" /> <line x1="12" x2="12" y1="17" y2="21" /></>) },
+  'chat-agent': { viewBox: '0 0 24 24', content: (<><circle cx="12" cy="8" r="5" /> <path d="M20 21a8 8 0 0 0-16 0" /></>) },
+  'chat-error': { viewBox: '0 0 24 24', content: (<><circle cx="12" cy="12" r="10" /> <line x1="12" x2="12" y1="8" y2="12" /> <line x1="12" x2="12.01" y1="16" y2="16" /></>) },
+  'chat-play': { viewBox: '0 0 24 24', content: (<><path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" fill="currentColor" stroke="none" /></>) },
+  'chat-pause': { viewBox: '0 0 24 24', content: (<><rect x="14" y="3" width="5" height="18" rx="1" /> <rect x="5" y="3" width="5" height="18" rx="1" /></>) },
+  'chat-busy': { viewBox: '0 0 24 24', content: (<><path d="M21 12a9 9 0 1 1-6.219-8.56" /></>) },
+  'chat-check': { viewBox: '0 0 24 24', content: <path d="M20 6 9 17l-5-5" /> },
+  'chat-chevron-down': { viewBox: '0 0 24 24', content: <path d="m6 9 6 6 6-6" /> },
+  'chat-chevron-right': { viewBox: '0 0 24 24', content: <path d="m9 18 6-6-6-6" /> },
+  'chat-retry': { viewBox: '0 0 24 24', content: <><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></> },
+  'chat-download': { viewBox: '0 0 24 24', content: <><path d="M12 15V3" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5" /></> },
+  'chat-external-link': { viewBox: '0 0 24 24', content: <><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></> },
+  'chat-clock': { viewBox: '0 0 24 24', content: <><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></> },
+  'chat-info': { viewBox: '0 0 24 24', content: <><circle cx="12" cy="12" r="10" /><path d="M12 16v-4M12 8h.01" /></> },
+  'chat-wrench': { viewBox: '0 0 24 24', content: <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" /> },
   'trash': { viewBox: '0 0 24 24', content: (<><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7m4-7v7" /></>) },
   'panel-expand': { viewBox: '0 0 24 24', content: (<><rect x="3" y="4" width="18" height="16" rx="4"/><path d="M8 8v8" strokeWidth="3" strokeLinecap="round"/></>) },
   'close': { viewBox: '0 0 24 24', content: (<><path d="m6 6 12 12M18 6 6 18"/></>) },
@@ -108,6 +129,7 @@ const glyphs = {
   'update-download': { viewBox: '0 0 24 24', content: (<><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18v2h14v-2" /></>) },
   'more-filled': { viewBox: '0 0 24 24', content: (<><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></>) },
   'volume': { viewBox: '0 0 24 24', content: (<><path d="M11 4 6 8H3v8h3l5 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></>) },
+  'playback-speed': { viewBox: '0 0 24 24', content: (<><path d="M12 3a9 9 0 1 0 9 9M16 4l3 3m2 2v1M12 7v5l3 3"/></>) },
   'folder': { viewBox: '0 0 24 24', content: (<><path d="M3 6h7l2 3h9v11H3z"/></>) },
   'file-text-tall': { viewBox: '0 0 24 28', content: (<><rect x="4" y="2" width="16" height="24" rx="4" stroke="currentColor" strokeWidth="1.6"/><path d="M8 9h8M8 14h6M8 19h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></>) },
   'plus': { viewBox: '0 0 24 24', content: (<><path d="M12 5v14M5 12h14"/></>) },
@@ -147,14 +169,8 @@ const glyphs = {
   'play-20': { viewBox: '0 0 20 20', content: (<><path d="m6 3 11 7-11 7z"/></>) },
   'external-link': { viewBox: '0 0 24 24', content: (<><path d="M14 3h7v7m0-7L10 14M10 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></>) },
   'download-tray': { viewBox: '0 0 24 24', content: (<><path d="M12 3v12m-5-5 5 5 5-5M5 8H3v12h18V8h-2"/></>) },
-  'stop': { viewBox: '0 0 24 24', content: (<><rect x="8.4" y="8.4" width="7.2" height="7.2" rx="1.2"/></>) },
-  // Center the inset Lucide paper plane at the shared composer icon size.
-  'send': { viewBox: '0 0 24 24', content: (
-    <g transform="translate(0.1 3.26) scale(0.86)" strokeWidth="1.5">
-      <path vectorEffect="non-scaling-stroke" d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" />
-      <path vectorEffect="non-scaling-stroke" d="m21.854 2.147-10.94 10.939" />
-    </g>
-  ) },
+  'stop': { viewBox: '0 0 24 24', content: (<><rect x="7" y="7" width="10" height="10" rx="2"/></>) },
+  'send': { viewBox: '0 0 24 24', content: (<><path d="M12 20V4m-7 7 7-7 7 7"/></>) },
   'check-16': { viewBox: '0 0 16 16', content: (<><path d="m3 8 3 3 7-7" /></>) },
   'copy-16': { viewBox: '0 0 16 16', content: (<><rect x="5" y="5" width="8" height="9" rx="1.5" /><path d="M10 3V2H2v9h1" /></>) },
   'disclosure-up': { viewBox: '0 0 20 20', content: (<><path d="m5 12 5-5 5 5" /></>) },
@@ -173,6 +189,7 @@ const glyphs = {
   'expand': { viewBox: '0 0 24 24', content: (<><path d="M8 4H4v4m12-4h4v4M4 16v4h4m12-4v4h-4" /></>) },
   'more': { viewBox: '0 0 24 24', content: (<><circle cx="5" cy="12" r="1" /><circle cx="12" cy="12" r="1" /><circle cx="19" cy="12" r="1" /></>) },
   'directory': { viewBox: '0 0 24 24', content: (<><path d="M3 7V5h7l2 3h9v12H3V7Z" /></>) },
+  'list-view': { viewBox: '0 0 24 24', content: <path d="M8 6h12M8 12h12M8 18h12M4 6h.01M4 12h.01M4 18h.01" /> },
   'download-wide': { viewBox: '0 0 24 24', content: (<><path d="M12 3v12m-4-4 4 4 4-4M4 16v4h16v-4" /></>) },
   'refresh-library': { viewBox: '0 0 24 24', content: (<><path d="M20 10a8 8 0 1 0-2 8M20 4v6h-6" /></>) },
   'file': { viewBox: '0 0 24 24', content: (<><path d="M14 3H5v18h14V8l-5-5Zm0 0v6h5M8 13h8m-8 4h5" /></>) },
@@ -335,7 +352,7 @@ export type IconProps = Omit<ComponentProps<'svg'>, 'children'> & { name: IconNa
 export function Icon({ name, ...props }: IconProps) {
   const glyph = glyphs[name];
   const lineStyle = name.startsWith('chat-') || name.startsWith('lucide-')
-    ? { fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
+    ? { fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
     : {};
   return <svg viewBox={glyph.viewBox} aria-hidden="true" {...lineStyle} {...props}>{glyph.content}</svg>;
 }

@@ -5,6 +5,7 @@ export function startsTimeGroup(current?:number,previous?:number) {
   return Math.abs(current-previous)>=5*60*1000 || new Date(current).toDateString()!==new Date(previous).toDateString();
 }
 const timelineTimeFormat = new Intl.DateTimeFormat('zh-CN',{month:'long',day:'numeric',hour:'2-digit',minute:'2-digit',hour12:false});
+const fullTimeFormat = new Intl.DateTimeFormat('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false});
 export function messageTimeLabel(time:number) {
   return timelineTimeFormat.format(time);
 }
@@ -15,5 +16,5 @@ export function appendChatText(draft:string,text:string) {
 }
 
 export function fullMessageTime(time?:number, fallback='') {
-  return time !== undefined && Number.isFinite(new Date(time).getTime()) ? new Date(time).toLocaleString('zh-CN',{year:'numeric',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit',hour12:false}) : fallback;
+  return time !== undefined && Number.isFinite(new Date(time).getTime()) ? fullTimeFormat.format(time) : fallback;
 }

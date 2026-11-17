@@ -1,3 +1,5 @@
+@use './chat-menu';
+
 .composer-add-menu,
 .composer-slash-menu {
   box-sizing: border-box;
@@ -27,14 +29,8 @@
   width: 216px;
   max-width: calc(100vw - 16px);
   max-height: calc(100dvh - 24px);
-  transform-origin: bottom left;
-
-  &[data-menu-popover-motion] {
-    transition: display 220ms allow-discrete, overlay 220ms allow-discrete;
-  }
 }
 .composer-slash-menu {
-  transform-origin: bottom left;
   position: absolute;
   bottom: calc(100% + 24px);
   left: -15px;
@@ -178,3 +174,40 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+
+:root[data-chat-host='desktop'] {
+  .composer-add-menu {
+    @include chat-menu.popover-presence;
+
+    > [role='menuitem'] { @include chat-menu.action-row; }
+  }
+
+  :is(.composer-add-menu, .composer-slash-menu) {
+    @include chat-menu.surface;
+
+    padding: var(--chat-menu-inset);
+
+    :is(.composer-command-row, .composer-command-main),
+    > button {
+      border-radius: var(--chat-menu-row-radius);
+    }
+  }
+
+  .composer-slash-menu [aria-selected='true'],
+  .composer-add-menu button:hover:not(:disabled),
+  .composer-add-menu button:focus-visible {
+    background: var(--chat-menu-hover);
+    border-color: transparent;
+  }
+
+  :is(.composer-add-menu, .composer-slash-menu) button:focus-visible {
+    outline: 1px solid var(--chat-secondary);
+    outline-offset: -2px;
+  }
+
+  :is(.composer-add-menu, .composer-slash-menu) button:active:not(:disabled) {
+    background: var(--chat-menu-pressed);
+  }
+}
+
+.composer-slash-menu { transform-origin: bottom left; }

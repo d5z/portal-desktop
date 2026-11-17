@@ -5,7 +5,7 @@
   top: 46%;
   transform: translateY(-50%);
   width: 36px;
-  z-index: 15;
+  z-index: var(--chat-layer-fixed-control, 15);
   display: flex;
   flex-direction: column;
   align-items: stretch;

@@ -2,6 +2,7 @@
 :root {
   -webkit-tap-highlight-color: transparent;
 
+  --ui-floating-control-shadow: 0 2px 8px light-dark(rgb(0 0 0 / 8%), rgb(0 0 0 / 24%));
   --ui-motion-fast: 120ms;
   --ui-motion-surface: 140ms;
   --ui-ease: cubic-bezier(0.2, 0.8, 0.2, 1);

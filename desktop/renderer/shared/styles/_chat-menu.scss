@@ -1,7 +1,7 @@
 @mixin surface(
-  $background: var(--chat-menu-surface, var(--bg)),
-  $border: var(--chat-menu-border, 1px solid var(--border)),
-  $shadow: var(--chat-menu-shadow, 0 5px 14px #0002)
+  $background: var(--chat-menu-surface),
+  $border: var(--chat-menu-border),
+  $shadow: var(--chat-menu-shadow)
 ) {
   background: $background;
   border: $border;
@@ -40,7 +40,8 @@
   }
 }
 
-// Animate UI Menu ContentMotion keeps the native top layer through the fade.
+
+// Match Animate UI Menu ContentMotion so the native top layer lasts through the fade.
 @mixin popover-presence {
   &[data-menu-popover-motion] {
     transition: display 220ms allow-discrete, overlay 220ms allow-discrete;

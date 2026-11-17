@@ -1,0 +1,175 @@
+@use '../../shared/styles/chat-icon-control';
+
+.message-media-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+
+  &:empty { display: none; }
+}
+
+.message-media-actions .message-image-toggle[aria-expanded='true'] svg { rotate: 180deg; }
+
+:root[data-chat-host='desktop'] {
+  $feedback: '.chat-error-indicator, .chat-status-actions, .message-action-status, .attachment-download-progress';
+
+  .message-bubble-row {
+    position: relative;
+    flex-wrap: wrap;
+    row-gap: 2px;
+  }
+
+  .message-action-space {
+    display: block;
+    align-self: flex-end;
+    flex: 0 0 auto;
+    min-width: 0;
+    margin-block-end: 4px;
+  }
+
+  .message.user .message-bubble-body:has(> .attachment-message-host) {
+    max-inline-size: min(var(--chat-attachment-width), 100%);
+  }
+
+  .message.being .message-bubble-body:has(> .intelligent-answer .intelligent-ui) {
+    flex-basis: 100%;
+  }
+
+  .message .message-hover-actions {
+    position: relative;
+    z-index: var(--chat-layer-inline-action);
+    width: max-content;
+    max-width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font: 400 11px/14px var(--chat-reading-font);
+    font-variant-numeric: tabular-nums;
+    color: var(--chat-secondary);
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .message.being .message-hover-time { order: 1; }
+
+  .message.user .message-hover-actions {
+    margin-inline-start: auto;
+  }
+
+  .message-media-actions { display: contents; }
+  .message.user .message-media-actions > :not(.message-image-toggle) { order: -1; }
+  .message.user .message-media-actions > :is(#{$feedback}) { order: 1; }
+  .message.being .message-media-actions > :is(#{$feedback}) { order: -1; }
+
+  @media (hover: hover) and (pointer: fine) {
+    .message-bubble-row:not(
+      [data-actions-hovered],
+      :has(> .message-bubble-body:hover),
+      :has(> .message-action-space:hover):not(:has(.message-media-actions > :is(#{$feedback}):hover)),
+      :has(:focus-visible, .message-hover-buttons [aria-haspopup][aria-expanded='true'])
+    ) {
+      .message-hover-actions {
+        opacity: 0;
+        pointer-events: none;
+
+        &:has(.message-media-actions > :is(#{$feedback})) { opacity: 1; }
+      }
+
+      // Keep the toolbar geometry stable while only the active feedback is visible.
+      .message-hover-time,
+      .message-hover-buttons > :not(.message-media-actions),
+      .message-media-actions > :not(#{$feedback}) {
+        opacity: 0;
+        pointer-events: none;
+      }
+
+      .message-media-actions > :is(#{$feedback}) { pointer-events: auto; }
+    }
+  }
+
+  .message:is(.being, .user) .message-hover-actions::before {
+    content: none;
+  }
+
+  .message-hover-time { color: var(--neutral-tertiary); }
+  .message-hover-buttons { gap: 4px; }
+
+  .message-hover-buttons button,
+  .message-hover-buttons .chat-error-indicator > button {
+    position: relative;
+    display: grid;
+    place-items: center;
+    flex: 0 0 var(--chat-icon-target);
+    width: var(--chat-icon-target);
+    height: var(--chat-icon-target);
+    padding: 0;
+    border-radius: 4px;
+
+    @include chat-icon-control.feedback;
+
+    > svg { display: block; width: var(--chat-icon-compact); height: var(--chat-icon-compact); }
+    &:focus-visible { outline: 1px solid var(--chat-secondary); outline-offset: -1px; }
+    transition: background-color var(--ui-motion-fast) ease;
+  }
+
+  @media (forced-colors: active) {
+    .message-hover-buttons button:focus-visible {
+      outline-color: Highlight;
+    }
+  }
+
+  .message-media-actions .attachment-download-progress {
+    width: 108px;
+    margin: 0;
+  }
+
+  .message-media-actions .message-action-status {
+    white-space: nowrap;
+  }
+
+  .message-action-status.chat-status-row {
+    min-height: var(--chat-icon-target);
+    gap: 6px;
+    padding: 0;
+
+    > svg { margin-inline: 4px; }
+    > .chat-error-indicator { order: -1; gap: 4px; }
+    > svg,
+    > .chat-error-indicator > button > svg {
+      width: 16px;
+      height: 16px;
+      stroke-width: calc(1.15 * 24 / 16);
+    }
+  }
+
+  .message-hover-buttons button[data-copy-failed],
+  .message-hover-buttons button[data-copy-failed]:hover:not(:disabled) {
+    color: var(--chat-error-icon);
+  }
+
+  @media (hover: none) {
+    .message-action-space { flex: 0 0 100%; margin-block-end: 0; }
+
+    .message .message-hover-actions {
+      justify-content: flex-start;
+      padding: 0;
+      background: transparent;
+    }
+
+    .message.user .message-hover-actions { justify-content: flex-end; }
+    .message-bubble-row .message-hover-actions { opacity: 1; pointer-events: auto; }
+    .message .message-hover-time { display: block; visibility: hidden; }
+    .message-bubble-row:focus-within .message-hover-time { visibility: visible; }
+    .message.being .message-hover-time { order: 0; }
+
+    .message-hover-buttons button,
+    .message-hover-buttons .chat-error-indicator > button {
+      flex-basis: var(--touch-target);
+      width: var(--touch-target);
+      height: var(--touch-target);
+      border-radius: 6px;
+      touch-action: manipulation;
+    }
+
+  }
+}

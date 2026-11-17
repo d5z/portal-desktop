@@ -284,7 +284,7 @@
 #being-info :is(.being-details, .being-config-actions) {
   margin: 0;
   border-radius: var(--utility-radius);
-  background: var(--being-card);
+  background: var(--neutral-card);
 }
 
 #being-info .being-details {
@@ -369,11 +369,6 @@
   line-height: 1.5;
 }
 
-#being-info .being-action-row::before {
-  inset: 0;
-  border-radius: inherit;
-}
-
 #being-info .being-config-actions {
   position: relative;
   isolation: isolate;
@@ -385,10 +380,15 @@
   top: 0;
   inset-inline: 0;
   border-radius: var(--utility-radius);
-  background: light-dark(#efefef, #2b2b2b);
+  background: var(--neutral-inset);
   opacity: 0;
   pointer-events: none;
   transition: transform var(--ui-motion-surface) var(--ui-ease), opacity var(--ui-motion-fast) ease;
+}
+
+#being-info .being-action-row::before {
+  inset: 0;
+  border-radius: inherit;
 }
 
 #being-info .being-config-actions[data-gliding] > .being-action-row:hover:not(:active)::before {
@@ -430,7 +430,7 @@
 #being-info #being-library-panel > p {
   min-height: 120px;
   border-radius: var(--utility-radius);
-  background: var(--being-card);
+  background: var(--neutral-card);
   margin: 0;
   padding: 34px 12px;
   color: var(--secondary);
@@ -441,7 +441,7 @@
 #being-info #being-computer-panel .being-computer-preview {
   border: 0;
   border-radius: var(--utility-radius);
-  background: var(--being-card);
+  background: var(--neutral-card);
   box-shadow: none;
 }
 
@@ -449,15 +449,6 @@
   min-height: 152px;
   max-height: none;
   aspect-ratio: auto;
-}
-
-#being-info #being-computer-panel .being-computer-footer {
-  min-height: 58px;
-  margin-top: 12px;
-  padding: 0 16px;
-  border: 1px solid var(--line);
-  border-radius: 16px;
-  background: transparent;
 }
 
 /* Final settings pass: one quiet surface language for navigation, controls, and app cards. */

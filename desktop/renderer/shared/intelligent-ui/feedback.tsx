@@ -1,7 +1,8 @@
+import { CopySuccessText } from '../components/copy-feedback';
 import { useCallback, useEffect, useId, useRef, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 
-type Notice = { owner: string; text: string };
+type Notice = { owner: string; text: string; copied: boolean };
 let notice: Notice | null = null;
 let timer: ReturnType<typeof setTimeout> | undefined;
 const listeners = new Set<() => void>();
@@ -23,11 +24,11 @@ export function useUIToast() {
     alive.current = true;
     return () => { alive.current = false; if (notice?.owner === owner) replace(null); };
   }, [owner]);
-  const notify = useCallback((text: string) => { if (alive.current) replace({ owner, text }); }, [owner]);
+  const notify = useCallback((text: string, copied = false) => { if (alive.current) replace({ owner, text, copied }); }, [owner]);
   return {
     notify,
     toast: current?.owner === owner && typeof document !== 'undefined' ? createPortal(
-      <div className="iui-toast" role="status" aria-live="polite" aria-atomic="true">{current.text}</div>,
+      <div className="iui-toast" role="status" aria-live="polite" aria-atomic="true">{current.copied ? <CopySuccessText>{current.text}</CopySuccessText> : current.text}</div>,
       document.body,
     ) : null,
   };

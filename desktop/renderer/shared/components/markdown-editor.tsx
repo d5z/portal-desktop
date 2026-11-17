@@ -42,7 +42,15 @@ export function MarkdownEditor({ value, onChange, inputRef, id, label, placehold
     editorProps: {
       attributes: { id: id || '', class: 'markdown-input', role: 'textbox', 'aria-multiline': 'true',
         'aria-label': label || '输入内容', 'data-placeholder': placeholder || '', spellcheck: 'false', 'data-empty': String(!value) },
-      handlePaste: (_view, event) => {
+      handleDOMEvents: {
+        beforeinput: (view, event) => {
+          // The browser can emit a paragraph insertion while the IME is still composing.
+          if (!view.composing || (event.inputType !== 'insertParagraph' && event.inputType !== 'insertLineBreak')) return false;
+          event.preventDefault();
+          return true;
+        },
+      },
+      handlePaste: (view, event) => {
         if (event.clipboardData?.files.length) return false;
         const text = event.clipboardData?.getData('text/plain');
         if (!text || !editor) return false;
@@ -58,8 +66,18 @@ export function MarkdownEditor({ value, onChange, inputRef, id, label, placehold
           // A single paragraph replaces the selection inline, as native paste does.
           // Inserting a whole Markdown document here splits the surrounding paragraph.
           const content = parsed.content;
-          editor.commands.insertContent(content?.length === 1 && content[0].type === 'paragraph'
-            ? content[0].content || [] : content || []);
+          const insertion = content?.length === 1 && content[0].type === 'paragraph' ? content[0].content || [] : content || [];
+          const selection = view.dom.ownerDocument.getSelection();
+          const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+          // The edit menu can restore the DOM selection just before the native paste event.
+          if (range && view.dom.contains(range.commonAncestorContainer)) {
+            editor.commands.insertContentAt({
+              from: view.posAtDOM(range.startContainer, range.startOffset),
+              to: view.posAtDOM(range.endContainer, range.endOffset),
+            }, insertion);
+          } else {
+            editor.commands.insertContent(insertion);
+          }
         }
         return true;
       },
@@ -108,7 +126,10 @@ export function MarkdownEditor({ value, onChange, inputRef, id, label, placehold
     // External draft replacement (including send/scene changes) starts fresh undo history.
     editor.view.updateState(EditorState.create({ schema: editor.schema, doc: editor.state.doc, plugins: editor.state.plugins }));
   }, [editor, value]);
-  useEffect(() => { editor?.setEditable(!disabled, false); }, [editor, disabled]);
+  useLayoutEffect(() => { editor?.setEditable(!disabled, false); }, [editor, disabled]);
+  useLayoutEffect(() => {
+    editor?.view.dom.setAttribute('aria-label', label || '输入内容');
+  }, [editor, label]);
   useEffect(() => {
     if (!editor) return;
     for (const [attribute, value] of Object.entries({ 'aria-controls': suggestions?.controls, 'aria-activedescendant': suggestions?.active, 'aria-autocomplete': suggestions?.autocomplete })) {

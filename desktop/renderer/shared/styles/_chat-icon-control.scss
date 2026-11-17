@@ -1,0 +1,10 @@
+// shadcn ghost interaction on Being's neutral and sent surfaces.
+@mixin feedback($ink: var(--chat-ink), $hover: 6%, $pressed: 12%) {
+  &:is(:hover, [aria-expanded='true'], [aria-pressed='true']):not(:disabled) {
+    background-color: color-mix(in srgb, $ink $hover, transparent);
+  }
+
+  &:active:not(:disabled) {
+    background-color: color-mix(in srgb, $ink $pressed, transparent);
+  }
+}

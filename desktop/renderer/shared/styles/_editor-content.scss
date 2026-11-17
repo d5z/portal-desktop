@@ -153,15 +153,19 @@
   padding-left: 0;
   list-style: none;
 }
-.markdown-input li[data-type='taskItem'] {
+.markdown-input ul[data-type='taskList'] > li {
   display: flex;
+  align-items: flex-start;
   gap: 8px;
 }
-.markdown-input li[data-type='taskItem'] > label {
-  flex: 0 0 auto;
+.markdown-input ul[data-type='taskList'] > li > label {
+  display: grid;
+  place-items: center;
+  flex: 0 0 14px;
+  height: 1lh;
   margin: 0;
 }
-.markdown-input li[data-type='taskItem'] > div {
+.markdown-input ul[data-type='taskList'] > li > div {
   min-width: 0;
   flex: 1;
 }

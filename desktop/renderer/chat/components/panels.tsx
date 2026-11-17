@@ -208,7 +208,7 @@ export function ChatInfoPanels({
         aria-label="隐私说明"
       >
         <div className="privacy-header panel-header">
-          <span>隐私说明</span>
+          <span>🛡️ Privacy Shield</span>
           <button
             className="btn-close"
             type="button"

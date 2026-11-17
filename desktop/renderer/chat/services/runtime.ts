@@ -10,7 +10,7 @@ import { createSceneRuntime } from "./scene-runtime";
 import { HistoryCache, normalizeHistoryRows } from "./history-cache";
 import { chatHistoryLimit } from '../../../shared/chat-history';
 import { inCurrentScene, messageScene, sceneItems, sceneTransitionNotice, stripSceneTransition, type MessageScene } from "../models/scenes";
-import type { ChatRuntime, ChatState, RuntimeOptions } from "../models/chat";
+import type { ChatRuntime, ChatState, Message, RuntimeOptions } from "../models/chat";
 
 /**
  * Loom's streaming, replay and history protocol, independent of rendering.
@@ -818,6 +818,7 @@ function createStreamRuntime(state: any, options: any): any {
     timestamp: any = null,
     isoTime: any = null,
     scene: any = role === "being" ? state.activeScene : state.currentScene,
+    statusMessageId?: string,
   ) {
     if (disposed) return null;
     if (!streaming && role !== "system") text = cleanContent(role === "user" ? stripSceneTransition(stripClientMessageContext(text)) : text);
@@ -870,6 +871,7 @@ function createStreamRuntime(state: any, options: any): any {
       createdAt: msgTime || undefined,
       label,
       consecutive,
+      statusMessageId,
     };
     state.items.push(message);
     moveRun();
@@ -1213,10 +1215,10 @@ function createStreamRuntime(state: any, options: any): any {
 
   let fetchRetryMessage: any = null;
 
-  function showFetchRetryStatus() {
+  function showFetchRetryStatus(target?: Message) {
     setStatus("reconnecting");
     if (!fetchRetryMessage) {
-      const message = addMessage("system", "连接中，正在重试...");
+      const message = addMessageNotice("连接中，正在重试...", target);
       fetchRetryMessage = message;
     }
   }
@@ -1228,25 +1230,27 @@ function createStreamRuntime(state: any, options: any): any {
     }
   }
 
-  function addNetworkFailureMessage(text: any, files: any, requestMessage: any) {
+  function addMessageNotice(text: string, target?: Message | null, scene = state.activeScene) {
+    const ownerScene = target ? { sceneId: target.sceneId, sceneLabel: target.sceneLabel, legacySceneId: target.legacySceneId } : scene;
+    return addMessage("system", text, false, undefined, undefined, ownerScene, target?.id);
+  }
+
+  function addNetworkFailureMessage(text: any, files: any, requestMessage: any, target?: Message | null) {
     const scene = { ...state.activeScene };
-    const message = addMessage("system", "⚠ 网络连接失败，请检查网络后重试", false, undefined, undefined, scene);
+    const message = addMessageNotice("⚠ 网络连接失败，请检查网络后重试", target, scene);
     message.retry = () => {
       if (state.currentScene.sceneId !== scene.sceneId) {
         message.text = "请切换回这条消息所属的场景后重试。"; changed(); return;
       }
       removeMessage(message);
-      return send(text, files?.length ? files : null, { isManualRetry: true, requestMessage });
+      return send(text, files?.length ? files : null, { isManualRetry: true, requestMessage, queuedMessage: target });
     };
     message.retryLabel = "重试";
     changed();
   }
 
   function addTimeoutRetryMessage() {
-    const message = addMessage(
-      "system",
-      "等了很久都没有新进展，可能是执行时间较长",
-    );
+    const message = addMessageNotice("等了很久都没有新进展，可能是执行时间较长", currentReplyBubble());
     message.retryLabel = "检查一下";
     message.retry = async () => {
       removeMessage(message);
@@ -1800,7 +1804,8 @@ function createStreamRuntime(state: any, options: any): any {
               pendingReply = null;
               stopCatchUpWatcher();
               removeThinkingIndicator();
-              addMessage("system", "⚠ " + (data.message || "unknown error"));
+              finalizePartialBubble();
+              addMessageNotice("⚠ " + (data.message || "回复失败"), currentReplyBubble());
               isStreaming = false;
               setStatus("error");
               tuiClear();
@@ -1974,7 +1979,7 @@ function createStreamRuntime(state: any, options: any): any {
     } catch (e: any) {
       if (sendOptions.attachmentDelivery) await sendOptions.attachmentDelivery('unknown');
       console.warn("splice send failed:", e);
-      addMessage("system", "⚠️ 发送失败，稍后重试");
+      if (!sendOptions.attachmentDelivery) addMessageNotice("⚠ 发送结果待确认，请核对历史", localMessage);
       return;
     }
     if (sendOptions.attachmentDelivery) await sendOptions.attachmentDelivery(res.ok ? 'accepted' : res.status >= 500 ? 'unknown' : 'failed');
@@ -2003,12 +2008,12 @@ function createStreamRuntime(state: any, options: any): any {
       showThinkingIndicator();
       isStreaming = true;
       updateSendButton();
-      await driveChatStream(res, spliceMsg, [], requestMessage, !!sendOptions.attachmentDelivery);
+      await driveChatStream(res, spliceMsg, [], requestMessage, !!sendOptions.attachmentDelivery, localMessage);
       return;
     }
     // 非 200/202：主动排空 body，别让连接挂着
     res.body?.cancel().catch(() => {});
-    addMessage("system", "⚠️ 发送失败，稍后重试");
+    if (!sendOptions.attachmentDelivery) addMessageNotice("⚠ 服务暂时无法接收消息", localMessage);
   }
 
   async function send(text: any, filesOverride: any = null, sendOptions: any = {}) {
@@ -2060,8 +2065,9 @@ function createStreamRuntime(state: any, options: any): any {
     replayTransportOnly = false;
     setStreamScene(state.currentScene);
 
+    const localMessage = isManualRetry ? sendOptions.queuedMessage
+      : ensureUserMessage(sendOptions.queuedMessage, msg || `[${filesToSend.length} file(s)]`);
     if (!isManualRetry) {
-      const localMessage = ensureUserMessage(sendOptions.queuedMessage, msg || `[${filesToSend.length} file(s)]`);
       // Servers may persist the user body without the transport-only scene cue.
       noteLocalEcho("user", requestMessage || `[${filesToSend.length} file(s)]`, sendingScene, localMessage, [stripSceneTransition(stripClientMessageContext(requestMessage))]);
       if (!fromQueue) clearComposer();
@@ -2104,7 +2110,7 @@ function createStreamRuntime(state: any, options: any): any {
         {
           onRetry: async () => {
             removeThinkingIndicator();
-            showFetchRetryStatus();
+            showFetchRetryStatus(localMessage);
           },
         },
       );
@@ -2112,8 +2118,7 @@ function createStreamRuntime(state: any, options: any): any {
       if (sendOptions.attachmentDelivery) {
         await sendOptions.attachmentDelivery('unknown');
         pendingReply = null; removeThinkingIndicator(); tuiClear();
-        addMessage('system', '附件消息发送结果不确定，请先核对历史；不会自动重发。');
-      } else handleStreamError(e, msg, filesToSend, requestMessage);
+      } else handleStreamError(e, msg, filesToSend, requestMessage, localMessage);
       finalizeSendCleanup();
       return;
     }
@@ -2136,8 +2141,8 @@ function createStreamRuntime(state: any, options: any): any {
     if (!res.ok) {
       pendingReply = null;
       stopCatchUpWatcher();
-      const err = await res.text();
-      addMessage("system", "⚠ " + err);
+      const error = await res.text().catch(() => '');
+      if (!sendOptions.attachmentDelivery) addMessageNotice("⚠ " + (error.trim() || "服务暂时无法接收消息"), localMessage);
       setStatus("error");
       removeThinkingIndicator();
       tuiClear();
@@ -2145,12 +2150,12 @@ function createStreamRuntime(state: any, options: any): any {
       return;
     }
 
-    await driveChatStream(res, msg, filesToSend, requestMessage, !!sendOptions.attachmentDelivery);
+    await driveChatStream(res, msg, filesToSend, requestMessage, !!sendOptions.attachmentDelivery, localMessage);
   }
 
   // 读取循环 + 统一的异常处理 + 统一的收尾。
   // send() 和 spliceSend() 都走这里，保证 isStreaming / 队列 / 按钮在任何路径上都能复位。
-  async function driveChatStream(res: any, msg: any, filesToSend: any, requestMessage = msg, attachmentAccepted = false) {
+  async function driveChatStream(res: any, msg: any, filesToSend: any, requestMessage = msg, attachmentAccepted = false, requestBubble?: Message) {
     let handedOff = false;
     try {
       const result = await consumeChatStream(res);
@@ -2171,8 +2176,11 @@ function createStreamRuntime(state: any, options: any): any {
       }
       return result;
     } catch (e: any) {
-      if (attachmentAccepted) { addMessage('system', '附件消息已被接受，回复连接中断，请刷新历史查看后续回复。'); }
-      else handleStreamError(e, msg, filesToSend, requestMessage);
+      if (attachmentAccepted) {
+        finalizePartialBubble();
+        addMessageNotice('⚠ 回复连接中断，请刷新历史查看后续回复。', currentReplyBubble());
+      }
+      else handleStreamError(e, msg, filesToSend, requestMessage, requestBubble);
       return { outcome: "aborted", streamId: lastStreamId, localSeq: liveSeq };
     } finally {
       if (renderTimer) {
@@ -2198,10 +2206,15 @@ function createStreamRuntime(state: any, options: any): any {
     }
   }
 
+  function currentReplyBubble(): Message | undefined {
+    const message = streamMessage || progressBubbles.at(-1)?.message;
+    if (message?.text && state.items.includes(message)) return message;
+  }
+
   // 统一的流异常处理。注意它**总是**让调用方走 finalizeSendCleanup()：
   // 断线恢复路径靠 pendingRecovery 让 finalizeSendCleanup 跳过队列 flush，
   // 而不是靠"不收尾"——isStreaming 卡在 true 是这次修复要根除的东西。
-  function handleStreamError(e: any, msg: any, filesToSend: any, requestMessage = msg) {
+  function handleStreamError(e: any, msg: any, filesToSend: any, requestMessage = msg, requestBubble?: Message) {
     pendingReply = null;
     stopCatchUpWatcher();
     clearFetchRetryStatus();
@@ -2229,12 +2242,13 @@ function createStreamRuntime(state: any, options: any): any {
         tuiClear();
       } else {
         // 初始连接就失败，消息根本没送出去 → 保留手动重试按钮
-        addNetworkFailureMessage(msg, filesToSend, requestMessage);
+        addNetworkFailureMessage(msg, filesToSend, requestMessage, requestBubble);
         setStatus("error");
         tuiClear();
       }
     } else {
-      addMessage("system", "⚠ " + e.message);
+      finalizePartialBubble();
+      addMessageNotice("⚠ " + e.message, currentReplyBubble() || requestBubble);
       setStatus("error");
       tuiClear();
     }
@@ -2545,7 +2559,7 @@ function createStreamRuntime(state: any, options: any): any {
       for (const item of state.items) if (item.stopMarker) acceptStopMarker(item);
       if (!attempt.confirmed && sameTurn()) {
         const notice = stopNotice && stopNotice.streamId === targetStreamId ? stopNotice.message
-          : addMessage("system", "停止尚未确认，仍在接收回复");
+          : addMessageNotice("停止尚未确认，仍在接收回复", currentReplyBubble());
         stopNotice = { streamId: targetStreamId, message: notice };
         notice.notice = "stop";
         notice.statusRunId = targetRun?.id;
@@ -2702,6 +2716,10 @@ function createStreamRuntime(state: any, options: any): any {
     pendingPersistedGroups.delete(persisted.seq);
     const first = fragments[0].message;
     const members = new Set(fragments.map(fragment => fragment.message));
+    const fragmentIds = new Set(fragments.map(fragment => fragment.message.id));
+    for (const item of state.items) {
+      if (item.kind === 'message' && item.statusMessageId && fragmentIds.has(item.statusMessageId)) item.statusMessageId = first.id;
+    }
     for (const message of members) {
       // Detached references can still be touched by the pending animation/stop;
       // give them their identity too so they cannot register another local echo.
@@ -3047,7 +3065,10 @@ function createStreamRuntime(state: any, options: any): any {
         delete prefetch.history;
       }
       const msgs = await fetchHistory(incremental, await takePrefetch("history"));
-      if (!msgs) return 0;
+      if (!msgs) {
+        if (!disposed && !state.historyLoadFailed) { state.historyLoadFailed = true; changed(); }
+        return 0;
+      }
       let added = 0;
       let toCache = [];
       if (disposed) return 0;
@@ -3085,9 +3106,11 @@ function createStreamRuntime(state: any, options: any): any {
       }
       if (!incremental) historyCacheSeeded = true;
       cacheHistory(toCache, lastHistorySeq);
+      if (state.historyLoadFailed) { state.historyLoadFailed = false; changed(); }
       return added;
     } catch (e: any) {
       console.warn("reconcileHistory failed:", e);
+      if (!disposed && !state.historyLoadFailed) { state.historyLoadFailed = true; changed(); }
       return 0;
     }
   }
@@ -3623,7 +3646,7 @@ function createStreamRuntime(state: any, options: any): any {
         isStreaming = false;
         currentStreamId = null;
         removeThinkingIndicator();
-        addMessage("system", "⚠ " + (eventData.message || "unknown error"));
+        addMessageNotice("⚠ " + (eventData.message || "回复失败"), currentReplyBubble());
         setStatus("error");
         tuiClear();
         actionLogClear();

@@ -1,8 +1,11 @@
-import { createContext, useContext, type ReactNode } from 'react';
+import { ErrorIndicator } from './error-indicator';
+import { createContext, useContext, useLayoutEffect, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import type { BeingFiles } from '../../../shared/being-files';
 import { Icon } from '../icons/icon';
 import { IconButton } from './icon-button';
 import { FileCard } from './file-card';
+import { MessageActionSlot } from './message-action-slot';
 import cardStyles from './file-card.module.scss';
 import styles from './being-files.module.scss';
 
@@ -17,16 +20,27 @@ export function HomeFileLink({ path, children }: { path?: string; children: Reac
 
 export function BeingFilesMessage({ receipt, streaming, source }: { receipt: BeingFiles; streaming: boolean; source: string }) {
   const open = useContext(HomeFileAction);
+  const actions = useContext(MessageActionSlot);
+  const registerExtraActions = actions?.registerExtraActions;
+  const canDownload = !!open && !streaming && !!receipt.files?.length;
+  useLayoutEffect(() => canDownload ? registerExtraActions?.() : undefined, [canDownload, registerExtraActions]);
   if (streaming) return <div className={styles.status} role="status">正在接收文件信息…</div>;
-  if (receipt.error) return <div className={styles.status}><p role="alert">{receipt.error}</p><details><summary>查看原始信息</summary><pre>{source}</pre></details></div>;
+  if (receipt.error) return <div className={styles.status}><ErrorIndicator description={receipt.error} /><details><summary>查看原始信息</summary><pre>{source}</pre></details></div>;
   return <div className={styles.files} data-slot="delivered-files" aria-label="交付文件">
     {receipt.files!.map((file, index) => <FileCard key={`${file.path}:${index}`} path={file.path} name={file.name} size={file.size}
       disabled={!open} title={[file.path, file.caption, open ? '点击预览' : '请在桌面客户端打开'].filter(Boolean).join('\n')}
       onOpen={() => open?.(file.path)}>
-      {open && <IconButton className={cardStyles.download} label={`下载文件：${file.name}`} title="下载文件" onClick={() => open(file.path, 'download')}>
+      {open && !actions && <IconButton className={cardStyles.download} label={`下载文件：${file.name}`} title="下载文件" onClick={() => open(file.path, 'download')}>
         <Icon name="download-wide" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" />
       </IconButton>}
     </FileCard>)}
+    {open && actions?.menu && createPortal(receipt.files!.map((file, index) =>
+      <div key={`${file.path}:${index}`} role="group" aria-label={file.name}>
+        <strong title={file.name}>{file.name}</strong>
+        <button type="button" role="menuitem" onClick={() => open(file.path, 'download')}>
+          <Icon name="chat-download" />下载原件
+        </button>
+      </div>), actions.menu)}
     {!open && <p className={styles.unavailable}>请在桌面客户端打开</p>}
   </div>;
 }

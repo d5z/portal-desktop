@@ -32,13 +32,15 @@
 .trigger.identity {
   @include conversation-control.surface;
 
+  --ui-floating-control-shadow: 0 2px 8px rgb(0 0 0 / 8%);
+  --neutral-raised: var(--neutral-main);
+
   flex-direction: column;
   gap: 3px;
   min-width: 0;
   max-width: min(240px, 100%);
   min-height: 62px;
   padding: 10px 20px;
-
   &[data-idle='true'] {
     min-height: 42px;
   }
@@ -91,7 +93,7 @@
   background: var(--hover, rgb(128 128 128 / 10%));
 }
 
-.trigger:focus-visible,
+.trigger:not(.identity):focus-visible,
 .panel button:focus-visible,
 .panel input:focus-visible {
   @include mixins.focus-ring;
@@ -330,7 +332,7 @@
   }
 }
 
-.trigger,
+.trigger:not(.identity),
 .heading > button {
   transition:
     background-color 150ms ease,

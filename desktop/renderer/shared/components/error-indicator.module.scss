@@ -1,0 +1,76 @@
+@use '../styles/chat-icon-control';
+
+.indicator {
+  display: inline-flex;
+  align-items: center;
+  flex: none;
+  gap: 2px;
+  color: var(--chat-error-icon, var(--chat-on-error, var(--error, #d33145)));
+
+  > :is(.status, .retry) {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    min-height: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    touch-action: manipulation;
+
+    &:hover:not(:disabled) { background: color-mix(in srgb, currentColor 10%, transparent); }
+    &:active:not(:disabled) { background: color-mix(in srgb, currentColor 18%, transparent); }
+
+    :global([data-chat-host='desktop']) & { @include chat-icon-control.feedback(currentColor); }
+    &:focus-visible { outline: 1px solid currentColor; outline-offset: -1px; }
+    &:disabled { opacity: 0.45; cursor: default; }
+  }
+}
+
+.tooltip {
+  position: fixed;
+  inset: auto;
+  width: max-content;
+  max-width: min(280px, calc(100vw - 16px));
+  box-sizing: border-box;
+  margin: 0;
+  padding: 6px 9px;
+  border: var(--chat-menu-border, 1px solid var(--border, #dedede));
+  border-radius: 8px;
+  background: var(--chat-menu-surface, var(--bg, #fff));
+  color: var(--chat-ink, var(--text, #202020));
+  box-shadow: var(--chat-menu-shadow, 0 3px 12px rgb(0 0 0 / 12%));
+  font: 12px/1.5 var(--font-sans, system-ui);
+  overflow: visible;
+  overflow-wrap: anywhere;
+  white-space: normal;
+  text-align: start;
+}
+
+.tooltip::before {
+  position: absolute;
+  inset: -7px 0;
+  content: '';
+}
+
+.description {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+
+@media (pointer: coarse) {
+  .indicator {
+    gap: 6px;
+
+    > :is(.status, .retry) { width: 44px; height: 44px; }
+  }
+}

@@ -3,43 +3,26 @@
   width: 300px;
   border: 0;
   background: var(--chat-received, var(--bg-softer));
-  border-radius: 16px;
+  border-radius: 18px 18px 5px;
   padding: 10px;
 }
 
-/* Use the standard file card rendering with the compact attachment treatment. */
-.attachment-card:is(.attachment-file-card, .attachment-upload-card) {
-  --chat-file-surface: light-dark(#eaeaea, #343434);
-  --chat-file-metadata: light-dark(#595959, #bcbcbc);
-
-  width: min(156px, 100%);
-  min-height: 48px;
-  gap: 6px;
-  padding: 6px 10px;
-  border: 0;
-  border-radius: 16px;
-  background: var(--chat-file-surface);
-
-  .attachment-file-icon {
-    width: 19px;
-    height: 22px;
-    background: transparent;
-    color: var(--chat-file-metadata);
-  }
-
-  .attachment-file-label {
-    gap: 0;
-
-    small {
-      font-size: 10px;
-      color: var(--chat-file-metadata);
-    }
-  }
+.attachment-file-action {
+  display: none;
 }
 
-.message.user .attachment-card:is(.attachment-file-card, .attachment-upload-card) {
-  --chat-file-surface: light-dark(#e9f4ff, #17304b);
-  --chat-file-metadata: light-dark(#466787, #b4cde6);
+.attachment-menu-trigger {
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.attachment-card:hover .attachment-menu-trigger,
+.attachment-card:focus-within .attachment-menu-trigger {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .attachment-menu-trigger { opacity: 1; }
 }
 
 .attachment-image-card {
@@ -54,7 +37,7 @@
   max-width: 100%;
   padding: 0;
   border: 1px solid var(--border);
-  border-radius: 16px;
+  border-radius: 18px 18px 5px;
   overflow: hidden;
   background: var(--bg-soft);
   cursor: zoom-in;
@@ -64,7 +47,7 @@
   display: block;
   width: auto;
   height: auto;
-  max-width: min(320px, 100%);
+  max-width: min(220px, 100%);
   max-height: 320px;
   object-fit: contain;
 }
@@ -155,7 +138,7 @@
 .attachment-image-upload {
   position: relative;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: 18px 18px 5px;
   align-self: flex-end;
 }
 
@@ -193,7 +176,7 @@
   max-width: 100%;
   height: 160px;
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: 18px 18px 5px;
 }
 
 .attachment-image-skeleton::after {
@@ -234,10 +217,6 @@
   justify-content: center;
   margin-bottom: 12px;
   overflow-anchor: none;
-}
-
-.history-page-control:empty {
-  display: none;
 }
 
 .history-page-loading {

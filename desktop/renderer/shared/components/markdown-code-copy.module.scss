@@ -6,13 +6,7 @@
   min-height: 26px;
   padding: 0;
 
-  > svg {
-    display: block;
-  }
-}
-
-:global(.markdown-code-modes) button.copy[data-failed] {
-  color: var(--red);
+  > svg { display: block; width: var(--chat-icon-action, 16px); height: var(--chat-icon-action, 16px); }
 }
 
 .feedback {
@@ -23,3 +17,5 @@
   clip-path: inset(50%);
   white-space: nowrap;
 }
+
+:global(.markdown-code-modes) button.copy[data-failed] { color: var(--chat-error-icon, #d33145); }

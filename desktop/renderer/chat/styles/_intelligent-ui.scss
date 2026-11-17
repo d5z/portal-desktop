@@ -239,6 +239,10 @@
   white-space: normal;
 }
 
+.message.being .message-bubble-body:has(> .intelligent-answer .intelligent-ui) {
+  flex: 1;
+}
+
 .intelligent-ui {
   position: relative;
   width: 100%;
@@ -316,10 +320,6 @@
   width: 5px;
   height: 5px;
   border-radius: 50%;
-  background: var(--green);
-}
-
-.iui-status-dot.generating {
   background: var(--accent);
 }
 

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { FileCard } from './file-card';
 import { localFileReference } from '../../../shared/local-file';
 import { checkLocalFile } from '../services/local-file-availability';
+import { postFilePreview } from '../services/file-preview-bridge';
 
 export const LocalFileAction = createContext<((path: string) => void) | undefined>(undefined);
 
@@ -54,6 +55,5 @@ export function LocalFileLink({ path, children, card = false, inlineCode = false
 
 export function requestLocalFilePreview(path: string) {
   const reference = localFileReference(path);
-  if (reference) window.parent.postMessage({ type: 'beings:local-file-preview', path: reference,
-    revision: new URLSearchParams(location.search).get('revision') }, '*');
+  if (reference) postFilePreview({ type: 'beings:local-file-preview', path: reference });
 }

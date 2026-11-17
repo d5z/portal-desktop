@@ -1,5 +1,3 @@
-@use '../../shared/styles/chat-menu';
-
 /* Attachment originals remain distinct from model-facing parsed context. */
 .attachment-message {
   display: grid;
@@ -145,7 +143,7 @@
   overflow-wrap: anywhere;
 }
 
-.attachment-download button {
+.attachment-download button:not(.chat-error-indicator > button) {
   margin-left: 10px;
 }
 
@@ -186,7 +184,7 @@
   gap: 8px;
 }
 
-.attachment-download button {
+.attachment-download button:not(.chat-error-indicator > button) {
   border: 0;
   border-radius: 6px;
   background: transparent;
@@ -198,11 +196,11 @@
   margin: 0;
 }
 
-.attachment-download button:hover {
+.attachment-download button:not(.chat-error-indicator > button):hover {
   color: var(--text);
 }
 
-.attachment-download button:disabled {
+.attachment-download button:not(.chat-error-indicator > button):disabled {
   opacity: 0.6;
 }
 
@@ -303,6 +301,7 @@
 }
 
 .attachment-file-row {
+  box-sizing: border-box;
   display: flex;
   align-items: center;
   width: 100%;
@@ -313,10 +312,10 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  width: 100%;
+  flex: 1;
   min-width: 0;
   text-align: left;
-  color: var(--text) !important;
+  color: var(--attachment-file-text, var(--text)) !important;
 }
 
 .attachment-file-icon {
@@ -352,97 +351,13 @@
   color: var(--text-dim);
 }
 
-.attachment-menu-trigger {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 24px;
-  height: 24px;
-  padding: 0;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--text-dim);
-  cursor: pointer;
-
-  &:is(:hover, [aria-expanded='true']) { background: var(--hover-overlay); }
-  &:focus-visible { outline: 1px solid currentColor; outline-offset: -1px; }
+.attachment-download .attachment-file-label .attachment-file-metadata {
+  display: none;
 }
 
-.attachment-file-popover[popover] {
-  @include chat-menu.surface;
-  @include chat-menu.popover-presence;
-
-  position: fixed;
-  inset: auto;
-  margin: 0;
-  width: min(248px, calc(100vw - 16px));
-  max-height: calc(100dvh - 16px);
-  overflow: auto;
-  padding: var(--chat-menu-inset, 4px);
-  gap: 2px;
-  color: var(--text);
-  font: 400 13px/20px var(--font-sans);
-  isolation: isolate;
-
-  &:popover-open { display: grid; }
-  &:focus { outline: none; }
-
-  // React Bits GlideSelect-TS-CSS pill, adapted to the menu's row geometry.
-  > .glide-select__pill {
-    position: absolute;
-    z-index: -1;
-    top: 0;
-    inset-inline: var(--chat-menu-inset, 4px);
-    height: 30px;
-    border-radius: var(--chat-menu-row-radius, 7px);
-    background: var(--chat-menu-hover, var(--hover-overlay));
-    opacity: 0;
-    pointer-events: none;
-    transition: transform var(--ui-motion-surface) cubic-bezier(.23, 1, .32, 1), opacity 150ms ease;
-    @media (prefers-reduced-motion: reduce) { transition: none; }
-  }
-
-  [role='menuitem'] { @include chat-menu.action-row; }
-  .attachment-details-content > button { @include chat-menu.action-row; }
-
-  .attachment-details-content > .message-feedback {
-    margin: 0;
-
-    > button {
-      width: 28px;
-      height: 28px;
-      padding: 0;
-      border-radius: 6px;
-    }
-
-    @media (pointer: coarse) {
-      > button { width: var(--touch-target); height: var(--touch-target); }
-    }
-  }
-
-  &[data-gliding] [role='menuitem']:hover:not(:disabled, :active) { background: transparent; }
-  .attachment-details:has(.attachment-segment) { max-height: 380px; overflow: auto; }
-}
-
-.attachment-file-menu-groups,
-.attachment-file-menu-group { display: grid; gap: 2px; }
-
-.attachment-file-menu-group {
-  > strong {
-    padding: 4px var(--space-sm);
-    color: var(--text-dim);
-    font: 500 12px/18px var(--font-sans);
-    overflow-wrap: anywhere;
-  }
-
-  &:only-child > strong { display: none; }
-
-  + .attachment-file-menu-group {
-    margin-top: 4px;
-    padding-top: 4px;
-    border-top: 1px solid var(--border);
-  }
+.attachment-file-action {
+  font-size: 17px;
+  opacity: 0.55;
 }
 
 .message.thinking-indicator.attachment-parsing-indicator {
@@ -526,6 +441,10 @@
   font-weight: 500;
 }
 
+.attachment-file-action {
+  font-size: 15px;
+}
+
 .attachment-audio {
   display: flex;
   flex-wrap: wrap;
@@ -606,4 +525,28 @@
   .attachment-status-spinner {
     animation: none;
   }
+}
+
+
+.attachment-download-progress:has(progress) {
+  display: grid;
+  flex-basis: 100%;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3px 8px;
+
+  > small { grid-area: 1 / 1; margin: 0; }
+  > button { grid-area: 1 / 2; }
+  > progress { grid-column: 1 / -1; }
+}
+
+.attachment-download .attachment-download-progress > button {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+
+  &:hover { background: var(--chat-menu-hover, var(--hover-overlay)); }
+  &:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
 }

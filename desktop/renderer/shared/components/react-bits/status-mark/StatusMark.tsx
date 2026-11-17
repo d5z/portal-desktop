@@ -3,6 +3,7 @@
 import React, { useEffect, useLayoutEffect, useRef, type CSSProperties, type ReactNode } from 'react';
 import { animate, useMotionValue, useReducedMotion } from 'motion/react';
 
+import './StatusMark.css';
 
 export type StatusMarkStatus = 'pending' | 'running' | 'done' | 'failed' | 'cancelled';
 

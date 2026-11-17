@@ -1,13 +1,15 @@
+@use '../../shared/styles/neutral-palette';
+
 :root {
-  --bg: #fff;
-  --composer-surface: #fff;
-  --bg-soft: #f1f2f4;
-  --bg-softer: #ebebed;
-  --border: #e2e5e9;
-  --text: #202322;
-  --text-dim: #62666b;
-  --text-muted: #666b72;
-  --text-ghost: #70756f;
+  --bg: var(--neutral-main);
+  --composer-surface: var(--neutral-main);
+  --bg-soft: var(--neutral-workspace);
+  --bg-softer: var(--neutral-inset);
+  --border: var(--neutral-border);
+  --text: var(--neutral-text);
+  --text-dim: var(--neutral-secondary);
+  --text-muted: var(--neutral-tertiary);
+  --text-ghost: var(--neutral-tertiary);
   --accent: #286197;
   --green: #4c8967;
   --yellow: #a78342;
@@ -15,7 +17,7 @@
   --purple: #827492;
   --accent-rgb: 63, 120, 174;
   --yellow-rgb: 167, 131, 66;
-  --hover-overlay: #2023220a;
+  --hover-overlay: color-mix(in srgb, var(--neutral-text) 4%, transparent);
   --overlay-backdrop: #0004;
   --surface-tint: #00000002;
   --accent-tint: #00000004;
@@ -55,56 +57,24 @@
 
   color-scheme: light;
 
-  --pressed-overlay: #20232214;
-  --chat-reply: #f6f6f6;
-  --chat-sent: #0a8dfe;
-  --chat-send-hover: #087fe9;
-  --chat-send-pressed: #086fd1;
-  --chat-queue-surface: #fcfcfc;
-}
-
-:root:has(.chat-root[data-chat-host='desktop']) {
-  --chat-menu-surface: light-dark(#fff, #252525);
-  --chat-menu-hover: var(--bg-soft);
-  --chat-menu-pressed: var(--pressed-overlay);
-  --chat-menu-radius: 12px;
-  --chat-menu-border: 0;
-  --chat-menu-shadow: 0 4px 16px light-dark(rgb(0 0 0 / 13%), rgb(0 0 0 / 32%));
+  --pressed-overlay: #416f5029;
+  --chat-reply: var(--neutral-workspace);
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --bg: #141414;
-  --composer-surface: #242629;
-  --bg-soft: #25272a;
-  --bg-softer: #303238;
-  --border: #ffffff19;
-  --text: #eceef1;
-  --text-dim: #b0b3b9;
-  --text-muted: #a0a5ae;
-  --text-ghost: #92959a;
+  --bg: var(--neutral-workspace);
+  --bg-soft: var(--neutral-inset);
+  --bg-softer: var(--neutral-raised);
   --accent: #a5cef6;
   --accent-rgb: 165, 206, 246;
   --green: #8bb79a;
-  --hover-overlay: #ffffff12;
-  --pressed-overlay: #ffffff20;
+  --hover-overlay: #b2cfb31f;
+  --pressed-overlay: #b2cfb333;
   --surface-tint: #ffffff02;
   --accent-tint: #ffffff08;
   --accent-border: #597b9e;
   --overlay-backdrop: #0008;
-  --chat-reply: #202020;
-  --chat-sent: #0071f1;
-  --chat-send-hover: #0081eb;
-  --chat-send-pressed: #0069e8;
-  --chat-queue-surface: #25272a;
-}
-
-@media (prefers-contrast: more) {
-  :root,
-  :root[data-theme='dark'] {
-    --chat-sent: #005db7;
-    --chat-send-hover: #0058ae;
-    --chat-send-pressed: #0053a5;
-  }
+  --chat-reply: var(--neutral-main);
 }

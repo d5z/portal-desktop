@@ -1,9 +1,13 @@
-import { Children, useCallback, useId, useRef, useState, type PointerEvent, type ReactNode } from 'react';
+import { Children, useCallback, useContext, useId, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { Icon } from '../icons/icon';
-import { MessageAction } from './message-action-slot';
 import Stack from './react-bits-stack/Stack';
+import { MessageAction, MessageActionSlot } from './message-action-slot';
 
-export function MessageImageGroup({ children, className = '' }: { children: ReactNode; className?: string }) {
+export function MessageImageGroup({ count, className, children }: {
+  count: number;
+  className: string;
+  children: ReactNode;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [firstIndex, setFirstIndex] = useState(0);
   const imagesId = useId();
@@ -13,25 +17,42 @@ export function MessageImageGroup({ children, className = '' }: { children: Reac
   const bindDeck = useCallback((node: HTMLDivElement | null) => {
     deck.current = node;
     node?.firstElementChild?.setAttribute('aria-label', '图片堆叠，方向键翻看');
-    // Keep the rear cards out of the tab order while the deck animates.
-    node?.querySelectorAll<HTMLElement>('[data-stack-card]').forEach(card => { card.inert = !card.hasAttribute('data-top'); });
+    // Stack keeps rear cards mounted for motion. Nested preview buttons still need to leave the tab order.
+    node?.querySelectorAll<HTMLElement>('.stack-card').forEach(card => { card.inert = !card.hasAttribute('data-top'); });
   }, []);
+  const desktop = typeof document !== 'undefined' && document.documentElement.dataset.chatHost === 'desktop';
+  const compact = !!useContext(MessageActionSlot) || desktop;
+  const collage = desktop && document.documentElement.dataset.chatStudy === 'imessage' && count < 4;
+  const toggleLabel = expanded ? '收起图片' : `展开 ${count} 张图片`;
   const cards = Children.toArray(children);
-  const toggleLabel = expanded ? '收起图片' : `展开 ${cards.length} 张图片`;
   const trackPress = (event: PointerEvent) => {
     const start = press.current;
     if (start?.id === event.pointerId && Math.hypot(event.clientX - start.x, event.clientY - start.y) >= (event.pointerType === 'touch' ? 6 : 3)) {
       start.moved = true;
     }
   };
-  return <div className={`message-image-group ${className}`.trim()} role="group" aria-label={`${cards.length} 张图片`}
-    data-expanded={expanded}>
-    {expanded ? <div id={imagesId} className="message-image-stack">{children}</div> :
-      <div ref={bindDeck} id={imagesId} className="message-image-deck"
+  return <div className={`message-image-group ${className}`} role="group" aria-label={`${count} 张图片`}
+    data-count={count} data-expanded={expanded} data-collage={collage || undefined}>
+    <MessageAction><button type="button" className="message-image-toggle" aria-controls={imagesId}
+      aria-label={toggleLabel} title={compact ? toggleLabel : undefined}
+      aria-expanded={expanded} onClick={() => {
+        if (expanded) setFirstIndex(topIndex.current);
+        setExpanded(!expanded);
+      }}>
+      {compact ? <Icon name="chat-chevron-down" width="14" height="14" /> : <>
+        <Icon name="image-rounded" width="16" height="16" />
+        <span>{toggleLabel}</span>
+        <Icon name="chevron-down-20" width="16" height="16" />
+      </>}
+    </button></MessageAction>
+    {desktop && !expanded && !collage
+      ? <div ref={bindDeck} id={imagesId} className="message-image-deck"
         onPointerDownCapture={event => { if (event.isPrimary && event.button === 0) press.current = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false }; }}
         onPointerMoveCapture={trackPress} onPointerUpCapture={trackPress}
         onClickCapture={event => {
-          if (event.detail > 0 && press.current?.moved) { event.preventDefault(); event.stopPropagation(); }
+          if (event.detail > 0 && press.current?.moved) {
+            event.preventDefault(); event.stopPropagation();
+          }
           press.current = null;
         }}>
         <Stack cards={[...cards.slice(firstIndex), ...cards.slice(0, firstIndex)]} shadow={false}
@@ -39,13 +60,7 @@ export function MessageImageGroup({ children, className = '' }: { children: Reac
             topIndex.current = (firstIndex + index) % cards.length;
             bindDeck(deck.current);
           }} />
-      </div>}
-    <MessageAction><button type="button" className="message-image-toggle" aria-controls={imagesId}
-      aria-label={toggleLabel} title={toggleLabel} aria-expanded={expanded} onClick={() => {
-        if (expanded) setFirstIndex(topIndex.current);
-        setExpanded(!expanded);
-      }}>
-      <Icon name="chat-chevron-down" width="14" height="14" />
-    </button></MessageAction>
+      </div>
+      : <div id={imagesId} className="message-image-stack" inert={!expanded && !collage} aria-hidden={!expanded && !collage || undefined}>{children}</div>}
   </div>;
 }

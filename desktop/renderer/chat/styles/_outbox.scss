@@ -1,15 +1,136 @@
-/* Reserve one queue row plus its overlap with the composer. */
-.composer-queue {
-  margin: 0 13px -13px;
-  min-height: 50px;
-  max-height: min(127px, 36dvh);
-  overflow: hidden auto;
-  padding: 4px 10px 0;
+@use '../../shared/styles/chat-icon-control';
+
+/* The upper tray extends behind the Prompt by one corner radius. */
+#composer-dock > .composer-queue-wrap {
+  width: 100%;
+  max-width: none;
+  --queue-tray-radius: var(--chat-prompt-radius, 22px);
+
+  box-sizing: border-box;
+  margin: 0 0 calc(-1 * var(--queue-tray-radius));
+  padding-block-end: var(--queue-tray-radius);
+  border-radius: var(--queue-tray-radius) var(--queue-tray-radius) 0 0;
+  background: var(--chat-queue-surface, var(--bg-soft));
+  box-shadow: inset 0 0 0 1px var(--chat-queue-divider, var(--border));
+}
+
+#composer-dock > .composer-queue-wrap .composer-queue {
+  width: 100%;
+  max-height: var(--chat-queue-max-height, 30dvh);
   overscroll-behavior: contain;
-  border: 1px solid var(--border);
-  border-bottom: 13px solid transparent;
-  border-radius: 22px 22px 0 0;
-  background: var(--chat-queue-surface);
+  border: 0;
+  border-radius: inherit;
+  background: transparent;
+}
+
+#composer-dock > .composer-queue-wrap + #input-area {
+  border-radius: var(--chat-prompt-radius, 22px);
+}
+
+:root[data-chat-host='desktop'] #composer-dock > .composer-queue-wrap {
+  width: auto;
+  margin-inline: 13px;
+}
+
+:root[data-chat-host='desktop'] .composer-queue-wrap {
+  .composer-queue {
+    --queue-action-size: var(--chat-icon-target);
+
+    display: flex;
+    flex-direction: column;
+    gap: var(--chat-content-divider-width);
+    padding: 4px 10px 8px;
+  }
+
+  .composer-queue-item {
+    flex-shrink: 0;
+    height: auto;
+    min-height: calc(var(--queue-action-size) + 4px);
+    gap: var(--space-sm);
+    padding: 2px 0;
+    border: 0;
+    border-radius: var(--radius-sm);
+    color: var(--chat-ink);
+    font: 400 var(--chat-prompt-text-size)/var(--chat-prompt-line-height) var(--chat-reading-font);
+
+    &[data-working], &.dragging { opacity: 0.6; }
+    &.dragging { position: relative; z-index: 1; background: transparent; box-shadow: none; }
+  }
+
+  .composer-queue-leading {
+    display: grid;
+    place-items: center;
+    flex: 0 0 var(--queue-action-size);
+    color: var(--chat-secondary);
+  }
+
+  .composer-queue-row-actions { align-items: center; gap: var(--space-xs); flex-shrink: 0; }
+
+  .composer-queue-item > button,
+  .composer-queue-row-actions button,
+  .composer-queue-copy .chat-error-indicator > button {
+    display: grid;
+    place-items: center;
+    flex: 0 0 var(--queue-action-size);
+    width: var(--queue-action-size);
+    height: var(--queue-action-size);
+    padding: 0;
+    border-radius: var(--space-xs);
+    background: transparent;
+    color: var(--chat-secondary);
+
+    @include chat-icon-control.feedback;
+
+    &:focus-visible { outline: 1px solid var(--chat-secondary); outline-offset: -1px; }
+    &:disabled { color: var(--neutral-disabled); }
+  }
+
+  .composer-queue-copy .chat-error-indicator > button { color: var(--chat-error-icon); }
+
+  .composer-queue-row-actions button.composer-queue-steer {
+    display: inline-flex;
+    flex: none;
+    width: auto;
+    gap: var(--space-xs);
+    padding-inline: var(--space-xs);
+    white-space: nowrap;
+  }
+
+  @media (pointer: coarse) {
+    .composer-queue { --queue-action-size: var(--touch-target); }
+    .composer-queue-item { touch-action: pan-y; }
+    .composer-queue-row-actions button.composer-queue-steer { min-inline-size: var(--touch-target); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .composer-queue-item { transition: none !important; }
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    .composer-queue-item[data-working] .composer-queue-leading > svg { animation: run-spin 900ms linear infinite; }
+  }
+}
+
+.composer-overflow-toggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-xs, 4px);
+  padding: var(--space-xs, 4px) var(--space-sm, 8px);
+  border: 0;
+  border-radius: var(--radius-sm, 8px);
+  background: var(--chat-subtle-surface, var(--bg-soft));
+  color: var(--chat-ink, var(--text));
+  font: inherit;
+  cursor: pointer;
+
+  &:hover { background: var(--chat-menu-hover, var(--hover-overlay)); }
+  &:focus-visible { outline: 1px solid var(--chat-link, var(--accent)); outline-offset: -1px; }
+  &[aria-expanded='true'] > svg { rotate: 180deg; }
+}
+
+@media (pointer: coarse) {
+  .composer-overflow-toggle { min-height: var(--touch-target); }
 }
 
 .chat-local-file-link {

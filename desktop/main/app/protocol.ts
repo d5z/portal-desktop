@@ -16,10 +16,11 @@ const MIME_TYPES: Record<string, string> = {
   '.css': 'text/css',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
+  '.ttf': 'font/ttf',
 };
 
 const CHAT_CONTENT_SECURITY_POLICY = "default-src 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src https: data: blob:; media-src 'self' blob:; connect-src 'self'; font-src 'self'; base-uri 'none'; form-action 'none'; frame-src beings://chat/iui-runtime.html";
-const CHAT_ASSETS = new Set(['loom.html', 'chat.js', 'highlight.css', 'chat.css', 'client-context.html', 'client-context.js', 'iui-runtime.html']);
+const CHAT_ASSETS = new Set(['loom.html', 'chat.js', 'highlight.css', 'chat.css', 'client-context.html', 'client-context.js', 'iui-runtime.html', 'chat-fonts.css', 'NotoSansSC.ttf']);
 
 export function registerLocalProtocol(assets: string, proxy: ChatProxy, plugins?: PluginRegistry, downloads = new AttachmentDownloads(app.getPath('userData'), async current => {
   const result=await dialog.showOpenDialog({title:'选择附件下载位置',defaultPath:current || app.getPath('downloads'),properties:['openDirectory','createDirectory']});

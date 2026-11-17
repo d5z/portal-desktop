@@ -1,18 +1,30 @@
+import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
+import { attachmentProcessing } from './components/attachment-processing';
+import { restrictToFirstScrollableAncestor, restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import { SortableContext, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import { HomeFileAction } from '../shared/components/being-files';
+import { FileName } from '../shared/components/file-name';
+import { beingFileBlocks } from '../../shared/being-files';
+import { imageGenerationBlocks } from '../../shared/image-generation-blocks';
 import { requestHomeFilePreview } from '../shared/services/home-file-preview';
 import { formatBytes } from '../shared/lib/format-bytes';
 import { Icon } from '../shared/icons/icon';
+import { ErrorIndicator } from '../shared/components/error-indicator';
 import { Toast } from '../shared/components/toast';
+import { ImageViewer } from '../shared/components/image-viewer';
+import GradualBlur from '../shared/components/react-bits/GradualBlur';
+import { ChatActionTooltip, ChatTooltipGroup } from '../shared/components/chat-action-tooltip';
 import useMemoizedFn from 'ahooks/es/useMemoizedFn';
 import { useFileDrop } from './hooks/use-file-drop';
 import { useChatViewport } from './hooks/use-chat-viewport';
-import GradualBlur from '../shared/components/react-bits/GradualBlur';
 import { useMessageSelection } from './hooks/use-message-selection';
 import { useChatShortcuts } from './hooks/use-chat-shortcuts';
 import { LocalFileAction, requestLocalFilePreview } from '../shared/components/local-file-link';
 import { SbsControl } from "../shared/components/sbs-control";
 import {useHistoryWindow} from './hooks/use-history-window';
-import { AttachmentMessageContent, hasAttachmentMessage, originalMessageText } from "./components/message-content";
+import { AttachmentMessageContent, AttachmentMessageStatus, hasAttachmentMessage, isPreviewImage, originalMessageText } from "./components/message-content";
+import { attachmentContentURL } from './services/attachment-view';
 import { ImageGenerationAnswer } from './components/image-generation';
 import { SurfaceContext } from '../shared/intelligent-ui/surface-view';
 import { SurfaceTimeline } from '../shared/intelligent-ui/surfaces';
@@ -27,37 +39,39 @@ import {
   Fragment,
   useCallback,
   useEffect,
+  useId,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  type ComponentProps,
   type CSSProperties,
   type ReactNode,
 } from "react";
 import {
   ChatState,
+  type Attachment,
   type ChatRuntime,
   type ChatPanel,
+  type ChatItem,
   type Message,
   type RuntimeOptions,
 } from "./models/chat";
 import { inCurrentScene, isGlobalBeingMessage, sceneItems, sceneName, type HistoryScope } from "./models/scenes";
 import { useModel } from "../shared/hooks/use-model";
-import { CodeClipboard } from "../shared/components/markdown";
+import { CodeClipboard, isImageOnlyMarkdown } from "../shared/components/markdown";
 import { type ComposerHandle } from "../shared/components/rich-composer";
 import { ChatComposer } from "./components/composer";
+import { MessageHoverRow } from './components/message-hover-row';
 import { ComposerSend } from "./components/composer-send";
-import { ComposerQueue } from "./components/composer-queue";
-import { ChatTooltipGroup } from "../shared/components/chat-action-tooltip";
-import { FileName } from "../shared/components/file-name";
 import { ComposerAddMenu } from './components/composer-add-menu';
+import { ComposerQueueContent } from './components/composer-queue-content';
 import { canUseComposerCommand, parseComposerCommands } from './models/composer-commands';
 import {useMessageMenu} from '../shared/components/message-menu';
-import {startsTimeGroup,messageTimeLabel} from '../shared/lib/message-time';
+import {startsTimeGroup,messageTimeLabel,fullMessageTime} from '../shared/lib/message-time';
 import { CopyMessage } from '../shared/components/copy-message';
-import { ChatActivity } from "./components/messages";
-import { MessageError } from './components/message-error';
-import { MessageActionRow } from './components/message-action-row';
+import { TemperatureGlow, ChatActivity } from "./components/messages";
+import { ChatStatusRow, SystemStatusRow } from './components/status-row';
 import { SceneLoading } from './components/scene-loading';
 import { ChatSettings } from "./components/settings";
 import { ChatInfoPanels } from "./components/panels";
@@ -65,8 +79,6 @@ import { EditContextMenu } from "../shared/components/context-menu";
 import { ChatIndex, JumpToLatest } from "./components/navigation";
 import type { ChatBridge } from "./services/bridge";
 import { useChatSession } from "./hooks/use-chat-session";
-
-const actionClock = new Intl.DateTimeFormat('zh-CN', { hour: '2-digit', minute: '2-digit', hour12: false });
 
 class ChatErrorBoundary extends Component<
   { children: ReactNode },
@@ -78,11 +90,9 @@ class ChatErrorBoundary extends Component<
   }
   render() {
     return this.state.failed ? (
-      <div role="alert" className="chat-error">
-        聊天页面加载未完成。
-        <button type="button" onClick={() => location.reload()}>
-          重新加载
-        </button>
+      <div className="chat-error">
+        <ChatStatusRow title="聊天页面加载未完成" tone="error"
+          retry={{ label: '重新加载', run: () => location.reload() }} />
       </div>
     ) : (
       this.props.children
@@ -97,7 +107,61 @@ export function ChatApp({ connection, keywordNavigation = true, mobileWeb = fals
     </ChatErrorBoundary>
   );
 }
-function ChatView({
+function canEditQueuedMessage(item: Message) {
+  return (!item.queuePhase || item.queuePhase === 'queued') && !hasAttachmentMessage(item) && !!item.editQueued;
+}
+
+function QueueRow({ item, index, reorderable, allowInterrupt, onEdit }: {
+  item: Message; index: number; reorderable: boolean; allowInterrupt: boolean;
+  onEdit?: (item: Message) => void;
+}) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } =
+    useSortable({ id: item.id, disabled: { draggable: !reorderable, droppable: !reorderable } });
+  const status = item.queueNotice || (item.queuePhase === 'preparing' ? '正在处理附件' : item.queuePhase === 'sending' ? '正在发送' : '');
+  const failed = (item.queueNotice && item.queueNoticeTone === 'error') || item.queuePhase === 'failed' || !!item.retry;
+  const unconfirmed = item.queuePhase === 'sending' && !!item.queueNotice;
+  const working = !failed && !unconfirmed && (item.queuePhase === 'preparing' || item.queuePhase === 'sending');
+  const parts = item.attachmentViews?.flatMap(view => view.parts.filter(part => part.type === 'attachment')) ?? [];
+  const files = item.attachmentUploads?.length ? item.attachmentUploads : parts;
+  const fileNames = files.map(file => file.name);
+  const imageCount = files.filter(file => isPreviewImage(file.mime)).length;
+  const imageUpload = item.attachmentUploads?.find(file => isPreviewImage(file.mime));
+  const imagePart = parts.find(part => isPreviewImage(part.mime));
+  const text = originalMessageText(item).trim();
+  const label = text.replace(/\s+/g, ' ') || (imageCount ? `${imageCount} 张图片` : fileNames.join('、'));
+  return <div ref={setNodeRef} className={`composer-queue-item${isDragging ? ' dragging' : ''}`} role="listitem"
+    aria-label={[label, ...fileNames.filter(name => !label.includes(name))].filter(Boolean).join('，') || undefined}
+    style={{ transform: CSS.Translate.toString(transform), transition }}
+    data-queue-id={item.id} data-queue-dragging={isDragging || undefined} data-working={working || undefined}>
+    {reorderable ? <button ref={setActivatorNodeRef} className="composer-queue-drag-handle" type="button"
+      aria-label={`调整顺序：${label}`} {...attributes} {...listeners}>
+      <Icon name="chat-grip" width="14" height="14" />
+    </button> : <span className="composer-queue-leading" aria-hidden="true">
+      <Icon name={working ? 'chat-busy' : 'chat-queue'} width="14" height="14" />
+    </span>}
+    <ComposerQueueContent text={text} summary={label} names={fileNames} position={index + 1} dragging={isDragging}
+      status={status && (failed ? <ErrorIndicator description={status} /> : unconfirmed &&
+        <span className="composer-queue-status" role="status" title={status} aria-label={status}>送达未确认</span>)}
+      image={imageUpload?.blob ? { blob: imageUpload.blob } : imagePart ? { src: attachmentContentURL(item.attachmentEndpoint || '', imagePart.attachment_id, true) } : undefined} />
+    {status && !failed && !unconfirmed && <span className="composer-queue-announcement" role="status" aria-label={status}>{status}</span>}
+    <div className="composer-queue-row-actions">
+      {item.retry ? <button type="button" className="composer-queue-steer" disabled={item.queueBusy} aria-label={item.retryLabel || '重试'}
+        onClick={() => void item.retry?.()}><Icon name="chat-retry" width="14" height="14" />重试</button>
+        : !working && !unconfirmed && item.canInterruptQueued && <ChatActionTooltip content="发给正在运行的任务" disabled={!allowInterrupt}>
+          <button type="button" className="composer-queue-steer" disabled={!allowInterrupt} aria-label="引导"
+            onClick={() => void item.interruptQueued?.()}><Icon name="turn-right" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />引导</button>
+        </ChatActionTooltip>}
+      {item.queuePhase !== 'sending' && item.cancelQueued && <button type="button" data-warm-tooltip="取消排队" aria-label={`取消排队：${label}`} disabled={item.queueBusy && item.queuePhase !== 'preparing'} onClick={() => item.cancelQueued?.()}>
+        <Icon name="trash" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      </button>}
+      {!working && !unconfirmed && onEdit && canEditQueuedMessage(item) && <button type="button" data-queue-edit data-warm-tooltip="编辑消息"
+        aria-label={`编辑消息：${label}`} disabled={item.queueBusy} onClick={() => onEdit(item)}>
+        <Icon name="chat-edit" width="14" height="14" />
+      </button>}
+    </div>
+  </div>;
+}
+export function ChatView({
   state,
   runtime,
   bridge,
@@ -122,27 +186,64 @@ function ChatView({
     return () => clearTimeout(timer);
   }, [state.banner, toastHosted]);
   const { viewport, narrow, nativeTouch } = useChatViewport(mobileWeb);
-  const [editingQueued, setEditingQueued] = useState<Message | null>(null);
+  const [editingQueued, setEditingQueued] = useState<{ item: Message; text: string; saving: boolean } | null>(null);
+  const openQueueEditor = useRef<Message | null>(null);
+  const endQueueEdit = useCallback((message: Message) => {
+    if (openQueueEditor.current !== message) return;
+    openQueueEditor.current = null;
+    message.setQueuedEditing?.(false);
+    setEditingQueued(null);
+  }, []);
+  function beginQueueEdit(message: Message) {
+    if (openQueueEditor.current || message.setQueuedEditing?.(true) === false) return false;
+    openQueueEditor.current = message;
+    setEditingQueued({ item: message, text: message.text, saving: false });
+    return true;
+  }
+  async function saveQueueEdit() {
+    if (!editingQueued || editingQueued.saving || !editingQueued.text.trim()) return;
+    const { item, text } = editingQueued;
+    if (text === item.text) { endQueueEdit(item); return; }
+    setEditingQueued({ item, text, saving: true });
+    if (await item.editQueued?.(text)) endQueueEdit(item);
+    else if (openQueueEditor.current === item) setEditingQueued({ item, text, saving: false });
+  }
+  useEffect(() => () => { openQueueEditor.current?.setQueuedEditing?.(false); }, []);
+  const queueSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
   const timelineItems = replyBubbles(sceneItems(withScheduling(state.items.filter(item => item.kind !== "message" || !item.queued), state.sceneTasks), state.historyScope, state.currentScene, state.showSbsMessages));
   const historyWindow=useHistoryWindow(state.historyLoading ? [] : timelineItems,JSON.stringify([state.historyScope,state.currentScene.sceneId,state.showSbsMessages]),before=>runtime.loadOlderHistory(before));
   const visibleItems=historyWindow.items;
   const progressRuns = quietProgressRuns(timelineItems);
+  const visibleBubbleIds = new Set(visibleItems.flatMap(item => item.kind === 'message' && item.role !== 'system' ? item.sourceMessageIds || [item.id] : []));
+  const bubbleNotices = new Map<string, Message[]>();
+  const attachedNoticeIds = new Set<string>();
+  for (const item of visibleItems) {
+    if (item.kind !== 'message' || item.role !== 'system' || !item.statusMessageId || !visibleBubbleIds.has(item.statusMessageId)) continue;
+    const notices = bubbleNotices.get(item.statusMessageId) || [];
+    notices.push(item);
+    bubbleNotices.set(item.statusMessageId, notices);
+    attachedNoticeIds.add(item.id);
+  }
+  const visibleTimeline = attachedNoticeIds.size ? visibleItems.filter(item => !attachedNoticeIds.has(item.id)) : visibleItems;
   const timeGroups=new Set<string>();
   let previousMessageTime:number|undefined;
-  for(const item of visibleItems) if(item.kind==='message') {
+  for(const item of visibleTimeline) if(item.kind==='message') {
     if(startsTimeGroup(item.createdAt,previousMessageTime))timeGroups.add(item.id);
     if(item.createdAt!==undefined&&Number.isFinite(item.createdAt))previousMessageTime=item.createdAt;
   }
   const pendingReveal=useRef<{seq:number;sceneId?:string}|null>(null);
-  const queuedMessages = state.items.filter((item): item is Message => item.kind === 'message' && !!item.queued && item.sceneId === state.currentScene.sceneId);
+  const queuedMessages = state.items.filter((item): item is Message => item.kind === 'message' && !!item.queued &&
+    item.sceneId === state.currentScene.sceneId && (!hasAttachmentMessage(item) || !!item.queuePhase));
+  const visibleQueue = editingQueued ? queuedMessages.filter(item => item !== editingQueued.item) : queuedMessages;
+  const sortableQueue = visibleQueue.filter(item => item.reorderQueued && !item.queueBusy && (!item.queuePhase || item.queuePhase === 'queued'));
+  const queueWriting = editingQueued?.saving || visibleQueue.some(item => item.queueBusy || item.queuePhase === 'sending' || item.queuePhase === 'preparing');
+  const sortableIds = !queueWriting && sortableQueue.length > 1 ? sortableQueue.map(item => item.id) : [];
   useEffect(() => {
-    if (editingQueued && !queuedMessages.includes(editingQueued)) setEditingQueued(null);
-  }, [editingQueued, queuedMessages]);
-  useLayoutEffect(() => {
-    if (!editingQueued) return;
-    const frame = requestAnimationFrame(() => composer.current?.focus());
-    return () => cancelAnimationFrame(frame);
-  }, [editingQueued]);
+    if (editingQueued && !queuedMessages.includes(editingQueued.item)) endQueueEdit(editingQueued.item);
+  }, [editingQueued, queuedMessages, endQueueEdit]);
   const historyEndpoint = useMemo(() => new URLSearchParams(location.search).get('history_scope') || '', []);
   const surfaceTimeline = useRef(new SurfaceTimeline());
   const surfaceScope = (sceneId?: string) => JSON.stringify([historyEndpoint || location.origin, state.soul.being_id || state.name, sceneId || 'global']);
@@ -151,22 +252,75 @@ function ChatView({
   })));
   const surfaceContext = useMemo(() => ({ blocks: surfaceBlocks }), [surfaceBlocks]);
   const currentSceneName = sceneName(state.currentScene, state.currentScene);
-  const [topInset, setTopInset] = useState(0);
-  const chatFrame = useRef<HTMLDivElement>(null),
+  const [pendingPreview, setPendingPreview] = useState<Attachment | null>(null);
+  const [pendingExpanded, setPendingExpanded] = useState(false);
+  const [fittingPendingCount, setFittingPendingCount] = useState<number>();
+  const pendingOverflow = fittingPendingCount === undefined ? 0 : Math.max(0, state.files.length - fittingPendingCount);
+  const pendingList = useRef<HTMLDivElement>(null);
+  const queueTooltipRoot = useRef<HTMLDivElement>(null);
+  const pendingToggle = useRef<HTMLButtonElement>(null);
+  const pendingListId = useId();
+  const isEditingQueue = Boolean(editingQueued);
+  const pendingImages = state.files.flatMap(file => {
+    if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type)) return [];
+    const src = file.previewUrl || (file.base64 && `data:${file.type};base64,${file.base64}`);
+    return src ? [{ file, src, name: file.name }] : [];
+  });
+  const pendingImageIndex = pendingImages.findIndex(image => image.file === pendingPreview);
+  const activePendingImage = pendingImages[pendingImageIndex];
+  useEffect(() => {
+    if (pendingPreview && pendingImageIndex < 0) setPendingPreview(null);
+  }, [pendingPreview, pendingImageIndex]);
+  useLayoutEffect(() => {
+    const list = pendingList.current;
+    const toggle = pendingToggle.current;
+    if (!list || !toggle || isEditingQueue || document.documentElement.dataset.chatHost !== 'desktop') return;
+    const shelf = list.parentElement!;
+    const cards = Array.from(list.children);
+    const measure = () => {
+      const width = shelf.clientWidth;
+      const gap = parseFloat(getComputedStyle(list).columnGap) || 0;
+      const widths = cards.map(card => card.getBoundingClientRect().width);
+      const all = widths.reduce((total, size) => total + size + gap, -gap);
+      if (all <= width) {
+        if (toggle === document.activeElement) {
+          list.querySelector<HTMLButtonElement>('.remove')?.focus({ preventScroll: true });
+        }
+        setFittingPendingCount(widths.length);
+        setPendingExpanded(false);
+        return;
+      }
+      // Reserve the disclosure button only when the complete row cannot fit.
+      let remaining = width - toggle.getBoundingClientRect().width;
+      const firstOverflow = widths.findIndex(size => (remaining -= size + gap) < -0.5);
+      setFittingPendingCount(firstOverflow < 0 ? widths.length : firstOverflow);
+    };
+    const resize = new ResizeObserver(measure);
+    resize.observe(shelf);
+    cards.forEach(card => resize.observe(card));
+    measure();
+    return () => resize.disconnect();
+  }, [state.files.length, isEditingQueue]);
+  const chatApp = useRef<HTMLDivElement>(null),
     messages = useRef<HTMLDivElement>(null),
     composer = useRef<ComposerHandle>(null),
+    composerDock = useRef<HTMLDivElement>(null),
     composerArea = useRef<HTMLDivElement>(null),
-    inputArea = useRef<HTMLDivElement>(null),
-    pendingFiles = useRef<HTMLDivElement>(null),
     fileInput = useRef<HTMLInputElement>(null);
+  const editingQueueItem = editingQueued?.item;
+  const editingWasActive = useRef(false);
+  useLayoutEffect(() => {
+    if (!editingQueued?.saving && (editingQueueItem || editingWasActive.current)) composer.current?.focus();
+    editingWasActive.current = Boolean(editingQueueItem);
+  }, [editingQueueItem, editingQueued?.saving]);
   const messageElements = useRef(new Map<string, HTMLDivElement>());
-  const reader = useMessageScroll(visibleItems, messages, messageElements, composerArea, mobileWeb ? undefined : chatFrame, topInset);
+  const reader = useMessageScroll(visibleItems, messages, messageElements, composerDock);
   const { scrollLock, releaseAnchor } = reader;
   useLayoutEffect(() => {
-    const area = composerArea.current, container = messages.current, frame = chatFrame.current;
-    if (!area || !container || !frame) return;
+    const app = chatApp.current, area = composerDock.current, container = messages.current;
+    if (!app || !area || !container) return;
     const sync = () => {
-      frame.style.setProperty('--chat-composer-height', `${area.getBoundingClientRect().height}px`);
+      app.style.setProperty('--chat-composer-height', `${area.getBoundingClientRect().height}px`);
       if (scrollLock.current) {
         releaseAnchor();
         container.scrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
@@ -177,20 +331,52 @@ function ChatView({
     observer.observe(area);
     return () => observer.disconnect();
   }, [scrollLock, releaseAnchor]);
+  useLayoutEffect(() => {
+    const area = composerArea.current;
+    const row = area?.querySelector<HTMLElement>('#input-row');
+    if (!area || !row) return;
+    const syncLayout = () => {
+      const input = row.querySelector<HTMLElement>('#input');
+      if (!input) return;
+      const paragraph = input.firstElementChild;
+      const isSingleParagraph = input.childElementCount === 1 && paragraph?.tagName === 'P' &&
+        !paragraph.querySelector('br:not(.ProseMirror-trailingBreak)');
+      let expanded = !isSingleParagraph;
+      if (isSingleParagraph && paragraph.textContent) {
+        const range = document.createRange();
+        range.selectNodeContents(paragraph);
+        const text = range.getBoundingClientRect();
+        const style = getComputedStyle(input);
+        const actions = Array.from(row.children).filter(child => !child.classList.contains('chat-composer'));
+        const available = row.clientWidth - actions.reduce((width, child) => width + child.getBoundingClientRect().width, 0)
+          - actions.length * parseFloat(getComputedStyle(row).columnGap)
+          - 2 * (parseFloat(style.getPropertyValue('--chat-prompt-inline-text-inset')) || 0);
+        expanded = text.height > parseFloat(style.lineHeight) + 2 || text.width > available;
+      }
+      area.toggleAttribute('data-long-draft', expanded);
+    };
+    syncLayout();
+    const resize = new ResizeObserver(syncLayout);
+    resize.observe(row);
+    const draft = new MutationObserver(syncLayout);
+    draft.observe(row, { childList: true, subtree: true, characterData: true });
+    return () => { resize.disconnect(); draft.disconnect(); };
+  }, []);
   const scopeScroll = useRef<Partial<Record<HistoryScope, { top: number; locked: boolean }>>>({});
   const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
-  const sendLabel = editingQueued ? "保存修改" : state.sendWillQueue ? (state.canInterruptQueue ? "立即打断并发送" : "加入队列") : "发送消息";
-  const showStop = (state.streaming || state.attachmentPending) && !state.draft.trim() && state.files.length === 0;
+  const hasDraft = !!state.draft.trim() || state.files.length > 0;
+  const readingFiles = state.files.some(file => file.loading);
+  const canSteer = state.streaming && state.canInterruptQueue && !state.attachmentPending;
+  const canChooseFollowUp = canSteer && hasDraft && !state.stopping &&
+    (state.files.length === 0 || location.protocol !== 'beings:');
+  const action = state.stopping || (!hasDraft && (state.streaming || state.attachmentPending)) ? 'stop'
+    : state.sendWillQueue ? canChooseFollowUp ? 'steer' : 'queue' : 'send';
+  const sendLabel = state.stopping ? '正在停止' : action === 'stop' ? '停止处理' : readingFiles ? '正在读取附件'
+    : action === 'steer' ? '引导' : action === 'queue' ? '排队' : '发送消息';
   const configureSubagent = parent !== window && location.protocol === 'beings:' ? () => bridge.send({ type: 'beings:subagent-settings' }) : undefined;
   function sendDraft(mode?: "interrupt") {
-    if (state.stopping) return;
-    if (!parseComposerCommands(state.draft).commands.every(command => canUseComposerCommand(command, state, configureSubagent))) return;
-    if (editingQueued) {
-      const text = state.draft.trim();
-      if (!text) return;
-      void Promise.resolve(editingQueued.editQueued?.(text)).then(() => { state.draft = ""; state.changed(); setEditingQueued(null); composer.current?.focus(); });
-      return;
-    }
+    if (state.stopping || readingFiles) return;
+    if (!parseComposerCommands(state.draft).commands.every(command => canUseComposerCommand(command, state, subagentAction?.run))) return;
     releaseAnchor();
     scrollLock.current = true;
     void runtime.send(state.draft, null, { mode });
@@ -214,6 +400,7 @@ function ChatView({
     [panel, setPanel] = useState<ChatPanel>(null),
     [panelReturnsToSettings, setPanelReturnsToSettings] = useState(false);
   const [readingSize, setReadingSize] = useState(16);
+  const [topInset, setTopInset] = useState(0);
   const [showReasoning, setShowReasoning] = useState(() => {
     try { return localStorage.getItem("beings:show-reasoning") === "true"; } catch { return false; }
   });
@@ -223,7 +410,9 @@ function ChatView({
       : "light",
   );
   const [contextMenuOpen, setContextMenuOpen] = useState(false);
-  const messageMenu=useMessageMenu(bridge.copyText,JSON.stringify([state.currentScene.sceneId,state.historyScope]),'chat');
+  const messageMenu=useMessageMenu(bridge.copyText,JSON.stringify([state.currentScene.sceneId,state.historyScope]));
+  const activeMenuMessageId = messageMenu.opener?.closest('[data-message-id]')?.getAttribute('data-message-id');
+  const attachmentMenuMessageId = messageMenu.attachmentOpener?.closest('[data-message-id]')?.getAttribute('data-message-id');
   const { selection, setSelection, addToChat } = useMessageSelection(messages, composer, nativeTouch);
   useChatShortcuts(bridge, !contextMenuOpen && !messageMenu.isOpen && !nativeTouch ? selection?.text : undefined, addToChat, isMac);
   const [subagentEnabling, setSubagentEnabling] = useState(false);
@@ -236,6 +425,11 @@ function ChatView({
     if (!ok) setSubagentEnableFailed(true);
     setSubagentEnabling(false);
   }
+  const subagentAction = configureSubagent && (state.subagentConfigured !== true ? { label: '去配置', run: configureSubagent }
+    : state.subagentEnabled === false ? {
+        label: subagentEnabling ? '正在启用…' : subagentEnableFailed ? '重试启用' : '启用',
+        run: () => { void enableSubagent(); },
+      } : undefined);
   useEffect(() => {
     const search = new ConversationSearch((path, init) => runtime.request(path, init));
     const abort = new AbortController();
@@ -346,12 +540,12 @@ function ChatView({
   };
   return (
     <SurfaceContext.Provider value={surfaceContext}>
+    <ChatTooltipGroup>
     <CodeClipboard.Provider value={bridge.copyText}>
     <HomeFileAction.Provider value={location.protocol === "beings:" && parent !== window ? requestHomeFilePreview : undefined}>
     <LocalFileAction.Provider value={location.protocol === "beings:" && parent !== window ? requestLocalFilePreview : undefined}>
     <div
       className={`chat-root${parent === window ? " standalone-chat" : ""}${showIntelligentUI ? " has-ui-examples" : ""}`}
-      data-chat-host={mobileWeb ? "web" : "desktop"}
       style={
         {
           "--reading-size": `${readingSize}px`,
@@ -378,10 +572,11 @@ function ChatView({
         }
       }}
     >
+      {!mobileWeb && <TemperatureGlow items={visibleItems} />}
       <div id="drop-zone" className={dragging ? "active" : ""}>
         松开以添加附件
       </div>
-      <div id="app" ref={chatFrame} inert={(nativeTouch && panel === 'model') || (showIntelligentUI && narrow)}>
+      <div id="app" ref={chatApp} inert={(nativeTouch && panel === 'model') || (showIntelligentUI && narrow)}>
         <header id="header">
           <SbsControl known={state.sbsKnown} enabled={state.sbsEnabled} origin={state.sbsStreamingOrigin} phase={state.sbsActivityPhase}
             showContent={state.showSbsMessages} allScenes={state.historyScope==='all'}
@@ -402,7 +597,7 @@ function ChatView({
             title="Beings Town"
             aria-label="Beings Town"
           >
-            <Icon name="settings-town" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            ⌂
           </a>
           <button
             className="btn-icon"
@@ -410,7 +605,7 @@ function ChatView({
             onClick={() => setPanel("privacy")}
             aria-label="隐私说明"
           >
-            <Icon name="permission-shield" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            🛡
           </button>
           <button
             id="settings-btn"
@@ -419,7 +614,7 @@ function ChatView({
             onClick={() => parent !== window && location.protocol === "beings:" ? bridge.send({ type: "beings:model-settings" }) : setPanel("model")}
             aria-label="模型设置"
           >
-            <Icon name="settings-models" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" />
+            ⚙
           </button>
         </header>
         {parent === window && <div className="chat-history-scope">
@@ -434,54 +629,75 @@ function ChatView({
               : "包含未标记场景的历史对话"}
           </span>
         </div>}
-        <ChatTooltipGroup anchorRoot={messages}><div
-          id="messages"
-          data-warm-tooltip-scope
-          ref={messages}
-          tabIndex={0}
-          aria-label="对话消息"
-          aria-busy={state.historyLoading || state.historyRefreshing}
-          onWheel={reader.onWheel}
-          onTouchStart={reader.onTouchStart}
-          onTouchMove={reader.onTouchMove}
-          onScroll={() => { reader.onScroll(); setSelection(null); if(!state.historyLoading && messages.current && messages.current.scrollTop<Math.max(800,messages.current.clientHeight*1.5) && !scrollLock.current && historyWindow.hasMore)void historyWindow.more(); }}
-        >
+        {(() => {
+          const viewportProps: ComponentProps<'div'> = {
+            id: 'messages', ref: messages, tabIndex: 0, 'aria-label': '对话消息',
+            'aria-busy': state.historyLoading || state.historyRefreshing,
+            onWheel: reader.onWheel, onTouchStart: reader.onTouchStart, onTouchMove: reader.onTouchMove,
+            onScroll: () => { reader.onScroll(); setSelection(null); if(!state.historyLoading && messages.current && messages.current.scrollTop<Math.max(800,messages.current.clientHeight*1.5) && !scrollLock.current && historyWindow.hasMore)void historyWindow.more(); },
+          };
+          const before = <>
           {state.historyLoading && <SceneLoading sceneName={currentSceneName} />}
           {!state.historyLoading && state.historyRefreshing && <div className="chat-refresh-overlay"><div className="chat-refresh-status" role="status"><span aria-hidden="true" />正在刷新对话…</div></div>}
-          {!state.historyLoading && !state.historyRefreshing && !visibleItems.some(item => item.kind === "message") && !state.thinking && (
-            <div className="chat-scope-empty">
-              <Icon name="chat-outline" width="24" height="24" fill="none" stroke="currentColor" strokeWidth="1.5" />
-              <strong>{state.historyScope === "current" ? "当前场景还没有对话。" : "暂无对话记录。"}</strong>
-              <p>在下方发一条消息，开始对话。</p>
-              {state.historyScope === "current" && <button type="button" onClick={() => changeScope("all")}>显示全部场景上下文</button>}
+          {!state.historyLoading && !state.historyRefreshing && state.historyLoadFailed && (
+            <div className="chat-scope-empty" role="status">
+              <span>{visibleItems.length ? '暂时无法更新对话，已保留现有记录。' : '暂时无法读取对话记录。'}</span>
+              <button type="button" onClick={() => void runtime.refreshHistory()}>重试读取记录</button>
+            </div>
+          )}
+          {!state.historyLoading && !state.historyRefreshing && !state.historyLoadFailed && !visibleItems.some(item => item.kind === "message") && !state.thinking && (
+            <div className="chat-scope-empty" role="status">
+              {state.historyScope === "current" ? "当前场景还没有对话。" : "暂无对话记录。"}
+              {state.historyScope === "current" && <button type="button" onClick={() => changeScope("all")}>查看所有场景的消息</button>}
             </div>
           )}
           <div className="history-page-control">
             {historyWindow.loading && <div className="history-page-loading" role="status"><span aria-hidden="true" />正在加载更早的消息…</div>}
           </div>
-          {visibleItems.map((item) =>
-            item.kind === "separator" ? (
+          </>;
+          const renderItem = (item: ChatItem, index: number) => {
+            const previous = visibleItems[index - 1];
+            if (item.kind === "separator") return (
               <div
                 key={item.id}
                 className={item.marker ? "breath-marker" : "time-gap"}
               >
                 {item.text}
               </div>
-            ) : item.kind === "run" ? (
+            );
+            if (item.kind === "run") return (
               <ChatActivity
                 key={item.id}
                 run={item}
                 showDetails={showReasoning}
                 showProgress={progressRuns.has(item.id)}
+                errorAlreadyShown={previous?.kind === "message" && previous.role === "system" &&
+                  previous.sceneId === item.sceneId && previous.text.startsWith("⚠")}
                 sceneLabel={state.historyScope === "all" ? sceneName(item, state.currentScene, state.sceneNames) : undefined}
               />
-            ) : item.notice === 'stop' ? (
-              <div key={item.id} className="chat-inline-notice" role="status">
-                {!item.retry && <Icon name="chat-stop" width="16" height="16" />}
-                <span>{item.retry ? '停止请求尚未确认' : item.text}</span>
-                {item.retry && <MessageError reason="仍在接收回复，可再次停止。" retryLabel={item.retryLabel} retry={() => void item.retry?.()} />}
-              </div>
-            ) : (
+            );
+            if (attachedNoticeIds.has(item.id)) return null;
+            const attachment = hasAttachmentMessage(item);
+            const processing = attachment ? attachmentProcessing(item) : null;
+            const notices = (item.sourceMessageIds || [item.id]).flatMap(id => bubbleNotices.get(id) || []);
+            let text = splitSchedulingHint(attachment ? originalMessageText(item) : item.text).text;
+            if (item.role === 'being') {
+              if (text.includes('being.image-generation')) {
+                text = imageGenerationBlocks(text).filter(block => block.kind === 'text').map(block => block.text).join('\n');
+              }
+              const files = beingFileBlocks(text);
+              if (files.length) text = files.filter(block => block.kind === 'text').map(block => block.text).join('\n');
+            }
+            const info = {
+              text: text.trim() && (attachment || !isImageOnlyMarkdown(text)) ? text : '',
+              time: item.createdAt,
+              fallbackTime: item.timestamp,
+            };
+            const instant = info.time === undefined ? undefined : new Date(info.time);
+            const dateTime = instant && Number.isFinite(instant.getTime()) ? instant.toISOString() : undefined;
+            const exactTime = fullMessageTime(info.time, info.fallbackTime);
+            const shortTime = exactTime.match(/\d{1,2}:\d{2}/)?.[0];
+            return (
               <Fragment key={item.id}>
               {timeGroups.has(item.id)&&item.createdAt!==undefined&&<time className="message-time-divider" dateTime={new Date(item.createdAt).toISOString()}>{messageTimeLabel(item.createdAt)}</time>}
               <div
@@ -496,27 +712,41 @@ function ChatView({
                 data-reply-id={item.replyId}
                 className={`message ${item.role}${item.persistedFrom === "partial" ? " message-partial" : ""}${item.consecutive ? " consecutive" : ""}${(highlighted === item.id || item.sourceMessageIds?.includes(highlighted || "")) ? " index-target" : ""}`}
               >
+                {item.role === "system" ? <SystemStatusRow item={item}
+                  sceneLabel={state.historyScope === "all" ? sceneName(item, state.currentScene, state.sceneNames) : undefined}>
+                  <CopyMessage appearance="chat" text={item.text} copy={bridge.copyText} />
+                </SystemStatusRow> : <>
                 <div className={`meta${item.consecutive ? " time-only" : ""}`}>
-                  {item.role === "system" && <span>系统消息</span>}
                   {state.historyScope === "all" && !isGlobalBeingMessage(item) && <span className="message-scene" title={item.sceneId || "这条历史消息未提供场景标记"}>{sceneName(item, state.currentScene, state.sceneNames)}</span>}
                 </div>
-                <MessageActionRow media={!mobileWeb} actions={<>
-                  {item.createdAt !== undefined && Number.isFinite(item.createdAt) && <time className="message-action-time">{actionClock.format(item.createdAt)}</time>}
-                  {originalMessageText(item).trim() && <CopyMessage appearance="chat" text={splitSchedulingHint(originalMessageText(item)).text} copy={bridge.copyText} />}
-                  {mobileWeb && <button type="button" className="message-more" data-message-more={item.id} aria-label="更多消息操作"
-                    data-warm-tooltip={messageMenu.trigger === item.id ? undefined : '更多消息操作'}
-                    aria-haspopup="menu" aria-expanded={messageMenu.trigger === item.id}
-                    onClick={event => messageMenu.showMenu(event.currentTarget, {
-                      text: splitSchedulingHint(originalMessageText(item)).text, time: item.createdAt, fallbackTime: item.timestamp,
-                    })}>
-                    <Icon name="chat-more" width="14" height="14" />
-                  </button>}
-                  {!mobileWeb && item.retry && <MessageError reason={item.queueNotice} retryLabel={item.retryLabel} retry={() => void item.retry?.()} />}
-                </>}>
-                  <div className="message-bubble-body" tabIndex={0} role="group" aria-label={`${item.role === "user" ? "你" : item.label}的消息`} aria-haspopup="menu"
-                    onContextMenu={event=>messageMenu.openMenu(event,{text:splitSchedulingHint(originalMessageText(item)).text,time:item.createdAt,fallbackTime:item.timestamp})}
-                    onKeyDown={event=>messageMenu.openMenu(event,{text:splitSchedulingHint(originalMessageText(item)).text,time:item.createdAt,fallbackTime:item.timestamp})}>
-                    {hasAttachmentMessage(item) ? <AttachmentMessageContent message={item} /> : <ImageGenerationAnswer
+                <MessageHoverRow sent={item.role === 'user'}
+                  bodyProps={hasExtraActions => ({ className: 'message-bubble-body', tabIndex: 0, role: 'group',
+                    'aria-label': `${item.role === 'user' ? '你' : item.label}的消息`, 'aria-haspopup': info.text || hasExtraActions ? 'menu' : undefined,
+                    onContextMenu: event => messageMenu.openMenu(event, { ...info, hasExtraActions }),
+                    onKeyDown: event => messageMenu.openMenu(event, { ...info, hasExtraActions }),
+                  })}
+                  menu={attachmentMenuMessageId === item.id ? messageMenu.attachmentTarget : null}
+                  feedback={<div className="message-feedback">
+                    {notices.map(notice => <SystemStatusRow key={notice.id} item={notice} inActions />)}
+                    {attachment ? <AttachmentMessageStatus message={item} processing={processing} /> : item.retry &&
+                      <ChatStatusRow title={item.queueNotice || '消息需要处理'} tone="error" inActions
+                        retry={{ label: item.retryLabel || '重试', run: () => void item.retry?.() }} />}
+                  </div>}
+                  actions={(mediaActions, hasExtraActions) => <div className="message-hover-actions" data-message-actions>
+                    {shortTime && <time className="message-hover-time" title={exactTime} dateTime={dateTime}>{shortTime}</time>}
+                    <div className="message-hover-buttons">
+                      {info.text && <CopyMessage appearance="chat" text={info.text} copy={bridge.copyText} />}
+                      {hasExtraActions && <ChatActionTooltip content="更多消息操作" disabled={activeMenuMessageId === item.id}>
+                        <button type="button" className="message-more" aria-label="更多消息操作"
+                          aria-haspopup="menu" aria-expanded={activeMenuMessageId === item.id}
+                          onClick={event => messageMenu.showMenu(event.currentTarget, { ...info, hasExtraActions }, { more: true })}>
+                          <Icon name="chat-more" width="16" height="16" />
+                        </button>
+                      </ChatActionTooltip>}
+                      {mediaActions}
+                    </div>
+                  </div>}>
+                    {attachment ? <AttachmentMessageContent message={item} processing={processing} /> : <ImageGenerationAnswer
                       text={item.role === 'being' ? item.text : ''}
                       streaming={item.streaming}
                       endpoint={historyEndpoint}
@@ -537,82 +767,128 @@ function ChatView({
                       onSnapshot={(text, _values, _apps, active) => { state.recordIntelligentUISnapshot(item.sceneId || 'global', text, active); }}
                       streaming={item.streaming}
                       chat
-                      onPlace={item.role === "system" || !keywordNavigation ? undefined : openPlace}
+                      onPlace={!keywordNavigation ? undefined : openPlace}
                     />}</ImageGenerationAnswer>}
-                  </div>
-                </MessageActionRow>
-                {mobileWeb && item.retry && <MessageError reason={item.queueNotice} retryLabel={item.retryLabel} retry={() => void item.retry?.()} />}
+                </MessageHoverRow>
+                </>}
               </div>
               </Fragment>
-            ),
-          )}
-        </div></ChatTooltipGroup>
-        {!mobileWeb && <>
-          <GradualBlur className="chat-edge-blur chat-edge-top" position="top"
-            height="calc(48px + var(--chat-top-inset, 0px))" strength={0.75} tint="var(--chat-edge-tint)" />
-          <GradualBlur className="chat-edge-blur chat-edge-bottom" position="bottom"
-            height="calc(var(--chat-composer-clearance) + var(--chat-composer-blur-lead))" strength={1} tint="var(--chat-edge-tint)" />
+            );
+          };
+          return <div {...viewportProps}>{before}{visibleItems.map(renderItem)}</div>;
+        })()}
+        {document.documentElement.dataset.chatHost === 'desktop' && <>
+          <GradualBlur className="chat-edge-blur" position="top"
+            height="calc(48px + var(--chat-top-inset, 0px))" strength={0.75} layers={6} autoHide container={messages}
+            curve="bezier" exponential={false} tint="var(--chat-edge-tint)" duration={0} zIndex={2} />
+          <GradualBlur className="chat-edge-blur" position="bottom"
+            height="calc(var(--chat-composer-clearance) + var(--chat-composer-blur-lead))" strength={1} layers={6} autoHide container={messages}
+            curve="bezier" exponential={false} tint="var(--chat-edge-tint)" duration={0} zIndex={2} />
         </>}
         {!toastHosted && <Toast message={connectionNotice} />}
-        <ChatIndex items={visibleItems.map(item=>item.kind==='message' && hasAttachmentMessage(item) ? {...item,text:originalMessageText(item)} : item)} container={messages} elements={messageElements} scrollLock={scrollLock} clearAnchor={releaseAnchor} highlight={setHighlighted} />
-        <div className="composer-stack" ref={composerArea}>
+        <ChatIndex items={visibleTimeline.map(item=>item.kind==='message' && hasAttachmentMessage(item) ? {...item,text:originalMessageText(item) || '附件消息'} : item)} container={messages} elements={messageElements} scrollLock={scrollLock} clearAnchor={releaseAnchor} highlight={setHighlighted} />
+        <div id="composer-dock" ref={composerDock}>
           {!state.historyLoading && <JumpToLatest trimHistory={historyWindow.toLatest} status={reader} container={messages} scrollLock={scrollLock} clearAnchor={releaseAnchor} />}
-          {queuedMessages.length > 0 && <ComposerQueue items={queuedMessages} allowInterrupt={state.canInterruptQueue && !state.stopping}
-            onEdit={item => { state.draft = item.text; state.changed(); setEditingQueued(item); }} />}
-          <ChatTooltipGroup anchorRoot={inputArea}><div id="input-area" ref={inputArea} data-warm-tooltip-scope onWheel={event => {
-            if (event.deltaY >= 0 || !messages.current) return;
-            const input = event.target instanceof HTMLElement ? event.target.closest('#input') as HTMLElement | null : null;
-            if (input && input.scrollTop > 0) return;
-            event.preventDefault();
-            messages.current.scrollBy({ top: event.deltaY, behavior: 'auto' });
-          }}>
-            {state.intelligentUIForMessage && state.intelligentUITargetTitle && <div className="iui-context-target" role="status"><span>修改「{state.intelligentUITargetTitle}」<small>将携带原界面和当前选择</small></span><button type="button" aria-label="取消本条界面修改" onClick={() => state.setIntelligentUIForMessage(false)}>×</button></div>}
-            <ChatTooltipGroup anchorRoot={pendingFiles}><div data-warm-tooltip-scope ref={pendingFiles}
-              id="pending-files"
-              className={state.files.length ? "active" : ""}
-            >
-              {state.files.map((file, i) => (
-                <div className="pending-file" key={`${file.name}-${i}`}>
-                  {/^image\/(png|jpeg|gif|webp)$/.test(file.type) && (file.previewUrl || file.base64) ? (
-                    <img
-                      className="pending-file-preview"
-                      src={file.previewUrl || `data:${file.type};base64,${file.base64}`}
-                      alt=""
-                    />
-                  ) : (
-                    <span className="pending-file-icon" aria-hidden="true">
-                      <Icon name={file.type.startsWith("image/") ? "image-rounded" : "file"} width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" />
-                    </span>
-                  )}
-                  <span className="pending-file-label">
-                    <FileName name={file.name} />
-                    <small>{formatBytes(file.size)} · {file.loading ? '正在读取…' : '待发送'}</small>
-                  </span>{" "}
-                  <button
-                    className="remove" data-warm-tooltip="移除附件"
-                    type="button"
-                    aria-label={`移除 ${file.name}`}
-                    onClick={() => runtime.removePending(i)}
-                  >
-                    <Icon name="chat-close" width="10" height="10" />
-                  </button>
+          {visibleQueue.length > 0 && <ChatTooltipGroup anchorRoot={queueTooltipRoot}><div ref={queueTooltipRoot} className="composer-queue-wrap" data-warm-tooltip-scope>
+            <DndContext sensors={queueSensors} collisionDetection={closestCenter}
+              modifiers={[restrictToVerticalAxis, restrictToFirstScrollableAncestor]}
+              accessibility={{ screenReaderInstructions: { draggable: '按空格键提起，使用上下方向键移动。按空格键放下，按 Esc 取消。' } }}
+              onDragEnd={({ active, over }) => {
+                if (over && active.id !== over.id && sortableIds.includes(String(over.id))) {
+                  void sortableQueue.find(item => item.id === active.id)?.reorderQueued?.(String(over.id));
+                }
+              }}>
+              <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
+                <div className="composer-queue" role="list" aria-label={`待发送消息，共 ${visibleQueue.length} 条`}>
+                  {visibleQueue.map((item, index) => <QueueRow key={item.id} item={item} index={index}
+                    reorderable={sortableIds.includes(item.id)} allowInterrupt={canSteer && !state.stopping}
+                    onEdit={editingQueued ? undefined : beginQueueEdit} />)}
                 </div>
-              ))}
-            </div></ChatTooltipGroup>
-            {editingQueued && <div className="composer-editing-queue" role="status"><span>正在编辑排队消息</span><button type="button" onClick={() => { state.draft = ""; state.changed(); setEditingQueued(null); composer.current?.focus(); }}>取消编辑</button></div>}
+              </SortableContext>
+            </DndContext>
+          </div></ChatTooltipGroup>}
+          <ChatTooltipGroup anchorRoot={composerArea}><div id="input-area" ref={composerArea} data-warm-tooltip-scope data-queue-editing={editingQueued ? '' : undefined}
+            onKeyDown={event => {
+              if (!editingQueued || event.key !== 'Escape' || event.nativeEvent.isComposing || event.keyCode === 229) return;
+              event.preventDefault();
+              event.stopPropagation();
+              if (!editingQueued.saving) endQueueEdit(editingQueued.item);
+            }} onWheel={event => {
+              if (event.deltaY >= 0 || !messages.current) return;
+              if (event.target instanceof Element && event.target.closest('#pending-files')) return;
+              const input = event.target instanceof HTMLElement ? event.target.closest('#input') as HTMLElement | null : null;
+              if (input && input.scrollTop > 0) return;
+              event.preventDefault();
+              messages.current.scrollBy({ top: event.deltaY, behavior: 'auto' });
+            }}>
+            {!editingQueued && state.intelligentUIForMessage && state.intelligentUITargetTitle && <div className="iui-context-target" role="status"><Icon name="chat-spark" width="16" height="16" /><span title={`修改「${state.intelligentUITargetTitle}」`}>修改「{state.intelligentUITargetTitle}」</span><button type="button" aria-label="取消本条界面修改" data-warm-tooltip="取消本条界面修改" onClick={() => state.setIntelligentUIForMessage(false)}><Icon name="chat-close" width="14" height="14" /></button></div>}
+            <div
+              id="pending-files"
+              className={!editingQueued && state.files.length ? "active" : ""}
+              hidden={!!editingQueued}
+              role="group"
+              aria-label="待发送附件"
+              data-expanded={pendingExpanded}
+            >
+              <button type="button" ref={pendingToggle} hidden={!pendingOverflow} className="composer-overflow-toggle pending-files-toggle"
+                aria-expanded={pendingExpanded} aria-controls={pendingListId} onClick={() => {
+                  if (pendingExpanded && pendingList.current) pendingList.current.scrollTop = 0;
+                  setPendingExpanded(!pendingExpanded);
+                }}>
+                {pendingExpanded ? '收起附件' : `另有 ${pendingOverflow} 份附件`}<Icon name="chat-chevron-down" width="14" height="14" />
+              </button>
+              <ChatTooltipGroup anchorRoot={pendingList}><div className="pending-files-list" id={pendingListId} ref={pendingList} data-warm-tooltip-scope>
+                {state.files.map((file, i) => {
+                  const preview = pendingImages.find(image => image.file === file)?.src;
+                  const mediaType = file.type.split('/', 1)[0];
+                  const icon = mediaType === 'audio' ? 'chat-audio' : mediaType === 'image' ? 'chat-image' : 'chat-file';
+                  return <div className={`pending-file${preview ? " pending-file-image" : ""}`} key={`${file.name}-${i}`}
+                    inert={!pendingExpanded && fittingPendingCount !== undefined && i >= fittingPendingCount}>
+                    <div className="pending-file-content" title={!preview && !file.loading ? `${file.name} · ${formatBytes(file.size)}` : undefined}>
+                      {preview ? <button className="pending-file-open" type="button" aria-label={`预览 ${file.name}`}
+                        data-warm-tooltip="预览图片" onClick={() => setPendingPreview(file)}>
+                        <img className="pending-file-preview" src={preview} alt="" draggable={false} />
+                      </button>
+                        : <>
+                          <Icon className="pending-file-icon" name={icon} width="18" height="18" />
+                          <span className="pending-file-label">
+                            <FileName name={file.name} />
+                            <small className={file.loading ? undefined : 'pending-file-size'} role={file.loading ? 'status' : undefined}>{file.loading ? '正在读取…' : formatBytes(file.size)}</small>
+                          </span>
+                        </>}
+                      <button className="remove" type="button" aria-label={`移除 ${file.name}`} title="" data-warm-tooltip="移除附件" onClick={event => {
+                        const list = event.currentTarget.closest('#pending-files');
+                        runtime.removePending(i);
+                        requestAnimationFrame(() => {
+                          const controls = list?.querySelectorAll<HTMLButtonElement>('.pending-file:not([inert]) .remove');
+                          (controls?.[i] ?? controls?.[i - 1] ?? (pendingToggle.current?.hidden ? null : pendingToggle.current) ?? composer.current)?.focus();
+                        });
+                      }}>
+                        <Icon name="chat-close" width="14" height="14" />
+                      </button>
+                    </div>
+                  </div>;
+                })}
+              </div></ChatTooltipGroup>
+            </div>
             <div id="input-row">
+              {!editingQueued && <ComposerAddMenu state={state} onUpload={() => fileInput.current?.click()} onSelect={() => requestAnimationFrame(() => composer.current?.focus())}
+                subagentAction={subagentAction}/>}
               <ChatComposer
                 state={state}
                 onExamples={openExamples}
-                onConfigureSubagent={configureSubagent}
+                subagentAction={subagentAction}
                 key={state.currentScene.sceneId || "global"}
                 textareaRef={composer}
                 id="input"
                 rows={1}
                 className={state.queued ? "queued" : ""}
                 placeholder="消息"
-                aria-label="message input"
-                aria-keyshortcuts={isMac ? "Enter Control+Enter Meta+Enter Shift+Enter" : "Enter Control+Enter Shift+Enter"}
+                queueEdit={editingQueued ? { text: editingQueued.text, onChange: text =>
+                  setEditingQueued(edit => edit?.item === editingQueued.item && !edit.saving ? { ...edit, text } : edit) } : undefined}
+                disabled={editingQueued?.saving}
+                aria-label={editingQueued ? "编辑待发消息" : "消息输入框"}
+                aria-keyshortcuts={editingQueued ? "Enter Shift+Enter Escape" : isMac ? "Enter Control+Enter Meta+Enter Shift+Enter" : "Enter Control+Enter Shift+Enter"}
                 onCompositionStart={() => {
                   composing.current = true;
                 }}
@@ -621,6 +897,13 @@ function ChatView({
                   compositionEnd.current = Date.now();
                 }}
                 onKeyDown={(event) => {
+                  if (event.key === 'ArrowUp' && !editingQueued && !hasDraft && !event.defaultPrevented &&
+                      !event.shiftKey && !event.altKey && !event.metaKey && !event.ctrlKey &&
+                      !composing.current && !event.nativeEvent.isComposing && event.keyCode !== 229) {
+                    const last = visibleQueue.at(-1);
+                    if (last && !last.queueBusy && canEditQueuedMessage(last) && beginQueueEdit(last)) event.preventDefault();
+                    return;
+                  }
                   if (
                     event.key !== "Enter" ||
                     event.shiftKey ||
@@ -633,28 +916,33 @@ function ChatView({
                     return;
                   event.preventDefault();
                   if (event.repeat) return;
-                  sendDraft(event.ctrlKey || (isMac && event.metaKey) ? undefined : "interrupt");
+                  if (editingQueued) { void saveQueueEdit(); return; }
+                  if (!hasDraft) return;
+                  const alternate = event.ctrlKey || (isMac && event.metaKey);
+                  sendDraft(canChooseFollowUp && !alternate ? 'interrupt' : undefined);
                 }}
               />
-              <ComposerAddMenu state={state} onUpload={() => fileInput.current?.click()} onSelect={() => requestAnimationFrame(() => composer.current?.focus())}
-                onConfigureSubagent={configureSubagent}
-                onEnableSubagent={parent !== window && location.protocol === 'beings:' ? () => { void enableSubagent(); } : undefined}
-                subagentEnabling={subagentEnabling} subagentEnableFailed={subagentEnableFailed}/>
-              <ComposerSend
-                action={showStop ? "stop" : state.sendWillQueue && !editingQueued ? (state.canInterruptQueue ? "steer" : "queue") : "send"}
-                label={state.stopping ? "正在停止" : showStop ? "停止处理" : sendLabel}
-                disabled={state.stopping || (!showStop && !state.draft.trim() && !state.files.length)}
-                stopping={state.stopping}
-                alternate={!showStop && !editingQueued && state.sendWillQueue && state.canInterruptQueue ? {
-                  label: "加入队列", shortcut: isMac ? "⌘ ↵" : "Ctrl ↵",
-                  key: isMac ? "Meta+Enter Control+Enter" : "Control+Enter", run: () => { sendDraft(); composer.current?.focus(); },
-                } : undefined}
-                onSubmit={() => {
-                  if (showStop) void runtime.stopCurrentTurn();
-                  else sendDraft("interrupt");
-                  composer.current?.focus();
-                }}
-              />
+              {editingQueued ? <div className="composer-queue-edit-actions">
+                {editingQueued.item.queueNoticeTone === 'error' && editingQueued.item.queueNotice &&
+                  <ErrorIndicator description={editingQueued.item.queueNotice} />}
+                <button type="button" className="btn-icon" data-queue-save aria-busy={editingQueued.saving}
+                  aria-label={editingQueued.saving ? '正在保存修改' : '保存修改'} data-warm-tooltip="保存修改" data-warm-tooltip-shortcut="↵"
+                  disabled={editingQueued.saving || !editingQueued.text.trim()} onClick={() => void saveQueueEdit()}>
+                  <Icon name={editingQueued.saving ? 'chat-busy' : 'chat-check'} width="18" height="18" />
+                </button>
+              </div> :
+                <ComposerSend label={sendLabel} action={action} mobileWeb={mobileWeb}
+                  disabled={state.stopping || (action !== 'stop' && (!hasDraft || readingFiles))} stopping={state.stopping}
+                  alternate={canChooseFollowUp ? {
+                    label: '排队', shortcut: isMac ? '⌘ ↵' : 'Ctrl ↵', key: isMac ? 'Meta+Enter Control+Enter' : 'Control+Enter',
+                    run: () => { sendDraft(); composer.current?.focus(); },
+                  } : undefined}
+                  onSubmit={() => {
+                    if (action === 'stop') void runtime.stopCurrentTurn();
+                    else sendDraft(action === 'steer' ? 'interrupt' : undefined);
+                    composer.current?.focus();
+                  }} />
+              }
             </div>
             <input
               ref={fileInput}
@@ -670,6 +958,17 @@ function ChatView({
           </div></ChatTooltipGroup>
         </div>
       </div>
+      {activePendingImage &&
+        <ImageViewer src={activePendingImage.src} name={activePendingImage.name}
+          onClose={() => setPendingPreview(null)} actions={null}
+          navigation={pendingImages.length > 1 ? {
+            index: pendingImageIndex,
+            total: pendingImages.length,
+            items: pendingImages,
+            select: index => setPendingPreview(pendingImages[index].file),
+            previous: () => setPendingPreview(pendingImages[pendingImageIndex - 1].file),
+            next: () => setPendingPreview(pendingImages[pendingImageIndex + 1].file),
+          } : undefined} />}
       {showIntelligentUI && <IntelligentUIExamples example={uiExample} overlay={narrow} onSelect={setUIExample} onClose={closeExamples}
         onContinue={text => { state.draft = text; state.changed(); closeExamples(); }}/>}
       <ChatSettings
@@ -700,6 +999,7 @@ function ChatView({
     </LocalFileAction.Provider>
     </HomeFileAction.Provider>
     </CodeClipboard.Provider>
+    </ChatTooltipGroup>
     </SurfaceContext.Provider>
   );
 }

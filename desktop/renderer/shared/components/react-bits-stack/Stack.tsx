@@ -10,7 +10,7 @@ import type {
 import { animate, motion, motionValue, useReducedMotion } from 'motion/react';
 import type { MotionValue, ValueAnimationTransition } from 'motion/react';
 
-import styles from './Stack.module.scss';
+import './Stack.css';
 
 type Layout = 'fan' | 'cascade' | 'deck' | 'pile';
 type Vector = [number, number];
@@ -621,7 +621,7 @@ export default function Stack({
   return (
     <div
       ref={rootRef}
-      className={`${styles.stack} ${className}`.trim()}
+      className={`stack ${className}`.trim()}
       style={style}
       tabIndex={0}
       role="group"
@@ -640,8 +640,7 @@ export default function Stack({
               if (element) elementsRef.current.set(index, element);
               else elementsRef.current.delete(index);
             }}
-            data-stack-card
-            className={styles.card}
+            className="stack-card"
             data-top={isTop ? '' : undefined}
             aria-hidden={isTop ? undefined : true}
             style={{
@@ -659,7 +658,7 @@ export default function Stack({
             onPointerDown={event => onDown(event, index)}
           >
             <motion.div
-              className={styles.face}
+              className="stack-card-face"
               style={{
                 rotateX: values.tiltX,
                 rotateY: values.tiltY,
@@ -674,10 +673,10 @@ export default function Stack({
                 boxShadow: shadow ? SHADOW : 'none'
               }}
             >
-              <div className={styles.content} style={{ borderRadius: innerRadius }}>
+              <div className="stack-card-content" style={{ borderRadius: innerRadius }}>
                 {card}
               </div>
-              <motion.div className={styles.shade} style={{ opacity: values.shade, borderRadius: radius }} />
+              <motion.div className="stack-card-shade" style={{ opacity: values.shade, borderRadius: radius }} />
             </motion.div>
           </motion.div>
         );

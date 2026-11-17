@@ -86,38 +86,20 @@
 }
 
 .chat-scope-empty {
-  display: grid;
-  justify-items: center;
-  gap: 8px;
-  padding: clamp(16px, 8dvh, 64px) 12px;
+  padding: 48px 12px;
   text-align: center;
   color: var(--text-dim);
   font-size: 13px;
 }
 
-.chat-scope-empty svg {
-  margin-bottom: 4px;
-}
-
-.chat-scope-empty strong {
-  color: var(--text);
-  font-size: 16px;
-  font-weight: 600;
-}
-
-.chat-scope-empty p {
-  margin: 0;
-}
-
 .chat-scope-empty button {
-  min-height: 32px;
-  margin-top: 4px;
+  display: block;
+  margin: 12px auto 0;
   border: 0;
   background: none;
   color: var(--text);
   font: inherit;
   text-decoration: underline;
-  text-underline-offset: 3px;
   cursor: pointer;
 }
 
@@ -208,6 +190,8 @@ button.step2-back {
 .message-bubble-body {
   min-width: 0;
 }
+
+.message-action-space { display: contents; }
 
 /* The row owns the width limit; do not apply the role's percentage again inside it. */
 .message:is(.user, .being, .system) .message-bubble-body > .content,
@@ -341,4 +325,79 @@ label.chat-scope-switch input {
   accent-color: var(--accent);
 }
 
-/* Interrupted prose stays readable; the turn status is shown once below it. */
+.message-hover-actions {
+  position: relative;
+  flex: 0 0 56px;
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  color: var(--text-muted);
+  opacity: 0;
+  pointer-events: none;
+
+  @media (prefers-reduced-motion: no-preference) {
+    transition: opacity 0.15s;
+  }
+}
+
+.message-bubble-row:focus-within .message-hover-actions,
+.message-bubble-row:has(.message-bubble-body:hover, .message-hover-actions:hover, .message-more[aria-expanded='true']) .message-hover-actions {
+  opacity: 1;
+  pointer-events: auto;
+
+  &::before {
+    position: absolute;
+    inset-block: 0;
+    inset-inline-end: 100%;
+    width: 8px;
+    content: '';
+  }
+}
+
+.message.user .message-hover-actions::before {
+  inset-inline: 100% auto;
+}
+
+.message-hover-time {
+  color: var(--text-muted);
+  font-size: 11px;
+  line-height: 14px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.message-hover-buttons {
+  display: flex;
+  align-items: center;
+
+  button {
+    flex: 0 0 28px;
+    width: 28px;
+    height: 28px;
+    padding: 6px;
+    border: 0;
+    border-radius: 7px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    pointer-events: inherit;
+
+    &:hover { background: var(--bg-soft); }
+    &:focus-visible { outline: 2px solid var(--accent); }
+  }
+}
+
+.message-more {
+  display: grid;
+  place-items: center;
+}
+
+@media (hover: none) {
+  .message-hover-actions {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .message-hover-time { display: none; }
+}

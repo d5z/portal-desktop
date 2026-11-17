@@ -14,6 +14,7 @@ import {
   type ReactElement,
   type ReactNode
 } from 'react';
+import './Folder.css';
 
 export interface FolderItem {
   title?: string;
