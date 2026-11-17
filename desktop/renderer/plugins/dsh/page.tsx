@@ -1,3 +1,4 @@
+import { SmallMenuDetails } from '../../shared/components/small-menu-details';
 import { WorkspaceDrawer, DrawerPresence } from "../../shared/components/workspace-drawer";
 import { createPortal } from 'react-dom';
 import { Icon } from '../../shared/icons/icon';
@@ -147,10 +148,10 @@ function DshPluginContent({ degraded = false }: { degraded?: boolean }) {
 
           <div className="dsh-detail-summary"><details><summary>插件信息</summary><p>{selected.description}</p></details><div className="dsh-actions">
             <button className="secondary" disabled={busy || formState.busy || (!selected.enabled && !canActivate)} onClick={() => requestLeave(() => void act(() => api!.enable(selected.id, !selected.enabled), selected.id))}>{selected.enabled ? '停用' : '启用'}</button>
-            <details className="dsh-more"><summary>管理</summary><div>
+            <SmallMenuDetails className="dsh-more" summary="管理" surfaceClassName="dsh-more-actions" inline>
               <button disabled={busy || formState.busy || !canActivate} onClick={() => requestLeave(() => void act(() => api!.install(selected.source), selected.id))}>更新／重新安装</button>
               <button className="danger-action" disabled={busy || formState.busy} onClick={() => requestLeave(() => void act(async () => { const removed = await api!.remove(selected.id); if (removed !== false) runtime.openManager(); return removed; }))}>卸载</button>
-            </div></details>
+            </SmallMenuDetails>
           </div></div>
           {selectedIssue && <div id={`dsh-issue-${selected.id}`} className="dsh-plugin-issue" tabIndex={-1} role="group" aria-label={`${selected.id}：${selectedIssue.title}`} aria-describedby={`dsh-reason-${selected.id}`}><Icon name="info-20" /><div><strong>{selectedIssue.title}</strong><p id={`dsh-reason-${selected.id}`}>{selectedIssue.reason}</p>{selectedIssue.detail && <details><summary>查看错误详情</summary><p>{selectedIssue.detail}</p></details>}</div></div>}
 

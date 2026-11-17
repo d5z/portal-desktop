@@ -1,15 +1,16 @@
 import { useEffect, useRef, useState } from 'react';
 import { MAX_HOME_PREVIEW, type HomeFileEntry, type HomeFilesAPI } from '../../../shared/home';
 import { FileTypeIcon } from '../../shared/components/file-type-icon';
+import TiltedCard from '../../shared/components/react-bits/TiltedCard';
 import { loadPdfDocument } from './pdf-document';
 import styles from './home-library.module.scss';
 
 const pendingPreviews = new Map<Element, () => void>();
 let thumbnailObserver: IntersectionObserver | undefined;
 
-export function HomeFileThumbnail({ file, api }: { file: HomeFileEntry; api?: HomeFilesAPI }) {
+export function HomeFileThumbnail({ file, api, onOpen }: { file: HomeFileEntry; api?: HomeFilesAPI; onOpen?: () => void }) {
   const host = useRef<HTMLDivElement>(null);
-  const [thumbnail, setThumbnail] = useState<string>();
+  const [thumbnail, setThumbnail] = useState<{ url: string; width: number; height: number }>();
   const { name, path, size } = file;
 
   useEffect(() => {
@@ -42,7 +43,12 @@ export function HomeFileThumbnail({ file, api }: { file: HomeFileEntry; api?: Ho
       }
       if (disposed || !blob) return;
       objectUrl = URL.createObjectURL(blob);
-      setThumbnail(objectUrl);
+      const image = new Image();
+      image.src = objectUrl;
+      await image.decode();
+      if (disposed) return;
+      const scale = Math.min(104 / image.naturalWidth, 76 / image.naturalHeight);
+      setThumbnail({ url: objectUrl, width: image.naturalWidth * scale, height: image.naturalHeight * scale });
     };
 
     thumbnailObserver ??= new IntersectionObserver((entries, observer) => {
@@ -74,8 +80,12 @@ export function HomeFileThumbnail({ file, api }: { file: HomeFileEntry; api?: Ho
     };
   }, [api, name, path, size]);
 
-  return <div className={styles.thumbnail} ref={host} aria-hidden="true">
-    {api && thumbnail ? <img src={thumbnail} alt="" decoding="async" onError={() => setThumbnail(undefined)} />
-      : <FileTypeIcon path={path} className={styles.fileTypeIcon} glyph="chat-file" />}
+  const fallback = <FileTypeIcon path={path} className={styles.fileTypeIcon} glyph="chat-file" />;
+  const previewLabel = `预览缩略图：${name}`;
+  return <div className={styles.thumbnail} ref={host}>
+    {api && thumbnail ? <TiltedCard imageSrc={thumbnail.url} altText={name} captionText={previewLabel}
+      containerWidth={104} containerHeight={76} imageWidth={thumbnail.width} imageHeight={thumbnail.height}
+      radius={6} shadow={0.2} showTooltip={false} onClick={onOpen} />
+      : onOpen ? <button type="button" className={styles.thumbnailPreview} aria-label={previewLabel} onClick={onOpen}>{fallback}</button> : fallback}
   </div>;
 }

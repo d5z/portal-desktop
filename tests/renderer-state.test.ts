@@ -388,7 +388,7 @@ describe("React desktop state lifecycle", () => {
       }
     } finally { vi.unstubAllGlobals(); }
   });
-  it("announces the scene context only when a session change enters another scene", async () => {
+  it("updates scene context without showing a toast when switching or renaming", async () => {
     vi.useFakeTimers();
     const original = { scene_id: "desktop-original", scene_meta: { client: "portal-desktop", scene_label: "日常对话" } };
     const discussion = { scene_id: "desktop-discussion", scene_meta: { client: "portal-desktop", scene_label: "方案讨论" } };
@@ -403,11 +403,12 @@ describe("React desktop state lifecycle", () => {
     app.navigate("bonfire");
 
     await app.changeChatSession("select", discussion.scene_id);
-    expect(app.toastMessage).toBe("已切到「方案讨论」场景");
+    expect(app.snapshot?.chatScene?.scene_meta.scene_label).toBe("方案讨论");
+    expect(app.toastMessage).toBe("");
     expect(app.view).toBe("bonfire");
 
-    app.toastMessage = "";
     await app.changeChatSession("rename", "技术方案", discussion.scene_id);
+    expect(app.snapshot?.chatScene?.scene_meta.scene_label).toBe("技术方案");
     expect(app.toastMessage).toBe("");
   });
   it("returns to the main scene without closing the right page from the Being shortcut", async () => {

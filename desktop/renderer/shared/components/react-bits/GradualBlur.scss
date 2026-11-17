@@ -1,0 +1,19 @@
+.gradual-blur {
+  position: absolute;
+  z-index: 2;
+  inset-inline: 0;
+  pointer-events: none;
+
+  &[data-edge='top'] {
+    inset-block-start: 0;
+  }
+
+  &[data-edge='bottom'] {
+    inset-block-end: 0;
+  }
+
+  > div {
+    position: absolute;
+    inset: 0;
+  }
+}

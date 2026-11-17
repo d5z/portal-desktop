@@ -352,13 +352,17 @@
   display: none;
 }
 
-.iui-menu > button {
+.iui-menu-surface {
   position: absolute;
   z-index: 2;
   right: 0;
   top: 30px;
-  min-width: 80px;
-  box-shadow: 0 4px 12px #0001;
+  transform-origin: top right;
+
+  > button {
+    min-width: 80px;
+    box-shadow: 0 4px 12px #0001;
+  }
 }
 
 .iui-body {

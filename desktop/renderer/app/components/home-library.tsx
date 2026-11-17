@@ -3,15 +3,18 @@ import { formatBytes } from '../../shared/lib/format-bytes';
 import { Icon } from '../../shared/icons/icon';
 import { useContext, useEffect, useId, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { motion, useReducedMotion } from 'motion/react';
 import type { HomeAPI } from '../../../shared/home';
 import { useModel } from '../../shared/hooks/use-model';
 import { FileTypeIcon } from '../../shared/components/file-type-icon';
+import Folder from '../../shared/components/react-bits/Folder';
 import { LocalFileAction } from '../../shared/components/local-file-link';
 import { homeRecentFiles, type RecentFile } from '../models/home-recent-files';
 import { HomeLibrary } from '../models/home-library';
 import styles from './home-library.module.scss';
 import { HomeFilePanel } from './home-file-panel';
 import { HomeFileThumbnail } from './home-file-thumbnail';
+const folderPapers = [{}, {}];
 const viewModes = [['grid', '网格视图', 'lucide-layout-grid'], ['list', '列表视图', 'lucide-list']] as const;
 
 function LibraryListIcon({ name, directory }: { name: string; directory?: boolean }) {
@@ -33,6 +36,8 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
     try { return localStorage.getItem('beings:home-files-view') === 'list' ? 'list' : 'grid'; }
     catch { return 'grid'; }
   });
+  const reduce = useReducedMotion();
+  const tileMotion = { layout: reduce ? false as const : 'position' as const, layoutDependency: view };
   const list = view === 'list';
   const tabId = useId();
   const [tip, setTip] = useState<{ path: string; source: RecentFile['source']; left: number; top: number; width: number; above: boolean } | null>(null);
@@ -76,7 +81,7 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
   const parts = model.path ? model.path.split('/') : [];
   return <div className={styles.library}>
     <div className={styles.toolbar}>
-    <div className={styles.tabs} data-tab={tab} role="tablist" aria-label="资料库内容" onKeyDown={event => {
+    <div className={styles.tabs} role="tablist" aria-label="资料库内容" onKeyDown={event => {
       if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
       event.preventDefault();
       const next = event.key === 'Home' ? 'recent' : event.key === 'End' ? 'workspace' : tab === 'recent' ? 'workspace' : 'recent';
@@ -86,6 +91,7 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
       {([['recent', '最近'], ['workspace', '工作区']] as const).map(([key, label]) =>
         <button type="button" role="tab" key={key} id={`${tabId}-${key}-tab`} data-tab={key} aria-selected={tab === key}
           aria-controls={`${tabId}-${key}`} tabIndex={tab === key ? 0 : -1} onClick={() => setTab(key)}>
+          {tab === key && <motion.span className={styles.tabIndicator} layoutId={reduce ? undefined : `${tabId}-indicator`} />}
           {label}
         </button>)}
     </div>
@@ -105,9 +111,10 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
     </div>
     <section role="tabpanel" id={`${tabId}-recent`} aria-labelledby={`${tabId}-recent-tab`} hidden={tab !== 'recent'}>
       {!recent.entries.length && <p className={styles.recentEmpty}>打开本机或云电脑中的文件后，会显示在这里。</p>}
-      <ul className={styles.fileGrid} data-layout={view} aria-label="最近的文件">{recent.entries.map(entry => <li className={styles.tile} key={`${entry.source}:${entry.path}`} onMouseLeave={() => setTip(null)}>
+      <ul className={styles.fileGrid} data-layout={view} aria-label="最近的文件">{recent.entries.map(entry => <motion.li {...tileMotion} className={styles.tile} key={`${entry.source}:${entry.path}`} onMouseLeave={() => setTip(null)}>
           {list ? <LibraryListIcon name={entry.name} /> : entry.source === 'cloud'
-            ? <HomeFileThumbnail file={entry} api={active && tab === 'recent' ? api.files : undefined} />
+            ? <HomeFileThumbnail file={entry} api={active && tab === 'recent' ? api.files : undefined}
+                onOpen={model.busy ? undefined : () => { setTip(null); void model.open(entry); }} />
             : <span className={styles.thumbnail}><FileTypeIcon path={entry.path} className={styles.fileTypeIcon} glyph="chat-file" /></span>}
         <button className={styles.tileButton} type="button" disabled={entry.source === 'local' ? !openLocal : model.busy}
           aria-describedby={hovered === entry ? `${tabId}-file-tip` : undefined}
@@ -116,7 +123,7 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
           <span className={styles.fileName}>{entry.name}</span><span className={styles.fileSource}>{entry.source === 'local' ? '本机' : '云电脑'}</span>
         </button>
         <IconButton className={`${styles.iconButton} ${styles.tileAction}`} label={`从最近记录移除：${entry.name}`} title="移除最近" onMouseEnter={() => setTip(null)} onFocus={() => setTip(null)} onClick={() => { setTip(null); recent.remove(entry.path, entry.source); }}><Icon name="lucide-trash" /></IconButton>
-      </li>)}</ul>
+      </motion.li>)}</ul>
     </section>
     <section role="tabpanel" id={`${tabId}-workspace`} aria-labelledby={`${tabId}-workspace-tab`} hidden={tab !== 'workspace'}>
     {parts.length > 0 && <div className={styles.heading}>
@@ -131,23 +138,27 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
     </label>
     {model.error && <div className={styles.feedback} role="alert"><p>{model.error}</p><div><button type="button" disabled={model.loading || model.busy} onClick={() => void model.load()}>重试</button><button type="button" onClick={onConnect}>前往电脑栏</button></div></div>}
     <p className={styles.status} role="status" hidden={!model.busy && !model.loading && !model.notice}>{model.busy ? '正在保存文件…' : model.loading ? '正在读取工作区…' : model.notice || (model.loaded ? `${entries.length} 项${query ? '匹配结果' : ''}` : '')}</p>
-    {model.loaded && !entries.length && <div className={styles.empty}>
+    {model.loaded && !entries.length && <motion.div className={styles.empty}
+      initial={query || reduce ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.12 }}>
       <Icon name="lucide-folder" />
       <strong>{query ? '没有匹配的文件' : '这个文件夹还是空的'}</strong>
       <p>{query ? '试试其他名称，或清除搜索。' : 'Being 生成的文件会出现在这里。'}</p>
       {query && <button type="button" onClick={() => setQuery('')}>清除搜索</button>}
-    </div>}
+    </motion.div>}
     <ul className={styles.fileGrid} data-layout={view} aria-label="工作区文件" aria-busy={model.loading}>{entries.map(entry => (
-      <li className={`${styles.tile} ${entry.type === 'directory' ? styles.folderTile : ''}`} key={entry.path}>
+      <motion.li {...tileMotion} className={`${styles.tile} ${entry.type === 'directory' ? styles.folderTile : ''}`} key={entry.path}>
         {entry.type === 'directory' ? <>
           {list ? <LibraryListIcon name={entry.name} directory />
-            : <span className={styles.folderThumb} aria-hidden="true"><i /><i /></span>}
+            : <Folder items={folderPapers} size={0.42} theme={document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'}
+              openOn="hover" compactOpen openPaperInset={14} tilt={0.15} bounce={0} intro={false}
+              draggable={false} zoomOnClick={false} onItemClick={() => { if (!model.busy) navigate(entry.path); }} />}
           <button className={styles.folderName} type="button" title={entry.name} disabled={model.busy} onClick={() => navigate(entry.path)}>
             <span className={styles.fileName}>{entry.name}</span>
           </button>
         </> : <>
           {list ? <LibraryListIcon name={entry.name} />
-            : <HomeFileThumbnail file={entry} api={active && tab === 'workspace' ? api.files : undefined} />}
+            : <HomeFileThumbnail file={entry} api={active && tab === 'workspace' ? api.files : undefined}
+              onOpen={model.busy ? undefined : () => void model.open(entry)} />}
           <button className={styles.tileButton} type="button" title={entry.name} disabled={model.busy} onClick={() => void model.open(entry)}>
             <span className={styles.fileName}>{entry.name}</span>
             <small className={styles.fileSize}>{formatBytes(entry.size)}</small>
@@ -157,7 +168,7 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
             <Icon name="chat-download" />
           </IconButton>
         </>}
-      </li>
+      </motion.li>
     ))}</ul>
     </section>
     {active && tab === 'recent' && tip && hovered && createPortal(<div id={`${tabId}-file-tip`} role="tooltip" className={styles.fileTooltip}

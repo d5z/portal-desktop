@@ -42,23 +42,8 @@
   --chat-file-metadata: light-dark(#466787, #b4cde6);
 }
 
-.attachment-code-icon {
-  font-size: 17px;
-  font-weight: 600;
-}
-
 .attachment-file-action {
   display: none;
-}
-
-.attachment-menu summary {
-  opacity: 0;
-  transition: opacity 0.12s;
-}
-
-.attachment-card:hover .attachment-menu summary,
-.attachment-card:focus-within .attachment-menu summary {
-  opacity: 1;
 }
 
 .attachment-image-card {

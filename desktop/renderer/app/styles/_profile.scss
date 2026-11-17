@@ -839,13 +839,9 @@
     0 2px 5px #00000006,
     0 10px 28px #00000012;
   transform-origin: bottom right;
-  animation: being-content-enter 160ms ease-out both;
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .being-computer-menu {
-    animation: none;
-  }
   .being-tabs button,
   .being-info-close {
     transition: none;

@@ -1,4 +1,6 @@
 import { AttachmentDownload } from './attachment-download';
+import { AnimatePresence } from 'motion/react';
+import { CollapsibleMotion } from '../../shared/components/animate-ui/collapsible-motion';
 import { useEffect, useRef, useState } from 'react';
 import type { AttachmentPart } from '../services/attachment-messages';
 import { parsedPage } from '../services/attachment-view';
@@ -32,13 +34,13 @@ export function AttachmentDetails({part, endpoint}: {part: AttachmentPart; endpo
     finally { if (!controller.current.signal.aborted) setBusy(false); }
   };
   return <div className="attachment-details">
-    <button type="button" onClick={() => { setOpen(!open); if (!open && !loaded) void load(); }}>{open ? '收起解析内容' : '查看解析内容'}</button>
-    {open && <div>
+    <button type="button" role="menuitem" aria-expanded={open} onClick={() => { setOpen(!open); if (!open && !loaded) void load(); }}>{open ? '收起解析内容' : '查看解析内容'}</button>
+    <AnimatePresence>{open && <CollapsibleMotion className="attachment-details-content">
       {segments.map((s, i) => <div className="attachment-segment" key={i}><small>{locationLabel(s.location, i)}</small><pre>{s.text}</pre></div>)}
       {error && <p role="alert">{error}</p>}
       {(!loaded || cursor) && <button type="button" disabled={busy} onClick={() => void load()}>{busy ? '正在读取…' : error ? '重试读取' : '继续查看'}</button>}
       {loaded && !cursor && <p>当前版本已全部显示</p>}
       {report && <AttachmentDownload endpoint={endpoint} id={part.attachment_id} artifact={report} name="content.md">下载完整解析文件</AttachmentDownload>}
-    </div>}
+    </CollapsibleMotion>}</AnimatePresence>
   </div>;
 }

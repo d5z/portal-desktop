@@ -4,6 +4,8 @@ import {parsedPage} from '../services/attachment-view';
 import {AttachmentDownload} from './attachment-download';
 import {AttachmentDetails} from './attachment-details';
 import {useAttachmentDownloadBridge} from './use-attachment-download-bridge';
+import { MessageAction } from './message-action-row';
+import { MessageError } from './message-error';
 export function AttachmentFilePreview({part,endpoint}:{part:AttachmentPart;endpoint:string}) {
   const [busy,setBusy]=useState(false),[error,setError]=useState('');
   const controller=useRef(new AbortController());
@@ -40,6 +42,7 @@ export function AttachmentFilePreview({part,endpoint}:{part:AttachmentPart;endpo
     finally{if(!controller.current.signal.aborted)setBusy(false);}
   }
   return <><AttachmentDownload onDownloaded={()=>setError('')} endpoint={endpoint} id={part.attachment_id} name={part.name} file={{size:part.size,mime:part.mime}} onPreview={supported?()=>void preview():undefined} details={part.parse_result_id?<AttachmentDetails key={JSON.stringify([endpoint,part.attachment_id,part.parse_result_id])} part={part} endpoint={endpoint}/>:undefined}>下载原件</AttachmentDownload>
-    {busy && <small role="status">正在准备预览…</small>}{error && <p role="alert">{error}</p>}
+    {busy && <MessageAction><small className="message-action-status" role="status">正在准备预览…</small></MessageAction>}
+    {error && <MessageAction><MessageError reason={`${part.name} · ${error}`} retryLabel="重新预览" retry={() => void preview()} /></MessageAction>}
   </>;
 }

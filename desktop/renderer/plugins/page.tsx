@@ -1,3 +1,4 @@
+import { SmallMenuDetails } from '../shared/components/small-menu-details';
 import { WorkspaceDrawer, DrawerPresence } from "../shared/components/workspace-drawer";
 import iconStyles from './icon.module.scss';
 import { PluginIconEditor } from './icon';
@@ -102,10 +103,10 @@ export function PluginSlots({ model }: { model: PluginsModel }) {
   if (!sides.length && !actions.length) return null;
   return <div className="plugin-slot-toolbar">
     {sides.map(({ plugin, slot }) => <button className="text-button" key={`${plugin.id}:${slot.id}`} onClick={() => plugins.openSlot(plugin.id, slot)}>{slot.title}</button>)}
-    {actions.length > 0 && <details className="plugin-resource-menu"><summary>资源插件操作</summary><div aria-label="资源插件操作">
+    {actions.length > 0 && <SmallMenuDetails className="plugin-resource-menu" summary="资源插件操作" surfaceClassName="plugin-resource-actions" surfaceLabel="资源插件操作">
       <p>{plugins.context?.resource?.title}</p>
       {actions.map(({ plugin, slot }) => <button className="secondary" key={`${plugin.id}:${slot.id}`} onClick={event => { event.currentTarget.closest('details')!.open = false; plugins.openSlot(plugin.id, slot); }}>{plugin.name} · {slot.title}</button>)}
-    </div></details>}
+    </SmallMenuDetails>}
   </div>;
 }
 

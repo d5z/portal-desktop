@@ -1,7 +1,8 @@
+@use '../../shared/styles/chat-menu';
 @use '../../shared/styles/mixins';
 
 .menu {
-  @include mixins.menu-enter;
+  @include chat-menu.popover-presence;
 
   position: fixed;
   inset: auto;

@@ -1,17 +1,20 @@
 import { Icon } from '../../shared/icons/icon';
-import {AttachmentFileMenu} from './attachment-file-menu';
-import {AttachmentAudioMenu} from './attachment-audio-menu';
+import { AttachmentAudioMenu, type AudioMenuControls } from './attachment-audio-menu';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {formatBytes} from '../../shared/lib/format-bytes';
 import {FileName} from '../../shared/components/file-name';
-export function AttachmentDownload({endpoint, id, artifact, name, children, file, details, compact=false, apiBase='', request=fetch, onPreview, onDownloaded}: {
-  onDownloaded?:()=>void; onPreview?:()=>void; request?:typeof fetch; apiBase?:string; endpoint: string; id: string; artifact?: string; name: string; children: string; file?:{size:number;mime:string}; details?:ReactNode; compact?:boolean;
+import { MessageAction, MessageFileActions } from './message-action-row';
+import { MessageError } from './message-error';
+export function AttachmentDownload({endpoint, id, artifact, name, children, file, details, audioControls, iconOnly=false, apiBase='', request=fetch, onPreview, onDownloaded}: {
+  onDownloaded?:()=>void; onPreview?:()=>void; request?:typeof fetch; apiBase?:string; endpoint: string; id: string; artifact?: string; name: string; children: string; file?:{size:number;mime:string}; details?:ReactNode; audioControls?:AudioMenuControls; iconOnly?:boolean;
 }) {
   const [activeAction,setActiveAction]=useState(''),[error,setError]=useState(''),[downloaded,setDownloaded]=useState(false);
   const [checking,setChecking]=useState(true);
   const [status,setStatus]=useState(''),[progress,setProgress]=useState({loaded:0,total:0});
   const busy=!!activeAction, downloading=activeAction==='download';
+  const inActions = !!(file || audioControls || iconOnly);
   const controller=useRef<AbortController | null>(null);
+  const failedAction=useRef('download');
   const url=apiBase+'/api/local-downloads?'+new URLSearchParams({endpoint,id,...(artifact ? {artifact} : {})});
   useEffect(()=>{
     const pending=new AbortController();
@@ -48,35 +51,50 @@ export function AttachmentDownload({endpoint, id, artifact, name, children, file
         }
         if(!complete)throw new Error('下载中断，请重试');
       } finally {await reader.cancel().catch(()=>{});}
-    } catch(e){setStatus(kind==='download' ? (pending.signal.aborted ? '已取消下载' : '下载失败') : '');if(!pending.signal.aborted)setError(e instanceof Error ? e.message : '操作失败');}
+    } catch(e){setStatus(kind==='download' ? (pending.signal.aborted ? '已取消下载' : '下载失败') : '');if(!pending.signal.aborted){failedAction.current=kind;setError(e instanceof Error ? e.message : '操作失败');}}
     finally{if(controller.current===pending){controller.current=null;setActiveAction('');}}
   }
   const extension=name.split('.').pop()?.toLowerCase() || '';
-  const fileType=({docx:'Word',doc:'Word',txt:'Text',md:'Text'} as Record<string,string>)[extension] || extension.toUpperCase();
-  const codeFile=['txt','md','csv','json'].includes(extension);
+  const fileType=extension.toUpperCase() || '文件';
   const primary=downloaded ? '打开' : '下载';
   const canPreview=downloaded && !!onPreview;
   const cardAction=checking ? '正在检查本地文件' : canPreview ? '在右侧预览' : downloaded ? '使用系统应用打开' : '下载';
+  const imageAction = downloaded ? '打开原图' : children;
+  const statusLabel = status + (downloading && progress.total ? ` · ${Math.min(99,Math.floor(progress.loaded / progress.total * 100))}% · ${formatBytes(progress.loaded)} / ${formatBytes(progress.total)}` : '');
   return <div className="attachment-download">
-    {compact ? <AttachmentAudioMenu name={name}>
-      {details}
+    {audioControls ? <AttachmentAudioMenu name={name} controls={audioControls}>
       <button type="button" disabled={busy || checking} onClick={()=>void action(downloaded ? 'open' : 'download')}><Icon name={downloaded ? 'external-link' : 'download-tray'} fill="none" stroke="currentColor" strokeWidth="1.7" /><span>{primary}</span></button>
       {downloaded && <button type="button" disabled={busy} onClick={()=>void action('reveal')}><Icon name="folder" fill="none" stroke="currentColor" strokeWidth="1.7" /><span>打开所在位置</span></button>}
     </AttachmentAudioMenu> : file ? <div className="attachment-file-row">
       <button className="attachment-file-main" type="button" disabled={busy || checking} title={cardAction} aria-label={`${canPreview ? '预览' : primary} ${name}`} onClick={()=>canPreview ? onPreview!() : void action(downloaded ? 'open' : 'download')}>
-        <span className="attachment-file-icon" aria-hidden="true">{codeFile ? <span className="attachment-code-icon">&lt;/&gt;</span> : <Icon name="file-text-tall" width="20" height="24" fill="none" />}</span>
+        <span className="attachment-file-icon" aria-hidden="true"><Icon name="chat-file" width="18" height="18" strokeWidth="1.65" /></span>
         <span className="attachment-file-label"><FileName name={name} /><small>{fileType} · {formatBytes(file.size)}</small></span>
         <span className="attachment-file-action" aria-hidden="true">{checking ? '…' : downloaded ? '↗' : '↓'}</span>
       </button>
-      <AttachmentFileMenu name={name}>
-        <button type="button" disabled={busy} onClick={()=>void action(downloaded ? 'open' : 'download')}>{primary}</button>
-        {downloaded && <button type="button" disabled={busy} onClick={()=>void action('reveal')}>打开所在位置</button>}
+      {(downloaded || details) && <MessageFileActions name={name}>
+        {canPreview && <button type="button" role="menuitem" disabled={busy} onClick={()=>void action('open')}><Icon name="chat-external-link" />用系统应用打开</button>}
+        {downloaded && <button type="button" role="menuitem" disabled={busy} onClick={()=>void action('reveal')}><Icon name="folder" />打开所在位置</button>}
         {details}
-      </AttachmentFileMenu>
-    </div> : <button type="button" disabled={busy || checking} onClick={()=>void action(downloaded ? 'open' : 'download')}>{checking ? '正在检查…' : downloaded ? '打开' : downloading ? '正在下载…' : children}</button>}
-    {downloading && <button type="button" onClick={()=>controller.current?.abort()}>取消下载</button>}
-    {status && <small role="status">{status}{downloading && progress.total ? ` · ${Math.min(99,Math.floor(progress.loaded / progress.total * 100))}% · ${formatBytes(progress.loaded)} / ${formatBytes(progress.total)}` : ''}</small>}
-    {downloading && <progress aria-label={`${name} 下载进度`} max={progress.total || undefined} value={progress.total ? progress.loaded : undefined} />}
-    {error && <p role="alert">{error}</p>}
+      </MessageFileActions>}
+    </div> : iconOnly ? <button type="button" className="attachment-download-icon" disabled={busy || checking}
+      aria-label={imageAction} title={imageAction} onClick={()=>void action(downloaded ? 'open' : 'download')}>
+      <Icon name={downloaded ? 'external-link' : 'chat-download'} width="16" height="16" />
+    </button> : <button type="button" disabled={busy || checking} onClick={()=>void action(downloaded ? 'open' : 'download')}>{checking ? '正在检查…' : downloaded ? '打开' : downloading ? '正在下载…' : children}</button>}
+    {inActions ? <MessageAction>
+      {downloading && <div className="attachment-download-progress">
+        <small role="status">{statusLabel}</small>
+        <progress aria-label={`${name} 下载进度`} max={progress.total || undefined} value={progress.total ? progress.loaded : undefined} />
+        <button type="button" onClick={()=>controller.current?.abort()}>取消下载</button>
+      </div>}
+      {!downloading && !error && status && <small className="message-action-status" role="status">{status}</small>}
+      {error && <MessageError reason={`${name} · ${error}`} disabled={busy || checking}
+        retryLabel={failedAction.current === 'download' ? '重新下载' : failedAction.current === 'reveal' ? '重新打开所在文件夹' : '重新打开'}
+        retry={() => void action(failedAction.current)} />}
+    </MessageAction> : <>
+      {downloading && <button type="button" onClick={()=>controller.current?.abort()}>取消下载</button>}
+      {status && <small role="status">{statusLabel}</small>}
+      {downloading && <progress aria-label={`${name} 下载进度`} max={progress.total || undefined} value={progress.total ? progress.loaded : undefined} />}
+      {error && <p role="alert">{error}</p>}
+    </>}
   </div>;
 }

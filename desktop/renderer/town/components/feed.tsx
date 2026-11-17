@@ -1,3 +1,4 @@
+import { SmallMenuDetails } from '../../shared/components/small-menu-details';
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   feedMessages,
@@ -171,8 +172,10 @@ export function TownFeed({
             </div>
           )}
           {summary}
-          <details
+          <SmallMenuDetails
             className="feed-options"
+            surfaceClassName="feed-selectors"
+            summary={effective.order !== "newest" || effective.days !== "all" || effective.author ? "筛选 · 已设置" : "筛选"}
             ref={more}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
@@ -185,35 +188,26 @@ export function TownFeed({
               }
             }}
           >
-            <summary>
-              {effective.order !== "newest" ||
-              effective.days !== "all" ||
-              effective.author
-                ? "筛选 · 已设置"
-                : "筛选"}
-            </summary>
-            <div className="feed-selectors">
-              {select(
-                "排序",
-                [
-                  ["newest", "最新在前"],
-                  ["oldest", "最早在前"],
-                ],
-                "order",
-              )}
-              {select(
-                "时间",
-                [
-                  ["all", "全部时间"],
-                  ["1", "最近 24 小时"],
-                  ["7", "最近 7 天"],
-                  ["30", "最近 30 天"],
-                ],
-                "days",
-              )}
-              {select("作者", [["", "全部作者"], ...authors], "author")}
-            </div>
-          </details>
+            {select(
+              "排序",
+              [
+                ["newest", "最新在前"],
+                ["oldest", "最早在前"],
+              ],
+              "order",
+            )}
+            {select(
+              "时间",
+              [
+                ["all", "全部时间"],
+                ["1", "最近 24 小时"],
+                ["7", "最近 7 天"],
+                ["30", "最近 30 天"],
+              ],
+              "days",
+            )}
+            {select("作者", [["", "全部作者"], ...authors], "author")}
+          </SmallMenuDetails>
         </div>
       </div>
       <div className="social-messages">

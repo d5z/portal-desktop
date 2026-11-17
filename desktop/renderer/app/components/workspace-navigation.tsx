@@ -1,11 +1,15 @@
 import { ChatSceneIndicator } from "./chat-scene";
 import { NavigationIcon } from '../../shared/icons/navigation';
 import { Icon } from '../../shared/icons/icon';
+import { menuGlide } from '../../shared/components/react-bits/GlideSelectMotion';
 import { WorkspaceDrawer } from "../../shared/components/workspace-drawer";
 import { dshRuntime } from "../../plugins/dsh/runtime";
 import { PluginIcon } from "../../plugins/icon";
+import { DockTooltipGroup } from "./dock-tooltip";
+import { DockMorePanel } from "./dock-more-panel";
+import { AnimatePresence } from "motion/react";
 import { useNavigationSort } from "./use-navigation-sort";
-import { useEffect, useLayoutEffect, useId, useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { PrivacyContent } from "../../chat/components/panels";
 import { createPortal } from "react-dom";
 import { PanelResizeHandle, usePanelWidth } from "../../shared/components/panel-resize";
@@ -57,29 +61,16 @@ function RailButton({ label, children, active, disabled, unread, onClick, classN
       { transform: 'none', offset: 1 },
     ], { duration: 680, easing: 'cubic-bezier(0.2, 0.65, 0.3, 1)' });
   };
-  const tooltipId = useId();
-  const [tip, setTip] = useState<{ left: number; top: number } | null>(null);
-  const show = (element: HTMLButtonElement) => {
-    const bounds = element.getBoundingClientRect();
-    setTip({ left: bounds.right + 12, top: Math.max(24, Math.min(innerHeight - 24, bounds.top + bounds.height / 2)) });
-  };
-  return <>
-    <button data-navigation-key={navigationKey} id={id} aria-expanded={expanded} className={`rail-button ${className}`} aria-label={label + (unread ? " · 有新动态" : "")} aria-current={active ? "page" : undefined}
-      aria-describedby={tip ? tooltipId : undefined} disabled={disabled} data-plugin-navigation={plugin || undefined}
-      onPointerDown={event => {
-        setTip(null);
-        event.currentTarget.querySelector('.rail-icon-line')?.getAnimations().forEach(animation => animation.cancel());
-      }} onMouseEnter={event => { animateIcon(event.currentTarget); if (tooltip) show(event.currentTarget); }} onMouseLeave={() => setTip(null)}
-      onFocus={event => {
-        if (event.currentTarget.matches(':focus-visible')) animateIcon(event.currentTarget);
-        if (tooltip) show(event.currentTarget);
-      }} onBlur={() => setTip(null)}
-      onKeyDown={event => { if (event.key === "Escape") setTip(null); }}
-      onClick={() => { setTip(null); onClick(); }}>
-      {children}{unread && <span className="rail-unread" aria-hidden="true" />}
-    </button>
-    {tip && createPortal(<div id={tooltipId} role="tooltip" className="rail-tooltip" style={{ left: tip.left, top: tip.top }}><span>{label}{unread ? " · 有新动态" : ""}</span>{shortcut && <kbd>{shortcut}</kbd>}</div>, document.body)}
-  </>;
+  const description = label + (unread ? " · 有新动态" : "");
+  return <button data-navigation-key={navigationKey} id={id} aria-expanded={expanded} className={`rail-button ${className}`} aria-label={description} aria-current={active ? "page" : undefined}
+    data-rail-tooltip={tooltip ? description : undefined} data-rail-shortcut={tooltip ? shortcut : undefined}
+    disabled={disabled} data-plugin-navigation={plugin || undefined}
+    onPointerDown={event => event.currentTarget.querySelector('.rail-icon-line')?.getAnimations().forEach(animation => animation.cancel())}
+    onMouseEnter={event => animateIcon(event.currentTarget)}
+    onFocus={event => { if (event.currentTarget.matches(':focus-visible')) animateIcon(event.currentTarget); }}
+    onClick={onClick}>
+    {children}{unread && <span className="rail-unread" aria-hidden="true" />}
+  </button>;
 }
 
 const PINNED_NAVIGATION_KEY = "beings:pinned-navigation";
@@ -103,6 +94,7 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
   });
   const [moreOpen, setMoreOpen] = useState(false);
   const morePanel = useRef<HTMLDivElement>(null);
+  const railLinks = useRef<HTMLDivElement>(null);
   const closeMore = (restoreFocus = false) => {
     setMoreOpen(false);
     if (restoreFocus) document.getElementById("rail-more-trigger")?.focus();
@@ -161,7 +153,8 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
       onScope={scope => app.changeChatHistoryScope(scope)}
       onCopy={id => void app.run(async () => { await app.api.copyText(id); app.toast('场景 ID 已复制'); })}
     />}
-    <div className="rail-links" {...sort}>
+    <DockTooltipGroup rail={railLinks}>
+    <div className="rail-links" ref={railLinks} data-warm-tooltip-scope {...sort}>
       {orderedKeys.map(key => {
         if (key === "chat") return <RailButton key={key} navigationKey={key} id="rail-chat-trigger" tooltip={false} label="对话" shortcut={app.api.platform === 'darwin' ? '⌘1' : 'Ctrl 1'} active={app.view === "chat"} onClick={() => app.navigate("chat")}><NavigationIcon name="rail-chat" /></RailButton>;
         if (key === "search") return <RailButton key={key} navigationKey={key} id="toggle-chat-search" expanded={app.searchOpen} label="查找对话" shortcut={app.api.platform === 'darwin' ? '⌘F' : 'Ctrl F'} disabled={!app.snapshot?.settings.hasToken} onClick={() => app.openSearch()}><NavigationIcon name="rail-search" /></RailButton>;
@@ -177,8 +170,9 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
         <NavigationIcon name={moreOpen ? "rail-collapse" : "rail-more"} />
       </RailButton>
     </div>
+    </DockTooltipGroup>
     <div className="rail-settings-placeholder" aria-hidden="true" />
-    {moreOpen && createPortal(<div ref={morePanel} className="rail-more-panel" role="dialog" aria-label="更多功能">
+    {createPortal(<AnimatePresence>{moreOpen && <DockMorePanel key="dock-more" panel={morePanel}>
       <header><div><strong>更多功能</strong><p>将常用功能固定到左侧</p></div><button aria-label="收起更多功能" onClick={() => closeMore(true)}>×</button></header>
       <div className="rail-more-list">{entries.map(entry => <div className="rail-more-row" key={entry.key}>
         <button className="rail-more-destination" aria-current={entry.active ? "page" : undefined} data-plugin-navigation={entry.plugin || undefined}
@@ -188,7 +182,7 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
           <NavigationIcon name="rail-pin" />
         </button>
       </div>)}</div>
-    </div>, document.body)}
+    </DockMorePanel>}</AnimatePresence>, document.body)}
   </nav>;
 }
 // Load on first visit, then keep state when the tab or the whole panel is hidden.
@@ -285,7 +279,8 @@ export function BeingInfo({ app }: { app: AppModel }) {
         </button></dd></div>
       </dl>
       <h3>配置</h3>
-      <div className="being-config-actions">
+      <div className="being-config-actions" {...menuGlide}>
+        <span className="glide-select__pill" aria-hidden="true" />
         <button className="being-action-row" onClick={() => app.openAppSettings()}><Icon name="lucide-layout-grid" /><span className="being-action-copy">应用设置</span><Icon className="being-action-chevron" name="chat-chevron-right" /></button>
         <button className="being-action-row being-model-entry" disabled={!connected} onClick={() => app.openModelSettings()}><Icon name="lucide-layers" /><span className="being-action-copy">模型设置</span><small>{connected ? currentModel || "正在读取模型…" : "连接后配置模型"}</small><Icon className="being-action-chevron" name="chat-chevron-right" /></button>
         <button ref={privacyEntry} className="being-action-row" onClick={() => setPrivacyOpen(true)}><Icon name="lucide-shield-check" /><span className="being-action-copy">隐私说明</span><Icon className="being-action-chevron" name="chat-chevron-right" /></button>

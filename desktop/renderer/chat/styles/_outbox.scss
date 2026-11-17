@@ -1,9 +1,10 @@
-/* Reserve at least one 36px row plus borders when the composer grows. */
+/* Reserve one queue row plus its overlap with the composer. */
 .composer-queue {
   margin: 0 13px -13px;
   min-height: 50px;
   max-height: min(127px, 36dvh);
   overflow: hidden auto;
+  padding: 4px 10px 0;
   overscroll-behavior: contain;
   border: 1px solid var(--border);
   border-bottom: 13px solid transparent;

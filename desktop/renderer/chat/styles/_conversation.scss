@@ -1,3 +1,5 @@
+@use '../../shared/styles/conversation-control';
+
 /* Soft chat bubbles and floating composer, shared with the desktop shell. */
 #messages {
   --reply-padding-y: 12px;
@@ -245,4 +247,22 @@
 #chat-jump-latest:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 3px;
+}
+
+.chat-root[data-chat-host='desktop'] #chat-jump-latest {
+  @include conversation-control.surface;
+  bottom: calc(100% + 10px);
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  min-height: 0;
+  padding: 0;
+
+  > span { display: none; }
+  svg { width: 16px; height: 16px; stroke-width: 2; }
+
+  @media (pointer: coarse) {
+    width: 44px;
+    height: 44px;
+  }
 }

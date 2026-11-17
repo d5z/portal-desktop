@@ -1,3 +1,8 @@
+import { AnimatePresence, useReducedMotion } from 'motion/react';
+import { DropdownMenuMotion } from '../../shared/components/animate-ui/dropdown-menu-motion';
+import { WarmTooltipGroup } from '../../shared/components/react-bits/WarmTooltip';
+import { WarmTooltipAnchors, shellTooltipAppearance } from '../../shared/components/warm-tooltip-anchors';
+import StatusMark from '../../shared/components/react-bits/status-mark/StatusMark';
 import { DrawerPresence, WorkspaceDrawer } from "../../shared/components/workspace-drawer";
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, defaultCoordinates, useSensor, useSensors, type KeyboardSensorProps } from "@dnd-kit/core";
 import { restrictToVerticalAxis, restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
@@ -11,6 +16,30 @@ import { CHAT_SCENE_ACTIVITY_LABELS, type ChatSceneActivity } from "../../../sha
 import type { HistoryScope } from "../../chat/models/scenes";
 import { PanelResizeHandle, usePanelWidth } from "../../shared/components/panel-resize";
 import { Dialog } from "../../shared/components/dialog";
+import doneGlyph from '../assets/scene-status/done.svg';
+import errorGlyph from '../assets/scene-status/error.svg';
+import queuedGlyph from '../assets/scene-status/queued.svg';
+import reconnectingGlyph from '../assets/scene-status/reconnecting.svg';
+import replyingGlyph from '../assets/scene-status/replying.svg';
+import stoppedGlyph from '../assets/scene-status/stopped.svg';
+import thinkingGlyph from '../assets/scene-status/thinking.svg';
+import timeoutGlyph from '../assets/scene-status/timeout.svg';
+import waitingGlyph from '../assets/scene-status/waiting.svg';
+import workingGlyph from '../assets/scene-status/working.svg';
+
+const sceneTooltipAppearance = { ...shellTooltipAppearance, side: 'top' as const, gap: 8 };
+const sceneActivityGlyphs: Record<ChatSceneActivity, string> = {
+  done: doneGlyph,
+  error: errorGlyph,
+  queued: queuedGlyph,
+  reconnecting: reconnectingGlyph,
+  replying: replyingGlyph,
+  stopped: stoppedGlyph,
+  thinking: thinkingGlyph,
+  timeout: timeoutGlyph,
+  waiting: waitingGlyph,
+  working: workingGlyph,
+};
 
 class SceneKeyboardSensor {
   static activators = KeyboardSensor.activators;
@@ -68,6 +97,37 @@ type SceneRename = {
   cancel: (restoreFocus: boolean) => void;
 };
 
+// The source waits 120 ms before drawing the mark. Its ring settles in 300 ms.
+const sceneMarkDrawDuration = 180;
+const sceneMarkPlaybackDuration = 340;
+
+function SceneActivityIcon({ activity }: { activity: ChatSceneActivity }) {
+  const reduceMotion = useReducedMotion();
+  const [previous, setPrevious] = useState(activity);
+  const [playing, setPlaying] = useState(false);
+  if (previous !== activity) {
+    setPrevious(activity);
+    setPlaying(previous === 'working' && (activity === 'done' || activity === 'error'));
+  }
+
+  const showMark = playing && !reduceMotion;
+  useEffect(() => {
+    if (!playing) return;
+    const timer = setTimeout(() => setPlaying(false), sceneMarkPlaybackDuration);
+    return () => clearTimeout(timer);
+  }, [playing, activity]);
+
+  return <>
+    <span className="chat-session-activity-icon" data-mark-playing={showMark || undefined}
+      style={{ maskImage: `url(${JSON.stringify(sceneActivityGlyphs[activity])})` }} />
+    {!reduceMotion && (activity === 'working' || showMark) && <span className="chat-session-status-mark" data-playing={showMark || undefined}>
+      <StatusMark status={activity === 'error' ? 'failed' : activity === 'done' ? 'done' : 'running'}
+        progress={0.75} size={16} strokeWidth={1.8} fillOpacity={0} drawDuration={sceneMarkDrawDuration}
+        color="currentColor" doneColor="currentColor" errorColor="currentColor" />
+    </span>}
+  </>;
+}
+
 function SceneRow({ session, selected, activity, disabled, sortable, onSelect, onContextMenu, rename }: {
   session: ChatScene;
   selected: boolean;
@@ -89,11 +149,12 @@ function SceneRow({ session, selected, activity, disabled, sortable, onSelect, o
     renameInput.current?.select();
   }, [renaming]);
   const label = session.scene_meta.scene_label;
+  const activityLabel = activity && CHAT_SCENE_ACTIVITY_LABELS[activity];
   return <div ref={setNodeRef} className="chat-session-item" data-reordering={isDragging || undefined}
     style={{ transform: CSS.Translate.toString(transform), transition }}>
     {sortable && <button ref={setActivatorNodeRef} type="button" className="chat-session-grip" {...attributes} {...listeners} disabled={disabled || renaming}
       aria-label={`调整场景顺序：${label}`} title="拖动调整顺序">
-      <Icon name="grip" fill="currentColor" stroke="none" aria-hidden="true" />
+      <Icon name="chat-grip" width="14" height="14" />
     </button>}
     {rename ? <>
       <form className="chat-session-select chat-session-rename" aria-current={selected ? 'true' : undefined} aria-busy={disabled}
@@ -119,11 +180,13 @@ function SceneRow({ session, selected, activity, disabled, sortable, onSelect, o
       {rename.error && <p id="chat-session-rename-error" className="chat-session-error" role="alert">{rename.error}</p>}
     </> : <button className="chat-session-select" data-scene-id={session.scene_id} type="button"
       aria-label={`切换到场景：${label}`} aria-current={selected ? "true" : undefined}
-      aria-description={activity && CHAT_SCENE_ACTIVITY_LABELS[activity]}
-      title={label} disabled={disabled} onClick={onSelect} onContextMenu={onContextMenu}>
-      <span>{label}</span>
-      {activity && <span className="chat-session-activity" data-status={activity} aria-hidden="true"
-        title={CHAT_SCENE_ACTIVITY_LABELS[activity]}><span className="chat-session-activity-icon" /></span>}
+      aria-description={activityLabel}
+      title={activity ? undefined : label} disabled={disabled} onClick={onSelect} onContextMenu={onContextMenu}>
+      <span title={activity ? label : undefined}>{label}</span>
+      {activity && <span className="chat-session-activity" data-status={activity} aria-hidden="true">
+        <SceneActivityIcon activity={activity} />
+        <span className="chat-session-activity-label">{activityLabel}</span>
+      </span>}
     </button>}
   </div>;
 }
@@ -216,6 +279,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
   const [query, setQuery] = useState("");
   const [reordering, setReordering] = useState(false);
   const search = useRef<HTMLInputElement>(null);
+  const [optionsExpanded, setOptionsExpanded] = useState(false);
   const options = useRef<HTMLDetailsElement>(null);
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<"create" | "bind" | null>(null);
@@ -302,12 +366,12 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
           {!pinned && <Icon name="split-panel" />}
         </button>
       </div>
-      {panelHost && createPortal(<DrawerPresence open={visible && expanded}><WorkspaceDrawer edge="left" ref={panel} style={{ width }} id="chat-session-panel" className="chat-session-panel" open={visible && expanded} data-pinned={drawerPinned} aria-label="场景列表"
+      {panelHost && createPortal(<DrawerPresence open={visible && expanded}><WarmTooltipGroup delay={300} warmWindow={350} travel={0} tooltipClassName="rail-tooltip"><WorkspaceDrawer edge="left" ref={panel} style={{ width }} id="chat-session-panel" className="chat-session-panel" data-warm-tooltip-scope open={visible && expanded} data-pinned={drawerPinned} aria-label="场景列表"
         onKeyDown={event => { if (event.key === "Escape" && !event.defaultPrevented && !reordering && !editing && !open && !deleting && !menu && !renaming) { event.preventDefault(); if (options.current?.open) { options.current.open = false; options.current.querySelector("summary")?.focus(); } else collapse(); } }}>
         <PanelResizeHandle panel={panel} label="调整场景列表宽度" width={width} onResize={setWidth} initial={320} min={240} max={480} reserve={48} edge="right" disabled={!pinned} />
         {drawerPinned && <div className="chat-session-titlebar">
           <strong>{beingName}</strong>
-          <button type="button" className="chat-session-collapse" aria-label="收起场景列表" title="收起场景列表" onClick={collapse}>
+          <button type="button" className="chat-session-collapse" aria-label="收起场景列表" data-warm-tooltip="收起场景列表" onClick={collapse}>
             <Icon name="split-panel" />
           </button>
         </div>}
@@ -316,17 +380,17 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
             <Icon name="search-20" />
             <input ref={search} type="search" aria-label="搜索场景" placeholder="搜索" value={query} onChange={event => setQuery(event.target.value)} />
           </label>
-          <details ref={options} className="chat-session-options" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false; }}>
-            <summary aria-label="场景列表选项" title="场景列表选项"><Icon name="more-filled" /></summary>
-            <div className="chat-session-options-popover">
+          <details ref={options} className="chat-session-options" onToggle={event => setOptionsExpanded(event.currentTarget.open)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false; }}>
+            <summary aria-label="场景列表选项" data-warm-tooltip="场景列表选项"><Icon name="more-filled" /></summary>
+            <AnimatePresence>{optionsExpanded && <DropdownMenuMotion className="chat-session-options-popover">
               <button type="button" disabled={!scene} onClick={() => { options.current?.removeAttribute("open"); setOpen(true); }}><Icon name="web-info" /><span>场景详情</span></button>
               <button type="button" disabled={!connected || busy || !sessions.length} onClick={() => { options.current?.removeAttribute("open"); edit("bind"); }}><Icon name="web-link" /><span>绑定已有场景</span></button>
               <hr />
               <button type="button" aria-label="关闭场景列表" onClick={collapse}><Icon name="chevron-left-20" /><span>收起列表</span><kbd>Esc</kbd></button>
-            </div>
+            </DropdownMenuMotion>}</AnimatePresence>
           </details>
         </div>
-        <div className="chat-session-group"><span>场景对话</span><button id="new-chat-session" type="button" aria-label="新建场景" title="新建场景" disabled={!connected || busy || !sessions.length} onClick={() => edit("create")}><Icon name="plus" /></button></div>
+        <div className="chat-session-group"><span>场景对话</span><button id="new-chat-session" type="button" aria-label="新建场景" data-warm-tooltip="新建场景" title="新建场景" disabled={!connected || busy || !sessions.length} onClick={() => edit("create")}><Icon name="plus" /></button></div>
         <SceneList key={orderKey} orderKey={orderKey} sessions={sessions} selected={scene?.scene_id} activity={activity}
           query={query} disabled={busy || !connected} onSelect={id => void change("select", id)}
           rename={renaming ? { id: renaming, error, save: name => void change("rename", name, renaming),
@@ -347,8 +411,9 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
         </label>
         {error && !editing && !deleting && !renaming && <p role="alert" className="chat-session-error">{error}</p>}
 
-      </WorkspaceDrawer></DrawerPresence>, panelHost)}
-      {menu && createPortal(<div ref={menuRef} className="chat-session-context-menu" role="menu" aria-label="场景操作"
+        <WarmTooltipAnchors rootRef={panel} appearance={sceneTooltipAppearance} />
+      </WorkspaceDrawer></WarmTooltipGroup></DrawerPresence>, panelHost)}
+      {createPortal(<AnimatePresence>{menu && <DropdownMenuMotion ref={menuRef} className="chat-session-context-menu" role="menu" aria-label="场景操作"
         style={{ left: menu.x, top: menu.y }} onContextMenu={event => { event.preventDefault(); event.stopPropagation(); }}
         onKeyDown={event => {
           const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button"));
@@ -363,7 +428,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
         }}>
         <button role="menuitem" type="button" onClick={() => { setRenaming(menu.scene.scene_id); setError(""); setMenu(undefined); }}>重命名</button>
         <button role="menuitem" type="button" className="danger" onClick={() => { setDeleting(menu.scene); setError(""); setMenu(undefined); }}>删除场景</button>
-      </div>, document.body)}
+      </DropdownMenuMotion>}</AnimatePresence>, document.body)}
       <Dialog id="chat-session-delete" className="utility-dialog" open={!!deleting} busy={busy}
         aria-labelledby="chat-session-delete-title" onClose={() => setDeleting(undefined)} dismissOnBackdrop>
         <div className="dialog-heading"><h2 id="chat-session-delete-title">删除场景？</h2></div>

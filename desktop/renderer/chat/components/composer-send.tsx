@@ -1,5 +1,7 @@
 import { useEffect, useId, useRef, useState } from 'react';
 import { Icon } from '../../shared/icons/icon';
+import { AnimatePresence } from 'motion/react';
+import { DropdownMenuMotion } from '../../shared/components/animate-ui/dropdown-menu-motion';
 
 export function ComposerSend({ label, action, stopping, disabled, alternate, onSubmit }: {
   label: string;
@@ -64,7 +66,7 @@ export function ComposerSend({ label, action, stopping, disabled, alternate, onS
     onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpenedBy(undefined); }}>
       <button ref={trigger} className={`btn-icon${action === 'stop' ? ' stop' : ''}`} id="send-btn" type="button"
         data-action={action}
-        title={hasChoices ? undefined : label}
+        data-warm-tooltip={hasChoices ? undefined : label}
         aria-label={label} aria-busy={stopping} disabled={disabled}
         aria-expanded={hasChoices ? visible : undefined}
         aria-controls={visible ? popupId : undefined}
@@ -91,7 +93,7 @@ export function ComposerSend({ label, action, stopping, disabled, alternate, onS
         }}>
         <Icon name={action === 'stop' ? 'stop' : 'send'} />
       </button>
-    {visible && alternate && <div className="composer-queue-tip" id={popupId} role="group" aria-label="发送选项">
+    <AnimatePresence>{visible && alternate && <DropdownMenuMotion className="composer-queue-tip" id={popupId} role="group" aria-label="发送选项">
       <div className="composer-queue-tip-surface">
         <button type="button" aria-label={label} aria-keyshortcuts="Enter"
           onClick={() => act(onSubmit)}>引导<kbd aria-hidden="true">↵</kbd></button>
@@ -100,6 +102,6 @@ export function ComposerSend({ label, action, stopping, disabled, alternate, onS
           排队<kbd aria-hidden="true">{alternate.shortcut}</kbd>
         </button>
       </div>
-    </div>}
+    </DropdownMenuMotion>}</AnimatePresence>
   </div>;
 }

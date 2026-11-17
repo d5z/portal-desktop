@@ -233,8 +233,14 @@ try {
   const longDraft = Array.from({ length: 30 }, (_, i) => JSON.stringify({ index: i, text: '长内容，检查自动换行与光标位置。'.repeat(3) })).join('\n');
   await pasteDraft(longDraft);
   await input.press('Control+End');
-  await input.evaluate(el => { el.scrollTop = el.scrollHeight; el.dispatchEvent(new Event('scroll')); });
-  assert.equal(await input.evaluate(el => el.scrollTop), await paint.evaluate(el => el.scrollTop));
+  await frame.locator('#input-area[data-long-draft]').waitFor();
+  const scrollTops = await editor.evaluate(el => {
+    const textarea = el.querySelector('textarea'), highlight = el.querySelector('pre');
+    textarea.scrollTop = textarea.scrollHeight;
+    textarea.dispatchEvent(new Event('scroll'));
+    return [textarea.scrollTop, highlight.scrollTop];
+  });
+  assert.equal(scrollTops[0], scrollTops[1]);
   await page.setViewportSize({ width: 390, height: 844 });
   await child().evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
   await pasteDraft('{"op":"state","initial":"家常小聚"}\n{"op":"commit"}');
@@ -333,7 +339,7 @@ try {
   assert.equal(await frame.locator('#input').evaluate(el => el instanceof HTMLTextAreaElement ? el.value : el.textContent), '保留草稿');
   await frame.locator('#messages').evaluate(el=>{el.scrollTop=0;el.dispatchEvent(new Event('scroll'));});
   await frame.locator('#chat-jump-latest').waitFor();
-  assert.match(await frame.locator('#chat-jump-latest').innerText(), /^[1-9]\d*条消息$/);
+  assert.match(await frame.locator('#chat-jump-latest').getAttribute('title'), /^下方还有[1-9]\d*条消息$/);
   await frame.locator('#chat-jump-latest').click();
   await child().waitForFunction(()=>{const el=document.querySelector('#messages');return el.scrollHeight-el.scrollTop-el.clientHeight<2;});
   await frame.locator('#chat-jump-latest').waitFor({state:'hidden'});
@@ -501,7 +507,7 @@ try {
   assert.equal(activeDuringHold.finished, false);
   assert.ok(activeDuringHold.events.some(item => item.event === 'content_block_delta'));
   await frame.locator('#send-btn.stop').click();
-  await frame.getByText(/停止尚未确认，仍在接收回复/).waitFor();
+  await frame.getByText('停止请求尚未确认', { exact: true }).waitFor();
   await frame.getByRole('button', {name:'再次停止',exact:true}).waitFor();
   // Recheck the live task after the attention debounce, as a slow CI run does.
   await page.waitForTimeout(1600);
@@ -544,7 +550,7 @@ try {
   // Keep a Markdown fence open across actual streamed React updates, then reload it from history.
   await pasteDraft('markdown-stream'); await frame.locator('#send-btn').click();
   const streamedMarkdown = frame.locator('.markdown-code-block').last();
-  await streamedMarkdown.locator('.markdown-preview h1').waitFor();
+  await streamedMarkdown.getByRole('heading', { name: markdownPrefix.slice(2), exact: true }).waitFor();
   assert.equal(await streamedMarkdown.locator('h1').textContent(), markdownPrefix.slice(2), 'An unfinished Markdown fence is previewed during streaming');
   await post({ type: 'beings:history-scope', scope: 'all', revision: 'fixture' });
   await page.waitForFunction(() => window.received.some(item => item.type === 'beings:history-scope-state' && item.scope === 'all'));
@@ -564,7 +570,9 @@ try {
   event(markdownResponse, 'message_stop', { session_id: 'session-fixture' });
   markdownResponse.end(); markdownResponse = null;
   await frame.locator('.run-activity.running').waitFor({ state: 'hidden' });
-  assert.equal(await streamedMarkdown.locator('.markdown-preview').getByText('末尾校验：全文结束。', { exact: true }).count(), 1);
+  const finalLine = streamedMarkdown.locator('.markdown-preview').getByText('末尾校验：全文结束。', { exact: true });
+  await finalLine.waitFor();
+  assert.equal(await finalLine.count(), 1);
   assert.equal(await child().evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
   // A taller viewport lets the entire block fit inside the scrolling message pane for visual QA.
   await page.setViewportSize({ width: 420, height: 1400 });

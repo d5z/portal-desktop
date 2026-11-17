@@ -1,3 +1,4 @@
+import { dropdownMenuPopover } from '../../shared/components/animate-ui/dropdown-menu-motion';
 import styles from './permissions.module.scss';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Dialog } from '../../shared/components/dialog';
@@ -18,11 +19,12 @@ export function PermissionSettings({ app }: { app: AppModel }) {
     element.showPopover();
     const position = () => {
       const anchor = app.permissionAnchor ?? { left: 80, top: innerHeight - 100, bottom: innerHeight - 68 };
-      const bounds = element.getBoundingClientRect();
-      const left = Math.max(8, Math.min(anchor.left, innerWidth - bounds.width - 8));
-      const top = anchor.top - bounds.height - 8 >= 8 ? anchor.top - bounds.height - 8
-        : Math.max(8, Math.min(anchor.bottom + 8, innerHeight - bounds.height - 8));
+      const { offsetWidth: width, offsetHeight: height } = element;
+      const left = Math.max(8, Math.min(anchor.left, innerWidth - width - 8));
+      const top = anchor.top - height - 8 >= 8 ? anchor.top - height - 8
+        : Math.max(8, Math.min(anchor.bottom + 8, innerHeight - height - 8));
       element.style.left = `${left}px`; element.style.top = `${top}px`;
+      element.style.transformOrigin = `${anchor.left - left}px ${top < anchor.top ? "bottom" : "top"}`;
     };
     position();
     const observer = new ResizeObserver(position); observer.observe(element);
@@ -39,7 +41,7 @@ export function PermissionSettings({ app }: { app: AppModel }) {
     catch (e) { setError(e instanceof Error ? e.message : '无法应用权限设置'); }
     finally { setBusy(false); }
   };
-  return <div ref={menu} popover="auto" role="menu" aria-label="工作权限" aria-busy={busy} className={styles.menu}
+  return <div ref={menu} popover="auto" {...dropdownMenuPopover} role="menu" aria-label="工作权限" aria-busy={busy} className={styles.menu}
     onToggle={event => { if (event.newState === 'closed' && app.permissionSettingsOpen) app.closePermissionSettings(); }}
     onKeyDown={event => {
       if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;

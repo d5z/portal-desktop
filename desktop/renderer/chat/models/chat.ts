@@ -55,6 +55,8 @@ export interface Message extends MessageScene {
   notice?: 'stop';
   statusRunId?: string;
   queued?: boolean;
+  queuePhase?: import('../services/scene-queue').SavedSceneSend['phase'];
+  queueBusy?: boolean;
   queueNotice?: string;
   cancelQueued?: () => void;
   canInterruptQueued?: boolean;

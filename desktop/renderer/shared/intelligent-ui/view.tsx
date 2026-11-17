@@ -1,3 +1,4 @@
+import { SmallMenuDetails } from '../components/small-menu-details';
 import { useUIToast } from './feedback';
 import { CodeClipboard } from '../components/clipboard';
 import type { AppSelections } from './surfaces';
@@ -52,7 +53,16 @@ export const IntelligentUI = memo(function IntelligentUI({ source, streaming = f
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
     }
   }}>
-    <header className="iui-toolbar"><span className="iui-status"><span className={streaming ? 'iui-status-dot generating' : 'iui-status-dot'} />{streaming ? '正在生成' : '可交互'}</span><div className="iui-toolbar-actions">{actions.onEdit && <button type="button" disabled={streaming || actions.submitDisabled} title="将此界面及当前选择带入下一条消息" onClick={() => { setExpanded(false); actions.onEdit?.(); }}>修改</button>}<button type="button" onClick={() => setExpanded(v => !v)} aria-label={expanded ? '收起界面' : '展开界面'}>{expanded ? '收起' : '展开'}</button><details className="iui-menu"><summary aria-label="界面更多选项">···</summary><button type="button" aria-pressed={showSource} onClick={() => setShowSource(v => !v)}>{showSource ? '预览' : '源码'}</button></details></div></header>
+    <header className="iui-toolbar">
+      <span className="iui-status"><span className={streaming ? 'iui-status-dot generating' : 'iui-status-dot'} />{streaming ? '正在生成' : '可交互'}</span>
+      <div className="iui-toolbar-actions">
+        {actions.onEdit && <button type="button" disabled={streaming || actions.submitDisabled} title="将此界面及当前选择带入下一条消息" onClick={() => { setExpanded(false); actions.onEdit?.(); }}>修改</button>}
+        <button type="button" onClick={() => setExpanded(v => !v)} aria-label={expanded ? '收起界面' : '展开界面'}>{expanded ? '收起' : '展开'}</button>
+        <SmallMenuDetails className="iui-menu" summary="···" summaryProps={{ "aria-label": "界面更多选项" }} surfaceClassName="iui-menu-surface">
+          <button type="button" aria-pressed={showSource} onClick={() => setShowSource(v => !v)}>{showSource ? '预览' : '源码'}</button>
+        </SmallMenuDetails>
+      </div>
+    </header>
     {(notice || !doc && streaming) && (!streaming || !doc) && <p className="iui-notice" role="status">{streaming ? '正在接收界面描述…' : `界面未更新：${notice}`}{doc ? ' · 已保留可用内容' : ''}</p>}
     {notice && !streaming && repair && <button type="button" className="iui-repair" onClick={() => { setExpanded(false); repair(`请修正刚才生成的智能界面「${doc?.title || '交互界面'}」。客户端报告：${notice}。请优先按上述错误中的节点、字段和层级修正，不要猜测删除其他合法属性。node 事件的 parent 必须与 op、node 同级，不能写入 node 对象；section.value、slider.value 和 list/checklist 项目的 description 都是合法字段。保留原需求和有效内容，重新输出完整的 intelligent-ui 界面；联动结果必须实际引用绑定状态。JSON 能解析不等于客户端校验通过，未经实际验证不要声称通过。`); }}>让 Being 修正</button>}
     <div className="iui-preview" hidden={showSource}>{doc && <UIRuntime doc={doc} {...actions} onEdit={actions.onEdit ? () => { setExpanded(false); actions.onEdit?.(); } : undefined} onContinue={actions.onContinue ? text => { setExpanded(false); actions.onContinue?.(text); } : undefined} submitDisabled={streaming || actions.submitDisabled} />}</div>

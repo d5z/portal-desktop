@@ -1,3 +1,5 @@
+import { dropdownMenuPopover, hideMenuPopover } from './animate-ui/dropdown-menu-motion';
+import { CopySuccessText } from './copy-feedback';
 import { Icon } from '../icons/icon';
 import styles from './message-menu.module.scss';
 import { useMenuDismiss } from '../hooks/use-menu-dismiss';
@@ -10,13 +12,28 @@ export function useMessageMenu(copy:(text:string)=>Promise<void>,scope:string, a
   const [context,setContext]=useState<(MessageInfo & {x:number;y:number;portal:HTMLElement;opener:HTMLElement;anchorLeft:number;anchorTop:number;selected:string})|null>(null);
   const [error,setError]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState<{text:string;portal:HTMLElement}|null>(null);
   const menu=useRef<HTMLDivElement>(null),revision=useRef(0),current=useRef(context);
+  const [closing,setClosing]=useState(false);
   current.current=context;
-  const close=useCallback((restore=false)=>{++revision.current;const opener=current.current?.opener;if(restore&&opener?.isConnected)opener.focus({preventScroll:true});setContext(null);},[]);
+  const close=useCallback((restore=false)=>{
+    const closed=++revision.current;
+    const opener=current.current?.opener;
+    const exit=hideMenuPopover(menu.current);
+    if(restore&&opener?.isConnected)opener.focus({preventScroll:true});
+    if(exit){
+      setClosing(true);
+      void exit.finished.catch(()=>{}).then(()=>{
+        if(revision.current===closed){setClosing(false);setContext(null);}
+      });
+    }else{
+      setClosing(false);
+      setContext(null);
+    }
+  },[]);
   const showMenu = useCallback((opener: HTMLElement, info: MessageInfo, point?: { x: number; y: number }) => {
     const rect = opener.getBoundingClientRect(), selection = window.getSelection();
     const selected = selection?.anchorNode && selection.focusNode && opener.contains(selection.anchorNode) && opener.contains(selection.focusNode)
       ? selection.toString() : '';
-    ++revision.current; setError(''); setNotice(null); setBusy(false);
+    ++revision.current; setError(''); setNotice(null); setBusy(false); setClosing(false);
     setContext({ ...info, opener, anchorLeft: rect.left, anchorTop: rect.top, portal: opener.closest<HTMLElement>('dialog[open]') || document.body,
       selected, x: point?.x ?? rect.left, y: point?.y ?? rect.bottom + 4 });
   }, []);
@@ -32,16 +49,19 @@ export function useMessageMenu(copy:(text:string)=>Promise<void>,scope:string, a
     }
   }, [showMenu]);
   useEffect(()=>{close();},[scope,close]);
-  useMenuDismiss(!!context, menu, close, () => {
+  useMenuDismiss(!!context && !closing, menu, close, () => {
     if (!context) return;
     const rect = context.opener.getBoundingClientRect();
     if (Math.abs(rect.left - context.anchorLeft) > 1 || Math.abs(rect.top - context.anchorTop) > 1) close();
   });
   useLayoutEffect(()=>{
     const node=menu.current;if(!node||!context)return;
-    node.showPopover();const rect=node.getBoundingClientRect();
-    node.style.left=`${Math.max(8,Math.min(context.x,innerWidth-rect.width-8))}px`;
-    node.style.top=`${Math.max(8,Math.min(context.y,innerHeight-rect.height-8))}px`;
+    node.showPopover();
+    const left=Math.max(8,Math.min(context.x,innerWidth-node.offsetWidth-8));
+    const top=Math.max(8,Math.min(context.y,innerHeight-node.offsetHeight-8));
+    node.style.left=`${left}px`;
+    node.style.top=`${top}px`;
+    node.style.transformOrigin=`${context.x-left}px ${context.y-top}px`;
     (node.querySelector<HTMLButtonElement>('button:not(:disabled)')||node).focus({preventScroll:true});
     return () => { if (node.matches(':popover-open')) node.hidePopover(); };
   },[context]);
@@ -52,7 +72,8 @@ export function useMessageMenu(copy:(text:string)=>Promise<void>,scope:string, a
   };
   const timestamp=context?fullMessageTime(context.time,context.fallbackTime):'';
   const shortTime=context?.time!==undefined&&Number.isFinite(new Date(context.time).getTime())?messageTimeLabel(context.time):timestamp;
-  const content=context&&createPortal(<div ref={menu} popover="manual" className={appearance === 'chat' ? `${styles.menu} ${styles.chatMenu}` : styles.menu} role="menu" tabIndex={-1} aria-label="消息操作" aria-busy={busy||undefined} style={{left:context.x,top:context.y}}
+  const content=context&&createPortal(<div ref={menu} popover="manual" {...dropdownMenuPopover} className={appearance === 'chat' ? `${styles.menu} ${styles.chatMenu}` : styles.menu} role="menu" tabIndex={-1} aria-label="消息操作" aria-busy={busy||undefined} style={{left:context.x,top:context.y}}
+    inert={closing} aria-hidden={closing || undefined}
     onKeyDown={event=>{
       event.stopPropagation();
       if(event.key==='Escape'||event.key==='Tab'){event.preventDefault();close(true);return;}
@@ -62,8 +83,8 @@ export function useMessageMenu(copy:(text:string)=>Promise<void>,scope:string, a
       items[next]?.focus();
     }}>
     {timestamp&&<div className={styles.info}><time title={timestamp} dateTime={context.time!==undefined&&Number.isFinite(new Date(context.time).getTime())?new Date(context.time).toISOString():undefined}>{shortTime}</time></div>}
-    <button role="menuitem" type="button" disabled={busy||!(context.selected||context.text)} onClick={()=>void copyValue(context.selected||context.text)}><Icon name="copy"/>复制</button>
+    <button role="menuitem" type="button" disabled={busy||!(context.selected||context.text)} onClick={()=>void copyValue(context.selected||context.text)}><Icon name={appearance === 'chat' ? 'chat-copy' : 'copy'}/>复制</button>
     {error&&<p className={styles.error} role="alert">{error}</p>}
   </div>,context.portal);
-  return {openMenu,showMenu,trigger:context?.opener.dataset.messageMore,closeMenu:close,isOpen:!!context,menu:<>{content}{notice&&createPortal(<div className={styles.notice} role="status">{notice.text}</div>,notice.portal)}</>};
+  return {openMenu,showMenu,trigger:closing ? undefined : context?.opener.dataset.messageMore,closeMenu:close,isOpen:!!context && !closing,menu:<>{content}{notice&&createPortal(<div className={styles.notice} role="status"><CopySuccessText>{notice.text}</CopySuccessText></div>,notice.portal)}</>};
 }

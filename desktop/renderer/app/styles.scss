@@ -34,3 +34,7 @@
 @use './styles/social-message';
 @use './styles/cue-surfaces';
 @use './styles/settings-frame';
+@use '../shared/components/react-bits/Folder';
+@use '../shared/components/react-bits/TiltedCard';
+@use '../shared/components/react-bits/WarmTooltip';
+@use '../shared/components/react-bits/status-mark/StatusMark';

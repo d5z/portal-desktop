@@ -439,7 +439,6 @@ export class AppModel extends Store {
   async changeChatSession(operation: "create" | "bind" | "select" | "rename" | "delete", value: string, sceneId?: string, historySeq?: number) {
     const endpoint = this.snapshot?.settings.endpoint;
     if (!endpoint) throw new Error("请先连接 Being。");
-    const previousSceneId = this.snapshot?.chatScene?.scene_id;
     const request = ++this.sessionChange;
     const next = await this.api.changeChatSession(operation, value, endpoint, sceneId);
     if (this.snapshot?.settings.endpoint !== endpoint || request !== this.sessionChange) return;
@@ -449,8 +448,6 @@ export class AppModel extends Store {
     this.chatHistoryScope = this.historyTarget ? "current" : this.savedChatHistoryScope();
     this.navigate("chat");
     this.postCurrentSession();
-    if (next.chatScene && next.chatScene.scene_id !== previousSceneId)
-      this.toast(`已切到「${next.chatScene.scene_meta.scene_label}」场景`);
   }
   private postCurrentSession() {
     if (this.chatSource && this.snapshot?.chatScene) this.post({

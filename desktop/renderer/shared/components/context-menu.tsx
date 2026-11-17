@@ -1,9 +1,10 @@
+import { hideMenuPopover, dropdownMenuPopover } from './animate-ui/dropdown-menu-motion';
 import styles from './context-menu.module.scss';
 import clsx from 'clsx';
 import useEventListener from 'ahooks/es/useEventListener';
 import { useMenuDismiss } from '../hooks/use-menu-dismiss';
 import { LocalFileAction } from './local-file-link';
-import { useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { ChatEditCommand } from "../../../shared/types";
 
@@ -23,17 +24,30 @@ export function EditContextMenu({ edit, onOpenChange, appearance = 'shell', root
 }) {
   const previewLocalFile = useContext(LocalFileAction);
   const [context, setContext] = useState<Context | null>(null);
+  const [closing, setClosing] = useState(false);
   const [error, setError] = useState<{ message: string; portal: HTMLElement } | null>(null);
   const menu = useRef<HTMLDivElement>(null);
   const notice = useRef<HTMLDivElement>(null);
   const modifier = /Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl+";
+
+  const close = useCallback(() => {
+    const node = menu.current;
+    if (!node || !node.matches(':popover-open')) return;
+    const exit = hideMenuPopover(node);
+    if (!exit) { setContext(null); return; }
+    setClosing(true);
+    void exit.finished.then(() => {
+      if (!node.matches(':popover-open')) { setClosing(false); setContext(null); }
+    }, () => {});
+  }, []);
 
   useEventListener("contextmenu", (event: MouseEvent) => {
       // A component-specific menu owns events it has already handled.
       if (event.defaultPrevented) return;
       if (!(event.target instanceof Element) || !event.target.closest(rootSelector)) return;
       if (menu.current?.contains(event.target)) return;
-      const file = event.target.closest<HTMLElement>("[data-local-file]")?.dataset.localFile;
+      const fileTarget = event.target.closest<HTMLElement>("[data-local-file]");
+      const file = fileTarget?.dataset.localFile;
       const element = event.target.closest<HTMLElement>("input, textarea, [contenteditable=true]");
       const field = element instanceof HTMLTextAreaElement ||
         (element instanceof HTMLInputElement && element.selectionStart !== null) ? element : null;
@@ -48,7 +62,7 @@ export function EditContextMenu({ edit, onOpenChange, appearance = 'shell', root
         !event.target.closest('button, a, summary, select, [role="button"]')&&
         [...range.getClientRects()].some(rect=>event.clientX>=rect.left&&event.clientX<=rect.right&&event.clientY>=rect.top&&event.clientY<=rect.bottom);
       // One delegated listener serves dynamic fields and dialogs; blank space is never a menu target.
-      if(!element && !(file&&previewLocalFile) && !selectedText){setContext(null);return;}
+      if(!element && !(file&&previewLocalFile) && !selectedText){close();return;}
       event.preventDefault();
       const start = field?.selectionStart ?? 0, end = field?.selectionEnd ?? 0;
       const direction = field?.selectionDirection ?? "none";
@@ -56,7 +70,7 @@ export function EditContextMenu({ edit, onOpenChange, appearance = 'shell', root
       const container = field || element || reading || event.target as HTMLElement;
       const portal = event.target.closest<HTMLElement>("dialog[open]") || document.body;
       const restore = () => {
-        const focus = field || element || active;
+        const focus = field || element || fileTarget || active;
         if (focus?.isConnected) focus.focus({ preventScroll: true });
         if (field?.isConnected) field.setSelectionRange(start, end, direction);
         else if (range?.commonAncestorContainer.isConnected) {
@@ -66,28 +80,33 @@ export function EditContextMenu({ edit, onOpenChange, appearance = 'shell', root
         }
       };
       setError(null);
+      setClosing(false);
       setContext({ target:event.target, file, x: event.clientX, y: event.clientY, editable,
         selected: field ? end > start : element ? !!range && element.contains(range.commonAncestorContainer) && !!selection?.toString() : selectedText,
         canSelect: !!(field ? field.value : container.textContent), field, container, portal, restore });
   }, { target: document });
 
-  useMenuDismiss(!!context, menu, () => setContext(null), event => {
+  useMenuDismiss(!!context && !closing, menu, close, event => {
     // Editor/other-panel scrolling must not dismiss a stationary menu.
-    if (context && event.target instanceof Node && event.target !== context.target && event.target.contains(context.target)) setContext(null);
+    if (context && event.target instanceof Node && event.target !== context.target && event.target.contains(context.target)) close();
   });
 
+  useLayoutEffect(() => { onOpenChange?.(!!context && !closing); }, [context, closing, onOpenChange]);
+
   useLayoutEffect(() => {
-    onOpenChange?.(!!context);
     if (!context || !menu.current) return;
     // A popover inside the originating modal stays above it and escapes clipping.
     if (!menu.current.matches(":popover-open")) menu.current.showPopover();
-    const node = menu.current, bounds = node.getBoundingClientRect();
-    node.style.left = `${Math.max(8, Math.min(context.x, innerWidth - bounds.width - 8))}px`;
-    node.style.top = `${Math.max(8, Math.min(context.y, innerHeight - bounds.height - 8))}px`;
+    const node = menu.current;
+    const left = Math.max(8, Math.min(context.x, innerWidth - node.offsetWidth - 8));
+    const top = Math.max(8, Math.min(context.y, innerHeight - node.offsetHeight - 8));
+    node.style.left = `${left}px`;
+    node.style.top = `${top}px`;
+    node.style.transformOrigin = `${context.x - left}px ${context.y - top}px`;
     // Keep Escape/arrow keys available without highlighting an item on right-click.
     node.focus({ preventScroll: true });
     return () => { if (node.matches(":popover-open")) node.hidePopover(); };
-  }, [context, onOpenChange]);
+  }, [context]);
 
   useEffect(() => {
     if (!error) return;
@@ -99,7 +118,7 @@ export function EditContextMenu({ edit, onOpenChange, appearance = 'shell', root
   const run = async (command: ChatEditCommand | "selectAll") => {
     if (!context) return;
     context.restore();
-    setContext(null);
+    close();
     if (command === "selectAll") {
       if (context.field) context.field.select();
       else {
@@ -118,13 +137,13 @@ export function EditContextMenu({ edit, onOpenChange, appearance = 'shell', root
   };
 
   return <>
-    {context && createPortal(<div ref={menu} popover="manual" className={clsx(styles.menu, appearance === 'chat' && styles.chat)} role="menu" aria-label="编辑菜单" tabIndex={-1}
+    {context && createPortal(<div ref={menu} popover="manual" {...dropdownMenuPopover} className={clsx(styles.menu, appearance === 'chat' && styles.chat)} role="menu" aria-label="编辑菜单" tabIndex={-1}
       style={{ left: context.x, top: context.y }}
       onMouseDown={event => event.preventDefault()}
       onKeyDown={event => {
         event.stopPropagation();
         if (event.key === "Escape" || event.key === "Tab") {
-          event.preventDefault(); context.restore(); setContext(null); return;
+          event.preventDefault(); context.restore(); close(); return;
         }
         if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
           event.preventDefault();
@@ -136,7 +155,11 @@ export function EditContextMenu({ edit, onOpenChange, appearance = 'shell', root
           items[next]?.focus();
         }
       }}>
-      {context.file && previewLocalFile && <><button role="menuitem" type="button" onClick={() => { previewLocalFile(context.file!); setContext(null); }}>预览文件</button></>}
+      {context.file && previewLocalFile && <button role="menuitem" type="button" onClick={() => {
+        context.restore();
+        previewLocalFile(context.file!);
+        close();
+      }}>预览文件</button>}
       {context.editable && <button role="menuitem" type="button" disabled={!context.selected} onClick={() => void run("cut")}>
         <span>剪切</span><kbd>{modifier}X</kbd>
       </button>}

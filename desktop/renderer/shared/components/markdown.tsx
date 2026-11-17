@@ -6,6 +6,7 @@ import { RemoteImage, RemoteImageGroup } from './remote-image';
 import { MessageImageGroup } from './message-image-group';
 import { remoteImageURL } from '../../../shared/remote-image';
 import { Icon } from '../icons/icon';
+import { CopyFeedbackIcon } from './copy-feedback';
 import codeStyles from './markdown-code-copy.module.scss';
 import { MarkdownReferences, MarkdownReferenceScope } from './markdown-references';
 import { localFileReference } from '../../../shared/local-file';
@@ -457,7 +458,7 @@ const MarkdownText = memo(function MarkdownText({
         case "list": {
           const list = token as Tokens.List;
           const items = list.items.map((item, i) => (
-            <li key={i}>
+            <li key={i} className={chat && item.task ? "markdown-task" : undefined}>
               {item.task && (
                 <input
                   type="checkbox"
@@ -478,36 +479,45 @@ const MarkdownText = memo(function MarkdownText({
         }
         case "table": {
           const table = token as Tokens.Table;
-          node = (
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr>
-                    {table.header.map((cell, i) => (
-                      <th
-                        key={i}
-                        style={{ textAlign: table.align[i] || undefined }}
+          const body = (
+            <table>
+              <thead>
+                <tr>
+                  {table.header.map((cell, i) => (
+                    <th
+                      key={i}
+                      scope="col"
+                      style={{ textAlign: table.align[i] || undefined }}
+                    >
+                      {render(cell.tokens, decorate)}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {table.rows.map((row, i) => (
+                  <tr key={i}>
+                    {row.map((cell, j) => (
+                      <td
+                        key={j}
+                        style={{ textAlign: table.align[j] || undefined }}
                       >
                         {render(cell.tokens, decorate)}
-                      </th>
+                      </td>
                     ))}
                   </tr>
-                </thead>
-                <tbody>
-                  {table.rows.map((row, i) => (
-                    <tr key={i}>
-                      {row.map((cell, j) => (
-                        <td
-                          key={j}
-                          style={{ textAlign: table.align[j] || undefined }}
-                        >
-                          {render(cell.tokens, decorate)}
-                        </td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                ))}
+              </tbody>
+            </table>
+          );
+          node = (
+            <div className="table-wrap">
+              {chat ? <div className="markdown-table-scroll">
+                {body}
+                <small className="table-scroll-hint" aria-hidden="true">
+                  可横向滚动 <Icon name="chat-chevron-right" width="12" height="12" />
+                </small>
+              </div> : body}
             </div>
           );
           break;
@@ -590,8 +600,10 @@ function CopyCode({ text }: { text: string }) {
     catch { setStatus('复制失败，请重试'); }
     timer.current = setTimeout(() => setStatus('复制代码'), 2000);
   }}>
-    <Icon name={copied ? 'check-16' : failed ? 'refresh-20' : 'chat-copy'} width="16" height="16"
-      fill="none" stroke="currentColor" strokeWidth="1.5" />
+    <CopyFeedbackIcon copied={copied}>
+      <Icon name={copied ? 'check-16' : failed ? 'refresh-20' : 'chat-copy'} width="16" height="16"
+        fill="none" stroke="currentColor" strokeWidth="1.5" />
+    </CopyFeedbackIcon>
     <span className={codeStyles.feedback} role="status">{copied || failed ? status : ''}</span>
   </button>;
 }

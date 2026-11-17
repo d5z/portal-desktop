@@ -1,4 +1,5 @@
 import { ActivityIcon as Icon } from '../../shared/icons/activity';
+import StatusMark from '../../shared/components/react-bits/status-mark/StatusMark';
 import { SceneScheduling } from './scheduling';
 import { LocalFileLink } from '../../shared/components/local-file-link';
 import { useEffect, useState } from "react";
@@ -125,6 +126,7 @@ function DetailedChatActivity({
       {run.scheduling && <SceneScheduling {...run.scheduling} />}
       <div className="run-list">
         {run.entries.map((entry, i) => {
+          const toolStatus = entry.type === 'tool' ? (entry.error ? 'failed' : entry.done ? 'done' : run.end ? undefined : 'running') : undefined;
           const detail =
             entry.type === "think"
               ? (
@@ -139,7 +141,7 @@ function DetailedChatActivity({
                 <span
                   className={`run-entry-icon${entry.error ? " error" : ""}`}
                 >
-                  <Icon
+                  {toolStatus ? <StatusMark status={toolStatus} size={16} color="currentColor" doneColor="currentColor" errorColor="currentColor" fillOpacity={0} /> : <Icon
                     name={
                       entry.error
                         ? "error"
@@ -147,7 +149,7 @@ function DetailedChatActivity({
                           ? "think"
                           : "tool"
                     }
-                  />
+                  />}
                 </span>
                 <div className="run-entry-caption">
                   <span className="run-entry-title">

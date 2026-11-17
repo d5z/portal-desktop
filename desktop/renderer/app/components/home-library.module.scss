@@ -1,5 +1,4 @@
 .library {
-  --library-card: light-dark(#f0f0f0, #2c2d2f);
   min-width: 0;
   font-size: 13px;
 }
@@ -109,7 +108,7 @@
   min-width: 0;
   height: 34px;
   padding: 7px 10px 7px 32px;
-  background: var(--library-card);
+  background: var(--being-card);
   border: 1px solid transparent;
   border-radius: 9px;
   color: var(--text);
@@ -215,73 +214,13 @@
   border-radius: var(--utility-radius);
 }
 
-.fileGrid[data-layout='grid'] .folderName {
-  flex: 1;
-  flex-direction: column;
-  padding: 98px 8px 8px;
-}
+.folderTile {
+  gap: 4px;
+  padding: 8px 0;
 
-.folderThumb {
-  position: absolute;
-  inset-block-start: 35px;
-  inset-inline: 0;
-  width: min(76px, 80%);
-  height: 54px;
-  margin-inline: auto;
-  border-radius: 5px;
-  background: light-dark(#4389e8, #386ebc);
-  perspective: 200px;
-  pointer-events: none;
-
-  &::before,
-  &::after {
-    position: absolute;
-    inset-inline-start: 0;
-    border-radius: inherit;
-    content: '';
-  }
-
-  &::before {
-    top: -7px;
-    width: 34px;
-    height: 16px;
-    background: inherit;
-  }
-
-  &::after {
-    inset: 8px 0 0;
-    background: linear-gradient(150deg, #75b7ff, #408cef);
-    box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%), 0 4px 8px rgb(0 0 0 / 13%);
-    transform-origin: bottom;
-  }
-
-  > i {
-    position: absolute;
-    inset: 4px 13px 6px;
-    border-radius: 3px;
-    background: #fbfcff;
-    box-shadow: 0 0 4px rgb(20 57 96 / 25%);
-  }
-
-  > i:first-child {
-    background: #e6effa;
-    rotate: -5deg;
-  }
-}
-
-@media (prefers-reduced-motion: no-preference) {
-  .folderThumb > i,
-  .folderThumb::after,
-  .thumbnail > img {
-    transition: transform 180ms ease;
-  }
-
-  .folderTile:is(:hover, :focus-within) .folderThumb {
-    &::after { transform: rotateX(-23deg); }
-
-    > i { transform: translateY(-8px) rotate(5deg); }
-
-    > i:first-child { transform: translate(-5px, -5px) rotate(-2deg); }
+  &:hover,
+  &:focus-within {
+    z-index: 1;
   }
 }
 
@@ -303,6 +242,12 @@
   padding: 98px 8px 8px;
 }
 
+.tile:has(.thumbnail :is(img, .thumbnailPreview)) > .tileButton {
+  flex: 0 0 auto;
+  margin-top: 94px;
+  padding: 4px 8px 8px;
+}
+
 .thumbnail {
   position: absolute;
   z-index: 1;
@@ -315,19 +260,24 @@
   margin-inline: auto;
   pointer-events: none;
 
-  > img {
-    display: block;
-    max-width: 100%;
-    max-height: 76px;
-    object-fit: contain;
-    border-radius: 6px;
-    box-shadow: 0 3px 10px rgb(0 0 0 / 15%);
+  &:has(img) {
+    pointer-events: auto;
+  }
+
+  :global(.tilted-card__shadow) {
+    filter: blur(9px);
   }
 }
 
-@media (prefers-reduced-motion: no-preference) {
-  .tile:is(:hover, :focus-within) .thumbnail > img {
-    transform: perspective(460px) rotateX(4deg) rotateY(-6deg) scale(1.035);
+.thumbnailPreview {
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  pointer-events: auto;
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
   }
 }
 
@@ -382,7 +332,7 @@
 .recentEmpty,
 .empty {
   border-radius: var(--utility-radius);
-  background: var(--library-card);
+  background: var(--being-card);
 }
 
 .empty {
@@ -491,7 +441,7 @@
   gap: 2px;
   padding: 2px;
   border-radius: 9px;
-  background: var(--library-card);
+  background: var(--being-card);
 
   .iconButton {
     width: 28px;
@@ -506,19 +456,14 @@
 }
 
 .tabs {
-  --library-tab-width: 60px;
-  --library-tab-gap: 4px;
-
-  position: relative;
-  isolation: isolate;
   display: flex;
   flex: 1;
-  gap: var(--library-tab-gap);
+  gap: 4px;
 
   button {
-    flex: 0 0 var(--library-tab-width);
-    padding: 6px 10px;
-    white-space: nowrap;
+    position: relative;
+    isolation: isolate;
+    padding: 6px 12px;
     border-radius: 7px;
     color: var(--secondary);
     font-size: 12px;
@@ -533,7 +478,6 @@
 
   button[aria-selected='true'],
   button[aria-selected='true']:hover:not(:disabled) {
-    background: transparent;
     color: var(--text);
     font-weight: 550;
   }
@@ -544,26 +488,13 @@
   }
 }
 
-.tabs::before {
+.tabIndicator {
   position: absolute;
-  inset: 0 auto 0 0;
+  inset: 0;
   z-index: -1;
-  width: var(--library-tab-width);
-  border-radius: 7px;
-  background: var(--library-card);
-  content: '';
+  border-radius: inherit;
+  background: var(--being-card);
   pointer-events: none;
-  transition: transform 180ms ease;
-}
-
-.tabs[data-tab='workspace']::before {
-  transform: translateX(calc(100% + var(--library-tab-gap)));
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .tabs::before {
-    transition: none;
-  }
 }
 
 .recentEmpty {

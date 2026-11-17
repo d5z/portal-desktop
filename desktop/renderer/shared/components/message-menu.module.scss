@@ -1,7 +1,8 @@
 @use '../styles/mixins';
+@use '../styles/chat-menu';
 
 .menu {
-  @include mixins.menu-enter;
+  @include chat-menu.popover-presence;
 
   position: fixed;
   inset: auto;
@@ -95,20 +96,17 @@
 }
 
 .chatMenu {
-  width: 168px;
+  @include chat-menu.surface;
+
   padding: 4px;
-  border-radius: 12px;
-  background: light-dark(#fff, #252525);
-  box-shadow: 0 4px 16px light-dark(rgb(0 0 0 / 13%), rgb(0 0 0 / 32%));
+  font-size: 13px;
 
   .info {
-    padding: 6px 8px;
+    padding: 4px 8px;
   }
 
   button {
-    min-height: 32px;
-    padding: 6px 8px;
-    border-radius: 8px;
+    @include chat-menu.action-row;
   }
 
   svg {
@@ -116,7 +114,4 @@
     height: 16px;
   }
 
-  @media (pointer: coarse) {
-    button { min-height: 44px; }
-  }
 }

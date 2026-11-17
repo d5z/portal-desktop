@@ -1,3 +1,5 @@
+import { AnimatePresence } from 'motion/react';
+import { DropdownMenuMotion } from '../../shared/components/animate-ui/dropdown-menu-motion';
 import { useId, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { RichComposer, type RichComposerProps } from '../../shared/components/rich-composer';
 import { useModel } from '../../shared/hooks/use-model';
@@ -39,18 +41,19 @@ export function ChatComposer({ state, onKeyDown, onConfigureSubagent, onExamples
 
     const update = () => {
       const input = row.querySelector<HTMLElement>('#input');
-      const paragraph = input?.firstElementChild;
-      if (!input || !paragraph) return;
-      const lineHeight = parseFloat(getComputedStyle(input).lineHeight);
-      let expanded = input.childElementCount > 1 || paragraph.tagName !== 'P'
-        || Boolean(paragraph.querySelector('br:not(.ProseMirror-trailingBreak)')) || paragraph.clientHeight > lineHeight + 2;
-      if (!expanded && paragraph.textContent) {
+      if (!input) return;
+      const paragraph = input.firstElementChild;
+      const isSingleParagraph = input.childElementCount === 1 && paragraph?.tagName === 'P'
+        && !paragraph.querySelector('br:not(.ProseMirror-trailingBreak)');
+      let expanded = !isSingleParagraph;
+      if (isSingleParagraph && paragraph.textContent) {
         const range = document.createRange();
         range.selectNodeContents(paragraph);
+        const text = range.getBoundingClientRect();
         const controls = Array.from(row.children).filter(child => child !== root.current);
         const available = row.clientWidth - controls.reduce((width, child) => width + child.getBoundingClientRect().width, 0)
           - controls.length * parseFloat(getComputedStyle(row).columnGap) - 4;
-        expanded = range.getBoundingClientRect().width > available + 1;
+        expanded = text.height > parseFloat(getComputedStyle(input).lineHeight) + 2 || text.width > available;
       }
       area.toggleAttribute('data-long-draft', expanded);
     };
@@ -102,7 +105,7 @@ export function ChatComposer({ state, onKeyDown, onConfigureSubagent, onExamples
   return <div ref={root} className="chat-composer" onFocus={() => setFocused(true)} onBlur={event => {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
   }}>
-    {open && <div ref={menu} className="composer-slash-menu" role="listbox" aria-label="斜杠功能" id={id}>
+    <AnimatePresence>{open && <DropdownMenuMotion ref={menu} className="composer-slash-menu" role="listbox" aria-label="斜杠功能" id={id}>
       {commands.map(command => {
         const index = actions.indexOf(command.id);
         return <div key={command.id} className="composer-command-row" role="presentation"><button className="composer-command-main" type="button" role="option" id={`${id}-${index}`}
@@ -112,7 +115,7 @@ export function ChatComposer({ state, onKeyDown, onConfigureSubagent, onExamples
         <span className="composer-menu-copy"><strong>{command.label}</strong>{command.id === 'subagent' && onConfigureSubagent && state.subagentConfigured !== true && <small>需配置</small>}</span>
       </button>{command.id === 'ui' && onExamples && <ComposerExamples onSelect={() => select('example')} option={{ id: `${id}-${index + 1}`, selected: active === index + 1, onHover: () => setSelected(index + 1) }}/>}</div>;
       })}
-    </div>}
+    </DropdownMenuMotion>}</AnimatePresence>
     <RichComposer {...props} editorExtensions={composerEditorExtensions} aria-controls={open ? id : undefined} aria-autocomplete="list" aria-activedescendant={open ? `${id}-${active}` : undefined}
       value={state.draft} onCompositionStart={event => { setComposing(true); props.onCompositionStart?.(event); }}
       onCompositionEnd={event => { setComposing(false); compositionEndedAt.current = Date.now(); props.onCompositionEnd?.(event); }}

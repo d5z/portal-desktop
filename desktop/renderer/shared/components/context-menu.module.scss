@@ -1,7 +1,8 @@
 @use '../styles/mixins';
+@use '../styles/chat-menu';
 
 .menu {
-  @include mixins.menu-enter;
+  @include chat-menu.popover-presence;
 
   position: fixed;
   z-index: 10000;
@@ -98,19 +99,15 @@
 
 // Chat has its own palette; select it explicitly, including in body portals.
 .menu.chat {
-  background: var(--context-surface, #fffefa);
-  border-color: var(--border);
+  @include chat-menu.surface(
+    var(--chat-menu-surface, var(--bg)),
+    var(--chat-menu-border, 1px solid var(--border))
+  );
+
+  padding: var(--chat-menu-inset, 4px);
   font-family: var(--font-sans);
 
-  button {
-    color: var(--text-dim);
-  }
-
-  button:hover:not(:disabled),
-  button:focus-visible {
-    background: var(--hover-overlay);
-    color: var(--text);
-  }
+  button { @include chat-menu.action-row; }
 
   kbd {
     color: var(--text-muted);
@@ -121,12 +118,8 @@
   }
 }
 
-:root[data-theme='dark'] .menu.chat {
-  --context-surface: #252e27;
-}
-
 :root[data-plugin-theme] .menu.chat {
-  --context-surface: var(--bg-soft);
+  background: var(--bg-soft);
 }
 
 .notice.chat {

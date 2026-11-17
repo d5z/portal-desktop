@@ -280,6 +280,217 @@ body {
   margin: 18px 0;
 }
 
+[data-chat-host='desktop'] #messages .message {
+  .message-bubble-body .content:not(.attachment-message, .attachment-deferred) {
+    --text: var(--chat-bubble-ink);
+    --text-dim: var(--chat-bubble-secondary);
+    --border: var(--chat-bubble-edge);
+    --accent: var(--chat-bubble-link);
+
+    color: var(--text);
+  }
+
+  &.user .message-bubble-body .content:not(.attachment-message, .attachment-deferred) {
+    --text: #fff;
+    --text-dim: #fff;
+    --border: rgb(255 255 255 / 20%);
+    --chat-bubble-inset: #0756af;
+  }
+
+  .content:has(> :is(h1, h2, h3, h4, h5, h6, blockquote, ul, ol, .table-wrap, .code-block)) {
+    font-size: var(--reading-size, 16px);
+    line-height: 1.6;
+  }
+
+  .content {
+    --syntax-keyword: #eed2ff;
+    --syntax-string: #c6f2d7;
+    --syntax-attribute: #fbe4b2;
+    --syntax-value: #caeaff;
+    --syntax-muted: #e1e9f8;
+
+    :is(h1, h2, h3, h4, h5, h6) {
+      margin-block: 1em 0.45em;
+      font-weight: 600;
+      line-height: 1.4;
+      letter-spacing: normal;
+    }
+
+    h1 { font-size: 1.5em; line-height: 1.2; margin-block-start: 0.75em; }
+    h2 { font-size: 1.25em; line-height: 1.25; margin-block-start: 0.9em; }
+    h3 { font-size: 1.125em; }
+    :is(h4, h5, h6) { font-size: 1em; }
+
+    :is(ul, ol) { margin-block: 0.5em; }
+    li { margin-block: 0.125em; }
+    li > :is(ul, ol) { margin-block: 0.125em; }
+    li p { margin-block-end: 0; }
+
+    ul:has(> .markdown-task):not(:has(> li:not(.markdown-task))) { padding-inline-start: 0; }
+    .markdown-task { list-style: none; }
+
+    li > input[type='checkbox'] {
+      appearance: none;
+      width: 14px;
+      height: 14px;
+      margin: 0 8px 0 0;
+      border: 1px solid var(--text-dim);
+      border-radius: 3px;
+      vertical-align: -2px;
+
+      &:checked {
+        background: var(--text-dim);
+
+        &::before {
+          content: '';
+          display: block;
+          width: 12px;
+          height: 12px;
+          background: var(--chat-reply);
+          mask: var(--chat-task-check) center / contain no-repeat;
+        }
+      }
+    }
+
+    blockquote {
+      margin: 0.8em 0;
+      padding: 0 0 0 10px;
+      border: 0;
+      border-inline-start: 1px solid var(--text-dim);
+      color: var(--text-dim);
+
+      p { margin-block: 0 6px; }
+      > :last-child { margin-block-end: 0; }
+      blockquote { margin-block: 6px 0; }
+    }
+
+    :is(code, .code-block) { background: var(--chat-bubble-inset); }
+    pre code { background: transparent; }
+
+    .code-block {
+      border: 0;
+      border-radius: 8px;
+    }
+
+    .code-lang {
+      border: 0;
+      color: var(--text-dim);
+      font: 12px/18px var(--font-sans, system-ui);
+      letter-spacing: normal;
+    }
+
+    .markdown-code-modes button {
+      min-height: 26px;
+      border-radius: 6px;
+
+      &:hover { background: color-mix(in srgb, currentColor 6%, transparent); }
+      &:active { background: color-mix(in srgb, currentColor 12%, transparent); }
+    }
+
+    .rich-code-block pre {
+      font-size: inherit;
+      line-height: 1.55;
+    }
+
+    .hljs { color: var(--text); }
+    :is(.hljs-keyword, .hljs-selector-tag, .hljs-built_in) { color: var(--syntax-keyword); }
+    :is(.hljs-string, .hljs-regexp, .hljs-quote) { color: var(--syntax-string); }
+    :is(.hljs-attr, .hljs-attribute, .hljs-bullet) { color: var(--syntax-attribute); }
+    :is(.hljs-number, .hljs-literal, .hljs-title, .hljs-section) { color: var(--syntax-value); }
+    :is(.hljs-comment, .hljs-code) { color: var(--syntax-muted); }
+
+    .table-wrap {
+      --table-divider: color-mix(in srgb, var(--border) 40%, transparent);
+      border-color: var(--table-divider);
+      border-radius: 8px;
+      background: light-dark(#fff, #202020);
+    }
+
+    .markdown-table-scroll {
+      container: markdown-table / scroll-state;
+      overflow-x: auto;
+      overscroll-behavior-inline: contain;
+      border-radius: inherit;
+
+      &:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+    }
+
+    table {
+      table-layout: auto;
+      font-family: inherit;
+      font-size: 0.875em;
+      font-variant-numeric: tabular-nums;
+    }
+
+    :is(th, td) {
+      min-inline-size: 5rem;
+      border-color: var(--table-divider);
+      overflow-wrap: anywhere;
+    }
+
+    th { background: var(--chat-bubble-inset); }
+
+    .table-scroll-hint {
+      position: sticky;
+      inset-inline-start: 0;
+      align-items: center;
+      gap: 4px;
+      width: max-content;
+      padding: 4px 8px;
+      color: var(--text-dim);
+      font: 12px/18px var(--font-sans, system-ui);
+    }
+
+    @container markdown-table scroll-state(scrollable: inline) {
+      .table-scroll-hint { display: flex; }
+    }
+
+    > :is(p, ul, ol, blockquote, .code-block, .table-wrap) + :is(p, ul, ol, blockquote, .code-block, .table-wrap) {
+      margin-block-start: 0.8em;
+    }
+
+    > :first-child { margin-block-start: 0; }
+    > :last-child { margin-block-end: 0; }
+  }
+
+  &.being .content {
+    --syntax-keyword: light-dark(#843d86, #eed2ff);
+    --syntax-string: light-dark(#26665a, #c6f2d7);
+    --syntax-attribute: light-dark(#795717, #fbe4b2);
+    --syntax-value: light-dark(#305e99, #caeaff);
+    --syntax-muted: light-dark(#6a6a6a, #e1e9f8);
+  }
+
+  &.user .content {
+    :is(em, a, .chat-place-link, code .chat-code-link) { color: #fff; }
+
+    .markdown-code-modes {
+      background: rgb(255 255 255 / 10%);
+
+      button {
+        color: #fff;
+
+        &:is(:hover, [aria-pressed='true']) { background: rgb(255 255 255 / 12%); }
+        &:active { background: rgb(255 255 255 / 20%); }
+      }
+    }
+
+    .table-wrap {
+      --table-divider: var(--border);
+      background: var(--chat-bubble-inset);
+    }
+
+    :is(th, td) { background: transparent; color: inherit; }
+    li > input[type='checkbox']:checked::before { background: var(--chat-sent); }
+  }
+
+  @media (max-width: 360px) {
+    .content :is(th, td) { min-inline-size: 4.5rem; }
+  }
+}
+
+.table-scroll-hint { display: none; }
+
 #input-area {
   padding: 14px 16px 12px;
   border-radius: 18px;

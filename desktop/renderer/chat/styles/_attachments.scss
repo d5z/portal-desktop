@@ -1,3 +1,5 @@
+@use '../../shared/styles/chat-menu';
+
 /* Attachment originals remain distinct from model-facing parsed context. */
 .attachment-message {
   display: grid;
@@ -355,54 +357,79 @@
   opacity: 0.55;
 }
 
-.attachment-menu {
-  position: relative;
-  flex-shrink: 0;
-}
-
-.attachment-menu summary {
-  list-style: none;
-  cursor: pointer;
-  padding: 5px;
-  font-weight: 700;
+.attachment-menu-trigger {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
   color: var(--text-dim);
+  cursor: pointer;
+
+  &:is(:hover, [aria-expanded='true']) { background: var(--hover-overlay); }
+  &:focus-visible { outline: 1px solid currentColor; outline-offset: -1px; }
 }
 
-.attachment-menu summary::-webkit-details-marker {
-  display: none;
-}
+.attachment-file-popover[popover] {
+  @include chat-menu.surface;
+  @include chat-menu.popover-presence;
 
-.attachment-menu > div {
-  position: absolute;
-  z-index: 20;
-  right: 0;
-  top: 100%;
-  min-width: 155px;
-  padding: 6px;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--bg);
-  box-shadow: 0 6px 24px #0002;
-}
-
-.attachment-menu > div > button,
-.attachment-menu .attachment-details > button {
-  display: block;
-  width: 100%;
-  padding: 8px 10px;
-  text-align: left;
-  white-space: nowrap;
-  border-radius: 6px;
-}
-
-.attachment-menu button:hover {
-  background: var(--hover-overlay);
-}
-
-.attachment-menu .attachment-details:has(.attachment-segment) {
-  width: 320px;
-  max-height: 380px;
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  width: min(248px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px);
   overflow: auto;
+  padding: 4px;
+  gap: 2px;
+  color: var(--text);
+  font: 400 13px/20px var(--font-sans);
+  isolation: isolate;
+
+  &:popover-open { display: grid; }
+
+  // React Bits GlideSelect-TS-CSS pill, adapted to the menu's row geometry.
+  > .glide-select__pill {
+    position: absolute;
+    z-index: -1;
+    top: 0;
+    inset-inline: var(--chat-menu-inset, 4px);
+    height: 30px;
+    border-radius: var(--chat-menu-row-radius, 7px);
+    background: var(--chat-menu-hover, var(--hover-overlay));
+    opacity: 0;
+    pointer-events: none;
+    transition: transform var(--ui-motion-surface) cubic-bezier(.23, 1, .32, 1), opacity 150ms ease;
+    @media (prefers-reduced-motion: reduce) { transition: none; }
+  }
+
+  [role='menuitem'] { @include chat-menu.action-row; }
+  &[data-gliding] [role='menuitem']:hover:not(:disabled, :active) { background: transparent; }
+  .attachment-details:has(.attachment-segment) { max-height: 380px; overflow: auto; }
+}
+
+.attachment-file-menu-groups,
+.attachment-file-menu-group { display: grid; gap: 2px; }
+
+.attachment-file-menu-group {
+  > strong {
+    padding: 4px var(--space-sm);
+    color: var(--text-dim);
+    font: 500 12px/18px var(--font-sans);
+    overflow-wrap: anywhere;
+  }
+
+  &:only-child > strong { display: none; }
+
+  + .attachment-file-menu-group {
+    margin-top: 4px;
+    padding-top: 4px;
+    border-top: 1px solid var(--border);
+  }
 }
 
 .message.thinking-indicator.attachment-parsing-indicator {

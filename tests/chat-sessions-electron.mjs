@@ -438,7 +438,9 @@ try {
   },status);
   await pushTasks('running');
   assert.equal(await chat.getByText('尚未配置 · 点击配置模型',{exact:true}).count(),0);
-  await page.getByRole('button',{name:'切换到场景：跨客户端场景'}).locator('.chat-session-activity[title="执行中"]').waitFor();
+  const runningScene = page.getByRole('button',{name:'切换到场景：跨客户端场景'});
+  await runningScene.locator('.chat-session-activity[data-status="working"]').waitFor();
+  assert.equal(await runningScene.getAttribute('aria-description'),'执行中');
   if (await schedulingRun.getAttribute('open') === null) await schedulingRun.locator('summary').click();
   await chat.locator('.scene-task-list').getByText('后台执行中',{exact:true}).waitFor();
   await page.screenshot({animations:'disabled',path:'test-results/scene-scheduling-running.png'});

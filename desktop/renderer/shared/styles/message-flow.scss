@@ -4,6 +4,17 @@
   --chat-inset-right: max(20px, calc((100% - var(--chat-content-width)) / 2));
 }
 
+.chat-root[data-chat-host='desktop'],
+#chat-view {
+  --chat-gutter: clamp(20px, calc(20vw - 84px), clamp(44px, 4.4vw, 56px));
+  --chat-inset-left: max(var(--chat-gutter), calc((100% - var(--chat-content-width)) / 2));
+  --chat-inset-right: var(--chat-inset-left);
+
+  @media (max-width: 520px) {
+    --chat-inset-right: max(var(--chat-gutter), env(safe-area-inset-right));
+  }
+}
+
 .message-time-divider {
   display: block;
   width: 100%;

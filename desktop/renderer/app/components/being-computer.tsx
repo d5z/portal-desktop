@@ -1,3 +1,5 @@
+import { AnimatePresence } from 'motion/react';
+import { DropdownMenuMotion } from '../../shared/components/animate-ui/dropdown-menu-motion';
 import { WorkspaceDrawer } from "../../shared/components/workspace-drawer";
 import { Icon } from '../../shared/icons/icon';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
@@ -168,12 +170,12 @@ export function BeingComputer({ name, api, active, context, browserHost, availab
       onClick={() => void refresh()}><Icon name="refresh" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></button>
     {state.authenticated && <button type="button" className="topbar-icon-button" aria-label="电脑更多操作" title="更多" aria-haspopup="true" aria-expanded={menuOpen}
       onClick={() => setMenuOpen(value => !value)}><Icon name="more" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /></button>}
-    {menuOpen && <div className="being-computer-menu" aria-label="电脑操作">
+    <AnimatePresence>{menuOpen && <DropdownMenuMotion className="being-computer-menu" aria-label="电脑操作">
       {viewing && <button type="button" disabled={!!busy} onClick={() => void run('open')}>重新连接浏览器</button>}
       {viewing && <button type="button" onClick={() => { autoOpen.current = false; void run('close'); }}>关闭浏览器</button>}
       {ready && running && !pending && <button type="button" disabled={!!busy} onClick={() => activate('stop')}>停止电脑…</button>}
       <button type="button" disabled={!!busy} onClick={() => activate('logout')}>退出 Home…</button>
-    </div>}
+    </DropdownMenuMotion>}</AnimatePresence>
   </div>;
   const feedback = <>{state.error && <p className="being-computer-error" role="alert">{state.error}</p>}
     {confirmation && <div className="being-computer-confirm" role="group" aria-label="确认云电脑操作">

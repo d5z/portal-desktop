@@ -1,3 +1,5 @@
+import { AnimatePresence } from 'motion/react';
+import { DropdownMenuMotion } from '../shared/components/animate-ui/dropdown-menu-motion';
 import { Icon } from '../shared/icons/icon';
 import { CodeClipboard } from '../shared/components/markdown';
 import { ToolsLibrary } from './components/tools-library';
@@ -498,8 +500,8 @@ function FiresideMembers({
         {loading && <span className="fireside-members-loading" aria-label="正在读取" />}
         <Icon name="chevron-down-12" className="fireside-members-chevron" />
       </button>
-      {open && (
-        <div
+      <AnimatePresence>{open && (
+        <DropdownMenuMotion
           className="fireside-member-panel"
           role="dialog"
           aria-label="围炉成员名单"
@@ -550,8 +552,8 @@ function FiresideMembers({
               </div>
             ))}
           </div>
-        </div>
-      )}
+        </DropdownMenuMotion>
+      )}</AnimatePresence>
     </div>
   );
 }

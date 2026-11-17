@@ -130,9 +130,11 @@
   border-radius: 10px;
 }
 
-#being-info .being-overview {
-  --being-card: light-dark(#f0f0f0, #2c2d2f);
+#being-info {
+  --being-card: light-dark(#f6f6f6, #202020);
+}
 
+#being-info .being-overview {
   padding: 12px 18px 0;
 }
 
@@ -372,8 +374,30 @@
   border-radius: inherit;
 }
 
+#being-info .being-config-actions {
+  position: relative;
+  isolation: isolate;
+}
+
+#being-info .being-config-actions > .glide-select__pill {
+  position: absolute;
+  z-index: -1;
+  top: 0;
+  inset-inline: 0;
+  border-radius: var(--utility-radius);
+  background: light-dark(#efefef, #2b2b2b);
+  opacity: 0;
+  pointer-events: none;
+  transition: transform var(--ui-motion-surface) var(--ui-ease), opacity var(--ui-motion-fast) ease;
+}
+
+#being-info .being-config-actions[data-gliding] > .being-action-row:hover:not(:active)::before {
+  opacity: 0;
+}
+
 @media (prefers-reduced-motion: reduce) {
-  #being-info .being-tabs::before {
+  #being-info .being-tabs::before,
+  #being-info .being-config-actions > .glide-select__pill {
     transition: none;
   }
 }

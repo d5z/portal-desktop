@@ -60,12 +60,11 @@ try{
  assert.equal(await page.evaluate(()=>copied.at(-1)),history[1].content);
  const more = page.locator('[data-history-seq="2"]').getByRole('button', { name: '更多消息操作' });
  await bubble.hover();
- assert.equal(await more.evaluate(el => el.getBoundingClientRect().width), 24);
- await more.click();
- await menu.waitFor();
- await page.keyboard.press('Escape');
- await menu.waitFor({ state: 'detached' });
- assert.equal(await more.evaluate(el => el === document.activeElement), true);
+ assert.equal(await more.count(), 0, 'A plain desktop message has one visible copy affordance');
+ const copy = page.locator('[data-history-seq="2"]').getByRole('button',{name:'复制正文'});
+ assert.equal(await copy.evaluate(el => el.getBoundingClientRect().width), 24);
+ await copy.hover();
+ await page.getByRole('tooltip').filter({hasText:'复制正文'}).waitFor();
  await bubble.focus();await page.keyboard.press('Shift+F10');await menu.waitFor();
  await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
  await menu.waitFor({state:'detached'});assert.equal(await page.evaluate(()=>copied.at(-1)),history[1].content);

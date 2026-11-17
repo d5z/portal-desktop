@@ -4,7 +4,7 @@ import type { ChatItem } from '../models/chat';
 import { firstAfter } from '../models/scroll-position';
 
 /** One controller owns bottom-follow and reading-position compensation. */
-export function useMessageScroll(items: ChatItem[], container: RefObject<HTMLDivElement | null>, elements: RefObject<Map<string, HTMLDivElement>>, composer: RefObject<HTMLDivElement | null>) {
+export function useMessageScroll(items: ChatItem[], container: RefObject<HTMLDivElement | null>, elements: RefObject<Map<string, HTMLDivElement>>, composer: RefObject<HTMLDivElement | null>, edgeRoot: RefObject<HTMLDivElement | null> | undefined, topInset: number) {
   const ordered = useRef<HTMLDivElement[]>([]);
   const snapshot = useRef({ away: false, count: 0 }), listeners = useRef(new Set<() => void>());
   const subscribe = useCallback((listener: () => void) => { listeners.current.add(listener); return () => { listeners.current.delete(listener); }; }, []);
@@ -12,17 +12,29 @@ export function useMessageScroll(items: ChatItem[], container: RefObject<HTMLDiv
   const publish = useCallback(() => {
     const el = container.current;
     if (!el) return;
-    const viewportBottom = el.getBoundingClientRect().top + el.clientHeight;
+    const viewportHeight = el.clientHeight;
+    const viewportBottom = el.getBoundingClientRect().top + viewportHeight;
     const bottom = Math.min(viewportBottom, composer.current?.getBoundingClientRect().top ?? viewportBottom);
+    const remaining = el.scrollHeight - el.scrollTop - viewportHeight;
+    const edges = edgeRoot?.current?.style;
+    if (edges) {
+      // Reuse the reading controller's scroll measurements for the two visual edges.
+      const clearance = viewportBottom - bottom;
+      const lead = Math.min(80, Math.max(0, viewportHeight - clearance - 48));
+      const top = Math.min(1, Math.max(0, el.scrollTop) / (48 + topInset)).toFixed(3);
+      const end = Math.min(1, Math.max(0, remaining) / Math.max(1, clearance + lead)).toFixed(3);
+      if (edges.getPropertyValue('--chat-edge-top') !== top) edges.setProperty('--chat-edge-top', top);
+      if (edges.getPropertyValue('--chat-edge-bottom') !== end) edges.setProperty('--chat-edge-bottom', end);
+    }
     // Bottom padding is not unread content; show the shortcut only when the
     // timeline extends below the visible area above the composer.
-    const away = el.clientHeight > 0 && el.scrollHeight - el.scrollTop - el.clientHeight > 2 &&
+    const away = viewportHeight > 0 && remaining > 2 &&
       (el.lastElementChild?.getBoundingClientRect().bottom ?? 0) > bottom + 2;
     const count = away ? ordered.current.length - firstAfter(ordered.current.length, bottom + 2, index => ordered.current[index].getBoundingClientRect().bottom) : 0;
     if (snapshot.current.away === away && snapshot.current.count === count) return;
     snapshot.current = { away, count };
     listeners.current.forEach(listener => listener());
-  }, [container, composer]);
+  }, [container, composer, edgeRoot, topInset]);
   const scrollLock = useRef(true), observedTop = useRef<number | null>(null), frame = useRef(0);
   const touchY = useRef(0);
   const reading = useRef<{ node: Element; offset: number; scrollTop: number; width: number } | null>(null);

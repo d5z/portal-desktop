@@ -5,6 +5,24 @@
   --message-bubble-width: 70%;
 }
 
+.chat-root[data-chat-host='desktop'] {
+  --bg: light-dark(#fff, #1c1c1c);
+  background: var(--bg);
+
+  #app {
+    --chat-composer-clearance: calc(var(--chat-composer-height, 50px) + var(--chat-composer-bottom));
+    --chat-composer-blur-lead: clamp(0px, calc(100dvh - var(--chat-composer-clearance) - 48px), 80px);
+    --chat-edge-tint: color-mix(in srgb, var(--bg) 75%, transparent);
+  }
+
+  @media (max-height: 600px) {
+    #app { --chat-composer-bottom: 12px; }
+  }
+}
+
+.chat-edge-top { --gradual-blur-reveal: var(--chat-edge-top, 0); }
+.chat-edge-bottom { --gradual-blur-reveal: var(--chat-edge-bottom, 0); }
+
 #messages {
   padding: max(24px, calc(var(--chat-top-inset, 0px) + 8px)) var(--chat-inset-right) max(120px, calc(var(--chat-composer-height, 99px) + var(--chat-composer-bottom) + 20px)) var(--chat-inset-left);
   scroll-padding-top: calc(20px + var(--chat-top-inset, 0px));
@@ -16,6 +34,14 @@
     transparent calc(var(--chat-composer-height, 52px) + var(--chat-composer-bottom)),
     #000 calc(var(--chat-composer-height, 52px) + var(--chat-composer-bottom) + 20px)
   );
+}
+
+@media (prefers-reduced-transparency: no-preference) and (prefers-contrast: no-preference) and (forced-colors: none) {
+  .chat-root[data-chat-host='desktop'] #messages { mask-image: none; }
+}
+
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more), (forced-colors: active) {
+  .chat-edge-blur { display: none; }
 }
 
 #messages > :is(.message.user, .message.being) {
@@ -106,8 +132,9 @@
     font: 12px/1.5 var(--font-sans, system-ui);
     cursor: pointer;
 
-    &:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+    &:hover:not(:disabled) { background: color-mix(in srgb, currentColor 8%, transparent); }
     &:focus-visible { outline: 1px solid currentColor; outline-offset: -1px; }
+    &:disabled { opacity: 0.45; cursor: default; }
   }
 }
 
@@ -120,6 +147,7 @@
   position-anchor: var(--message-error-anchor);
   position-area: top center;
   position-try-fallbacks: flip-block, flip-inline;
+  width: max-content;
   max-width: min(280px, calc(100vw - 16px));
   margin: 6px;
   padding: 6px 9px;
@@ -129,7 +157,16 @@
   color: var(--text);
   box-shadow: 0 3px 12px #0002;
   font: 12px/1.5 var(--font-sans, system-ui);
+  overflow: visible;
   overflow-wrap: anywhere;
+
+  &[data-below] { position-area: bottom center; }
+
+  &::before {
+    position: absolute;
+    inset: -7px 0;
+    content: '';
+  }
 }
 
 .message-feedback-announcement {
@@ -169,7 +206,7 @@
 }
 
 @media (hover: hover) and (pointer: fine) {
-  .message-bubble-row:not(:hover, :focus-within, :has(.message-more[aria-expanded='true'])) .message-row-actions {
+  .message-bubble-row:not(:hover, :focus-within, :has(:is(.message-more, .audio-menu-trigger, .attachment-menu-trigger)[aria-expanded='true'])) .message-row-actions {
     opacity: 0;
     pointer-events: none;
   }
@@ -275,6 +312,155 @@
   color: inherit;
 }
 
+[data-chat-host='desktop'] #messages {
+  --chat-bubble-ink: light-dark(#202020, #f6f6f6);
+  --chat-bubble-secondary: light-dark(#5c5c5c, #c9c9c9);
+  --chat-bubble-edge: light-dark(#e1e1e1, #363636);
+  --chat-bubble-inset: light-dark(#efefef, #2b2b2b);
+  --chat-bubble-link: light-dark(#086fd1, #5cb8ff);
+  --chat-bubble-hover: color-mix(in srgb, var(--chat-bubble-ink) 6%, transparent);
+  --chat-bubble-pressed: color-mix(in srgb, var(--chat-bubble-ink) 12%, transparent);
+
+  .message-bubble-row { row-gap: 2px; }
+
+  .message-row-actions {
+    --text-muted: var(--chat-bubble-secondary);
+    --selected: var(--chat-bubble-hover);
+    --pressed: var(--chat-bubble-pressed);
+    gap: 6px;
+  }
+
+  .message-action-time { color: light-dark(#6a6a6a, #a0a0a0); }
+
+  .message-row-actions button[data-copy-failed] { color: light-dark(#d33145, #ff9da7); }
+
+  .message-row-actions > button + button { margin-inline-start: -2px; }
+
+  .message-row-actions .message-more {
+    &:is(:hover, [aria-expanded='true']) { background: var(--chat-bubble-hover); }
+    &:active:not(:disabled) { background: var(--chat-bubble-pressed); }
+  }
+
+  .message-row-actions .message-feedback,
+  .chat-inline-notice .message-feedback {
+    gap: 2px;
+    margin: 0;
+    color: light-dark(#d33145, #ff9da7);
+  }
+
+  .message.being .message-row-actions .message-feedback { order: -1; }
+
+  .message-media-actions { display: contents; }
+
+  .message.user .message-action-time { order: -2; }
+  .message.user .message-media-actions > .audio-menu-trigger { order: -1; }
+  .message.user .message-media-actions > :not(.audio-menu-trigger) { order: 1; }
+  .message.being .message-media-actions > :not(.audio-menu-trigger) { order: -1; }
+
+  .message-media-actions :is(.attachment-download-icon, .audio-menu-trigger) {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    padding: 0;
+    margin: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--chat-bubble-secondary);
+
+    &:is(:hover, [aria-expanded='true']):not(:disabled) { background: var(--chat-bubble-hover); }
+    &:active:not(:disabled) { background: var(--chat-bubble-pressed); }
+    &:focus-visible { outline: 1px solid currentColor; outline-offset: -1px; }
+  }
+
+  .message-media-actions :is(.message-action-status, .attachment-download-progress) {
+    color: var(--chat-bubble-secondary);
+    font: 12px/18px var(--font-sans, system-ui);
+  }
+
+  .message-media-actions .attachment-download-progress {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0 4px;
+    width: 108px;
+
+    progress {
+      width: 100%;
+      height: 3px;
+      accent-color: var(--accent);
+    }
+
+    button {
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: var(--chat-bubble-link);
+      font: inherit;
+    }
+  }
+
+  .message.user .content.attachment-message {
+    max-width: min(320px, 100%);
+
+    > div { gap: 6px; }
+  }
+
+  .message-feedback:has(.message-feedback-tooltip:popover-open) .message-feedback-reason,
+  .message-feedback > button:hover:not(:disabled) {
+    background: var(--chat-bubble-hover);
+  }
+
+  .message-feedback-tooltip {
+    padding: 6px 9px;
+    background: light-dark(#fff, #363636);
+    color: var(--chat-bubble-ink);
+    box-shadow: 0 4px 16px light-dark(rgb(0 0 0 / 13%), rgb(0 0 0 / 32%));
+  }
+
+  .chat-inline-notice {
+    align-items: center;
+    gap: 6px;
+    color: var(--chat-bubble-secondary);
+    font-size: 12px;
+    line-height: 18px;
+  }
+
+  .thinking-bubble {
+    min-width: 58px;
+    min-height: 52px;
+    padding: 0;
+    border-radius: 16px;
+    color: var(--chat-bubble-secondary);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .message-bubble-row:not(:focus-within, :has(.message-bubble-body:hover, .message-row-actions:hover, :is(.audio-menu-trigger, .attachment-menu-trigger)[aria-expanded='true'], .message-feedback-tooltip:popover-open)) .message-row-actions {
+      opacity: 0;
+      pointer-events: none;
+
+      &:has(.message-feedback, .attachment-download-progress, .message-action-status) { opacity: 1; }
+      > :is(.message-feedback, .message-media-actions) { pointer-events: auto; }
+      > :not(.message-feedback, .message-media-actions) { opacity: 0; }
+      .message-media-actions > .audio-menu-trigger { opacity: 0; pointer-events: none; }
+    }
+  }
+
+  @media (max-width: 520px) {
+    .message-row-actions { flex-basis: 100%; padding-block-end: 0; }
+    .message.user .message-row-actions { justify-content: flex-end; }
+  }
+
+  @media (pointer: coarse) {
+    .message-feedback > button,
+    .message-media-actions :is(.attachment-download-icon, .audio-menu-trigger) {
+      min-width: var(--touch-target);
+      min-height: var(--touch-target);
+    }
+  }
+}
+
 /* Keep process activity behind the floating composer instead of showing through it. */
 .run-activity {
   position: relative;
@@ -298,10 +484,14 @@
   padding: 7px;
   --prompt-shadow: 0 2px 8px rgb(32 32 32 / 4%), 0 4px 80px 8px rgb(32 32 32 / 2.4%);
 
-  border: 1px solid var(--border);
+  border: 1px solid light-dark(#e1e1e1, var(--border));
   border-radius: 22px;
   background: var(--composer-surface, var(--bg));
   box-shadow: var(--prompt-shadow);
+}
+
+.composer-stack:not(:has(.composer-queue)) > #input-area:not([data-long-draft], :has(#pending-files.active, .composer-editing-queue, .iui-context-target)) {
+  border-radius: 999px;
 }
 
 #input-area:focus-within {

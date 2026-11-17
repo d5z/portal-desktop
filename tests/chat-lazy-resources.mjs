@@ -12,7 +12,7 @@ function App(){const[immediate,setImmediate]=useState(false);window.activate=()=
 <AttachmentAudio src="/audio.wav" name="fixture.wav" endpoint="https://fixture.test" id="audio_fixture"/>
 <div id="messages" style={{height:240,overflow:'auto'}}><div style={{height:1800}}>spacer</div><Deferred/><UploadTransition immediate={immediate}/></div></>;}
 createRoot(document.getElementById('root')).render(<App/>);
-`},bundle:true,write:false,format:'iife',platform:'browser',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"'}});
+`},bundle:true,write:false,format:'iife',platform:'browser',jsx:'automatic',loader:{'.scss':'empty'},define:{'process.env.NODE_ENV':'"production"'}});
 const wav=Buffer.alloc(44+8000);wav.write('RIFF');wav.writeUInt32LE(wav.length-8,4);wav.write('WAVEfmt ',8);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(1,22);wav.writeUInt32LE(8000,24);wav.writeUInt32LE(16000,28);wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(8000,40);
 let audioReads=0;
 const server=createServer((req,res)=>{if(req.url==='/fixture.js'){res.setHeader('Content-Type','text/javascript');return res.end(bundle.outputFiles[0].text);}if(req.url==='/audio.wav'){audioReads++;res.setHeader('Content-Type','audio/wav');return res.end(wav);}if(req.url.startsWith('/api/')){res.setHeader('Content-Type','application/json');return res.end('{}');}res.setHeader('Content-Type','text/html');res.end('<!doctype html><div id="root"></div><script src="/fixture.js"></script>');});

@@ -1,3 +1,4 @@
+import { dropdownMenuPopover } from '../../shared/components/animate-ui/dropdown-menu-motion';
 import { Icon } from '../../shared/icons/icon';
 import { useId, useLayoutEffect, useRef, useState } from 'react';
 import { canUseComposerCommand, composerCommands, insertComposerCommand } from '../models/composer-commands';
@@ -35,12 +36,12 @@ export function ComposerAddMenu({ state, onUpload, onSelect, onConfigureSubagent
     return () => { observer.disconnect(); window.removeEventListener('resize', close); window.removeEventListener('blur', close); };
   }, [open]);
   return <div className="composer-add">
-    <button ref={trigger} type="button" className="btn-icon composer-add-trigger" aria-label="添加附件和工具" title={state.intelligentUIForMessage ? '添加附件和工具 · 本条已开启智能 UI' : '添加附件和工具'}
+    <button ref={trigger} type="button" className="btn-icon composer-add-trigger" aria-label="添加附件和工具" data-warm-tooltip={state.intelligentUIForMessage ? '添加附件和工具 · 本条已开启智能 UI' : '添加附件和工具'}
       popoverTarget={id} onClick={event => { event.preventDefault(); toggle(); }} aria-haspopup="menu" aria-expanded={open} data-active={state.intelligentUIForMessage}>
       <Icon name="plus" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
       {state.intelligentUIForMessage && <span className="composer-add-dot" aria-hidden="true"/>}
     </button>
-    <div id={id} ref={menu} popover="auto" role="menu" aria-label="添加附件和工具" className="composer-add-menu" onToggle={event => setOpen(event.newState === 'open')}
+    <div id={id} ref={menu} popover="auto" role="menu" aria-label="添加附件和工具" className="composer-add-menu" {...dropdownMenuPopover} onToggle={event => setOpen(event.newState === 'open')}
       onKeyDown={event => {
         if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(event.key)) return;
         event.preventDefault();

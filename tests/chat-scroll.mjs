@@ -163,7 +163,7 @@ try {
   for (let i = 0; i < 5; i++) {
     event(heldResponse, 'content_block_delta', { delta: { text: `\n\n滚动回归段落 ${i}` } });
     await frame.getByText(`滚动回归段落 ${i}`, { exact: true }).waitFor();
-    assert.match(await jump.innerText(),/^(1条消息|最新消息)$/,'Streaming text in the same bubble does not increment the message count');
+    assert.match(await jump.getAttribute('title'),/^(下方还有1条消息|回到底部)$/,'Streaming text in the same bubble does not increment the message count');
     assert.ok(Math.abs(await messages.evaluate(el => el.scrollTop) - readingTop) < 2,
       'Streaming must preserve the reading position after a small upward scroll');
   }

@@ -18,7 +18,16 @@ const glyphs = {
     <circle cx="5.25" cy="7" r="1.167" /><circle cx="8.75" cy="7" r="1.167" />
     <circle cx="5.25" cy="11.083" r="1.167" /><circle cx="8.75" cy="11.083" r="1.167" />
   </>) },
+  'chat-grip': { viewBox: '0 0 24 24', content: (<><circle cx="9" cy="12" r="1" /><circle cx="9" cy="5" r="1" /><circle cx="9" cy="19" r="1" /><circle cx="15" cy="12" r="1" /><circle cx="15" cy="5" r="1" /><circle cx="15" cy="19" r="1" /></>) },
+  'chat-queue': { viewBox: '0 0 20 20', content: <path d="M3.33 3.33V11q0 4 4 4h9.33m-2.08-2.08L16.66 15l-2.08 2.08M7.5 5h6.67M7.5 9.58h4.17" strokeWidth="1.33" /> },
+  'chat-busy': { viewBox: '0 0 24 24', content: <path d="M21 12a9 9 0 1 1-6.219-8.56" /> },
+  'chat-stop': { viewBox: '0 0 24 24', content: <rect width="18" height="18" x="3" y="3" rx="2" fill="currentColor" stroke="none" /> },
+  'chat-error': { viewBox: '0 0 24 24', content: (<><circle cx="12" cy="12" r="10" /> <line x1="12" x2="12" y1="8" y2="12" /> <line x1="12" x2="12.01" y1="16" y2="16" /></>) },
+  'chat-play': { viewBox: '0 0 24 24', content: (<path d="M5 5a2 2 0 0 1 3.008-1.728l11.997 6.998a2 2 0 0 1 .003 3.458l-12 7A2 2 0 0 1 5 19z" fill="currentColor" stroke="none" />) },
+  'chat-pause': { viewBox: '0 0 24 24', content: (<><rect x="14" y="3" width="5" height="18" rx="1" /> <rect x="5" y="3" width="5" height="18" rx="1" /></>) },
+  'chat-retry': { viewBox: '0 0 24 24', content: <><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8" /><path d="M21 3v5h-5" /></> },
   'chat-download': { viewBox: '0 0 24 24', content: <><path d="M12 15V3" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5" /></> },
+  'chat-external-link': { viewBox: '0 0 24 24', content: <><path d="M15 3h6v6" /><path d="M10 14 21 3" /><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" /></> },
   'chat-image': { viewBox: '0 0 24 24', content: (<><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></>) },
   'chat-file': { viewBox: '0 0 24 24', content: (<><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></>) },
   // Official Lucide geometry used by Being Home, https://lucide.dev/license.

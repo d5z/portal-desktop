@@ -88,6 +88,12 @@ html[data-platform='win32'] .workspace-stage .topbar {
   overflow: visible;
 }
 
+.workspace-body > #being-info,
+.workspace-content > #chat-view {
+  --panel-canvas: light-dark(#fff, #1c1c1c);
+  --panel-border: light-dark(#e9e9e9, #353535);
+}
+
 /* Clip the content corners without clipping the handle in the shared gutter. */
 .workspace-body > :is(.client-file-viewer, .plugin-sidebar) > :last-child,
 #chat-view > #chat-frame {
@@ -317,7 +323,7 @@ html[data-platform='darwin'] .workspace-stage .topbar {
   overflow: hidden;
   border-left: 1px solid var(--line);
   padding: 48px 24px 0;
-  background: var(--bg);
+  background: var(--panel-canvas, var(--bg));
 }
 
 .being-info-close {
@@ -545,7 +551,7 @@ html[data-platform='darwin'] .workspace-stage .topbar {
   outline: 1px solid var(--panel-border);
   outline-offset: -1px;
   border-radius: var(--panel-radius);
-  background: var(--bg);
+  background: var(--panel-canvas, var(--bg));
   box-shadow: none;
   overflow: clip;
 }

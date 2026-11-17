@@ -4,9 +4,9 @@ export function audioMenuPosition(rect:{top:number;bottom:number;right:number},v
   const preferredTop=rect.top-height-gap>=edge ? rect.top-height-gap : rect.bottom+gap;
   const top=Math.max(edge,Math.min(viewport.height-height-edge,preferredTop));
   const submenuWidth=Math.min(220,viewport.width-edge*2),submenuHeight=size.submenuHeight;
-  const submenuLeft=left>=submenuWidth+gap+edge ? -submenuWidth-gap
-    : left+width+gap+submenuWidth<=viewport.width-edge ? width+gap
-    : Math.max(edge-left,viewport.width-submenuWidth-left-edge);
+  const side=left>=submenuWidth+gap+edge ? 'left'
+    : left+width+gap+submenuWidth<=viewport.width-edge ? 'right' : 'stacked';
+  const submenuLeft=side==='left' ? -submenuWidth-gap : side==='right' ? width+gap : 0;
   const submenuTop=Math.max(edge-top,Math.min(48,viewport.height-top-submenuHeight-edge));
-  return {left,top,width,submenuLeft,submenuTop,submenuWidth};
+  return {left,top,width,side,submenuLeft,submenuTop,submenuWidth:side==='stacked' ? width : submenuWidth};
 }

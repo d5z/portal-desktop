@@ -1,4 +1,5 @@
 @use '../styles/mixins';
+@use '../styles/conversation-control';
 
 .root {
   display: flex;
@@ -28,26 +29,19 @@
   font: inherit;
 }
 
-.identity {
+.trigger.identity {
+  @include conversation-control.surface;
+
   flex-direction: column;
   gap: 3px;
   min-width: 0;
   max-width: min(240px, 100%);
   min-height: 62px;
   padding: 10px 20px;
-  border-radius: 24px;
-  background: var(--control);
-  box-shadow: var(--popover-shadow);
-  transition: background-color 160ms ease;
 
   &[data-idle='true'] {
     min-height: 42px;
   }
-}
-
-.trigger.identity:hover,
-.identity[aria-expanded='true'] {
-  background: var(--surface);
 }
 
 .identityName {

@@ -1,3 +1,4 @@
+import { SmallMenuDetails } from '../../shared/components/small-menu-details';
 import { catalogPage } from '../models/pagination';
 import { useEffect, useRef, useState } from "react";
 import type { SeedFilters, TownQuery } from "../../../shared/types";
@@ -37,7 +38,8 @@ export function SeedSearch({ town }: { town: TownModel }) {
     }}>
       <input type="search" aria-label="搜索种子" placeholder="搜索种子、领域或经验…" maxLength={300}
         value={filters.q} onChange={event => setFilters({ ...filters, q: event.target.value })} />
-      <details className="seed-filter-menu" ref={more} onKeyDown={event => {
+      <SmallMenuDetails className="seed-filter-menu" surfaceClassName="seed-filter-fields" ref={more}
+        summary={`筛选${Object.entries(town.seedFilters).some(([key, value]) => key !== "q" && value) ? " · 已设置" : ""}`} onKeyDown={event => {
         if (event.key !== "Escape") return;
         event.stopPropagation();
         if (event.target instanceof Element && event.target.closest("select:open")) return;
@@ -45,19 +47,16 @@ export function SeedSearch({ town }: { town: TownModel }) {
         event.currentTarget.open = false;
         event.currentTarget.querySelector("summary")?.focus();
       }}>
-        <summary>筛选{Object.entries(town.seedFilters).some(([key, value]) => key !== "q" && value) ? " · 已设置" : ""}</summary>
-        <div className="seed-filter-fields">
-          {([["domain", "领域"], ["tag", "标签"], ["kit", "Kit 经验墙"]] as [keyof SeedFilters, string][]).map(([key, label]) => (
-            <label key={key}>{label}<input aria-label={label} maxLength={300} value={filters[key]}
-              onChange={event => setFilters({ ...filters, [key]: event.target.value })} /></label>
-          ))}
-          <label>状态<select aria-label="种子状态" value={filters.lifecycle} onChange={event => setFilters({ ...filters, lifecycle: event.target.value })}>
-            <option value="">全部状态</option>
-            {Object.entries(states).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </select></label>
-          <button className="secondary" type="submit">应用筛选</button>
-        </div>
-      </details>
+        {([["domain", "领域"], ["tag", "标签"], ["kit", "Kit 经验墙"]] as [keyof SeedFilters, string][]).map(([key, label]) => (
+          <label key={key}>{label}<input aria-label={label} maxLength={300} value={filters[key]}
+            onChange={event => setFilters({ ...filters, [key]: event.target.value })} /></label>
+        ))}
+        <label>状态<select aria-label="种子状态" value={filters.lifecycle} onChange={event => setFilters({ ...filters, lifecycle: event.target.value })}>
+          <option value="">全部状态</option>
+          {Object.entries(states).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+        </select></label>
+        <button className="secondary" type="submit">应用筛选</button>
+      </SmallMenuDetails>
       <button className="secondary" type="submit">搜索</button>
       {active && <button className="text-button" type="button" onClick={() => town.filterSeeds({ q: "", domain: "", tag: "", kit: "", lifecycle: "" })}>清除筛选</button>}
     </form>

@@ -103,10 +103,16 @@
   }
 }
 
+#conversation-options.rail-settings-menu::details-content {
+  content-visibility: visible;
+}
+
 #conversation-options.rail-settings-menu .options-menu {
   position: absolute;
   inset: auto auto 56px 0;
   max-height: calc(100vh - 100px);
   overflow: auto;
   transform-origin: bottom left;
+
+  &:not([inert]) { z-index: 1; }
 }

@@ -1,0 +1,50 @@
+@mixin surface(
+  $background: var(--chat-menu-surface, var(--bg)),
+  $border: var(--chat-menu-border, 1px solid var(--border)),
+  $shadow: var(--chat-menu-shadow, 0 5px 14px #0002)
+) {
+  background: $background;
+  border: $border;
+  border-radius: var(--chat-menu-radius, 12px);
+  box-shadow: $shadow;
+}
+
+@mixin action-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-sm, 8px);
+  width: 100%;
+  min-height: 32px;
+  padding: 6px var(--space-sm, 8px);
+  border: 0;
+  border-radius: var(--chat-menu-row-radius, 7px);
+  background: transparent;
+  color: var(--chat-ink, var(--text));
+  font: 400 var(--chat-ui-text-size, 13px)/var(--chat-ui-line-height, 20px) var(--chat-reading-font, var(--font-sans, system-ui));
+  text-align: start;
+  cursor: pointer;
+
+  &:hover:not(:disabled), &:focus-visible { background: var(--chat-menu-hover, var(--hover-overlay)); }
+  &:active:not(:disabled) { background: var(--chat-menu-pressed, var(--pressed-overlay)); }
+  &:focus-visible { outline: 1px solid var(--chat-secondary, currentColor); outline-offset: -2px; }
+  &:disabled { color: var(--neutral-disabled, var(--text-dim)); cursor: default; }
+
+  > svg {
+    flex: none;
+    width: var(--chat-icon-action, 16px);
+    height: var(--chat-icon-action, 16px);
+  }
+
+  @media (pointer: coarse) {
+    min-height: var(--touch-target, 44px);
+  }
+}
+
+// Animate UI Menu ContentMotion keeps the native top layer through the fade.
+@mixin popover-presence {
+  &[data-menu-popover-motion] {
+    transition: display 220ms allow-discrete, overlay 220ms allow-discrete;
+
+    &:not(:popover-open) { pointer-events: none; }
+  }
+}

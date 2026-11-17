@@ -6,6 +6,7 @@ import { Toast } from '../shared/components/toast';
 import useMemoizedFn from 'ahooks/es/useMemoizedFn';
 import { useFileDrop } from './hooks/use-file-drop';
 import { useChatViewport } from './hooks/use-chat-viewport';
+import GradualBlur from '../shared/components/react-bits/GradualBlur';
 import { useMessageSelection } from './hooks/use-message-selection';
 import { useChatShortcuts } from './hooks/use-chat-shortcuts';
 import { LocalFileAction, requestLocalFilePreview } from '../shared/components/local-file-link';
@@ -47,6 +48,7 @@ import { type ComposerHandle } from "../shared/components/rich-composer";
 import { ChatComposer } from "./components/composer";
 import { ComposerSend } from "./components/composer-send";
 import { ComposerQueue } from "./components/composer-queue";
+import { ChatTooltipGroup } from "../shared/components/chat-action-tooltip";
 import { FileName } from "../shared/components/file-name";
 import { ComposerAddMenu } from './components/composer-add-menu';
 import { canUseComposerCommand, parseComposerCommands } from './models/composer-commands';
@@ -55,6 +57,7 @@ import {startsTimeGroup,messageTimeLabel} from '../shared/lib/message-time';
 import { CopyMessage } from '../shared/components/copy-message';
 import { ChatActivity } from "./components/messages";
 import { MessageError } from './components/message-error';
+import { MessageActionRow } from './components/message-action-row';
 import { SceneLoading } from './components/scene-loading';
 import { ChatSettings } from "./components/settings";
 import { ChatInfoPanels } from "./components/panels";
@@ -148,18 +151,22 @@ function ChatView({
   })));
   const surfaceContext = useMemo(() => ({ blocks: surfaceBlocks }), [surfaceBlocks]);
   const currentSceneName = sceneName(state.currentScene, state.currentScene);
-  const messages = useRef<HTMLDivElement>(null),
+  const [topInset, setTopInset] = useState(0);
+  const chatFrame = useRef<HTMLDivElement>(null),
+    messages = useRef<HTMLDivElement>(null),
     composer = useRef<ComposerHandle>(null),
     composerArea = useRef<HTMLDivElement>(null),
+    inputArea = useRef<HTMLDivElement>(null),
+    pendingFiles = useRef<HTMLDivElement>(null),
     fileInput = useRef<HTMLInputElement>(null);
   const messageElements = useRef(new Map<string, HTMLDivElement>());
-  const reader = useMessageScroll(visibleItems, messages, messageElements, composerArea);
+  const reader = useMessageScroll(visibleItems, messages, messageElements, composerArea, mobileWeb ? undefined : chatFrame, topInset);
   const { scrollLock, releaseAnchor } = reader;
   useLayoutEffect(() => {
-    const area = composerArea.current, container = messages.current;
-    if (!area || !container) return;
+    const area = composerArea.current, container = messages.current, frame = chatFrame.current;
+    if (!area || !container || !frame) return;
     const sync = () => {
-      container.style.setProperty('--chat-composer-height', `${area.getBoundingClientRect().height}px`);
+      frame.style.setProperty('--chat-composer-height', `${area.getBoundingClientRect().height}px`);
       if (scrollLock.current) {
         releaseAnchor();
         container.scrollTop = Math.max(0, container.scrollHeight - container.clientHeight);
@@ -207,7 +214,6 @@ function ChatView({
     [panel, setPanel] = useState<ChatPanel>(null),
     [panelReturnsToSettings, setPanelReturnsToSettings] = useState(false);
   const [readingSize, setReadingSize] = useState(16);
-  const [topInset, setTopInset] = useState(0);
   const [showReasoning, setShowReasoning] = useState(() => {
     try { return localStorage.getItem("beings:show-reasoning") === "true"; } catch { return false; }
   });
@@ -345,6 +351,7 @@ function ChatView({
     <LocalFileAction.Provider value={location.protocol === "beings:" && parent !== window ? requestLocalFilePreview : undefined}>
     <div
       className={`chat-root${parent === window ? " standalone-chat" : ""}${showIntelligentUI ? " has-ui-examples" : ""}`}
+      data-chat-host={mobileWeb ? "web" : "desktop"}
       style={
         {
           "--reading-size": `${readingSize}px`,
@@ -374,7 +381,7 @@ function ChatView({
       <div id="drop-zone" className={dragging ? "active" : ""}>
         松开以添加附件
       </div>
-      <div id="app" inert={(nativeTouch && panel === 'model') || (showIntelligentUI && narrow)}>
+      <div id="app" ref={chatFrame} inert={(nativeTouch && panel === 'model') || (showIntelligentUI && narrow)}>
         <header id="header">
           <SbsControl known={state.sbsKnown} enabled={state.sbsEnabled} origin={state.sbsStreamingOrigin} phase={state.sbsActivityPhase}
             showContent={state.showSbsMessages} allScenes={state.historyScope==='all'}
@@ -427,8 +434,9 @@ function ChatView({
               : "包含未标记场景的历史对话"}
           </span>
         </div>}
-        <div
+        <ChatTooltipGroup anchorRoot={messages}><div
           id="messages"
+          data-warm-tooltip-scope
           ref={messages}
           tabIndex={0}
           aria-label="对话消息"
@@ -469,8 +477,9 @@ function ChatView({
               />
             ) : item.notice === 'stop' ? (
               <div key={item.id} className="chat-inline-notice" role="status">
-                <span>{item.text}</span>
-                {item.retry && <MessageError reason={item.text} retryLabel={item.retryLabel} retry={() => void item.retry?.()} />}
+                {!item.retry && <Icon name="chat-stop" width="16" height="16" />}
+                <span>{item.retry ? '停止请求尚未确认' : item.text}</span>
+                {item.retry && <MessageError reason="仍在接收回复，可再次停止。" retryLabel={item.retryLabel} retry={() => void item.retry?.()} />}
               </div>
             ) : (
               <Fragment key={item.id}>
@@ -491,7 +500,19 @@ function ChatView({
                   {item.role === "system" && <span>系统消息</span>}
                   {state.historyScope === "all" && !isGlobalBeingMessage(item) && <span className="message-scene" title={item.sceneId || "这条历史消息未提供场景标记"}>{sceneName(item, state.currentScene, state.sceneNames)}</span>}
                 </div>
-                <div className="message-bubble-row" data-copy-group>
+                <MessageActionRow media={!mobileWeb && hasAttachmentMessage(item)} actions={<>
+                  {item.createdAt !== undefined && Number.isFinite(item.createdAt) && <time className="message-action-time">{actionClock.format(item.createdAt)}</time>}
+                  <CopyMessage appearance="chat" text={splitSchedulingHint(originalMessageText(item)).text} copy={bridge.copyText} />
+                  {mobileWeb && <button type="button" className="message-more" data-message-more={item.id} aria-label="更多消息操作"
+                    data-warm-tooltip={messageMenu.trigger === item.id ? undefined : '更多消息操作'}
+                    aria-haspopup="menu" aria-expanded={messageMenu.trigger === item.id}
+                    onClick={event => messageMenu.showMenu(event.currentTarget, {
+                      text: splitSchedulingHint(originalMessageText(item)).text, time: item.createdAt, fallbackTime: item.timestamp,
+                    })}>
+                    <Icon name="chat-more" width="14" height="14" fill="currentColor" stroke="none" />
+                  </button>}
+                  {!mobileWeb && item.retry && <MessageError reason={item.queueNotice} retryLabel={item.retryLabel} retry={() => void item.retry?.()} />}
+                </>}>
                   <div className="message-bubble-body" tabIndex={0} role="group" aria-label={`${item.role === "user" ? "你" : item.label}的消息`} aria-haspopup="menu"
                     onContextMenu={event=>messageMenu.openMenu(event,{text:splitSchedulingHint(originalMessageText(item)).text,time:item.createdAt,fallbackTime:item.timestamp})}
                     onKeyDown={event=>messageMenu.openMenu(event,{text:splitSchedulingHint(originalMessageText(item)).text,time:item.createdAt,fallbackTime:item.timestamp})}>
@@ -519,32 +540,26 @@ function ChatView({
                       onPlace={item.role === "system" || !keywordNavigation ? undefined : openPlace}
                     />}</ImageGenerationAnswer>}
                   </div>
-                  <div className="message-row-actions">
-                    {item.createdAt !== undefined && Number.isFinite(item.createdAt) && <time className="message-action-time">{actionClock.format(item.createdAt)}</time>}
-                    <CopyMessage appearance="chat" text={splitSchedulingHint(originalMessageText(item)).text} copy={bridge.copyText} />
-                    <button type="button" className="message-more" data-message-more={item.id} aria-label="更多消息操作"
-                      aria-haspopup="menu" aria-expanded={messageMenu.trigger === item.id}
-                      onClick={event => messageMenu.showMenu(event.currentTarget, {
-                        text: splitSchedulingHint(originalMessageText(item)).text, time: item.createdAt, fallbackTime: item.timestamp,
-                      })}>
-                      <Icon name="chat-more" width="14" height="14" fill="currentColor" stroke="none" />
-                    </button>
-                  </div>
-                </div>
-                {item.retry && <MessageError reason={item.queueNotice} retryLabel={item.retryLabel} retry={() => void item.retry?.()}
-                  onRemove={hasAttachmentMessage(item) && item.queued ? item.cancelQueued : undefined} />}
+                </MessageActionRow>
+                {mobileWeb && item.retry && <MessageError reason={item.queueNotice} retryLabel={item.retryLabel} retry={() => void item.retry?.()} />}
               </div>
               </Fragment>
             ),
           )}
-        </div>
+        </div></ChatTooltipGroup>
+        {!mobileWeb && <>
+          <GradualBlur className="chat-edge-blur chat-edge-top" position="top"
+            height="calc(48px + var(--chat-top-inset, 0px))" strength={0.75} tint="var(--chat-edge-tint)" />
+          <GradualBlur className="chat-edge-blur chat-edge-bottom" position="bottom"
+            height="calc(var(--chat-composer-clearance) + var(--chat-composer-blur-lead))" strength={1} tint="var(--chat-edge-tint)" />
+        </>}
         {!toastHosted && <Toast message={connectionNotice} />}
         <ChatIndex items={visibleItems.map(item=>item.kind==='message' && hasAttachmentMessage(item) ? {...item,text:originalMessageText(item)} : item)} container={messages} elements={messageElements} scrollLock={scrollLock} clearAnchor={releaseAnchor} highlight={setHighlighted} />
         <div className="composer-stack" ref={composerArea}>
           {!state.historyLoading && <JumpToLatest trimHistory={historyWindow.toLatest} status={reader} container={messages} scrollLock={scrollLock} clearAnchor={releaseAnchor} />}
           {queuedMessages.length > 0 && <ComposerQueue items={queuedMessages} allowInterrupt={state.canInterruptQueue && !state.stopping}
             onEdit={item => { state.draft = item.text; state.changed(); setEditingQueued(item); }} />}
-          <div id="input-area" onWheel={event => {
+          <ChatTooltipGroup anchorRoot={inputArea}><div id="input-area" ref={inputArea} data-warm-tooltip-scope onWheel={event => {
             if (event.deltaY >= 0 || !messages.current) return;
             const input = event.target instanceof HTMLElement ? event.target.closest('#input') as HTMLElement | null : null;
             if (input && input.scrollTop > 0) return;
@@ -552,7 +567,7 @@ function ChatView({
             messages.current.scrollBy({ top: event.deltaY, behavior: 'auto' });
           }}>
             {state.intelligentUIForMessage && state.intelligentUITargetTitle && <div className="iui-context-target" role="status"><span>修改「{state.intelligentUITargetTitle}」<small>将携带原界面和当前选择</small></span><button type="button" aria-label="取消本条界面修改" onClick={() => state.setIntelligentUIForMessage(false)}>×</button></div>}
-            <div
+            <ChatTooltipGroup anchorRoot={pendingFiles}><div data-warm-tooltip-scope ref={pendingFiles}
               id="pending-files"
               className={state.files.length ? "active" : ""}
             >
@@ -574,16 +589,16 @@ function ChatView({
                     <small>{formatBytes(file.size)} · {file.loading ? '正在读取…' : '待发送'}</small>
                   </span>{" "}
                   <button
-                    className="remove"
+                    className="remove" data-warm-tooltip="移除附件"
                     type="button"
                     aria-label={`移除 ${file.name}`}
                     onClick={() => runtime.removePending(i)}
                   >
-                    ✕
+                    <Icon name="chat-close" width="10" height="10" />
                   </button>
                 </div>
               ))}
-            </div>
+            </div></ChatTooltipGroup>
             {editingQueued && <div className="composer-editing-queue" role="status"><span>正在编辑排队消息</span><button type="button" onClick={() => { state.draft = ""; state.changed(); setEditingQueued(null); composer.current?.focus(); }}>取消编辑</button></div>}
             <div id="input-row">
               <ChatComposer
@@ -652,7 +667,7 @@ function ChatView({
                 event.target.value = "";
               }}
             />
-          </div>
+          </div></ChatTooltipGroup>
         </div>
       </div>
       {showIntelligentUI && <IntelligentUIExamples example={uiExample} overlay={narrow} onSelect={setUIExample} onClose={closeExamples}
