@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { mkdtemp, rm, readFile } from 'node:fs/promises';
+import { mkdtemp, rm, readFile, mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import { createServer } from 'node:https';
@@ -20,6 +20,7 @@ if (packaged) {
 const directory = await mkdtemp(path.join(os.tmpdir(), 'home-stream-'));
 let app, server, wss;
 let exchanges = 0, htmlLoads = 0, sockets = 0, actions = [], controls = [], expired = false, canControl = false;
+let holdStream = false, releaseFailures = 0;
 const state = () => ({ ready: true, can_control: canControl, controller: canControl ? 'human' : 'being', lease_remaining_seconds: canControl ? 60 : 0,
   view_mode: 'native', frame_width: 320, frame_height: 180, live_view: { available: true, protocol: 'rfb' } });
 const origins = [], cookies = [];
@@ -36,13 +37,20 @@ try {
     origins.push(request.headers.origin); cookies.push(request.headers.cookie);
     if (expired || request.headers.cookie !== 'bh_desktop=fixture-session') { response.writeHead(401); response.end('{}'); return; }
     let body = ''; for await (const chunk of request) body += chunk;
-    if (request.url.endsWith('/control')) { const { action } = JSON.parse(body); controls.push(action); canControl = action !== 'release'; }
+    if (request.url.endsWith('/control')) {
+      const { action } = JSON.parse(body); controls.push(action);
+      if (action === 'release' && releaseFailures > 0) {
+        releaseFailures--; response.writeHead(503); response.end('{}'); return;
+      }
+      canControl = action !== 'release';
+    }
     if (request.url.endsWith('/action')) { assert(canControl); actions.push(JSON.parse(body)); }
     response.setHeader('Content-Type', 'application/json'); response.end(JSON.stringify(state()));
   });
   wss = new WebSocketServer({ server, maxPayload: 65536 });
   wss.on('connection', (socket, request) => {
     sockets++; assert.equal(request.headers.cookie, 'bh_desktop=fixture-session'); assert.equal(request.headers.origin, 'https://home.beings.town');
+    if (holdStream) return;
     let phase = 0, pending = Buffer.alloc(0), frames = 0;
     socket.send(Buffer.from('RFB 003.008\n'));
     socket.on('message', data => {
@@ -78,12 +86,12 @@ try {
     app.setPath('userData', ${JSON.stringify(directory)});
     app.commandLine.appendSwitch('host-resolver-rules', 'MAP home.beings.town 127.0.0.1:${port}'); app.commandLine.appendSwitch('no-proxy-server');
     app.on('session-created', jar => jar.setCertificateVerifyProc((r, cb) => cb(r.hostname === 'home.beings.town' && new X509Certificate(r.certificate.data).fingerprint256 === ${JSON.stringify(fingerprint)} ? 0 : -2)));
-    const logs = []; app.on('web-contents-created', (_e, wc) => { wc.on('console-message', (_e, _level, message) => logs.push(message)); wc.on('did-fail-load', (_e, code, message) => logs.push({code,message})); });
+    const logs = [], diagnostics = []; app.on('web-contents-created', (_e, wc) => { wc.on('console-message', (_e, _level, message) => logs.push(message)); wc.on('did-fail-load', (_e, code, message) => logs.push({code,message})); });
     app.whenReady().then(async () => {
       const window = new BrowserWindow({ width: 900, height: 650, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } });
       await window.loadURL('data:text/html,<title>Home stream test</title>');
-      const phases = []; const viewer = new HomeViewer(() => window, phase => phases.push(phase), ${JSON.stringify(assets)});
-      globalThis.fixture = { viewer, window, phases, logs };
+      const phases = []; const viewer = new HomeViewer(() => window, phase => phases.push(phase), ${JSON.stringify(assets)}, (event, fields) => diagnostics.push({event,...fields}));
+      globalThis.fixture = { viewer, window, phases, logs, diagnostics };
       viewer.setBounds({ x: 200, y: 100, width: 600, height: 400, visible: true, presentation: 'preview' });
       viewer.open('https://home.beings.town/desktop/connect?ticket=fixture-one', 'computer');
     }); app.on('window-all-closed', () => app.quit());
@@ -140,17 +148,63 @@ try {
   assert.equal(await native('document.querySelector("#notice").hidden'), false);
   assert.match(await native('document.querySelector("#notice").textContent'), /4000/);
   assert.equal(actions.length, 3, 'Oversized paste must not send a truncated prefix');
+  holdStream = true;
+  const socketsBeforePause = sockets;
+  for (const socket of wss.clients) socket.terminate();
+  await wait(async () => (await native('document.querySelector("#status").textContent')).includes('仍由你接管'));
+  assert.equal(await native('document.querySelector("#control").textContent'), '交还 Being');
+  assert.equal(await native('document.querySelector("#control").disabled'), false, 'release remains available without a live frame');
+  releaseFailures = 1;
+  await native('document.querySelector("#control").click()');
+  await wait(async () => !(await native('document.querySelector("#notice").hidden')) &&
+    (await native('document.querySelector("#notice").textContent')).includes('交还未确认'));
+  assert.equal(canControl, true, 'a failed release must not change the server lease');
+  await mkdir('test-results', {recursive:true});
+  const screenshot = async name => {
+    const png = await app.evaluate(async () => {
+      const wc = globalThis.fixture.viewer.view.webContents;
+      await wc.executeJavaScript('new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)))');
+      return (await wc.capturePage()).toPNG().toString('base64');
+    });
+    await writeFile(path.join('test-results', name), Buffer.from(png, 'base64'));
+  };
+  await screenshot('home-control-release-unconfirmed.png');
+  await app.evaluate(() => globalThis.fixture.viewer.setBounds({ x: 200, y: 100, width: 320, height: 400, visible: true, presentation: 'browser', dark: true }));
+  await wait(async () => (await native('document.documentElement.dataset.theme')) === 'dark');
+  assert(await native(`(() => { const pill = document.querySelector('.control-pill').getBoundingClientRect(); return pill.left >= 0 && pill.right <= innerWidth; })()`), 'paused control status and release must fit a narrow panel');
+  await screenshot('home-control-release-narrow-dark.png');
+  await app.evaluate(() => globalThis.fixture.viewer.setBounds({ x: 200, y: 100, width: 600, height: 400, visible: true, presentation: 'browser' }));
+  await wait(() => sockets > socketsBeforePause);
+  holdStream = false;
+  for (const socket of wss.clients) socket.terminate();
+  await wait(async () => await native('document.querySelector("#loading").hidden'));
+  assert.equal(await native('document.querySelector("#notice").hidden'), false, 'frame recovery cannot confirm a failed release');
+  assert.match(await native('document.querySelector("#notice").textContent'), /交还未确认/);
+  assert.match(await native('document.querySelector("#status").textContent'), /仍由你接管/);
+  await native('document.querySelector("#control").click()');
+  await wait(async () => !canControl && (await native('document.querySelector("#status").textContent')) === '仅观看');
+  await screenshot('home-control-release-confirmed.png');
+  assert.equal(await native('document.querySelector("#control").textContent'), '接管浏览器');
+  const diagnostics = await app.evaluate(() => globalThis.fixture.diagnostics);
+  assert(diagnostics.some(event => event.event === 'control_failed' && event.action === 'release'));
+  assert(diagnostics.some(event => event.event === 'control_result' && event.action === 'release' && event.owns_control === false));
+  assert(!JSON.stringify(diagnostics).match(/fixture-session|fixture-one|中文输入测试/), 'diagnostics must exclude cookies, tickets and input text');
+  await native('document.querySelector("#control").click()');
+  await wait(() => canControl);
+  const releasesBeforeHiding = controls.filter(action => action === 'release').length;
+  const socketsBeforeLayout = sockets;
   await app.evaluate(() => globalThis.fixture.viewer.setBounds({ x: 200, y: 100, width: 600, height: 400, visible: false, presentation: 'preview' }));
-  await wait(() => controls.includes('release'));
+  await wait(() => !canControl && controls.filter(action => action === 'release').length > releasesBeforeHiding);
   await assert.rejects(native('window.homeViewer.request("input",{action:"native_key",key:"Enter",modifiers:0})'));
   await app.evaluate(() => globalThis.fixture.viewer.setBounds({ x: 200, y: 100, width: 600, height: 400, visible: true, presentation: 'preview' }));
-  assert.equal(exchanges, 1); assert.equal(sockets, 1, 'layout changes must retain the live stream');
+  assert.equal(exchanges, 1); assert.equal(sockets, socketsBeforeLayout, 'layout changes must retain the live stream');
   assert(origins.every(origin => origin === 'https://home.beings.town')); assert(cookies.every(cookie => cookie === 'bh_desktop=fixture-session'));
+  const socketsBeforeRecovery = sockets;
   for (const socket of wss.clients) socket.terminate();
-  await wait(() => sockets === 2);
+  await wait(() => sockets === socketsBeforeRecovery + 1);
   await wait(async () => await native('document.querySelector("#loading").hidden'));
   assert.equal(actions.length, 3, 'network recovery must never replay an input');
-  assert.equal(controls.filter(value => value === 'claim').length, 1, 'network recovery must not reclaim control');
+  assert.equal(controls.filter(value => value === 'claim').length, 2, 'only explicit clicks may claim control; network recovery must not reclaim it');
   expired = true;
   await app.evaluate(() => globalThis.fixture.viewer.transport.read().catch(() => {}));
   await wait(() => app.evaluate(() => globalThis.fixture.phases.includes('expired')));
