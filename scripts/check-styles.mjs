@@ -28,15 +28,6 @@ const chatPalette = path.resolve('desktop/renderer/shared/styles/_chat-palette.s
 const sharedChatTokens = /(?:^|[;{}\n])\s*(--chat-(?:sent|sent-file-surface|bubble-radius|menu-radius|menu-surface|menu-border|menu-shadow))\s*:/g;
 const chatDesignTokens = path.resolve('desktop/renderer/chat/styles/_design-tokens.scss');
 
-export function chatStudyOverrides(css) {
-  const overrides = new Set();
-  const layoutTokens = new Set(['--chat-prompt-width', '--chat-composer-bottom']);
-  postcss.parse(css).walkDecls(/^--(?:chat|neutral|ui)-/, ({ prop }) => {
-    if (!layoutTokens.has(prop)) overrides.add(prop);
-  });
-  return [...overrides];
-}
-
 export function duplicateRules(css) {
   const seen = new Map();
   const duplicates = [];
