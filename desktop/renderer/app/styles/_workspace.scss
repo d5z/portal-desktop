@@ -631,7 +631,7 @@ html[data-platform='darwin'] .workspace-stage .topbar {
   max-height: calc(100% - 232px);
   flex: 0 1 auto;
   justify-content: safe center;
-  gap: 3px;
+  gap: 5px;
   padding: 5px 4px;
   min-height: 0;
   border-radius: 26px;
@@ -812,6 +812,16 @@ body:has(.rail-links[data-sorting]) .rail-tooltip {
     margin-right: 0;
     max-width: calc(100% - 16px);
     box-shadow: var(--popover-shadow);
+  }
+
+  @media (prefers-reduced-transparency: no-preference) {
+    html[data-platform='darwin'] .chat-session-panel[data-pinned='true'] {
+      background: light-dark(
+        color-mix(in srgb, var(--neutral-50) 78%, transparent),
+        color-mix(in srgb, var(--neutral-900) 80%, transparent)
+      );
+      backdrop-filter: blur(50px);
+    }
   }
 
   .chat-session-panel > [data-slot='panel-resize-handle'] {
