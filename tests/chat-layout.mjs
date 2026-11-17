@@ -47,13 +47,15 @@ try{
   });
   assert.ok(columnWidth > 900 && columnWidth <= 920, 'Desktop conversation aligns within the 920px column');
   const photos = frame.getByRole('group', {name:'3 张图片',exact:true});
-  await photos.locator('[data-stack-card][data-top]').getByRole('button',{name:'预览 第一张示例图'}).waitFor();
+  await photos.locator('.stack-card[data-top]').getByRole('button',{name:'预览 第一张示例图'}).waitFor();
   await photos.getByLabel('图片堆叠，方向键翻看').press('ArrowRight');
-  await photos.locator('[data-stack-card][data-top]').getByRole('button',{name:'预览 第二张示例图'}).waitFor();
-  await photos.getByRole('button',{name:'展开 3 张图片'}).click();
+  await photos.locator('.stack-card[data-top]').getByRole('button',{name:'预览 第二张示例图'}).waitFor();
+  const imageActions = photos.locator('xpath=ancestor::div[@data-message-hover]').locator('.message-hover-actions');
+  await photos.locator('.stack-card[data-top] button').hover();
+  await imageActions.getByRole('button',{name:'展开 3 张图片'}).click();
   assert.equal(await photos.locator('.message-image-stack img').count(),3);
-  await photos.getByRole('button',{name:'收起图片'}).click();
-  await photos.locator('[data-stack-card][data-top]').getByRole('button',{name:'预览 第二张示例图'}).waitFor();
+  await imageActions.getByRole('button',{name:'收起图片'}).click();
+  await photos.locator('.stack-card[data-top]').getByRole('button',{name:'预览 第二张示例图'}).waitFor();
   await page.context().setOffline(true);
   await frame.locator('#toast:popover-open').waitFor();
   assert.equal(await frame.locator('#toast').textContent(),'已离线，恢复网络后会自动继续');
@@ -81,8 +83,8 @@ try{
       const before = await bubble.boundingBox();
       const scrollBefore = await frame.locator('#messages').evaluate(el => el.scrollTop);
       const button = await copy.boundingBox();
-      assert.ok(width <= 520 ? button.y >= before.y + before.height - 1
-        : role === 'user' ? button.x + button.width <= before.x : button.x >= before.x + before.width, 'Copy stays outside the bubble');
+      assert.ok(role === 'user' ? button.x + button.width <= before.x : button.x >= before.x + before.width,
+        `${role} Copy stays outside the bubble at ${width}px`);
       await copy.hover();
       const after = await bubble.boundingBox();
       const scrollAfter = await frame.locator('#messages').evaluate(el => el.scrollTop);
@@ -90,8 +92,20 @@ try{
         `Hover does not resize or move the ${role} bubble at ${width}px`);
       assert.equal(await copy.evaluate(el => getComputedStyle(el).opacity), '1');
     }
-    const overflow=await frame.locator('#messages, .message, .message .content, .code-block, .table-wrap, #input-area, #pending-files, .pending-file').evaluateAll(nodes=>nodes.filter(n=>n.scrollWidth>n.clientWidth+1).map(n=>({element:n.id||n.className,width:n.clientWidth,contentWidth:n.scrollWidth})));
+    const overflow = await frame.locator('#messages, .message, .message .content, .code-block, .table-wrap, #input-area, #pending-files')
+      .evaluateAll(nodes => nodes.filter(node => {
+        if (node.scrollWidth <= node.clientWidth + 1) return false;
+        // Wide tables can scroll inside the message's boundary.
+        return !node.matches('.table-wrap') || getComputedStyle(node).overflowX === 'visible';
+      }).map(node => ({ element: node.id || node.className, width: node.clientWidth, contentWidth: node.scrollWidth })));
     assert.deepEqual(overflow,[],`Horizontal overflow at ${width}px`);
+    assert.ok(await frame.locator('#pending-files .pending-file:not([inert]) .remove').evaluateAll(buttons => {
+      const prompt = document.querySelector('#input-area').getBoundingClientRect();
+      return buttons.length > 0 && buttons.every(button => {
+        const rect = button.getBoundingClientRect();
+        return rect.left >= prompt.left && rect.right <= prompt.right;
+      });
+    }), `Attachment remove buttons stay within the Prompt at ${width}px`);
     assert.equal(await frame.locator('#chat-index').count(),1);
     await frame.locator('#input').fill(long);
     assert.ok(await frame.locator('#input').evaluate(n=>n.scrollWidth<=n.clientWidth+1));

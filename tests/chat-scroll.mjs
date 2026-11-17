@@ -83,7 +83,7 @@ try {
     const nodes=el.querySelectorAll('.message');
     el.scrollTop+=nodes[nodes.length-11].getBoundingClientRect().bottom-document.querySelector('#input-area').getBoundingClientRect().top+1;
   });
-  await child().waitForFunction(()=>document.querySelector('#chat-jump-latest').textContent==='10条消息');
+  await child().waitForFunction(()=>document.querySelector('#chat-jump-latest').getAttribute('aria-description')==='下方还有10条消息');
   assert.equal(await jump.evaluate(node=>getComputedStyle(node).borderWidth),'0px');
   await mkdir('test-results',{recursive:true});
   await page.screenshot({path:'test-results/chat-jump-muse-light.png'});
@@ -94,7 +94,7 @@ try {
   await child().waitForFunction(()=>{
     const el=document.querySelector('#messages'),bottom=document.querySelector('#input-area').getBoundingClientRect().top;
     const count=[...el.querySelectorAll('.message')].filter(node=>node.getBoundingClientRect().bottom>bottom+2).length;
-    return document.querySelector('#chat-jump-latest').textContent===`${count}条消息`;
+    return document.querySelector('#chat-jump-latest').getAttribute('aria-description')===(count?`下方还有${count}条消息`:null);
   });
   const bounds=await jump.boundingBox();assert.ok(bounds.x>=0&&bounds.x+bounds.width<=435);
   await page.screenshot({path:'test-results/chat-jump-muse-narrow.png'});
@@ -163,7 +163,7 @@ try {
   for (let i = 0; i < 5; i++) {
     event(heldResponse, 'content_block_delta', { delta: { text: `\n\n滚动回归段落 ${i}` } });
     await frame.getByText(`滚动回归段落 ${i}`, { exact: true }).waitFor();
-    assert.match(await jump.getAttribute('title'),/^(下方还有1条消息|回到底部)$/,'Streaming text in the same bubble does not increment the message count');
+    assert.match((await jump.getAttribute('aria-description')) || '',/^(下方还有1条消息|)$/,'Streaming text in the same bubble does not increment the message count');
     assert.ok(Math.abs(await messages.evaluate(el => el.scrollTop) - readingTop) < 2,
       'Streaming must preserve the reading position after a small upward scroll');
   }
@@ -265,8 +265,9 @@ try {
   event(heldResponse, 'message_stop', {});
   await browser.contexts()[0].grantPermissions(['clipboard-read', 'clipboard-write']);
   const copyTarget = frame.locator('.message.being:not(.thinking-indicator):not(.consecutive)').last();
-  await copyTarget.hover();
-  await copyTarget.getByRole('button', { name: '复制正文', exact: true }).click();
+  const copy = copyTarget.getByRole('button', { name: '复制正文', exact: true });
+  await copy.focus();
+  await copy.press('Enter');
   await copyTarget.getByRole('button', { name: '已复制', exact: true }).waitFor();
   assert.match(await child().evaluate(() => navigator.clipboard.readText()), /开始回复/);
   assert.deepEqual(errors, []);
