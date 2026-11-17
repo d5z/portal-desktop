@@ -1,7 +1,7 @@
 /* Three-column workspace: destinations, active page, dismissible Being details. */
 .workspace-rail {
-  width: 76px;
-  flex: 0 0 76px;
+  width: var(--workspace-rail-width);
+  flex: 0 0 var(--workspace-rail-width);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -491,9 +491,11 @@ html[data-platform='darwin'] .workspace-stage .topbar {
 }
 
 @media (max-width: 800px) {
+  :root {
+    --workspace-rail-width: 64px;
+  }
+
   .workspace-rail {
-    width: 64px;
-    flex-basis: 64px;
     padding-inline: 10px;
   }
 
