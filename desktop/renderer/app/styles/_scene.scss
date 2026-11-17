@@ -873,10 +873,6 @@ body:not([data-view='chat'], [data-view='portal']) #view-title {
   margin-top: 3px;
 }
 
-.feed-options:not([open]) > .feed-selectors {
-  display: none;
-}
-
 .feed-options .feed-selectors {
   position: absolute;
   right: 0;
@@ -889,6 +885,7 @@ body:not([data-view='chat'], [data-view='portal']) #view-title {
 
 .feed-options .feed-selectors,
 .seed-filter-fields {
+  transform-origin: top right;
   padding: 16px;
   background: var(--control);
   border: 1px solid var(--line);

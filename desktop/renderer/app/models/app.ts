@@ -79,6 +79,7 @@ export class AppModel extends Store {
   sbsEnabled = true;
   sbsKnown = false;
   toastMessage = "";
+  toastCopied = false;
   settingsOpen = false;
   subagentSettingsOpen = false;
   subagentFromConnection = false;
@@ -331,7 +332,8 @@ export class AppModel extends Store {
     }
     this.changed();
   }
-  toast = (error: unknown) => {
+  toast = (error: unknown, copied = false) => {
+    this.toastCopied = copied;
     this.toastMessage = error === '' ? '' : errorText(error);
     this.changed();
     clearTimeout(this.toastTimer);

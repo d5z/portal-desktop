@@ -148,7 +148,7 @@ function ReadyTopbar({ model: app }: { model: AppModel }) {
                 return;
               }
               const buttons = [
-                ...options.current!.querySelectorAll<HTMLButtonElement>(
+                ...event.currentTarget.querySelectorAll<HTMLButtonElement>(
                   `${help ? "#options-secondary" : "#options-home"} button:not(:disabled)`,
                 ),
               ];

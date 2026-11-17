@@ -28,6 +28,14 @@ await writeFile(
 );
 await copyFile("web/OSS.md", "out/web-static/DEPLOY.md");
 await copyFile("LICENSE", "out/web-static/LICENSE");
+await copyFile(
+  "desktop/renderer/shared/components/react-bits-stack/LICENSE.md",
+  "out/web-static/React-Bits-LICENSE.md",
+);
+await copyFile(
+  "desktop/renderer/shared/components/animate-ui.LICENSE.md",
+  "out/web-static/Animate-UI-LICENSE.md",
+);
 await writeThirdPartyLicenses("out/web-static/THIRD-PARTY-LICENSES.txt", viteModules(result));
 console.log(
   "Static files ready in out/web-static. Upload its contents to OSS.",

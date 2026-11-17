@@ -151,7 +151,7 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
       connected={connected} scope={app.chatHistoryScope}
       scopeReady={connected && !app.chatLoading && app.chatHistoryScopeKnown}
       onScope={scope => app.changeChatHistoryScope(scope)}
-      onCopy={id => void app.run(async () => { await app.api.copyText(id); app.toast('场景 ID 已复制'); })}
+      onCopy={id => void app.run(async () => { await app.api.copyText(id); app.toast('场景 ID 已复制', true); })}
     />}
     <DockTooltipGroup rail={railLinks}>
     <div className="rail-links" ref={railLinks} data-warm-tooltip-scope {...sort}>

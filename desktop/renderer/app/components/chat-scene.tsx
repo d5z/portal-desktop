@@ -17,7 +17,7 @@ import type { HistoryScope } from "../../chat/models/scenes";
 import { PanelResizeHandle, usePanelWidth } from "../../shared/components/panel-resize";
 import { Dialog } from "../../shared/components/dialog";
 
-const sceneTooltipAppearance = { ...shellTooltipAppearance, side: 'top' as const, gap: 8 };
+const sceneTooltipAppearance = { ...shellTooltipAppearance, side: 'bottom' as const, gap: 6 };
 class SceneKeyboardSensor {
   static activators = KeyboardSensor.activators;
   autoScrollEnabled = false;
@@ -331,7 +331,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
           {!pinned && <Icon name="split-panel" />}
         </button>
       </div>
-      {panelHost && createPortal(<DrawerPresence open={visible && expanded}><WarmTooltipGroup delay={300} warmWindow={350} travel={0} tooltipClassName="rail-tooltip"><WorkspaceDrawer edge="left" ref={panel} style={{ width }} id="chat-session-panel" className="chat-session-panel" data-warm-tooltip-scope open={visible && expanded} data-pinned={drawerPinned} aria-label="场景列表"
+      {panelHost && createPortal(<DrawerPresence open={visible && expanded}><WarmTooltipGroup delay={300} warmWindow={350} travel={0} tooltipClassName="rail-tooltip"><WorkspaceDrawer edge="left" ref={panel} style={{ width }} id="chat-session-panel" className="chat-session-panel" data-warm-tooltip-scope open={visible && expanded} data-pinned={drawerPinned} data-scene-sidebar aria-label="场景列表"
         onKeyDown={event => { if (event.key === "Escape" && !event.defaultPrevented && !reordering && !editing && !open && !deleting && !menu && !renaming) { event.preventDefault(); if (options.current?.open) { options.current.open = false; options.current.querySelector("summary")?.focus(); } else collapse(); } }}>
         <PanelResizeHandle panel={panel} label="调整场景列表宽度" width={width} onResize={setWidth} initial={320} min={240} max={480} reserve={48} edge="right" disabled={!pinned} />
         {drawerPinned && <div className="chat-session-titlebar">

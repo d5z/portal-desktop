@@ -150,6 +150,15 @@ html[data-platform='win32'] .workspace-stage .topbar {
   color: var(--text);
 }
 
+.workspace-rail .rail-button > svg[data-navigation-icon] {
+  color: light-dark(#777, var(--neutral-secondary));
+  stroke-width: 1.35;
+}
+
+.workspace-rail .rail-button:is([aria-current='page'], :hover, :focus-visible):not(:disabled) > svg[data-navigation-icon] {
+  color: light-dark(#2a2a2a, var(--neutral-text));
+}
+
 .workspace-rail .rail-button > svg {
   width: 28px;
   height: 28px;
@@ -721,42 +730,34 @@ body:has(.rail-links[data-sorting]) .rail-tooltip {
 }
 
 .rail-tooltip {
-  position: fixed;
   z-index: 10020;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 9px 12px;
-  border: 0;
-  border-radius: 12px;
-  background: var(--control);
-  color: var(--text);
-  box-shadow: 0 10px 28px #00000024, 0 2px 6px #0000000a;
-  font-size: 13px;
-  line-height: 18px;
-  max-width: 240px;
-  pointer-events: none;
-  animation: tooltip-in 0.12s ease-out;
   -webkit-app-region: no-drag;
 }
 
-.rail-tooltip kbd {
+.rail-tooltip .warm-tooltip__box {
+  box-shadow: 0 10px 28px #00000024, 0 2px 6px #0000000a;
+}
+
+.rail-tooltip .warm-tooltip__text {
+  flex: none;
+  width: max-content;
+  max-width: 216px;
+  gap: 12px;
+  font-weight: inherit;
+  line-height: 18px;
+  letter-spacing: normal;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.rail-tooltip .warm-tooltip__kbd {
+  height: auto;
+  padding: 0;
+  background: none;
+  box-shadow: none;
   color: var(--secondary);
   font: inherit;
   white-space: nowrap;
-}
-
-@keyframes tooltip-in {
-  from {
-    opacity: 0;
-    margin-left: -4px;
-  }
-
-  to {
-    opacity: 1;
-    margin-left: 0;
-  }
 }
 
 .workspace-content > #chat-view,
@@ -841,12 +842,6 @@ body:has(.rail-links[data-sorting]) .rail-tooltip {
 @container stage (max-width:700px) {
   .split-chat > #chat-view > [data-slot='panel-resize-handle'] {
     display: none;
-  }
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .rail-tooltip {
-    animation: none;
   }
 }
 

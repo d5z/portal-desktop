@@ -199,7 +199,7 @@ export function App({ model }: { model: AppModel }) {
       <KitInstall model={app.town} />
       <PermissionSettings app={app}/>
       <ToolApprovalDialog app={app}/>
-      <Toast message={app.toastMessage} />
+      <Toast message={app.toastMessage} copied={app.toastCopied} />
       <EditContextMenu edit={app.api.editSelection} rootSelector="#client-main, dialog[open]"
         selectionSelector=".reading-text, .dialog-body pre" />
     </HomeFileViewer>
