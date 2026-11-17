@@ -121,6 +121,53 @@
   color: #999;
 }
 
+#messages .message.user .attachment-audio-card {
+  --chat-wave-played: light-dark(#086bc6, #87bfff);
+  --chat-wave-unplayed: light-dark(#8ba3b9, #6b8095);
+
+  padding: 9px 16px;
+  border: 0;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--chat-sent) 9%, var(--chat-reply));
+  color: var(--text);
+
+  .attachment-audio-filename {
+    margin: 0 0 6px;
+    color: inherit;
+    font-weight: 500;
+  }
+
+  .attachment-audio {
+    gap: 8px;
+    padding: 0;
+    background: transparent;
+    color: var(--text-dim);
+
+    > button {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--chat-sent);
+      color: #fff;
+    }
+
+    > span,
+    .audio-menu-trigger {
+      color: var(--text-dim);
+    }
+  }
+
+  .attachment-audio-transcript:not(:empty) {
+    margin: 8px 0 0;
+    padding: 6px 0 0;
+    border-top: 1px solid var(--border);
+    background: transparent;
+    color: inherit;
+    font-size: 12px;
+    line-height: 18px;
+  }
+}
+
 .audio-waveform {
   flex: 1;
   min-width: 0;

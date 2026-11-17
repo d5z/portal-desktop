@@ -79,15 +79,26 @@ try {
   await page.getByRole('menuitem',{name:/上传附件/}).click();
   await (await choosing).setFiles([sampleFile,imageFile]);
   await page.locator('#input').fill('请分析附件');await page.locator('#send-btn').click();
-  await page.locator('.attachment-card').first().waitFor();
-  await page.getByText(/正在整理完整结果/).first().waitFor().catch(async e=>{console.log(await page.locator('body').innerText());throw e;});
+  const pending = page.getByRole('group',{name:/待发送消息/});
+  await pending.getByRole('status').filter({hasText:'正在整理完整结果'}).waitFor();
+  assert.equal(await page.locator('.message.user').count(),0,'Pending attachments belong to the queue');
+  await pending.getByRole('button',{name:/预览待发消息/}).click();
+  const preview = page.getByRole('dialog',{name:'待发消息预览'});
+  await preview.getByRole('list',{name:'待发附件'}).getByText('sample.txt',{exact:true}).waitFor();
+  await page.keyboard.press('Escape');
   assert.equal(await application.evaluate(()=>globalThis.fixture.sends.length),0);
   await page.reload();
-  await page.locator('.attachment-card').first().waitFor();
+  await pending.getByRole('button',{name:/预览待发消息/}).waitFor();
+  assert.equal(await page.locator('.message.user').count(),0);
   assert.equal(await application.evaluate(()=>globalThis.fixture.files.length),2,'restart reuses uploaded files');
   await application.evaluate(()=>globalThis.fixture.finish());
   await page.locator('.attachment-cancel').waitFor({state:'detached'});
   await page.locator('.attachment-file-main').first().waitFor();
+  await pending.waitFor({state:'hidden'});
+  const sentFile = page.locator('.attachment-file-card').first();
+  const fileBox = await sentFile.boundingBox();
+  assert.equal(fileBox.width,156);
+  assert.equal(await sentFile.locator('.attachment-filename span').last().innerText(),'.txt');
   await application.evaluate(async () => {
     const deadline = Date.now() + 15000;
     while (!globalThis.fixture.sends.length) {

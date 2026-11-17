@@ -32,8 +32,21 @@ try{
   await page.getByRole('button',{name:'停止处理',exact:true}).waitFor();
   await input.fill('稍后发送');await input.press('Control+Enter');
   await page.locator('.composer-queue-item').filter({hasText:'稍后发送'}).waitFor();
-  await input.fill('优先处理');await page.getByRole('button',{name:'加入队列',exact:true}).click();
+  await input.fill('优先处理');
+  await page.locator('#send-btn').hover();
+  const sendOptions = page.getByRole('group',{name:'发送选项'});
+  await sendOptions.getByRole('button',{name:'加入队列',exact:true}).waitFor();
+  await page.keyboard.press('Escape');
+  await sendOptions.waitFor({state:'hidden'});
+  await page.locator('#send-btn').focus();
+  await page.keyboard.press('ArrowUp');
+  await sendOptions.getByRole('button',{name:'加入队列',exact:true}).click();
   await page.locator('.composer-queue-item').filter({hasText:'优先处理'}).waitFor();
+  await page.getByRole('button',{name:'预览待发消息：优先处理',exact:true}).click();
+  const preview = page.getByRole('dialog',{name:'待发消息预览'});
+  assert.equal(await preview.innerText(),'优先处理');
+  await page.keyboard.press('Escape');
+  await preview.waitFor({state:'hidden'});
   const firstHandle = page.locator('.composer-queue-item').filter({ hasText: '优先处理' }).locator('.composer-queue-drag-handle');
   const firstBounds = await firstHandle.boundingBox();
   const dropBounds = await page.locator('.composer-queue-item').filter({ hasText: '稍后发送' }).boundingBox();
@@ -91,15 +104,18 @@ try{
     assert.ok(queue.x > composer.x && queue.x + queue.width < composer.x + composer.width, 'Queue is inset inside both composer edges');
     assert.ok(queue.y < composer.y && queue.y + queue.height > composer.y, 'Queue tucks under the top edge of the composer');
     await input.fill('草稿第一行\n草稿第二行\n草稿第三行');
+    await page.locator('#input-area[data-long-draft]').waitFor();
     const expandedQueue = await queuePanel.boundingBox();
     const expandedComposer = await inputArea.boundingBox();
     assert.ok(expandedComposer.y < composer.y, 'A multiline draft grows upward');
-    assert.equal(queue.y - expandedQueue.y, composer.y - expandedComposer.y, 'Queue moves with the composer');
+    assert.ok(Math.abs(queue.y + queue.height - composer.y - (expandedQueue.y + expandedQueue.height - expandedComposer.y)) < 1,
+      'Queue stays attached to the composer as the short layout uses its scrollable area');
     assert.ok(expandedQueue.y >= 0, 'Queue remains visible above a multiline draft in a short split panel');
     assert.ok(expandedComposer.y + expandedComposer.height < height, 'Composer remains inside the viewport');
     await queuePanel.getByRole('button',{name:'取消排队：平台快捷键排队',exact:true}).click({trial:true});
     assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
     await input.fill('');
+    await page.locator('#input-area:not([data-long-draft])').waitFor();
   }
   const queuedText = '平台快捷键排队';
   await queuePanel.getByRole('button',{name:`编辑排队消息：${queuedText}`,exact:true}).click();

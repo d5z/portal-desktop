@@ -27,6 +27,9 @@ const server=createServer((req,res)=>{
 await new Promise(r=>server.listen(Number(process.env.CHAT_LAYOUT_PORT)||0,'127.0.0.1',r));
 const origin='http://127.0.0.1:'+server.address().port;
 history.slice(-2).forEach(row=>row.content='![布局检查]('+origin+'/wide.svg)');
+const pictures = ['第一张示例图', '第二张示例图', '第三张示例图'];
+history.push({seq: history.length + 1, role: 'being', scene_id: 'layout', at: '2026-10-10T08:01:00Z',
+  content: pictures.map((name, index) => `![${name}](${origin}/wide.svg?image=${index})`).join('\n\n')});
 if(process.env.CHAT_LAYOUT_PREVIEW){console.log(origin);await new Promise(()=>{});}
 let browser;
 try{
@@ -43,6 +46,14 @@ try{
     return el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
   });
   assert.ok(columnWidth > 900 && columnWidth <= 920, 'Desktop conversation aligns within the 920px column');
+  const photos = frame.getByRole('group', {name:'3 张图片',exact:true});
+  await photos.locator('[data-stack-card][data-top]').getByRole('button',{name:'预览 第一张示例图'}).waitFor();
+  await photos.getByLabel('图片堆叠，方向键翻看').press('ArrowRight');
+  await photos.locator('[data-stack-card][data-top]').getByRole('button',{name:'预览 第二张示例图'}).waitFor();
+  await photos.getByRole('button',{name:'展开 3 张图片'}).click();
+  assert.equal(await photos.locator('.message-image-stack img').count(),3);
+  await photos.getByRole('button',{name:'收起图片'}).click();
+  await photos.locator('[data-stack-card][data-top]').getByRole('button',{name:'预览 第二张示例图'}).waitFor();
   await page.context().setOffline(true);
   await frame.locator('#toast:popover-open').waitFor();
   assert.equal(await frame.locator('#toast').textContent(),'已离线，恢复网络后会自动继续');
@@ -93,6 +104,7 @@ try{
   assert.equal(await frame.locator('.message.being .code-block code').textContent(),'const result = "'+long+'";');
   const keyboardCopy = frame.locator('.message.being').first().getByRole('button', {name:'复制正文',exact:true});
   await page.mouse.move(0, 0);
+  await page.keyboard.press('Tab');
   await keyboardCopy.focus();
   assert.equal(await keyboardCopy.evaluate(el => getComputedStyle(el).opacity), '1', 'Keyboard focus reveals Copy without hovering');
   assert.equal(await keyboardCopy.evaluate(el => getComputedStyle(el).outlineStyle), 'solid');

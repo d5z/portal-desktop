@@ -3,6 +3,7 @@ import {AttachmentFileMenu} from './attachment-file-menu';
 import {AttachmentAudioMenu} from './attachment-audio-menu';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {formatBytes} from '../../shared/lib/format-bytes';
+import {FileName} from '../../shared/components/file-name';
 export function AttachmentDownload({endpoint, id, artifact, name, children, file, details, compact=false, apiBase='', request=fetch, onPreview, onDownloaded}: {
   onDownloaded?:()=>void; onPreview?:()=>void; request?:typeof fetch; apiBase?:string; endpoint: string; id: string; artifact?: string; name: string; children: string; file?:{size:number;mime:string}; details?:ReactNode; compact?:boolean;
 }) {
@@ -64,7 +65,7 @@ export function AttachmentDownload({endpoint, id, artifact, name, children, file
     </AttachmentAudioMenu> : file ? <div className="attachment-file-row">
       <button className="attachment-file-main" type="button" disabled={busy || checking} title={cardAction} aria-label={`${canPreview ? '预览' : primary} ${name}`} onClick={()=>canPreview ? onPreview!() : void action(downloaded ? 'open' : 'download')}>
         <span className="attachment-file-icon" aria-hidden="true">{codeFile ? <span className="attachment-code-icon">&lt;/&gt;</span> : <Icon name="file-text-tall" width="20" height="24" fill="none" />}</span>
-        <span className="attachment-file-label"><strong>{name}</strong><small>{fileType} · {formatBytes(file.size)}</small></span>
+        <span className="attachment-file-label"><FileName name={name} /><small>{fileType} · {formatBytes(file.size)}</small></span>
         <span className="attachment-file-action" aria-hidden="true">{checking ? '…' : downloaded ? '↗' : '↓'}</span>
       </button>
       <AttachmentFileMenu name={name}>

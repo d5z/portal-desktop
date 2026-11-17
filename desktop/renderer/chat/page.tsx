@@ -45,13 +45,16 @@ import { useModel } from "../shared/hooks/use-model";
 import { CodeClipboard } from "../shared/components/markdown";
 import { type ComposerHandle } from "../shared/components/rich-composer";
 import { ChatComposer } from "./components/composer";
+import { ComposerSend } from "./components/composer-send";
 import { ComposerQueue } from "./components/composer-queue";
+import { FileName } from "../shared/components/file-name";
 import { ComposerAddMenu } from './components/composer-add-menu';
 import { canUseComposerCommand, parseComposerCommands } from './models/composer-commands';
 import {useMessageMenu} from '../shared/components/message-menu';
 import {startsTimeGroup,messageTimeLabel} from '../shared/lib/message-time';
 import { CopyMessage } from '../shared/components/copy-message';
 import { ChatActivity } from "./components/messages";
+import { MessageError } from './components/message-error';
 import { SceneLoading } from './components/scene-loading';
 import { ChatSettings } from "./components/settings";
 import { ChatInfoPanels } from "./components/panels";
@@ -117,7 +120,7 @@ function ChatView({
   }, [state.banner, toastHosted]);
   const { viewport, narrow, nativeTouch } = useChatViewport(mobileWeb);
   const [editingQueued, setEditingQueued] = useState<Message | null>(null);
-  const timelineItems = replyBubbles(sceneItems(withScheduling(state.items.filter(item => item.kind !== "message" || !item.queued || !!item.attachmentViews?.length || !!item.attachmentUploads?.length), state.sceneTasks), state.historyScope, state.currentScene, state.showSbsMessages));
+  const timelineItems = replyBubbles(sceneItems(withScheduling(state.items.filter(item => item.kind !== "message" || !item.queued), state.sceneTasks), state.historyScope, state.currentScene, state.showSbsMessages));
   const historyWindow=useHistoryWindow(state.historyLoading ? [] : timelineItems,JSON.stringify([state.historyScope,state.currentScene.sceneId,state.showSbsMessages]),before=>runtime.loadOlderHistory(before));
   const visibleItems=historyWindow.items;
   const progressRuns = quietProgressRuns(timelineItems);
@@ -128,7 +131,7 @@ function ChatView({
     if(item.createdAt!==undefined&&Number.isFinite(item.createdAt))previousMessageTime=item.createdAt;
   }
   const pendingReveal=useRef<{seq:number;sceneId?:string}|null>(null);
-  const queuedMessages = state.items.filter((item): item is Message => item.kind === 'message' && !!item.queued && item.sceneId === state.currentScene.sceneId && !hasAttachmentMessage(item));
+  const queuedMessages = state.items.filter((item): item is Message => item.kind === 'message' && !!item.queued && item.sceneId === state.currentScene.sceneId);
   useEffect(() => {
     if (editingQueued && !queuedMessages.includes(editingQueued)) setEditingQueued(null);
   }, [editingQueued, queuedMessages]);
@@ -169,7 +172,6 @@ function ChatView({
   }, [scrollLock, releaseAnchor]);
   const scopeScroll = useRef<Partial<Record<HistoryScope, { top: number; locked: boolean }>>>({});
   const isMac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
-  const queueShortcut = isMac ? "⌘ Enter / Ctrl Enter" : "Ctrl Enter";
   const sendLabel = editingQueued ? "保存修改" : state.sendWillQueue ? (state.canInterruptQueue ? "立即打断并发送" : "加入队列") : "发送消息";
   const showStop = (state.streaming || state.attachmentPending) && !state.draft.trim() && state.files.length === 0;
   const configureSubagent = parent !== window && location.protocol === 'beings:' ? () => bridge.send({ type: 'beings:subagent-settings' }) : undefined;
@@ -468,7 +470,7 @@ function ChatView({
             ) : item.notice === 'stop' ? (
               <div key={item.id} className="chat-inline-notice" role="status">
                 <span>{item.text}</span>
-                {item.retry && <button type="button" onClick={() => void item.retry?.()}>{item.retryLabel}</button>}
+                {item.retry && <MessageError reason={item.text} retryLabel={item.retryLabel} retry={() => void item.retry?.()} />}
               </div>
             ) : (
               <Fragment key={item.id}>
@@ -529,14 +531,8 @@ function ChatView({
                     </button>
                   </div>
                 </div>
-                {hasAttachmentMessage(item) ? item.retry && <div className="attachment-message-actions">
-                  {item.queueNotice && <span className="attachment-error" role="alert">{item.queueNotice}</span>}
-                  {item.retry && <button className="attachment-retry-action" type="button" onClick={()=>void item.retry?.()}>{item.retryLabel}</button>}
-                  {item.queued && item.cancelQueued && <button className="attachment-dismiss-action" type="button" aria-label="移除失败附件" onClick={()=>void item.cancelQueued?.()}>移除</button>}
-                </div> : <>
-                  {item.queueNotice && !item.queued && item.retry && <p className="attachment-error" role="alert">{item.queueNotice}</p>}
-                  {item.retry && <button className="retry-btn" type="button" onClick={()=>void item.retry?.()}>{item.retryLabel}</button>}
-                </>}
+                {item.retry && <MessageError reason={item.queueNotice} retryLabel={item.retryLabel} retry={() => void item.retry?.()}
+                  onRemove={hasAttachmentMessage(item) && item.queued ? item.cancelQueued : undefined} />}
               </div>
               </Fragment>
             ),
@@ -573,8 +569,8 @@ function ChatView({
                       <Icon name={file.type.startsWith("image/") ? "image-rounded" : "file"} width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" />
                     </span>
                   )}
-                  <span>
-                    <strong>{file.name}</strong>
+                  <span className="pending-file-label">
+                    <FileName name={file.name} />
                     <small>{formatBytes(file.size)} · {file.loading ? '正在读取…' : '待发送'}</small>
                   </span>{" "}
                   <button
@@ -629,23 +625,21 @@ function ChatView({
                 onConfigureSubagent={configureSubagent}
                 onEnableSubagent={parent !== window && location.protocol === 'beings:' ? () => { void enableSubagent(); } : undefined}
                 subagentEnabling={subagentEnabling} subagentEnableFailed={subagentEnableFailed}/>
-              {state.sendWillQueue && !editingQueued && (state.draft.trim() || state.files.length > 0) && <div className="composer-queue-hint"><button type="button" title={`加入队列（${queueShortcut}）`} aria-label="加入队列" disabled={state.stopping} onClick={() => sendDraft()}>排队 <span aria-hidden="true">{isMac ? "⌘ ↵" : "Ctrl ↵"}</span></button></div>}
-              <button
-                className={`btn-icon${showStop ? " stop" : ""}`}
-                id="send-btn"
-                type="button"
-                title={showStop ? "停止处理" : `${sendLabel}（Enter）；${queueShortcut} 排队，Shift Enter 换行`}
-                aria-label={state.stopping ? "正在停止" : showStop ? "停止处理" : sendLabel}
+              <ComposerSend
+                action={showStop ? "stop" : state.sendWillQueue && !editingQueued ? (state.canInterruptQueue ? "steer" : "queue") : "send"}
+                label={state.stopping ? "正在停止" : showStop ? "停止处理" : sendLabel}
                 disabled={state.stopping || (!showStop && !state.draft.trim() && !state.files.length)}
-                aria-busy={state.stopping}
-                onClick={() => {
+                stopping={state.stopping}
+                alternate={!showStop && !editingQueued && state.sendWillQueue && state.canInterruptQueue ? {
+                  label: "加入队列", shortcut: isMac ? "⌘ ↵" : "Ctrl ↵",
+                  key: isMac ? "Meta+Enter Control+Enter" : "Control+Enter", run: () => { sendDraft(); composer.current?.focus(); },
+                } : undefined}
+                onSubmit={() => {
                   if (showStop) void runtime.stopCurrentTurn();
                   else sendDraft("interrupt");
                   composer.current?.focus();
                 }}
-              >
-                <Icon name={showStop ? 'stop' : 'send'}  />
-              </button>
+              />
             </div>
             <input
               ref={fileInput}

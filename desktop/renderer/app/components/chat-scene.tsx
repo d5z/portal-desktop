@@ -61,7 +61,14 @@ class SceneKeyboardSensor {
   }
 }
 
-function SceneRow({ session, selected, activity, disabled, sortable, onSelect, onContextMenu }: {
+type SceneRename = {
+  id: string;
+  error: string;
+  save: (name: string) => void;
+  cancel: (restoreFocus: boolean) => void;
+};
+
+function SceneRow({ session, selected, activity, disabled, sortable, onSelect, onContextMenu, rename }: {
   session: ChatScene;
   selected: boolean;
   activity?: ChatSceneActivity;
@@ -69,29 +76,59 @@ function SceneRow({ session, selected, activity, disabled, sortable, onSelect, o
   sortable: boolean;
   onSelect: () => void;
   onContextMenu: (event: MouseEvent<HTMLButtonElement>) => void;
+  rename?: SceneRename;
 }) {
   const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
-    id: session.scene_id, disabled: !sortable,
+    id: session.scene_id, disabled: !sortable || disabled || Boolean(rename),
   });
+  const renameInput = useRef<HTMLInputElement>(null);
+  const renaming = Boolean(rename);
+  useLayoutEffect(() => {
+    if (!renaming) return;
+    renameInput.current?.focus();
+    renameInput.current?.select();
+  }, [renaming]);
   const label = session.scene_meta.scene_label;
   return <div ref={setNodeRef} className="chat-session-item" data-reordering={isDragging || undefined}
     style={{ transform: CSS.Translate.toString(transform), transition }}>
-    {sortable && <button ref={setActivatorNodeRef} type="button" className="chat-session-grip" {...attributes} {...listeners}
+    {sortable && <button ref={setActivatorNodeRef} type="button" className="chat-session-grip" {...attributes} {...listeners} disabled={disabled || renaming}
       aria-label={`调整场景顺序：${label}`} title="拖动调整顺序">
       <Icon name="grip" fill="currentColor" stroke="none" aria-hidden="true" />
     </button>}
-    <button className="chat-session-select" data-scene-id={session.scene_id} type="button"
+    {rename ? <>
+      <form className="chat-session-select chat-session-rename" aria-current={selected ? 'true' : undefined} aria-busy={disabled}
+        onSubmit={event => {
+          event.preventDefault();
+          const name = renameInput.current!.value.trim();
+          if (!disabled && name) rename.save(name);
+        }}
+        onBlur={event => {
+          if (!disabled && !event.currentTarget.contains(event.relatedTarget)) rename.cancel(false);
+        }}
+        onKeyDown={event => {
+          if (event.key !== 'Escape') return;
+          event.stopPropagation();
+          if (!disabled && !event.nativeEvent.isComposing) { event.preventDefault(); rename.cancel(true); }
+        }}>
+        <input ref={renameInput} aria-label="场景名称" aria-describedby={rename.error ? 'chat-session-rename-error' : undefined}
+          defaultValue={label} maxLength={128} readOnly={disabled} required />
+        <button type="submit" aria-label="保存名称" title="保存名称" disabled={disabled}>
+          <Icon name="check-16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" />
+        </button>
+      </form>
+      {rename.error && <p id="chat-session-rename-error" className="chat-session-error" role="alert">{rename.error}</p>}
+    </> : <button className="chat-session-select" data-scene-id={session.scene_id} type="button"
       aria-label={`切换到场景：${label}`} aria-current={selected ? "true" : undefined}
       aria-description={activity && CHAT_SCENE_ACTIVITY_LABELS[activity]}
       title={label} disabled={disabled} onClick={onSelect} onContextMenu={onContextMenu}>
       <span>{label}</span>
       {activity && <span className="chat-session-activity" data-status={activity} aria-hidden="true"
         title={CHAT_SCENE_ACTIVITY_LABELS[activity]}><span className="chat-session-activity-icon" /></span>}
-    </button>
+    </button>}
   </div>;
 }
 
-function SceneList({ sessions, selected, activity, query, disabled, orderKey, onSelect, onContextMenu, onReordering }: {
+function SceneList({ sessions, selected, activity, query, disabled, orderKey, onSelect, onContextMenu, onReordering, rename }: {
   sessions: ChatScene[];
   selected?: string;
   activity: Record<string, ChatSceneActivity>;
@@ -101,6 +138,7 @@ function SceneList({ sessions, selected, activity, query, disabled, orderKey, on
   onSelect: (id: string) => void;
   onContextMenu: (event: MouseEvent<HTMLButtonElement>, session: ChatScene) => void;
   onReordering: (active: boolean) => void;
+  rename?: SceneRename;
 }) {
   const [order, setOrder] = useState<string[]>(() => {
     try {
@@ -115,7 +153,7 @@ function SceneList({ sessions, selected, activity, query, disabled, orderKey, on
   const search = query.trim().toLocaleLowerCase();
   const visible = orderedIds.map(id => sceneById.get(id)!).filter(session => session.scene_meta.scene_label.toLocaleLowerCase().includes(search));
   const visibleIds = visible.map(session => session.scene_id);
-  const sortable = !disabled && visibleIds.length > 1;
+  const sortable = (!disabled || Boolean(rename)) && visibleIds.length > 1;
 
   return <nav className="chat-session-list" aria-label="切换场景">
     <DndContext id="chat-scene-sort" sensors={sensors} collisionDetection={closestCenter}
@@ -146,6 +184,7 @@ function SceneList({ sessions, selected, activity, query, disabled, orderKey, on
       <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
         {visible.map(session => <SceneRow key={session.scene_id} session={session} selected={selected === session.scene_id}
           activity={activity[session.scene_id]} disabled={disabled} sortable={sortable} onSelect={() => onSelect(session.scene_id)}
+          rename={rename?.id === session.scene_id ? rename : undefined}
           onContextMenu={event => onContextMenu(event, session)} />)}
       </SortableContext>
     </DndContext>
@@ -179,8 +218,8 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
   const search = useRef<HTMLInputElement>(null);
   const options = useRef<HTMLDetailsElement>(null);
   const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<"create" | "bind" | "rename" | null>(null);
-  const [target, setTarget] = useState<ChatScene>();
+  const [editing, setEditing] = useState<"create" | "bind" | null>(null);
+  const [renaming, setRenaming] = useState<string>();
   const [deleting, setDeleting] = useState<ChatScene>();
   const [menu, setMenu] = useState<{ scene: ChatScene; x: number; y: number }>();
   const menuRef = useRef<HTMLDivElement>(null);
@@ -200,21 +239,27 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
       window.removeEventListener("scroll", close, true);
     };
   }, [menu]);
-  useEffect(() => { setMenu(undefined); }, [visible, scene?.scene_id]);
+  useEffect(() => { setMenu(undefined); setRenaming(undefined); }, [visible, scene?.scene_id]);
   const [bindingId, setBindingId] = useState("");
   const [name, setName] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const changing = useRef(false);
-  const edit = (operation: "create" | "bind" | "rename", selected = scene) => {
-    setMenu(undefined); setTarget(selected); setBindingId("");
-    setError(""); setName(operation === "rename" ? selected?.scene_meta.scene_label || "" : ""); setEditing(operation);
+  const edit = (operation: "create" | "bind") => {
+    setMenu(undefined); setRenaming(undefined); setBindingId("");
+    setError(""); setName(""); setEditing(operation);
+  };
+  const finishRename = (id: string, restoreFocus: boolean) => {
+    setRenaming(undefined); setError("");
+    if (restoreFocus) requestAnimationFrame(() => {
+      (panel.current?.querySelector<HTMLButtonElement>(`button[data-scene-id="${globalThis.CSS.escape(id)}"]`) ?? search.current)?.focus();
+    });
   };
   const lastCreateRequest = useRef(createRequest);
   useEffect(() => {
     if (lastCreateRequest.current === createRequest) return;
     lastCreateRequest.current = createRequest;
-    setMenu(undefined); setTarget(undefined); setError(""); setName(""); setEditing("create");
+    setMenu(undefined); setRenaming(undefined); setError(""); setName(""); setEditing("create");
   }, [createRequest]);
   const change = async (operation: "create" | "bind" | "select" | "rename" | "delete", value: string, sceneId?: string) => {
     if (changing.current) return;
@@ -222,11 +267,16 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
     // Selecting a scene keeps navigation visually stable; mutations still lock
     // the editor and list while saving. The ref prevents duplicate requests.
     setBusy(operation !== "select"); setError("");
-    try { await onSession(operation, value, sceneId); setEditing(null); setDeleting(undefined); if (!pinned && ["select", "create", "bind"].includes(operation)) collapse(); }
+    try {
+      await onSession(operation, value, sceneId);
+      if (operation === "rename") finishRename(sceneId!, true);
+      setEditing(null); setDeleting(undefined);
+      if (!pinned && ["select", "create", "bind"].includes(operation)) collapse();
+    }
     catch (error) { setError(error instanceof Error ? error.message : String(error)); }
     finally { changing.current = false; setBusy(false); }
   };
-  const expanded = pinned || Boolean(editing || deleting || open || menu);
+  const expanded = pinned || Boolean(editing || deleting || open || menu || renaming);
   const pin = (next: boolean) => {
     setPinned(next);
     try { localStorage.setItem("beings:scenes-pinned", String(next)); } catch { /* Keep the session preference. */ }
@@ -238,7 +288,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
   useLayoutEffect(() => { if (expanded) lastPinned.current = pinned; }, [expanded, pinned]);
   const drawerPinned = expanded ? pinned : lastPinned.current;
   const label = scene?.scene_meta.scene_label || "场景标记不可用";
-  const collapse = () => { setMenu(undefined); pin(false); trigger.current?.focus(); };
+  const collapse = () => { setMenu(undefined); setRenaming(undefined); pin(false); trigger.current?.focus(); };
   const reveal = () => { pin(true); onReveal?.(); };
   useEffect(() => { if (pinned && visible) search.current?.focus(); }, [pinned, visible]);
   return (
@@ -253,7 +303,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
         </button>
       </div>
       {panelHost && createPortal(<DrawerPresence open={visible && expanded}><WorkspaceDrawer edge="left" ref={panel} style={{ width }} id="chat-session-panel" className="chat-session-panel" open={visible && expanded} data-pinned={drawerPinned} aria-label="场景列表"
-        onKeyDown={event => { if (event.key === "Escape" && !event.defaultPrevented && !reordering && !editing && !open && !deleting && !menu) { event.preventDefault(); if (options.current?.open) { options.current.open = false; options.current.querySelector("summary")?.focus(); } else collapse(); } }}>
+        onKeyDown={event => { if (event.key === "Escape" && !event.defaultPrevented && !reordering && !editing && !open && !deleting && !menu && !renaming) { event.preventDefault(); if (options.current?.open) { options.current.open = false; options.current.querySelector("summary")?.focus(); } else collapse(); } }}>
         <PanelResizeHandle panel={panel} label="调整场景列表宽度" width={width} onResize={setWidth} initial={320} min={240} max={480} reserve={48} edge="right" disabled={!pinned} />
         {drawerPinned && <div className="chat-session-titlebar">
           <strong>{beingName}</strong>
@@ -279,6 +329,8 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
         <div className="chat-session-group"><span>场景对话</span><button id="new-chat-session" type="button" aria-label="新建场景" title="新建场景" disabled={!connected || busy || !sessions.length} onClick={() => edit("create")}><Icon name="plus" /></button></div>
         <SceneList key={orderKey} orderKey={orderKey} sessions={sessions} selected={scene?.scene_id} activity={activity}
           query={query} disabled={busy || !connected} onSelect={id => void change("select", id)}
+          rename={renaming ? { id: renaming, error, save: name => void change("rename", name, renaming),
+            cancel: restoreFocus => finishRename(renaming, restoreFocus) } : undefined}
           onReordering={dragging => { if (dragging) setMenu(undefined); setReordering(dragging); }}
           onContextMenu={(event, session) => {
             if (busy || !connected) return;
@@ -293,7 +345,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
             onChange={event => onScope(event.target.checked ? "all" : "current")} />
           <span>显示全部场景上下文</span>
         </label>
-        {error && !editing && !deleting && <p role="alert" className="chat-session-error">{error}</p>}
+        {error && !editing && !deleting && !renaming && <p role="alert" className="chat-session-error">{error}</p>}
 
       </WorkspaceDrawer></DrawerPresence>, panelHost)}
       {menu && createPortal(<div ref={menuRef} className="chat-session-context-menu" role="menu" aria-label="场景操作"
@@ -302,14 +354,14 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
           const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button"));
           if (event.key === "Escape" || event.key === "Tab") {
             event.preventDefault(); setMenu(undefined);
-            document.querySelector<HTMLButtonElement>(`.chat-session-list button[data-scene-id="${menu.scene.scene_id}"]`)?.focus();
+            document.querySelector<HTMLButtonElement>(`.chat-session-list button[data-scene-id="${globalThis.CSS.escape(menu.scene.scene_id)}"]`)?.focus();
           } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
             event.preventDefault();
             const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
             buttons[event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (event.key === "ArrowUp" ? -1 : 1) + buttons.length) % buttons.length]?.focus();
           }
         }}>
-        <button role="menuitem" type="button" onClick={() => edit("rename", menu.scene)}>重命名</button>
+        <button role="menuitem" type="button" onClick={() => { setRenaming(menu.scene.scene_id); setError(""); setMenu(undefined); }}>重命名</button>
         <button role="menuitem" type="button" className="danger" onClick={() => { setDeleting(menu.scene); setError(""); setMenu(undefined); }}>删除场景</button>
       </div>, document.body)}
       <Dialog id="chat-session-delete" className="utility-dialog" open={!!deleting} busy={busy}
@@ -324,13 +376,13 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
       </Dialog>
       <Dialog id="chat-session-editor" open={editing !== null} busy={busy}
         aria-labelledby="chat-session-title" onClose={() => setEditing(null)} dismissOnBackdrop>
-        <form className="dialog-form" onSubmit={event => { event.preventDefault(); if (editing && !busy) void change(editing, name, editing === "bind" ? bindingId : target?.scene_id); }}>
+        <form className="dialog-form" onSubmit={event => { event.preventDefault(); if (editing && !busy) void change(editing, name, editing === "bind" ? bindingId : undefined); }}>
           <div className="dialog-heading">
-            <h2 id="chat-session-title">{editing === "bind" ? "绑定已有场景" : editing === "create" ? "新建场景" : "重命名场景"}</h2>
+            <h2 id="chat-session-title">{editing === "bind" ? "绑定已有场景" : "新建场景"}</h2>
             <button className="close" type="button" aria-label="关闭场景编辑" disabled={busy} onClick={() => setEditing(null)} />
           </div>
           <div className="dialog-body">
-            <p className="utility-subtitle">{editing === "bind" ? "填入同一 Being 在其他客户端的场景 ID，即可继续该场景的对话。" : editing === "create" ? "与同一个 Being 开始一个独立的对话场景。" : "修改名称不会改变场景的历史记录。"}</p>
+            <p className="utility-subtitle">{editing === "bind" ? "填入同一 Being 在其他客户端的场景 ID，即可继续该场景的对话。" : "与同一个 Being 开始一个独立的对话场景。"}</p>
             {editing === "bind" && <label className="chat-session-field">场景 ID
               <input autoFocus name="scene-id" autoComplete="off" value={bindingId} maxLength={256} placeholder="粘贴其他客户端的场景 ID" disabled={busy} onChange={event => setBindingId(event.target.value)} />
             </label>}
@@ -342,7 +394,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
           </div>
           <div className="files-footer">
             <button type="button" disabled={busy} onClick={() => setEditing(null)}>取消</button>
-            <button type="submit" disabled={busy || !name.trim() || (editing === "bind" && !bindingId.trim())}>{busy ? "保存中…" : editing === "bind" ? "绑定并进入" : editing === "create" ? "创建并进入" : "保存名称"}</button>
+            <button type="submit" disabled={busy || !name.trim() || (editing === "bind" && !bindingId.trim())}>{busy ? "保存中…" : editing === "bind" ? "绑定并进入" : "创建并进入"}</button>
           </div>
         </form>
       </Dialog>

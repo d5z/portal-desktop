@@ -2,7 +2,11 @@ import { homeFileReference, beingFileBlocks } from '../../../shared/being-files'
 import { BeingFilesMessage, HomeFileLink } from './being-files';
 import { StreamingMarkdown } from '../lib/streaming-markdown';
 import { LocalFileAction, LocalFileLink } from './local-file-link';
-import { RemoteImage } from './remote-image';
+import { RemoteImage, RemoteImageGroup } from './remote-image';
+import { MessageImageGroup } from './message-image-group';
+import { remoteImageURL } from '../../../shared/remote-image';
+import { Icon } from '../icons/icon';
+import codeStyles from './markdown-code-copy.module.scss';
 import { MarkdownReferences, MarkdownReferenceScope } from './markdown-references';
 import { localFileReference } from '../../../shared/local-file';
 import { IntelligentUI } from "../intelligent-ui/view";
@@ -300,7 +304,28 @@ const MarkdownText = memo(function MarkdownText({
     );
   }
   function render(list: Token[], decorate = true, topLevel = false): ReactNode {
+    let imageRunEnd = 0;
     return list.map((token, index) => {
+      if (index < imageRunEnd) return null;
+      const images = chat && topLevel && !streaming && !leadingContent ? imageParagraph(token) : undefined;
+      if (images) {
+        let next = index + 1;
+        while (next < list.length) {
+          const imageIndex = list[next].type === 'space' ? next + 1 : next;
+          const more = imageParagraph(list[imageIndex]);
+          if (!more) break;
+          images.push(...more);
+          next = imageIndex + 1;
+        }
+        if (images.length > 1) {
+          imageRunEnd = next;
+          const group = <MessageImageGroup>{images.map(({ src, name, title }, imageIndex) =>
+            <RemoteImage key={imageIndex} src={src} name={name} title={title} />)}</MessageImageGroup>;
+          return <div className="markdown-image-group" key={index}>
+            {images.every(({ src }) => remoteImageURL(src)) ? <RemoteImageGroup items={images}>{group}</RemoteImageGroup> : group}
+          </div>;
+        }
+      }
       const before = topLevel && onPlace ? [...linked].sort().join(',') : '';
       const cached = topLevel ? blockCache.get(token) : undefined;
       if (cached && cached.before === before) {
@@ -320,7 +345,7 @@ const MarkdownText = memo(function MarkdownText({
           node = null;
           break;
         case "paragraph":
-          node = <p>{token === firstContentToken && leadingContent}{inner}</p>;
+          node = <p className={images ? 'markdown-image-only' : undefined}>{token === firstContentToken && leadingContent}{inner}</p>;
           break;
         case "text":
         case "escape":
@@ -500,6 +525,20 @@ const MarkdownText = memo(function MarkdownText({
   return <div className={className}>{leadingContent && firstContentToken?.type !== 'paragraph' && <p>{leadingContent}</p>}{render(tokens, true, true)}</div>;
 });
 
+function imageParagraph(token: Token | undefined) {
+  if (token?.type !== 'paragraph' || !('tokens' in token)) return;
+  const images: { src: string; name: string; title?: string }[] = [];
+  for (const child of token.tokens as Token[]) {
+    if (child.type === 'br' || child.type === 'text' && !child.raw.trim()) continue;
+    if (child.type !== 'image') return;
+    const image = child as Tokens.Image;
+    const src = safeLink(unescapeText(image.href));
+    if (!src) return;
+    images.push({ src, name: unescapeText(image.text) || '图片', title: image.title || undefined });
+  }
+  return images.length ? images : undefined;
+}
+
 function MarkdownCodeBlock({ text, language, streaming }: { text: string; language: string; streaming: boolean }) {
   const [mode, setMode] = useState<"preview" | "source">("preview");
   const panelId = useId();
@@ -544,12 +583,17 @@ function CopyCode({ text }: { text: string }) {
   const [status, setStatus] = useState('复制代码');
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
-  return <button type="button" aria-label={status} onClick={async () => {
+  const copied = status === '已复制', failed = status.startsWith('复制失败');
+  return <button type="button" className={codeStyles.copy} data-failed={failed || undefined} title={status} aria-label={status} onClick={async () => {
     clearTimeout(timer.current);
     try { await copy(text); setStatus('已复制'); }
     catch { setStatus('复制失败，请重试'); }
     timer.current = setTimeout(() => setStatus('复制代码'), 2000);
-  }}><span role="status">{status}</span></button>;
+  }}>
+    <Icon name={copied ? 'check-16' : failed ? 'refresh-20' : 'chat-copy'} width="16" height="16"
+      fill="none" stroke="currentColor" strokeWidth="1.5" />
+    <span className={codeStyles.feedback} role="status">{copied || failed ? status : ''}</span>
+  </button>;
 }
 
 function ChatCodeBlock({ text, language, streaming }: { text: string; language: string; streaming: boolean }) {

@@ -650,9 +650,14 @@ function ConnectorGroup({ title, kits, connected = false, pendingConnection, loc
     const isConnecting = pendingConnection === kit.release_id;
     const local = localKitFor(kit, localKits);
     const localOnly = hasLocalRuntime(kit) && !hasRemoteRuntime(kit);
-    const localAction = localOnly && !local;
+    const action = localOnly && !local
+      ? { label: '安装到本机', onClick: onInstallLocal, icon: false }
+      : connected || local
+        ? { label: '管理应用', onClick: onOpen, icon: true }
+        : { label: '连接', onClick: onConnect, icon: false };
+    const actionLabel = isConnecting ? '连接中…' : disabled ? '暂不可用' : action.label;
     const open = disabled ? undefined : () => onOpen(kit);
-    return <article className={`connector-card${open ? ' is-clickable' : ''}${connected ? ' is-installed' : ''}`} key={kit.release_id} role={open ? 'button' : undefined} onPointerEnter={() => onPrefetch(kit)} onFocus={() => onPrefetch(kit)} onClick={open} onKeyDown={event => {
+    return <article className={`connector-card${open ? ' is-clickable' : ''}`} key={kit.release_id} role={open ? 'button' : undefined} onPointerEnter={() => onPrefetch(kit)} onFocus={() => onPrefetch(kit)} onClick={open} onKeyDown={event => {
       if (event.target === event.currentTarget && open && (event.key === 'Enter' || event.key === ' ')) {
         event.preventDefault();
         open();
@@ -660,10 +665,10 @@ function ConnectorGroup({ title, kits, connected = false, pendingConnection, loc
     }} aria-label={open ? `查看 ${kit.name} 详情` : undefined} tabIndex={open ? 0 : undefined}>
       <ConnectorIcon name={kit.name} iconURL={kit.icon_url} />
       <div className="connector-card-copy"><strong>{kit.name}</strong>{!connected && (kit.description || disabled) && <small>{disabled ? kit.unavailable_reason || kit.description || '当前不可用。' : kit.description}</small>}{local && <small className="connector-local-status">{local.problem ? '本机文件异常' : '已安装到本机'}</small>}</div>
-      <button className="connector-card-action" type="button" aria-label={isConnecting ? '连接中…' : localAction ? '安装到本机' : connected ? '管理' : disabled ? '暂不可用' : '连接'} title={localAction ? '安装到本机' : connected ? '管理应用' : disabled ? '暂不可用' : '连接应用'} disabled={disabled || isConnecting || localOnly && !localKitsReady} aria-busy={isConnecting} onClick={event => {
+      <button className="connector-card-action" data-icon-only={action.icon || isConnecting || undefined} type="button" aria-label={actionLabel} title={actionLabel} disabled={disabled || isConnecting || localOnly && !localKitsReady} aria-busy={isConnecting} onClick={event => {
         event.stopPropagation();
-        localAction ? onInstallLocal(kit) : connected || local ? onOpen(kit) : onConnect(kit);
-      }}>{isConnecting ? <span className="connector-loading-spinner" aria-hidden="true" /> : localAction ? <span>安装到本机</span> : connected || local ? <Icon className="connector-line-icon" name="chevron-right-20" aria-hidden="true" /> : <span>连接</span>}</button>
+        action.onClick(kit);
+      }}>{isConnecting ? <span className="connector-loading-spinner" aria-hidden="true" /> : action.icon ? <Icon className="connector-line-icon" name="chevron-right-20" aria-hidden="true" /> : <span>{action.label}</span>}</button>
     </article>;
   })}</div></section>;
 }

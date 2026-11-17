@@ -1,0 +1,96 @@
+#messages .message {
+  .message-image-group {
+    position: relative;
+    width: 320px;
+    max-width: 100%;
+  }
+
+  .message-image-deck {
+    box-sizing: border-box;
+    width: 100%;
+    aspect-ratio: 320 / 212;
+    padding: 9% 13% 4% 5%;
+  }
+
+  .message-image-stack {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .message-image-stack > * {
+    min-width: 0;
+    height: 104px;
+  }
+
+  .message-image-group :is(.attachment-card-host, .attachment-image-card, .attachment-image-upload, .attachment-image-placeholder) {
+    width: 100%;
+    height: 100%;
+    min-height: 0;
+  }
+
+  .message-image-group :is(.attachment-image-thumbnail, [data-slot='image-thumbnail']) {
+    display: block;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: 0;
+    border-radius: 16px;
+    overflow: hidden;
+
+    > img {
+      width: 100%;
+      height: 100%;
+      max-width: none;
+      max-height: none;
+      object-fit: cover;
+    }
+  }
+
+  .message-image-toggle {
+    display: grid;
+    place-items: center;
+    width: 24px;
+    height: 24px;
+    margin-block-start: 4px;
+    margin-inline-start: auto;
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--text-muted);
+    cursor: pointer;
+
+    &:hover { background: var(--hover-overlay); }
+    &:focus-visible { outline: 1px solid currentColor; }
+  }
+
+  .content > :is(.markdown-image-only, .markdown-image-group) {
+    width: min(320px, 100%);
+  }
+
+  .content:has(> :is(.markdown-image-only, .markdown-image-group):only-child) {
+    width: min(320px, 100%);
+    padding: 0;
+    background: transparent;
+  }
+
+  .content > .markdown-image-only > [data-slot='image-thumbnail'] {
+    border: 0;
+    border-radius: 16px;
+  }
+
+  .content:has(> .markdown-image-only:last-child):has(> :not(.markdown-image-only, .markdown-image-group)) {
+    padding-block-end: 12px;
+
+    > .markdown-image-only {
+      margin-inline: -4px;
+      width: auto;
+    }
+
+    > .markdown-image-only:last-child > [data-slot='image-thumbnail'] {
+      border-end-start-radius: 10px;
+      border-end-end-radius: 10px;
+    }
+  }
+}

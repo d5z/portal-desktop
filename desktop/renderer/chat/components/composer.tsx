@@ -33,6 +33,37 @@ export function ChatComposer({ state, onKeyDown, onConfigureSubagent, onExamples
     state.changed();
   };
   useLayoutEffect(() => {
+    const row = root.current?.parentElement;
+    const area = row?.closest('#input-area');
+    if (!row || !area) return;
+
+    const update = () => {
+      const input = row.querySelector<HTMLElement>('#input');
+      const paragraph = input?.firstElementChild;
+      if (!input || !paragraph) return;
+      const lineHeight = parseFloat(getComputedStyle(input).lineHeight);
+      let expanded = input.childElementCount > 1 || paragraph.tagName !== 'P'
+        || Boolean(paragraph.querySelector('br:not(.ProseMirror-trailingBreak)')) || paragraph.clientHeight > lineHeight + 2;
+      if (!expanded && paragraph.textContent) {
+        const range = document.createRange();
+        range.selectNodeContents(paragraph);
+        const controls = Array.from(row.children).filter(child => child !== root.current);
+        const available = row.clientWidth - controls.reduce((width, child) => width + child.getBoundingClientRect().width, 0)
+          - controls.length * parseFloat(getComputedStyle(row).columnGap) - 4;
+        expanded = range.getBoundingClientRect().width > available + 1;
+      }
+      area.toggleAttribute('data-long-draft', expanded);
+    };
+    let frame = 0;
+    const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(update); };
+    const resize = new ResizeObserver(schedule);
+    const draft = new MutationObserver(schedule);
+    resize.observe(row);
+    draft.observe(row, { childList: true, subtree: true, characterData: true });
+    update();
+    return () => { cancelAnimationFrame(frame); resize.disconnect(); draft.disconnect(); };
+  }, []);
+  useLayoutEffect(() => {
     if (focusAfterSelection.current) props.textareaRef.current?.focus();
     focusAfterSelection.current = false;
   }, [state.draft]);

@@ -615,6 +615,44 @@
   text-overflow: ellipsis;
 }
 
+.composer-queue button.composer-queue-preview-trigger {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  min-width: 0;
+  padding: 0 4px;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  anchor-name: var(--queue-preview-anchor);
+}
+
+.composer-queue-preview {
+  position: fixed;
+  position-anchor: var(--queue-preview-anchor);
+  position-area: top span-inline-end;
+  position-try-fallbacks: flip-block, flip-inline;
+  width: max-content;
+  max-width: min(432px, calc(100vw - 16px));
+  max-height: min(50dvh, calc(100vh - 16px));
+  overflow: auto;
+  margin: 6px 0;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 4px 16px #0002;
+  font: 13px/20px var(--font-sans, system-ui);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+
+  > ul { padding-inline-start: 18px; margin: 4px 0; }
+  > small { display: block; margin-block-start: 4px; color: var(--text-dim); }
+}
+
 .composer-queue-edit {
   flex: 1;
   min-width: 0;
@@ -629,21 +667,26 @@
   font: inherit;
 }
 
-.composer-queue-notice {
-  display: grid;
-  flex: 0 0 14px;
-  height: 14px;
-  place-items: center;
-  border: 1px solid currentcolor;
-  border-radius: 50%;
-  color: var(--red);
-  cursor: help;
-  font-size: 10px;
-  line-height: 1;
+.composer-queue-status {
+  max-width: 30%;
+  overflow: hidden;
+  color: var(--text-dim);
+  font-size: 11px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+
+  &[data-error='true'] { color: var(--red); }
 }
 
-.composer-queue button,
-.composer-queue-hint button {
+.composer-queue-thumbnail {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  object-fit: cover;
+}
+
+.composer-queue button {
   flex-shrink: 0;
   border: 0;
   background: transparent;
@@ -683,28 +726,60 @@
   outline-offset: -2px;
 }
 
-.composer-queue button:hover,
-.composer-queue-hint button:hover {
+.composer-queue button:hover {
   background: var(--bg-soft);
   color: var(--text);
 }
 
-.composer-queue button:disabled,
-.composer-queue-hint button:disabled {
+.composer-queue button:disabled {
   opacity: 0.4;
   cursor: default;
 }
 
-.composer-queue-hint {
+.composer-submit {
+  position: relative;
+  flex: none;
+  align-self: center;
+}
+
+.composer-queue-tip {
   position: absolute;
-  right: 42px;
-  bottom: 0;
-  height: 36px;
+  inset-inline-end: 0;
+  bottom: 100%;
+  z-index: 5;
+  width: max-content;
+  padding-bottom: 8px;
+}
+
+.composer-queue-tip-surface {
+  display: grid;
+  padding: 4px;
+  border-radius: 12px;
+  background: var(--bg);
+  box-shadow: 0 4px 12px #0002;
+}
+
+.composer-queue-tip button {
   display: flex;
   align-items: center;
-  justify-content: flex-end;
-  z-index: 1;
-  white-space: nowrap;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text);
+  font: 13px/20px var(--font-sans, system-ui);
+  cursor: pointer;
+
+  &:hover { background: var(--hover-overlay); }
+  &:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+  kbd { color: var(--text-dim); font: inherit; white-space: nowrap; }
+}
+
+@media (pointer: coarse) {
+  .composer-queue-tip button { min-height: var(--touch-target); }
 }
 
 #input-area #input-row {

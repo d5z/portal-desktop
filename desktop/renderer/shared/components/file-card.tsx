@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { FileTypeIcon } from './file-type-icon';
+import { FileName } from './file-name';
 import { formatBytes } from '../lib/format-bytes';
 import styles from './file-card.module.scss';
 
@@ -9,12 +10,12 @@ export function FileCard({ path, name, size, title, disabled, localPath, classNa
   className?: string; onOpen: () => void; children?: ReactNode;
 }) {
   const extension = path.split(/[\\/]/).pop()!.split('.').slice(1).pop()?.toUpperCase() || '文件';
-  return <span className={`${styles.file} ${className}`}>
-    <button type="button" className={styles.open} disabled={disabled} data-local-file={localPath}
+  return <span className={`${styles.file} ${className}`} data-slot="file-card">
+    <button type="button" className={styles.open} disabled={disabled} data-local-file={localPath} data-slot="file-card-open"
       aria-label={`预览文件：${name}`} title={title} onClick={onOpen}>
       <FileTypeIcon path={path} />
       <span className={styles.details}>
-        <strong>{name}</strong>
+        <FileName name={name} />
         <span className={styles.metadata}>{extension}{size !== undefined && ` · ${formatBytes(size)}`}</span>
       </span>
     </button>

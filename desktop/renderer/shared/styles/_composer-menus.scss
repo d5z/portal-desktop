@@ -123,10 +123,6 @@
     display: none;
   }
 
-  #input-area #input-row:has(.permission-quick-trigger) > .composer-queue-hint span {
-    display: none;
-  }
-
   .composer-slash-menu {
     left: -13px;
     max-width: calc(100% + 26px);

@@ -86,6 +86,61 @@
   color: var(--text-muted);
 }
 
+.message-feedback {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-block-start: 4px;
+  color: light-dark(#d33145, #ff9da7);
+
+  > button {
+    display: grid;
+    place-items: center;
+    min-width: 24px;
+    min-height: 24px;
+    padding: 0 4px;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: inherit;
+    font: 12px/1.5 var(--font-sans, system-ui);
+    cursor: pointer;
+
+    &:hover { background: color-mix(in srgb, currentColor 8%, transparent); }
+    &:focus-visible { outline: 1px solid currentColor; outline-offset: -1px; }
+  }
+}
+
+.message-feedback-reason {
+  anchor-name: var(--message-error-anchor);
+}
+
+.message-feedback-tooltip {
+  position: fixed;
+  position-anchor: var(--message-error-anchor);
+  position-area: top center;
+  position-try-fallbacks: flip-block, flip-inline;
+  max-width: min(280px, calc(100vw - 16px));
+  margin: 6px;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+  box-shadow: 0 3px 12px #0002;
+  font: 12px/1.5 var(--font-sans, system-ui);
+  overflow-wrap: anywhere;
+}
+
+.message-feedback-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 .message.being .message-action-time {
   order: 1;
 }
@@ -268,12 +323,6 @@
   flex: 1;
 }
 
-#input-area #input-row > .composer-queue-hint {
-  position: static;
-  height: 34px;
-  flex-shrink: 0;
-}
-
 #input-area #input-row #input {
   min-height: 34px;
   max-height: min(320px, 40vh);
@@ -286,6 +335,36 @@
   padding: 7px 2px;
   font-size: 14px;
   line-height: 20px;
+}
+
+#input-area:is([data-long-draft], :has(#pending-files.active, .composer-editing-queue, .iui-context-target)) {
+  padding-block-start: 14px;
+
+  #input-row {
+    flex-wrap: wrap;
+  }
+
+  #input-row > .chat-composer {
+    order: -2;
+    flex: 0 0 100%;
+    padding-inline: 10px;
+  }
+
+  #input-row > .composer-add {
+    margin-inline-end: auto;
+  }
+
+  #input-row :is(#input, [data-slot='composer-highlight']) {
+    padding: 4px 0;
+  }
+
+  #input-row #input > p {
+    margin-block-end: 0;
+  }
+}
+
+#input-area[data-long-draft]:not(:has(#pending-files.active, .composer-editing-queue, .iui-context-target)) #input-row > .chat-composer {
+  padding-inline-start: 40px;
 }
 
 :root[data-theme='dark'] #input-area {

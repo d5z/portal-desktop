@@ -19,7 +19,7 @@ export function BeingFilesMessage({ receipt, streaming, source }: { receipt: Bei
   const open = useContext(HomeFileAction);
   if (streaming) return <div className={styles.status} role="status">正在接收文件信息…</div>;
   if (receipt.error) return <div className={styles.status}><p role="alert">{receipt.error}</p><details><summary>查看原始信息</summary><pre>{source}</pre></details></div>;
-  return <div className={styles.files} aria-label="交付文件">
+  return <div className={styles.files} data-slot="delivered-files" aria-label="交付文件">
     {receipt.files!.map((file, index) => <FileCard key={`${file.path}:${index}`} path={file.path} name={file.name} size={file.size}
       disabled={!open} title={[file.path, file.caption, open ? '点击预览' : '请在桌面客户端打开'].filter(Boolean).join('\n')}
       onOpen={() => open?.(file.path)}>

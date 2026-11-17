@@ -93,7 +93,7 @@
 }
 
 #client-settings-dialog #settings-panel .llm-current {
-  background: var(--utility-surface);
+  background: var(--settings-card);
   border: 0;
   padding: 18px 20px;
   border-radius: var(--utility-radius);
@@ -140,7 +140,7 @@
 
 #client-settings-dialog .portal-card {
   padding: 20px;
-  background: var(--utility-surface);
+  background: var(--settings-card);
   border: 0;
   border-radius: var(--utility-radius);
 }
@@ -311,7 +311,7 @@
 .client-settings-backdrop {
   position: fixed;
   inset: 0;
-  background: #0005;
+  background: rgb(0 0 0 / 33%);
   z-index: 1000;
   -webkit-app-region: no-drag;
 }
@@ -561,38 +561,41 @@ html[data-theme='dark'] .town-logo-light {
 
 /* Settings uses the same quiet panel language as the rest of the client. */
 #client-settings-dialog {
-  --settings-page: var(--bg);
-  --settings-sidebar: var(--sidebar);
-  --settings-card: light-dark(#f0f0f0, #2c2d2f);
-  --settings-hover: var(--surface);
-  --settings-active: var(--selected);
+  --settings-page: light-dark(#fefefe, #151515);
+  --settings-sidebar: light-dark(#f7f7f7, #1f1f1f);
+  --settings-card: var(--neutral-card);
+  --settings-hover: var(--hover);
+  --settings-active: light-dark(#e9f1fb, #28374a);
 
   width: min(1120px, calc(100vw - 48px));
   height: min(820px, calc(100dvh - 48px));
   border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
-  border-radius: var(--panel-radius);
+  border-radius: 28px;
   background: var(--settings-page);
-  box-shadow: var(--popover-shadow);
+  box-shadow:
+    0 30px 90px rgb(20 24 32 / 20%),
+    0 8px 24px rgb(20 24 32 / 10%);
 }
 
 #client-settings-dialog .client-settings-content {
   grid-template-columns: 200px minmax(0, 1fr);
-  grid-template-rows: 76px minmax(0, 1fr);
+  grid-template-rows: 88px minmax(0, 1fr);
   background: var(--settings-page);
 }
 
 #client-settings-dialog .client-settings-content > .dialog-heading,
 #client-settings-dialog .settings-tabs {
   background: var(--settings-sidebar);
-  border-right: 1px solid color-mix(in srgb, var(--line) 72%, transparent);
+  border-right: 1px solid var(--text);
 }
 
 #client-settings-dialog .client-settings-content > .dialog-heading {
-  padding: 24px;
+  padding: 30px 24px 20px;
 }
 
 #client-settings-dialog .dialog-heading h2 {
-  font-size: 21px;
+  font-size: 24px;
+  letter-spacing: -0.03em;
 }
 
 #client-settings-dialog .settings-tabs {
@@ -606,15 +609,16 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 #client-settings-dialog .settings-tabs button {
-  min-height: 40px;
-  padding: 8px 12px;
-  border-radius: 8px;
+  min-height: 48px;
+  padding: 12px 14px;
+  border-radius: 14px;
   gap: 12px;
   font-size: 14px;
   transition:
     background-color 160ms ease,
     color 160ms ease,
-    border-color 160ms ease;
+    box-shadow 160ms ease,
+    transform 160ms ease;
 }
 
 #client-settings-dialog .settings-tabs button:hover:not(:disabled),
@@ -627,19 +631,25 @@ html[data-theme='dark'] .town-logo-light {
 #client-settings-dialog .settings-tabs button[aria-selected='true']:hover:not(:disabled) {
   background: var(--settings-active);
   color: var(--text);
+  box-shadow: none;
   font-weight: 600;
 }
 
+#client-settings-dialog .settings-tabs button:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
 #client-settings-dialog .settings-page-heading {
-  min-height: 80px;
-  padding: 24px 32px 20px;
+  min-height: 76px;
+  padding: 20px 36px;
   border-bottom: 0;
   background: var(--settings-page);
 }
 
 #client-settings-dialog .settings-page-title {
-  font-size: 24px;
-  font-weight: 600;
+  font-size: 20px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
 }
 
 #client-settings-dialog .settings-page-back {
@@ -657,7 +667,7 @@ html[data-theme='dark'] .town-logo-light {
 
 #client-settings-dialog .dialog-body,
 #client-settings-dialog .settings-inline-body {
-  padding: 0 32px 32px;
+  padding: 0 36px 44px;
   background: var(--settings-page);
   scrollbar-color: var(--muted) transparent;
 }
@@ -684,19 +694,20 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 #client-settings-dialog :is(.settings-item, .settings-page-link, .settings-plugin-link) {
-  border: 1px solid var(--line);
-  border-radius: var(--utility-radius);
+  border: 0;
+  border-radius: 12px;
   background: var(--settings-card);
   transition:
     background-color 160ms ease,
-    border-color 160ms ease;
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
 }
 
 #client-settings-dialog .settings-item {
-  min-height: 64px;
-  margin: 0 0 8px;
-  padding: 12px 16px;
-  border-bottom: 1px solid var(--line);
+  min-height: 76px;
+  margin: 0 0 12px;
+  padding: 17px 20px;
 }
 
 #client-settings-dialog label.settings-item:has(input:enabled):hover,
@@ -708,9 +719,9 @@ html[data-theme='dark'] .town-logo-light {
 #client-settings-dialog .settings-page-link,
 #client-settings-dialog .settings-plugin-link {
   width: 100%;
-  min-height: 64px;
-  margin: 0 0 8px;
-  padding: 12px 16px;
+  min-height: 76px;
+  margin: 0 0 12px;
+  padding: 17px 20px;
 }
 
 #client-settings-dialog .settings-page-link::after,
@@ -738,14 +749,22 @@ html[data-theme='dark'] .town-logo-light {
   border: 1px solid color-mix(in srgb, var(--line) 82%, transparent);
   border-radius: 12px;
   background: var(--control);
+  box-shadow: 0 1px 4px rgb(20 24 32 / 5%);
   color: var(--text);
   transition:
     background-color 160ms ease,
-    border-color 160ms ease;
+    border-color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
 }
 
 #client-settings-dialog :is(.settings-item-control > button, .download-setting-change, .theme-options button, .history-setting button[type='submit']):hover:not(:disabled) {
   background: var(--settings-hover);
+}
+
+#client-settings-dialog :is(.settings-item-control > button, .download-setting-change, .theme-options button, .history-setting button[type='submit']):active:not(:disabled) {
+  transform: scale(0.975);
+  box-shadow: 0 1px 3px rgb(20 24 32 / 5%);
 }
 
 #client-settings-dialog .theme-options {
@@ -765,15 +784,17 @@ html[data-theme='dark'] .town-logo-light {
 #client-settings-dialog .theme-options button[aria-pressed='true'] {
   border-color: var(--line);
   background: var(--control);
+  box-shadow: 0 2px 7px rgb(20 24 32 / 9%);
 }
 
 #client-settings-dialog .appearance-settings-group > .reading-setting,
 #client-settings-dialog .appearance-settings-group > .history-setting {
   margin: 0 0 12px;
   padding: 20px;
-  border: 1px solid var(--line);
-  border-radius: var(--utility-radius);
+  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+  border-radius: 16px;
   background: var(--settings-card);
+  box-shadow: 0 2px 8px rgb(20 24 32 / 4%);
 }
 
 #client-settings-dialog .appearance-settings-group > .reading-setting {
@@ -804,13 +825,12 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 #client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):checked {
-  background: var(--accent);
+  background: #2f86f6;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
 #client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):checked::before {
   transform: translateX(16px);
-  background: var(--button-text);
 }
 
 #client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):hover:not(:disabled) {
@@ -818,7 +838,7 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 #client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid #2f86f6;
   outline-offset: 2px;
 }
 
@@ -826,9 +846,10 @@ html[data-theme='dark'] .town-logo-light {
   gap: 12px;
   margin: 0 0 12px;
   padding: 14px;
-  border: 1px solid var(--line);
-  border-radius: var(--utility-radius);
+  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+  border-radius: 16px;
   background: var(--settings-card);
+  box-shadow: 0 2px 8px rgb(20 24 32 / 4%);
 }
 
 #client-settings-dialog .notification-switches .settings-item {
@@ -847,7 +868,7 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 #client-settings-dialog .settings-unsaved {
-  border-radius: var(--utility-radius);
+  border-radius: 16px;
   box-shadow: 0 5px 16px rgb(20 24 32 / 7%);
 }
 
@@ -1266,13 +1287,13 @@ html[data-theme='dark'] .town-logo-light {
 
 #client-settings-dialog .settings-page-link strong,
 #client-settings-dialog .settings-plugin-link strong {
-  font-size: 13px;
+  font-size: 14px;
 }
 
 #client-settings-dialog .settings-page-link small,
 #client-settings-dialog .settings-plugin-link small {
   margin-top: 3px;
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.45;
 }
 
@@ -1366,41 +1387,107 @@ html[data-theme='dark'] .town-logo-light {
   gap: 8px;
 }
 
-#client-settings-dialog .connector-card,
-#client-settings-dialog .connector-card.is-installed {
-  min-height: 64px;
+#client-settings-dialog .connector-card {
+  display: flex;
+  align-items: center;
   gap: 10px;
+  min-height: 64px;
   padding: 11px 12px;
+  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
   border-radius: 14px;
+  background: var(--control);
+  transition: background-color 140ms ease, border-color 140ms ease;
+
+  &.is-clickable {
+    cursor: pointer;
+
+    &:hover {
+      border-color: color-mix(in srgb, var(--secondary) 22%, var(--line));
+      background: var(--settings-hover);
+    }
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
 }
 
 #client-settings-dialog .connector-card-copy {
+  display: grid;
+  flex: 1;
   gap: 2px;
+  min-width: 0;
+
+  strong {
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 1.4;
+    overflow-wrap: anywhere;
+  }
+
+  small {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    color: var(--secondary);
+    font-size: 11px;
+    line-height: 1.35;
+    overflow-wrap: anywhere;
+  }
+
+  .connector-local-status {
+    -webkit-line-clamp: 1;
+    color: var(--accent);
+  }
 }
 
-#client-settings-dialog .connector-card-copy strong {
-  font-size: 13px;
-}
-
-#client-settings-dialog .connector-card-copy small {
-  font-size: 11px;
-  line-height: 1.35;
-}
-
-#client-settings-dialog .connector-card > button.connector-card-action {
-  width: 30px;
-  min-width: 30px;
-  height: 30px;
-  min-height: 30px;
-  padding: 5px;
-}
-
-#client-settings-dialog .connector-card:not(.is-installed) > button.connector-card-action {
-  width: auto;
+#client-settings-dialog .connector-card-action {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
   min-width: 48px;
-  padding-inline: 10px;
+  height: 30px;
+  padding: 0 11px;
+  border: 1px solid var(--line);
   border-radius: 10px;
+  background: var(--control);
+  color: var(--secondary);
+  font-size: 12px;
+  font-weight: 500;
   white-space: nowrap;
+  transition: background-color 140ms ease, border-color 140ms ease;
+
+  &[data-icon-only] {
+    width: 30px;
+    min-width: 30px;
+    padding: 0;
+    border-color: transparent;
+    border-radius: 50%;
+    background: transparent;
+  }
+
+  svg {
+    width: 18px;
+    height: 18px;
+  }
+
+  &:hover:not(:disabled) {
+    border-color: color-mix(in srgb, var(--secondary) 34%, var(--line));
+    background: var(--settings-hover);
+  }
+
+  &:active:not(:disabled) {
+    background: var(--pressed);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #client-settings-dialog :is(.connector-card, .connector-card-action) {
+    transition: none;
+  }
 }
 
 #client-settings-dialog .connector-detail {
@@ -1676,7 +1763,7 @@ html[data-theme='dark'] .town-logo-light {
   height: 44px;
   margin-top: 0;
   padding: 0 12px;
-  border: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+  border: 1px solid #010000;
   border-radius: 20px;
   background: var(--control);
   color: var(--secondary);
@@ -1701,7 +1788,7 @@ html[data-theme='dark'] .town-logo-light {
   margin: 0 0 24px;
   padding: 0;
   overflow: hidden;
-  border-radius: var(--utility-radius);
+  border-radius: 12px;
   background: var(--settings-card);
 }
 
@@ -1774,8 +1861,8 @@ html[data-theme='dark'] .town-logo-light {
 #client-settings-dialog .settings-section-card .general-setting-help,
 #client-settings-dialog .settings-section-card .form-error {
   margin: 0;
-  padding: 10px 0 12px;
-  font-size: 11px;
+  padding: 10px 12px 12px;
+  font-size: 12px;
 }
 
 #client-settings-dialog .settings-nav-search > svg {

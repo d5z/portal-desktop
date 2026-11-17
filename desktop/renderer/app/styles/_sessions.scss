@@ -416,6 +416,39 @@
   padding-inline-start: 42px;
 }
 
+.chat-session-rename {
+  justify-content: flex-start;
+  gap: 6px;
+  padding-block: 6px;
+  padding-inline-end: 8px;
+
+  input {
+    flex: 1;
+    min-width: 0;
+    padding: 4px 6px;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--bg);
+    color: var(--text);
+    font: inherit;
+
+    &:focus {
+      border-color: var(--accent);
+      outline: none;
+    }
+  }
+
+  button {
+    display: grid;
+    flex: 0 0 28px;
+    height: 28px;
+    padding: 0;
+    place-items: center;
+    border-radius: 6px;
+    color: var(--secondary);
+  }
+}
+
 .chat-session-grip {
   position: absolute;
   inset-block-start: 8px;

@@ -1,0 +1,25 @@
+:global(.markdown-code-modes) button.copy {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  min-height: 26px;
+  padding: 0;
+
+  > svg {
+    display: block;
+  }
+}
+
+:global(.markdown-code-modes) button.copy[data-failed] {
+  color: var(--red);
+}
+
+.feedback {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

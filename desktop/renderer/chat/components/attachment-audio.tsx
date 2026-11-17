@@ -40,7 +40,7 @@ export function AttachmentAudio({src,name,endpoint,id}:{src:string;name:string;e
       if(playing)audio.current?.pause();else {setError('');void audio.current?.play().catch(()=>setError('音频暂时无法播放'));}
     }}><Icon name={playing ? 'pause-20' : 'play-20'} width="18" height="18" fill="currentColor" /></button>
     <div className="audio-waveform">
-      <div className="audio-waveform-bars" aria-hidden="true">{peaks.map((peak,index)=><i key={index} style={{height:`${peak*100}%`,background:index/peaks.length<=position/(duration || 1) ? '#f5f5f5' : '#606060'}}/>)}</div>
+      <div className="audio-waveform-bars" aria-hidden="true">{peaks.map((peak,index)=><i key={index} style={{height:`${peak*100}%`,background:index/peaks.length<=position/(duration || 1) ? 'var(--chat-wave-played, #f5f5f5)' : 'var(--chat-wave-unplayed, #606060)'}}/>)}</div>
       <input type="range" aria-label={`${name} 播放进度`} min={0} max={Number.isFinite(duration) && duration>0 ? duration : 1} step={0.1} value={position} disabled={!Number.isFinite(duration) || !duration} onChange={event=>{if(audio.current){audio.current.currentTime=Number(event.target.value);setPosition(Number(event.target.value));}}}/>
     </div>
     <span>{time(position)} / {duration>0 ? time(duration) : '—'}</span>

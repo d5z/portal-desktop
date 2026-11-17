@@ -195,9 +195,18 @@ try {
   assert.equal(await chat.locator('#input').evaluate(el => el.value ?? el.editor.getMarkdown()),'方案草稿');
   await page.getByRole('button',{name:'切换到场景：方案讨论'}).click({button:'right'});
   await page.getByRole('menuitem',{name:'重命名',exact:true}).click();
-  await page.getByRole('textbox',{name:'场景名称'}).fill('技术方案');
-  await page.getByRole('button',{name:'保存名称'}).click();
-  await page.locator('#chat-session-editor').waitFor({state:'hidden'});
+  const rename = page.getByRole('navigation',{name:'切换场景'}).getByRole('textbox',{name:'场景名称'});
+  await rename.waitFor();
+  assert.equal(await rename.evaluate(input => input === document.activeElement && input.selectionEnd - input.selectionStart === input.value.length),true);
+  await rename.fill('取消这次改名');
+  await rename.press('Escape');
+  await rename.waitFor({state:'hidden'});
+  assert.equal(await page.getByRole('button',{name:'切换到场景：方案讨论'}).count(),1);
+  await page.getByRole('button',{name:'切换到场景：方案讨论'}).click({button:'right'});
+  await page.getByRole('menuitem',{name:'重命名',exact:true}).click();
+  await rename.fill('技术方案');
+  await rename.press('Enter');
+  await rename.waitFor({state:'hidden'});
   const persisted = await page.evaluate(() => window.beings.snapshot());
   assert.equal(persisted.chatScene.scene_id,discussion);
   assert.equal(persisted.chatScene.scene_meta.scene_label,'技术方案');
@@ -340,9 +349,9 @@ try {
   await page.getByRole('menu',{name:'场景操作'}).waitFor();
   assert.equal(await page.getByRole('menu',{name:'编辑菜单'}).count(),0,'Session context menu must suppress the global edit menu');
   await page.getByRole('menuitem',{name:'重命名',exact:true}).click();
-  await page.getByRole('textbox',{name:'场景名称'}).fill('旧会话');
+  await rename.fill('旧会话');
   await page.getByRole('button',{name:'保存名称'}).click();
-  await page.locator('#chat-session-editor').waitFor({state:'hidden'});
+  await rename.waitFor({state:'hidden'});
   assert.equal(await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id),discussion);
   const oldScene = page.getByRole('button',{name:'切换到场景：旧会话'});
   await oldScene.click({button:'right'});
@@ -400,6 +409,8 @@ try {
   await page.getByRole('button',{name:'收起场景列表',exact:true}).waitFor();
   await page.getByRole('button',{name:'切换到场景：跨客户端场景'}).waitFor();
   assert.equal((await page.evaluate(() => window.beings.snapshot())).chatScene.scene_id,'feishu-shared');
+  await page.waitForFunction(() => !window.fixtureApp.chatLoading);
+  await chat.locator('.message.user').filter({hasText:'Bound scene message'}).waitFor();
   // Scheduling is inspectable process metadata, never inline conversation prose.
   const wire = '独立问题\n\n[Desktop 场景调度提示]\n当前输入属于 scene_id="feishu-shared"。本客户端其他场景尚在处理或等待回复：\n[{"scene_id":"background-a"}]\n[/Desktop 场景调度提示]';
   // Preserve transport metadata verbatim instead of typing it through Markdown serialization.
@@ -427,7 +438,7 @@ try {
   },status);
   await pushTasks('running');
   assert.equal(await chat.getByText('尚未配置 · 点击配置模型',{exact:true}).count(),0);
-  await page.getByRole('button',{name:'切换到场景：跨客户端场景'}).getByText('执行中').waitFor();
+  await page.getByRole('button',{name:'切换到场景：跨客户端场景'}).locator('.chat-session-activity[title="执行中"]').waitFor();
   if (await schedulingRun.getAttribute('open') === null) await schedulingRun.locator('summary').click();
   await chat.locator('.scene-task-list').getByText('后台执行中',{exact:true}).waitFor();
   await page.screenshot({animations:'disabled',path:'test-results/scene-scheduling-running.png'});

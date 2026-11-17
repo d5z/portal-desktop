@@ -1,0 +1,176 @@
+#messages {
+  --chat-file-surface: light-dark(#eaeaea, #343434);
+  --chat-file-text: light-dark(#202020, #f0f0f0);
+  --chat-file-meta: light-dark(#595959, #bcbcbc);
+  --chat-file-icon: light-dark(#545454, #cbcbcb);
+
+  > .message.user {
+    --chat-file-surface: light-dark(#e9f4ff, #17304b);
+    --chat-file-text: light-dark(#16273c, #ecf5ff);
+    --chat-file-meta: light-dark(#466787, #b4cde6);
+    --chat-file-icon: light-dark(#086bc6, #87bfff);
+  }
+
+  .message-bubble-body .content:has(> [data-slot='delivered-files']:only-child) {
+    width: min(320px, 100%);
+    padding: 0;
+    background: transparent;
+  }
+
+  :is(.content, .run-artifacts) [data-slot='file-card'] {
+    margin-block: 0;
+  }
+
+  :is([data-slot='file-card'], .attachment-file-card, .attachment-upload-card) {
+    width: 156px;
+    min-width: 0;
+    max-width: 100%;
+    border: 0;
+    border-radius: 16px;
+    background: var(--chat-file-surface);
+    color: var(--chat-file-text);
+  }
+
+  :is([data-slot='file-card-open'], .attachment-file-main, .attachment-upload-card .attachment-file-row) {
+    min-height: 48px;
+    height: auto;
+    gap: 8px;
+    padding: 8px 12px;
+  }
+
+  [data-slot='file-card']:has(> button + button) [data-slot='file-card-open'] {
+    padding-inline-end: 40px;
+  }
+
+  [data-slot='file-card'] > button:not([data-slot='file-card-open']) {
+    right: 6px;
+    width: 28px;
+    height: 28px;
+  }
+
+  :is([data-slot='file-card-open'] > span:first-child, .attachment-file-icon) {
+    width: 18px;
+    height: 18px;
+    background: transparent;
+    color: var(--chat-file-icon);
+
+    > svg {
+      width: 100%;
+      height: 100%;
+    }
+  }
+
+  :is([data-slot='file-card-open'] > span:nth-child(2), .attachment-file-label) {
+    gap: 0;
+  }
+
+  .attachment-filename {
+    display: flex;
+    min-width: 0;
+    font-size: 13px;
+    font-weight: 500;
+    line-height: 18px;
+
+    > span {
+      min-width: 0;
+      max-width: 66px;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    > span + span {
+      flex: 0 0 auto;
+      max-width: 45%;
+    }
+  }
+
+  :is([data-slot='file-card-open'] > span:nth-child(2) > span, .attachment-file-label small) {
+    color: var(--chat-file-meta);
+    font-size: 10px;
+    line-height: 14px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .attachment-file-card {
+    padding: 0;
+    .attachment-file-row { gap: 0; }
+    .attachment-file-main {
+      padding-inline-end: 0;
+      color: var(--chat-file-text) !important;
+    }
+    .attachment-file-action { display: none; }
+    .attachment-menu summary { padding-inline: 5px 8px; }
+  }
+
+  .attachment-upload-card {
+    padding: 0 12px 8px;
+    .attachment-file-row { padding-inline: 0; }
+  }
+}
+
+#input-area #pending-files.active {
+  gap: 6px;
+  align-items: flex-start;
+  margin: 0 10px 4px;
+
+  .pending-file:not(:has(.pending-file-preview)) {
+    width: 184px;
+    max-width: 100%;
+    height: 48px;
+    flex-direction: row;
+    justify-content: start;
+    gap: 8px;
+    padding: 8px 26px 8px 10px;
+    border: 0;
+    border-radius: 10px;
+    background: var(--chat-reply);
+  }
+
+  .pending-file .pending-file-label {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .pending-file:has(.pending-file-preview) .pending-file-label {
+    display: none;
+  }
+
+  .pending-file .pending-file-icon {
+    color: var(--text-dim);
+  }
+
+  .pending-file .attachment-filename {
+    display: flex;
+    font-size: 13px;
+    line-height: 18px;
+
+    > span {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    > span + span {
+      flex: 0 0 auto;
+      max-width: 45%;
+    }
+  }
+
+  .pending-file small {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-size: 10px;
+  }
+
+  .pending-file .pending-file-preview {
+    width: 64px;
+    height: 48px;
+    object-fit: cover;
+    border-radius: 10px;
+  }
+}
