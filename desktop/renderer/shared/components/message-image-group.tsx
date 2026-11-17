@@ -22,7 +22,6 @@ export function MessageImageGroup({ count, className, children }: {
   }, []);
   const desktop = typeof document !== 'undefined' && document.documentElement.dataset.chatHost === 'desktop';
   const compact = !!useContext(MessageActionSlot) || desktop;
-  const collage = desktop && document.documentElement.dataset.chatStudy === 'imessage' && count < 4;
   const toggleLabel = expanded ? '收起图片' : `展开 ${count} 张图片`;
   const cards = Children.toArray(children);
   const trackPress = (event: PointerEvent) => {
@@ -32,7 +31,7 @@ export function MessageImageGroup({ count, className, children }: {
     }
   };
   return <div className={`message-image-group ${className}`} role="group" aria-label={`${count} 张图片`}
-    data-count={count} data-expanded={expanded} data-collage={collage || undefined}>
+    data-count={count} data-expanded={expanded}>
     <MessageAction><button type="button" className="message-image-toggle" aria-controls={imagesId}
       aria-label={toggleLabel} title={compact ? toggleLabel : undefined}
       aria-expanded={expanded} onClick={() => {
@@ -45,7 +44,7 @@ export function MessageImageGroup({ count, className, children }: {
         <Icon name="chevron-down-20" width="16" height="16" />
       </>}
     </button></MessageAction>
-    {desktop && !expanded && !collage
+    {desktop && !expanded
       ? <div ref={bindDeck} id={imagesId} className="message-image-deck"
         onPointerDownCapture={event => { if (event.isPrimary && event.button === 0) press.current = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false }; }}
         onPointerMoveCapture={trackPress} onPointerUpCapture={trackPress}
@@ -61,6 +60,6 @@ export function MessageImageGroup({ count, className, children }: {
             bindDeck(deck.current);
           }} />
       </div>
-      : <div id={imagesId} className="message-image-stack" inert={!expanded && !collage} aria-hidden={!expanded && !collage || undefined}>{children}</div>}
+      : <div id={imagesId} className="message-image-stack" inert={!expanded} aria-hidden={!expanded || undefined}>{children}</div>}
   </div>;
 }
