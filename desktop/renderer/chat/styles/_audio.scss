@@ -174,7 +174,7 @@
   bottom: calc(100% + 8px);
   right: -2px;
   border: 0;
-  border-radius: 22px;
+  border-radius: 12px;
   box-shadow: 0 8px 30px #0003;
 }
 
@@ -302,7 +302,7 @@
   max-width: 100%;
   padding: 12px 16px;
   background: var(--chat-sent);
-  border-radius: 22px 5px 22px 22px;
+  border-radius: 22px;
 }
 
 .attachment-message-copy:empty {
@@ -386,7 +386,7 @@
   box-sizing: border-box;
   padding: 12px 14px;
   border: 0;
-  border-radius: 22px;
+  border-radius: 12px;
   background: var(--bg);
   color: var(--text);
   box-shadow: 0 8px 30px #0003;

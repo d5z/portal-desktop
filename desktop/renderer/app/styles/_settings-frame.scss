@@ -563,7 +563,7 @@ html[data-theme='dark'] .town-logo-light {
 #client-settings-dialog {
   --settings-page: var(--bg);
   --settings-sidebar: var(--sidebar);
-  --settings-card: var(--control);
+  --settings-card: light-dark(#f0f0f0, #2c2d2f);
   --settings-hover: var(--surface);
   --settings-active: var(--selected);
 
@@ -1247,12 +1247,12 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 #client-settings-dialog .settings-item-label {
-  font-size: 13px;
+  font-size: 14px;
   line-height: 1.4;
 }
 
 #client-settings-dialog .settings-item-copy small {
-  font-size: 11px;
+  font-size: 13px;
   line-height: 1.45;
 }
 
@@ -1684,6 +1684,10 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 /* Grouped cards keep related controls together and let dividers carry the rhythm. */
+#client-settings-dialog :is(#settings-panel-general, #settings-panel-appearance) {
+  max-width: 680px;
+}
+
 #client-settings-dialog .settings-group > h3,
 #client-settings-dialog .general-settings-group > h3 {
   margin: 0 0 9px;
@@ -1694,10 +1698,9 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 #client-settings-dialog .settings-section-card {
-  margin: 0 0 22px;
+  margin: 0 0 24px;
   padding: 0;
   overflow: hidden;
-  border: 1px solid var(--line);
   border-radius: var(--utility-radius);
   background: var(--settings-card);
 }
@@ -1726,8 +1729,9 @@ html[data-theme='dark'] .town-logo-light {
   padding: 14px 12px;
 }
 
-#client-settings-dialog .settings-section-card > :not(:first-child) {
-  border-top: 1px solid color-mix(in srgb, var(--line) 88%, transparent);
+#client-settings-dialog .settings-section-card > :not(:first-child),
+#client-settings-dialog .settings-section-card .notification-switches .settings-item + .settings-item {
+  border-top: 1px solid var(--line);
 }
 
 #client-settings-dialog .settings-section-card > label.settings-item:has(input:enabled):hover,
@@ -1749,17 +1753,17 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 #client-settings-dialog .settings-section-card > .notification-switches {
-  display: grid;
-  gap: 4px 8px;
-  padding: 8px 0;
+  display: block;
+  padding: 0;
 }
 
 #client-settings-dialog .settings-section-card .notification-switches .settings-item {
-  min-height: 42px;
+  min-height: 44px;
   margin: 0;
-  padding: 7px 12px;
+  padding: 8px 12px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 0;
+  background: transparent;
   box-shadow: none;
 }
 
@@ -1873,11 +1877,6 @@ html[data-theme='dark'] .town-logo-light {
 #client-settings-dialog .settings-plugin-link small {
   margin-top: 2px;
   line-height: 1.35;
-}
-
-#client-settings-dialog .settings-section-card .notification-switches .settings-item {
-  min-height: 38px;
-  padding-block: 5px;
 }
 
 #client-settings-dialog :is(.settings-item-control > button, .download-setting-change, .theme-options button) {

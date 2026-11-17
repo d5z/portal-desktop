@@ -39,13 +39,13 @@
   flex: 0 0 32px;
   width: 32px;
   height: 32px;
-  padding: 7px;
-  border-radius: 8px;
+  padding: 8px;
+  border-radius: 7px;
   color: var(--text-muted);
 
   svg {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
   }
 
   @media (prefers-reduced-motion: no-preference) {

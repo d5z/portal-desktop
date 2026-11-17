@@ -22,6 +22,7 @@ html[data-platform='win32'] .workspace-rail .rail-links {
   position: static;
   transform: none;
   max-height: none;
+  margin-block: auto;
 }
 
 html[data-platform='win32'] .workspace-stage .topbar {
@@ -595,11 +596,15 @@ html[data-platform='darwin'] .workspace-stage .topbar {
   transform: translateY(-50%);
 
   // Reserve equal space for the avatar and bottom controls without shifting the center.
-  max-height: calc(100% - 240px);
+  max-height: calc(100% - 232px);
+  flex: 0 1 auto;
   justify-content: safe center;
-  gap: 12px;
-  padding: 10px 0;
+  gap: 3px;
+  padding: 5px 4px;
   min-height: 0;
+  border-radius: 26px;
+  background: color-mix(in srgb, var(--control) 80%, transparent);
+  box-shadow: var(--panel-shadow);
 }
 
 .workspace-rail .rail-being {
@@ -828,7 +833,7 @@ body:has(.rail-links[data-sorting]) .rail-tooltip {
     gap: 8px;
     padding-inline: 12px;
 
-    > :first-child {
+    > [aria-hidden='true'] {
       display: none;
     }
 
@@ -841,6 +846,19 @@ body:has(.rail-links[data-sorting]) .rail-tooltip {
     .topbar-actions {
       grid-column: 2;
       gap: 8px;
+    }
+
+    &:has(> #current-chat-scene) {
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
+
+      .pair-name {
+        grid-column: 2;
+        justify-self: center;
+      }
+
+      .topbar-actions {
+        grid-column: 3;
+      }
     }
   }
 }

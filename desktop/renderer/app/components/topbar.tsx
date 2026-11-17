@@ -131,6 +131,7 @@ function ReadyTopbar({ model: app }: { model: AppModel }) {
     };
   }, []);
   const hasToken = Boolean(app.snapshot?.settings.hasToken);
+  const sceneName = hasToken && !app.subagentSettingsOpen ? app.snapshot?.chatScene?.scene_meta.scene_label : undefined;
   const checkingUpdate = app.updateChecking || app.update?.phase === "checking";
   const updateActivity = app.update?.activity;
   const portal = app.snapshot?.portal;
@@ -141,7 +142,7 @@ function ReadyTopbar({ model: app }: { model: AppModel }) {
   };
   return (
     <header className={`topbar ${styles.bar}`}>
-      <div aria-hidden="true" />
+      {sceneName ? <h2 id="current-chat-scene" className={styles.sceneName} title={sceneName}>{sceneName}</h2> : <div aria-hidden="true" />}
       <div className="pair-name" hidden={app.subagentSettingsOpen}>
         <SbsControl name={town.displayName || app.snapshot?.settings.being || "Being"} known={hasToken && app.sbsKnown && !app.chatLoading} enabled={app.sbsEnabled}
           origin={app.chatSbsOrigin} phase={app.chatSbsPhase} showContent={app.chatShowSbsMessages} allScenes={app.chatHistoryScope==='all'}

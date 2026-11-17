@@ -122,10 +122,10 @@ function QueueRow({ item, index, allowInterrupt, onEdit, onReorder }: { item: Me
     <span className="composer-queue-drag-handle" title="拖动排序" aria-label="拖动排序"><Icon name="grip" className="composer-queue-icon" width="16" height="20" fill="currentColor" /></span>
     <span className="composer-queue-content" title={item.text}>{item.text}</span>
     {item.queueNotice && <span className="composer-queue-notice" role="status" title={item.queueNotice} aria-label={item.queueNotice}>!</span>}
-    <button className="composer-queue-text-action" type="button" aria-label={`编辑排队消息：${item.text}`} title="在输入框编辑" onClick={() => onEdit(item)} disabled={!item.editQueued}>编辑</button>
+    <button type="button" aria-label={`编辑排队消息：${item.text}`} title="在输入框编辑" onClick={() => onEdit(item)} disabled={!item.editQueued}><Icon name="chat-edit" width="15" height="15" /></button>
     {item.retry && <button className="composer-queue-text-action" type="button" onClick={() => void item.retry?.()}>{item.retryLabel}</button>}
     <button className="composer-queue-steer" type="button" aria-label="调整方向" disabled={!allowInterrupt || !item.canInterruptQueued} title="调整方向：立即打断并发送这条消息" onClick={() => void item.interruptQueued?.()}><Icon name="turn-right" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" /><span>调整方向</span></button>
-    <button type="button" title="删除排队消息" aria-label={`取消排队：${item.text}`} onClick={() => item.cancelQueued?.()}>×</button>
+    <button type="button" title="删除排队消息" aria-label={`取消排队：${item.text}`} onClick={() => item.cancelQueued?.()}><Icon name="chat-close" width="15" height="15" /></button>
   </div>;
 }
 function ChatView({

@@ -1,6 +1,75 @@
 import type { ComponentProps } from 'react';
 
 const glyphs = {
+  'chat-edit': { viewBox: '0 0 24 24', content: (<><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /></>) },
+  'chat-close': { viewBox: '0 0 24 24', content: (<><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></>) },
+  'chat-chevron-right': { viewBox: '0 0 24 24', content: <path d="m9 18 6-6-6-6" /> },
+  'chat-copy': { viewBox: '0 0 24 24', content: (<>
+    <rect x="8" y="8" width="14" height="14" rx="2" />
+    <path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2" />
+  </>) },
+  'chat-download': { viewBox: '0 0 24 24', content: <><path d="M12 15V3" /><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><path d="m7 10 5 5 5-5" /></> },
+  'chat-image': { viewBox: '0 0 24 24', content: (<><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></>) },
+  'chat-file': { viewBox: '0 0 24 24', content: (<><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></>) },
+  // Official Lucide geometry used by Being Home, https://lucide.dev/license.
+  'lucide-message-circle': { viewBox: '0 0 24 24', content: <path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /> },
+  'lucide-sun': { viewBox: '0 0 24 24', content: (<>
+    <circle cx="12" cy="12" r="4" />
+    <path d="M12 2v2" /><path d="M12 20v2" /><path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" />
+    <path d="M2 12h2" /><path d="M20 12h2" /><path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" />
+  </>) },
+  'lucide-folder': { viewBox: '0 0 24 24', content: <path d="M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.69-.9L9.6 3.9A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2Z" /> },
+  'lucide-layout-grid': { viewBox: '0 0 24 24', content: (<>
+    <rect width="7" height="7" x="3" y="3" rx="1" />
+    <rect width="7" height="7" x="14" y="3" rx="1" />
+    <rect width="7" height="7" x="14" y="14" rx="1" />
+    <rect width="7" height="7" x="3" y="14" rx="1" />
+  </>) },
+  'lucide-list': { viewBox: '0 0 24 24', content: (<>
+    <path d="M3 5h.01" />
+    <path d="M3 12h.01" />
+    <path d="M3 19h.01" />
+    <path d="M8 5h13" />
+    <path d="M8 12h13" />
+    <path d="M8 19h13" />
+  </>) },
+  'lucide-search': { viewBox: '0 0 24 24', content: (<>
+    <path d="m21 21-4.34-4.34" />
+    <circle cx="11" cy="11" r="8" />
+  </>) },
+  'lucide-refresh-cw': { viewBox: '0 0 24 24', content: (<>
+    <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
+    <path d="M21 3v5h-5" />
+    <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
+    <path d="M8 16H3v5" />
+  </>) },
+  'lucide-layers': { viewBox: '0 0 24 24', content: (<>
+    <path d="M12.83 2.18a2 2 0 0 0-1.66 0L2.6 6.08a1 1 0 0 0 0 1.83l8.58 3.91a2 2 0 0 0 1.66 0l8.58-3.9a1 1 0 0 0 0-1.83z" />
+    <path d="M2 12a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 12" />
+    <path d="M2 17a1 1 0 0 0 .58.91l8.6 3.91a2 2 0 0 0 1.65 0l8.58-3.9A1 1 0 0 0 22 17" />
+  </>) },
+  'lucide-shield-check': { viewBox: '0 0 24 24', content: (<>
+    <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+    <path d="m9 12 2 2 4-4" />
+  </>) },
+  'lucide-sliders-horizontal': { viewBox: '0 0 24 24', content: (<>
+    <path d="M10 5H3" />
+    <path d="M12 19H3" />
+    <path d="M14 3v4" />
+    <path d="M16 17v4" />
+    <path d="M21 12h-9" />
+    <path d="M21 19h-5" />
+    <path d="M21 5h-7" />
+    <path d="M8 10v4" />
+    <path d="M8 12H3" />
+  </>) },
+  'lucide-trash': { viewBox: '0 0 24 24', content: (<>
+    <path d="M10 11v6" />
+    <path d="M14 11v6" />
+    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6" />
+    <path d="M3 6h18" />
+    <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
+  </>) },
   'trash': { viewBox: '0 0 24 24', content: (<><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 10v7m4-7v7" /></>) },
   'panel-expand': { viewBox: '0 0 24 24', content: (<><rect x="3" y="4" width="18" height="16" rx="4"/><path d="M8 8v8" strokeWidth="3" strokeLinecap="round"/></>) },
   'close': { viewBox: '0 0 24 24', content: (<><path d="m6 6 12 12M18 6 6 18"/></>) },
@@ -58,8 +127,14 @@ const glyphs = {
   'play-20': { viewBox: '0 0 20 20', content: (<><path d="m6 3 11 7-11 7z"/></>) },
   'external-link': { viewBox: '0 0 24 24', content: (<><path d="M14 3h7v7m0-7L10 14M10 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-5"/></>) },
   'download-tray': { viewBox: '0 0 24 24', content: (<><path d="M12 3v12m-5-5 5 5 5-5M5 8H3v12h18V8h-2"/></>) },
-  'stop': { viewBox: '0 0 24 24', content: (<><rect x="7" y="7" width="10" height="10" rx="2"/></>) },
-  'send': { viewBox: '0 0 24 24', content: (<><path d="M12 20V4m-7 7 7-7 7 7"/></>) },
+  'stop': { viewBox: '0 0 24 24', content: (<><rect x="8.4" y="8.4" width="7.2" height="7.2" rx="1.2"/></>) },
+  // Center the inset Lucide paper plane at the shared composer icon size.
+  'send': { viewBox: '0 0 24 24', content: (
+    <g transform="translate(0.1 3.26) scale(0.86)" strokeWidth="1.5">
+      <path vectorEffect="non-scaling-stroke" d="M14.536 21.686a.5.5 0 0 0 .937-.024l6.5-19a.496.496 0 0 0-.635-.635l-19 6.5a.5.5 0 0 0-.024.937l7.93 3.18a2 2 0 0 1 1.112 1.11z" />
+      <path vectorEffect="non-scaling-stroke" d="m21.854 2.147-10.94 10.939" />
+    </g>
+  ) },
   'check-16': { viewBox: '0 0 16 16', content: (<><path d="m3 8 3 3 7-7" /></>) },
   'copy-16': { viewBox: '0 0 16 16', content: (<><rect x="5" y="5" width="8" height="9" rx="1.5" /><path d="M10 3V2H2v9h1" /></>) },
   'disclosure-up': { viewBox: '0 0 20 20', content: (<><path d="m5 12 5-5 5 5" /></>) },
@@ -239,5 +314,8 @@ export type IconProps = Omit<ComponentProps<'svg'>, 'children'> & { name: IconNa
 /** Authored geometry lives here; callers own size, color and CSS hooks. */
 export function Icon({ name, ...props }: IconProps) {
   const glyph = glyphs[name];
-  return <svg viewBox={glyph.viewBox} aria-hidden="true" {...props}>{glyph.content}</svg>;
+  const lineStyle = name.startsWith('chat-') || name.startsWith('lucide-')
+    ? { fill: 'none', stroke: 'currentColor', strokeWidth: 1.75, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const }
+    : {};
+  return <svg viewBox={glyph.viewBox} aria-hidden="true" {...lineStyle} {...props}>{glyph.content}</svg>;
 }

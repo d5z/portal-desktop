@@ -21,6 +21,20 @@
   -webkit-app-region: no-drag;
 }
 
+.sceneName {
+  grid-column: 1;
+  align-self: start;
+  min-width: 0;
+  margin: 15px 0 0;
+  overflow: hidden;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 550;
+  line-height: 30px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .bar > :global([class~='pair-name']) {
   align-self: start;
   margin-top: 12px;

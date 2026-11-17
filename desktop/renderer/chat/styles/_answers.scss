@@ -541,7 +541,7 @@
 .composer-queue-item {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   height: 36px;
   box-sizing: border-box;
   padding: 2px 8px;
@@ -627,16 +627,23 @@
   resize: vertical;
   padding: 4px 6px;
   border: 1px solid var(--border);
-  border-radius: 5px;
+  border-radius: 6px;
   background: var(--bg);
   color: var(--text);
   font: inherit;
 }
 
 .composer-queue-notice {
-  flex-shrink: 0;
+  display: grid;
+  flex: 0 0 14px;
+  height: 14px;
+  place-items: center;
+  border: 1px solid currentcolor;
+  border-radius: 50%;
+  color: var(--red);
   cursor: help;
-  font-size: 12px;
+  font-size: 10px;
+  line-height: 1;
 }
 
 .composer-queue button,
@@ -649,7 +656,7 @@
   font-size: 12px;
   cursor: pointer;
   padding: 4px;
-  border-radius: 5px;
+  border-radius: 6px;
 }
 
 .composer-queue button {

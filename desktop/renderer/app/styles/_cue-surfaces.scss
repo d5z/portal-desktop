@@ -130,9 +130,141 @@
   border-radius: 10px;
 }
 
-#being-info .being-info-content {
+#being-info .being-overview {
+  --being-card: light-dark(#f0f0f0, #2c2d2f);
+
+  padding: 12px 18px 0;
+}
+
+#being-info .being-home-title {
+  display: flex;
+  flex: none;
+  align-items: center;
+  height: 36px;
+  color: var(--secondary);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+#being-info .being-info-close {
+  z-index: 1;
+  top: 14px;
+  right: 18px;
+  color: var(--secondary);
+}
+
+#being-info .being-info-close > svg {
+  width: 17px;
+  height: 17px;
+}
+
+#being-info .being-profile {
+  min-height: 128px;
+  padding: 6px 0 12px;
+}
+
+#being-info .being-avatar {
+  --avatar-colors: #17445d, #206876 42%, #318d94 78%, #68bdba;
+
+  width: 62px;
+  height: 62px;
+  margin-bottom: 10px;
+  border: 0;
+  background: radial-gradient(circle 35px at 47% 50%, var(--avatar-colors));
+  color: white;
+  font: 500 27px/33px var(--font-sans);
+
+  &[data-palette='indigo'] {
+    --avatar-colors: #3f346f, #5b4e9a 42%, #786cbe 78%, #a99bdd;
+  }
+
+  &[data-palette='clay'] {
+    --avatar-colors: #753a35, #a14e41 42%, #c7745d 78%, #e6ac90;
+  }
+
+  &[data-palette='blue'] {
+    --avatar-colors: #173e80, #285aab 42%, #5185d0 78%, #87b7ef;
+  }
+}
+
+#being-info .being-profile h2 {
+  margin: 0;
+  font-size: 20px;
+  line-height: 26px;
+}
+
+#being-info .being-status {
+  gap: 5px;
+  margin: 2px 0 0;
+  font-size: 11px;
+  line-height: 18px;
+
+  > span {
+    width: 6px;
+    height: 6px;
+  }
+}
+
+/* Keep the existing selection glide on the underline. */
+#being-info .being-tabs {
+  --being-tab-index: 0;
+
+  position: relative;
+  isolation: isolate;
+  gap: 0;
+  width: min(224px, 100%);
+  height: 42px;
   padding: 0;
   margin: 0;
+  background: transparent;
+
+  &:has(> button:nth-of-type(2)[aria-selected='true']) {
+    --being-tab-index: 1;
+  }
+
+  &:has(> button:nth-of-type(3)[aria-selected='true']) {
+    --being-tab-index: 2;
+  }
+
+  &::before {
+    position: absolute;
+    z-index: -1;
+    bottom: 6px;
+    inset-inline-start: 0;
+    width: calc(100% / 3);
+    height: 2px;
+    background: linear-gradient(var(--text), var(--text)) center / 24px 2px no-repeat;
+    transform: translateX(calc(var(--being-tab-index) * 100%));
+    transition: transform var(--ui-motion-surface) var(--ui-ease);
+    content: '';
+    pointer-events: none;
+  }
+
+  > button {
+    flex: 1 1 0;
+    min-width: 0;
+    min-height: 42px;
+    padding: 0 4px 6px;
+    border-radius: 8px;
+    color: var(--secondary);
+    transform: none;
+  }
+
+  > button:is(:hover, :focus-visible, [aria-selected='true']) {
+    background: transparent;
+    color: var(--text);
+    box-shadow: none;
+  }
+
+  > button[aria-selected='true'] {
+    font-weight: 500;
+  }
+}
+
+#being-info .being-info-content {
+  padding: 10px 8px 24px;
+  margin-inline: -8px;
+  scrollbar-gutter: auto;
 }
 
 #being-info .being-info-content > section {
@@ -140,65 +272,96 @@
 }
 
 #being-info #being-profile-panel h3 {
-  margin: 0;
-  padding: 8px 8px 4px;
+  margin: 0 0 9px;
   color: var(--secondary);
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 500;
-  line-height: 1.5;
+  line-height: 20px;
+}
+
+#being-info :is(.being-details, .being-config-actions) {
+  margin: 0;
+  border-radius: var(--utility-radius);
+  background: var(--being-card);
 }
 
 #being-info .being-details {
-  margin-bottom: 24px;
-  padding: 0;
+  margin-bottom: 20px;
+}
+
+#being-info :is(.being-details > div, .being-action-row) {
+  min-height: 46px;
+  padding: 8px 12px;
   border: 0;
-  border-radius: 0;
-  background: transparent;
 }
 
 #being-info .being-details > div {
   position: relative;
-  min-height: 56px;
-  padding: 16px 8px;
-  border: 0;
+  gap: 12px;
+  min-width: 0;
 }
 
 #being-info .being-details dt {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
   color: var(--text);
   font-size: 13px;
+  line-height: 18px;
+}
+
+#being-info .being-details dd {
+  min-width: 0;
+  color: var(--secondary);
+  font-size: 12px;
+  line-height: 20px;
+  overflow-wrap: anywhere;
 }
 
 #being-info #being-profile-panel svg {
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
-  fill: none;
-  stroke: currentcolor;
-  stroke-width: 1.6;
-  stroke-linecap: round;
-  stroke-linejoin: round;
+  width: 17px;
+  height: 17px;
+  color: var(--secondary);
 }
 
-#being-info .being-details > div:not(:last-child)::after,
-#being-info .being-action-row:not(:last-child)::after {
+#being-info :is(.being-details > div + div, .being-action-row + .being-action-row)::after {
   content: '';
   position: absolute;
-  right: 8px;
-  bottom: 0;
-  left: 40px;
+  inset-inline: 12px;
+  top: 0;
   height: 1px;
   background: var(--line);
+  pointer-events: none;
+}
+
+#being-info .being-details .being-wake-switch {
+  gap: 6px;
+  height: 20px;
+  padding: 0;
+  white-space: nowrap;
+  font-weight: 400;
+}
+
+#being-info .being-wake-track {
+  width: 29px;
+  height: 16px;
+  padding: 2px;
+
+  &::after {
+    width: 12px;
+    height: 12px;
+    box-shadow: none;
+  }
+}
+
+#being-info .being-wake-switch[aria-checked='false'] .being-wake-track {
+  background: #888;
 }
 
 #being-info .being-action-row {
-  min-height: 56px;
-  margin: 0;
-  padding: 16px 8px;
-  border: 0;
-  border-radius: 10px;
+  gap: 10px;
+  border-radius: var(--utility-radius);
   background: transparent;
   font-size: 13px;
   line-height: 1.5;
@@ -206,14 +369,18 @@
 
 #being-info .being-action-row::before {
   inset: 0;
-  border-radius: 10px;
+  border-radius: inherit;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  #being-info .being-tabs::before {
+    transition: none;
+  }
 }
 
 #being-info .being-action-copy {
-  display: grid;
   flex: 1;
   min-width: 0;
-  gap: 4px;
 }
 
 #being-info #being-profile-panel .being-action-chevron {
@@ -222,27 +389,13 @@
   color: var(--secondary);
 }
 
-#being-info .being-action-row strong {
-  font-size: 13px;
-  font-weight: 400;
-}
-
 #being-info .being-action-row small {
+  max-width: 50%;
+  overflow: hidden;
   color: var(--secondary);
   font-size: 12px;
-}
-
-#being-info .being-model-entry .being-action-copy {
-  grid-template-columns: auto minmax(0, 1fr);
-  align-items: center;
-  gap: 12px;
-}
-
-#being-info .being-model-entry small {
-  overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  text-align: right;
 }
 
 #being-info #being-library-panel > div,
@@ -250,9 +403,10 @@
   margin-top: 0;
 }
 
-#being-info #being-library-panel .recentEmpty,
 #being-info #being-library-panel > p {
   min-height: 120px;
+  border-radius: var(--utility-radius);
+  background: var(--being-card);
   margin: 0;
   padding: 34px 12px;
   color: var(--secondary);
@@ -261,18 +415,16 @@
 
 #being-info #being-computer-panel .being-computer-screen,
 #being-info #being-computer-panel .being-computer-preview {
-  border: 1px solid var(--line);
-  border-radius: 20px;
-  background: linear-gradient(
-    155deg,
-    color-mix(in srgb, var(--surface) 92%, var(--control)),
-    var(--control)
-  );
+  border: 0;
+  border-radius: var(--utility-radius);
+  background: var(--being-card);
   box-shadow: none;
 }
 
 #being-info #being-computer-panel .being-computer-screen {
-  min-height: 240px;
+  min-height: 152px;
+  max-height: none;
+  aspect-ratio: auto;
 }
 
 #being-info #being-computer-panel .being-computer-footer {
@@ -289,6 +441,7 @@
   --settings-sidebar: var(--surface);
   --settings-page: var(--bg);
   --settings-hover: color-mix(in srgb, var(--selected) 58%, transparent);
+  --settings-active: color-mix(in srgb, var(--selected) 82%, var(--control));
   --settings-radius: 14px;
 
   width: min(960px, calc(100vw - 48px));
@@ -334,7 +487,7 @@
 
 #client-settings-dialog .settings-page-title {
   font-size: 20px;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 #client-settings-dialog .settings-page-back {

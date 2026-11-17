@@ -11,6 +11,14 @@ import { homeRecentFiles, type RecentFile } from '../models/home-recent-files';
 import { HomeLibrary } from '../models/home-library';
 import styles from './home-library.module.scss';
 import { HomeFilePanel } from './home-file-panel';
+import { HomeFileThumbnail } from './home-file-thumbnail';
+const viewModes = [['grid', '网格视图', 'lucide-layout-grid'], ['list', '列表视图', 'lucide-list']] as const;
+
+function LibraryListIcon({ name, directory }: { name: string; directory?: boolean }) {
+  const glyph = directory ? 'lucide-folder' : /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(name) ? 'chat-image' : 'chat-file';
+  return <span className={styles.thumbnail}><Icon name={glyph} width={20} height={20} /></span>;
+}
+
 export function BeingLibrary({ api, onConnect, active = true }: { api?: HomeAPI; onConnect: () => void; active?: boolean }) {
   if (!api?.files) return <p className="being-empty">当前客户端不支持云端资料库，请更新桌面客户端。</p>;
   return <Library api={api} active={active} onConnect={onConnect} />;
@@ -21,6 +29,11 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
   const recent = useModel(homeRecentFiles);
   const openLocal = useContext(LocalFileAction);
   const [tab, setTab] = useState<'recent' | 'workspace'>('recent');
+  const [view, setView] = useState<'grid' | 'list'>(() => {
+    try { return localStorage.getItem('beings:home-files-view') === 'list' ? 'list' : 'grid'; }
+    catch { return 'grid'; }
+  });
+  const list = view === 'list';
   const tabId = useId();
   const [tip, setTip] = useState<{ path: string; source: RecentFile['source']; left: number; top: number; width: number; above: boolean } | null>(null);
   const hovered = recent.entries.find(entry => entry.path === tip?.path && entry.source === tip?.source);
@@ -63,51 +76,89 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
   const parts = model.path ? model.path.split('/') : [];
   return <div className={styles.library}>
     <div className={styles.toolbar}>
-    <div className={styles.tabs} role="tablist" aria-label="资料库内容" onKeyDown={event => {
+    <div className={styles.tabs} data-tab={tab} role="tablist" aria-label="资料库内容" onKeyDown={event => {
       if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
       event.preventDefault();
       const next = event.key === 'Home' ? 'recent' : event.key === 'End' ? 'workspace' : tab === 'recent' ? 'workspace' : 'recent';
       setTab(next);
       event.currentTarget.querySelector<HTMLButtonElement>(`[data-tab="${next}"]`)?.focus();
     }}>
-      <button type="button" role="tab" id={`${tabId}-recent-tab`} data-tab="recent" aria-selected={tab === 'recent'} aria-controls={`${tabId}-recent`} tabIndex={tab === 'recent' ? 0 : -1} onClick={() => setTab('recent')}>最近</button>
-      <button type="button" role="tab" id={`${tabId}-workspace-tab`} data-tab="workspace" aria-selected={tab === 'workspace'} aria-controls={`${tabId}-workspace`} tabIndex={tab === 'workspace' ? 0 : -1} onClick={() => setTab('workspace')}>工作区</button>
+      {([['recent', '最近'], ['workspace', '工作区']] as const).map(([key, label]) =>
+        <button type="button" role="tab" key={key} id={`${tabId}-${key}-tab`} data-tab={key} aria-selected={tab === key}
+          aria-controls={`${tabId}-${key}`} tabIndex={tab === key ? 0 : -1} onClick={() => setTab(key)}>
+          {label}
+        </button>)}
     </div>
     {tab === 'workspace' && <>
       {model.loaded && entries.length > 0 && <span className={styles.count}>{entries.length} 项</span>}
-      <IconButton className={styles.iconButton} label="刷新资料库" disabled={model.loading || model.busy} onClick={() => void model.load()}><Icon name="refresh-library" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></IconButton>
+      <IconButton className={styles.iconButton} label="刷新资料库" disabled={model.loading || model.busy} onClick={() => void model.load()}><Icon name="lucide-refresh-cw" /></IconButton>
     </>}
+    <div className={styles.viewModes} role="group" aria-label="文件显示布局">
+      {viewModes.map(([mode, label, icon]) => <IconButton key={mode} className={styles.iconButton} label={label}
+        aria-pressed={view === mode} onClick={() => {
+          setView(mode); setTip(null);
+          try { localStorage.setItem('beings:home-files-view', mode); } catch { /* Keep the current view. */ }
+        }}>
+        <Icon name={icon} />
+      </IconButton>)}
+    </div>
     </div>
     <section role="tabpanel" id={`${tabId}-recent`} aria-labelledby={`${tabId}-recent-tab`} hidden={tab !== 'recent'}>
       {!recent.entries.length && <p className={styles.recentEmpty}>打开本机或云电脑中的文件后，会显示在这里。</p>}
-      <ul className={styles.recentFiles} aria-label="最近的文件">{recent.entries.map(entry => <li key={`${entry.source}:${entry.path}`} onMouseLeave={() => setTip(null)}>
-        <button className={styles.recentFile} type="button" disabled={entry.source === 'local' ? !openLocal : model.busy}
+      <ul className={styles.fileGrid} data-layout={view} aria-label="最近的文件">{recent.entries.map(entry => <li className={styles.tile} key={`${entry.source}:${entry.path}`} onMouseLeave={() => setTip(null)}>
+          {list ? <LibraryListIcon name={entry.name} /> : entry.source === 'cloud'
+            ? <HomeFileThumbnail file={entry} api={active && tab === 'recent' ? api.files : undefined} />
+            : <span className={styles.thumbnail}><FileTypeIcon path={entry.path} className={styles.fileTypeIcon} glyph="chat-file" /></span>}
+        <button className={styles.tileButton} type="button" disabled={entry.source === 'local' ? !openLocal : model.busy}
           aria-describedby={hovered === entry ? `${tabId}-file-tip` : undefined}
           onMouseEnter={event => showTip(event.currentTarget, entry)} onFocus={event => showTip(event.currentTarget, entry)} onBlur={() => setTip(null)}
           onClick={() => { setTip(null); if (entry.source === 'local') openLocal?.(entry.path); else void model.open(entry); }}>
-          <FileTypeIcon path={entry.path} className={styles.fileTypeIcon} /><span className={styles.recentName}>{entry.name}</span><span className={styles.fileSource}>{entry.source === 'local' ? '本机' : '云电脑'}</span>
+          <span className={styles.fileName}>{entry.name}</span><span className={styles.fileSource}>{entry.source === 'local' ? '本机' : '云电脑'}</span>
         </button>
-        <IconButton className={styles.iconButton} label={`从最近记录移除：${entry.name}`} title="移除最近" onMouseEnter={() => setTip(null)} onFocus={() => setTip(null)} onClick={() => { setTip(null); recent.remove(entry.path, entry.source); }}><Icon name="trash" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></IconButton>
+        <IconButton className={`${styles.iconButton} ${styles.tileAction}`} label={`从最近记录移除：${entry.name}`} title="移除最近" onMouseEnter={() => setTip(null)} onFocus={() => setTip(null)} onClick={() => { setTip(null); recent.remove(entry.path, entry.source); }}><Icon name="lucide-trash" /></IconButton>
       </li>)}</ul>
     </section>
     <section role="tabpanel" id={`${tabId}-workspace`} aria-labelledby={`${tabId}-workspace-tab`} hidden={tab !== 'workspace'}>
     {parts.length > 0 && <div className={styles.heading}>
       <nav className={styles.breadcrumbs} aria-label="工作区路径">
-        <button type="button" aria-label="工作区" aria-current={!parts.length ? 'location' : undefined} onClick={() => navigate('')}><Icon name="directory" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><span>工作区</span></button>
+        <button type="button" aria-label="工作区" aria-current={!parts.length ? 'location' : undefined} onClick={() => navigate('')}><Icon name="lucide-folder" /><span>工作区</span></button>
         {parts.map((part, index) => <span key={index}><span aria-hidden="true">/</span><button type="button" title={part} aria-current={index === parts.length - 1 ? 'location' : undefined} onClick={() => navigate(parts.slice(0, index + 1).join('/'))}>{part}</button></span>)}
       </nav>
     </div>}
     <label className={styles.searchField}>
-      <Icon name="search-20" fill="none" stroke="currentColor" strokeWidth="1.5" />
+      <Icon name="lucide-search" />
       <input className={styles.search} type="search" aria-label="搜索当前文件夹" placeholder="搜索文件" value={query} onChange={event => setQuery(event.target.value)} />
     </label>
     {model.error && <div className={styles.feedback} role="alert"><p>{model.error}</p><div><button type="button" disabled={model.loading || model.busy} onClick={() => void model.load()}>重试</button><button type="button" onClick={onConnect}>前往电脑栏</button></div></div>}
     <p className={styles.status} role="status" hidden={!model.busy && !model.loading && !model.notice}>{model.busy ? '正在保存文件…' : model.loading ? '正在读取工作区…' : model.notice || (model.loaded ? `${entries.length} 项${query ? '匹配结果' : ''}` : '')}</p>
-    {model.loaded && !entries.length && <div className={styles.empty}><Icon name="directory" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /><strong>{query ? '没有匹配的文件' : '这个文件夹还是空的'}</strong><p>{query ? '试试其他名称，或清除搜索。' : 'Being 生成的文件会出现在这里。'}</p>{query && <button type="button" onClick={() => setQuery('')}>清除搜索</button>}</div>}
-    <ul className={styles.files} aria-label="工作区文件" aria-busy={model.loading}>{entries.map(entry => <li key={entry.path}>
-      <button className={styles.file} type="button" title={entry.name} disabled={model.busy} onClick={() => entry.type === 'directory' ? navigate(entry.path) : void model.open(entry)}>{entry.type === 'directory' ? <Icon name="directory" className={styles.folderIcon} fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /> : <FileTypeIcon path={entry.path} className={styles.fileTypeIcon} />}<span className={styles.fileName}>{entry.name}</span>{entry.type === 'directory' ? <Icon className={styles.folderArrow} name="chevron-right-20" fill="none" stroke="currentColor" strokeWidth="1.5" /> : <small>{formatBytes(entry.size)}</small>}</button>
-      {entry.type === 'file' && <button className={styles.iconButton} type="button" aria-label={`下载 ${entry.name}`} title="下载文件" disabled={model.busy} onClick={() => void model.download(entry.path)}><Icon name="download-wide" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></button>}
-    </li>)}</ul>
+    {model.loaded && !entries.length && <div className={styles.empty}>
+      <Icon name="lucide-folder" />
+      <strong>{query ? '没有匹配的文件' : '这个文件夹还是空的'}</strong>
+      <p>{query ? '试试其他名称，或清除搜索。' : 'Being 生成的文件会出现在这里。'}</p>
+      {query && <button type="button" onClick={() => setQuery('')}>清除搜索</button>}
+    </div>}
+    <ul className={styles.fileGrid} data-layout={view} aria-label="工作区文件" aria-busy={model.loading}>{entries.map(entry => (
+      <li className={`${styles.tile} ${entry.type === 'directory' ? styles.folderTile : ''}`} key={entry.path}>
+        {entry.type === 'directory' ? <>
+          {list ? <LibraryListIcon name={entry.name} directory />
+            : <span className={styles.folderThumb} aria-hidden="true"><i /><i /></span>}
+          <button className={styles.folderName} type="button" title={entry.name} disabled={model.busy} onClick={() => navigate(entry.path)}>
+            <span className={styles.fileName}>{entry.name}</span>
+          </button>
+        </> : <>
+          {list ? <LibraryListIcon name={entry.name} />
+            : <HomeFileThumbnail file={entry} api={active && tab === 'workspace' ? api.files : undefined} />}
+          <button className={styles.tileButton} type="button" title={entry.name} disabled={model.busy} onClick={() => void model.open(entry)}>
+            <span className={styles.fileName}>{entry.name}</span>
+            <small className={styles.fileSize}>{formatBytes(entry.size)}</small>
+          </button>
+          <IconButton className={`${styles.iconButton} ${styles.tileAction}`} label={`下载 ${entry.name}`} title="下载文件"
+            disabled={model.busy} onClick={() => void model.download(entry.path)}>
+            <Icon name="chat-download" />
+          </IconButton>
+        </>}
+      </li>
+    ))}</ul>
     </section>
     {active && tab === 'recent' && tip && hovered && createPortal(<div id={`${tabId}-file-tip`} role="tooltip" className={styles.fileTooltip}
       style={{ left: tip.left, top: tip.top, width: tip.width, transform: tip.above ? 'translateY(-100%)' : undefined }}>

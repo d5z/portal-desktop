@@ -19,7 +19,7 @@ export function CopyMessage({ text, copy, appearance = 'compact' }: {
       catch { setStatus('复制失败，请重试'); }
       timer.current = setTimeout(() => setStatus('复制正文'), 2000);
     }}>
-    <Icon name={status === '已复制' ? 'check-16' : 'copy-16'} width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" />
+    <Icon name={status === '已复制' ? 'check-16' : appearance === 'chat' ? 'chat-copy' : 'copy-16'} width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.3" />
     <span className={styles.status} role="status">{status === '复制正文' ? '' : status}</span>
   </button>;
 }

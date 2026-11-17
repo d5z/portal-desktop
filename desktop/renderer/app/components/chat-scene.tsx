@@ -1,14 +1,161 @@
 import { DrawerPresence, WorkspaceDrawer } from "../../shared/components/workspace-drawer";
+import { DndContext, KeyboardSensor, PointerSensor, closestCenter, defaultCoordinates, useSensor, useSensors, type KeyboardSensorProps } from "@dnd-kit/core";
+import { restrictToVerticalAxis, restrictToFirstScrollableAncestor } from "@dnd-kit/modifiers";
+import { SortableContext, arrayMove, sortableKeyboardCoordinates, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Icon } from '../../shared/icons/icon';
 import { createPortal } from "react-dom";
-import { Fragment, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import type { ChatScene } from "../../../shared/types";
 import { CHAT_SCENE_ACTIVITY_LABELS, type ChatSceneActivity } from "../../../shared/types";
 import type { HistoryScope } from "../../chat/models/scenes";
 import { PanelResizeHandle, usePanelWidth } from "../../shared/components/panel-resize";
 import { Dialog } from "../../shared/components/dialog";
 
-export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connected, scope, scopeReady, onScope, onCopy, onSession, visible = true, onReveal, createRequest = 0, beingName = "Being", onHome }: {
+class SceneKeyboardSensor {
+  static activators = KeyboardSensor.activators;
+  autoScrollEnabled = false;
+
+  constructor({ active, activeNode, event, context, onStart, onMove, onEnd, onCancel }: KeyboardSensorProps) {
+    const listeners = new AbortController();
+    const { signal } = listeners;
+    const document = activeNode.node.current!.ownerDocument;
+    const cancel = () => { listeners.abort(); onCancel(); };
+    let startY: number | undefined;
+
+    // Install synchronously so a key pressed as soon as the row lifts is handled.
+    document.addEventListener('keydown', key => {
+      if (key === event) return;
+      if (key.code === 'Escape') {
+        key.preventDefault();
+        cancel();
+      } else if (key.code === 'Space' || key.code === 'Enter' || key.code === 'Tab') {
+        key.preventDefault();
+        if (key.repeat) return;
+        listeners.abort();
+        onEnd();
+      } else if (key.code === 'ArrowUp' || key.code === 'ArrowDown') {
+        const { collisionRect, draggingNodeRect, scrollableAncestors } = context.current;
+        key.preventDefault();
+        if (!collisionRect || !draggingNodeRect) return;
+        const next = sortableKeyboardCoordinates(key, {
+          active, context: context.current, currentCoordinates: { x: collisionRect.left, y: collisionRect.top },
+        });
+        if (!next) return;
+        startY ??= draggingNodeRect.top;
+        const scroll = scrollableAncestors[0];
+        let scrollDelta = 0;
+        if (scroll) {
+          const { top, bottom } = scroll.getBoundingClientRect();
+          const before = scroll.scrollTop;
+          const nextBottom = next.y + draggingNodeRect.height;
+          scroll.scrollTop += Math.min(0, next.y - top) + Math.max(0, nextBottom - bottom);
+          scrollDelta = scroll.scrollTop - before;
+        }
+        onMove({ x: 0, y: next.y - startY - scrollDelta });
+      }
+    }, { signal });
+    document.defaultView?.addEventListener('resize', cancel, { signal });
+    document.addEventListener('visibilitychange', cancel, { signal });
+    onStart(defaultCoordinates);
+  }
+}
+
+function SceneRow({ session, selected, activity, disabled, sortable, onSelect, onContextMenu }: {
+  session: ChatScene;
+  selected: boolean;
+  activity?: ChatSceneActivity;
+  disabled: boolean;
+  sortable: boolean;
+  onSelect: () => void;
+  onContextMenu: (event: MouseEvent<HTMLButtonElement>) => void;
+}) {
+  const { attributes, listeners, setNodeRef, setActivatorNodeRef, transform, transition, isDragging } = useSortable({
+    id: session.scene_id, disabled: !sortable,
+  });
+  const label = session.scene_meta.scene_label;
+  return <div ref={setNodeRef} className="chat-session-item" data-reordering={isDragging || undefined}
+    style={{ transform: CSS.Translate.toString(transform), transition }}>
+    {sortable && <button ref={setActivatorNodeRef} type="button" className="chat-session-grip" {...attributes} {...listeners}
+      aria-label={`调整场景顺序：${label}`} title="拖动调整顺序">
+      <Icon name="grip" fill="currentColor" stroke="none" aria-hidden="true" />
+    </button>}
+    <button className="chat-session-select" data-scene-id={session.scene_id} type="button"
+      aria-label={`切换到场景：${label}`} aria-current={selected ? "true" : undefined}
+      aria-description={activity && CHAT_SCENE_ACTIVITY_LABELS[activity]}
+      title={label} disabled={disabled} onClick={onSelect} onContextMenu={onContextMenu}>
+      <span>{label}</span>
+      {activity && <span className="chat-session-activity" data-status={activity} aria-hidden="true"
+        title={CHAT_SCENE_ACTIVITY_LABELS[activity]}><span className="chat-session-activity-icon" /></span>}
+    </button>
+  </div>;
+}
+
+function SceneList({ sessions, selected, activity, query, disabled, orderKey, onSelect, onContextMenu, onReordering }: {
+  sessions: ChatScene[];
+  selected?: string;
+  activity: Record<string, ChatSceneActivity>;
+  query: string;
+  disabled: boolean;
+  orderKey: string;
+  onSelect: (id: string) => void;
+  onContextMenu: (event: MouseEvent<HTMLButtonElement>, session: ChatScene) => void;
+  onReordering: (active: boolean) => void;
+}) {
+  const [order, setOrder] = useState<string[]>(() => {
+    try {
+      const saved: unknown = JSON.parse(localStorage.getItem(orderKey) ?? 'null');
+      return Array.isArray(saved) ? saved.filter((id): id is string => typeof id === 'string') : [];
+    } catch { return []; }
+  });
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(SceneKeyboardSensor));
+  const sceneById = new Map(sessions.map(session => [session.scene_id, session]));
+  const orderedIds = [...new Set([...order.filter(id => sceneById.has(id)), ...sceneById.keys()])];
+  const search = query.trim().toLocaleLowerCase();
+  const visible = orderedIds.map(id => sceneById.get(id)!).filter(session => session.scene_meta.scene_label.toLocaleLowerCase().includes(search));
+  const visibleIds = visible.map(session => session.scene_id);
+  const sortable = !disabled && visibleIds.length > 1;
+
+  return <nav className="chat-session-list" aria-label="切换场景">
+    <DndContext id="chat-scene-sort" sensors={sensors} collisionDetection={closestCenter}
+      modifiers={[restrictToVerticalAxis, restrictToFirstScrollableAncestor]}
+      accessibility={{
+        screenReaderInstructions: { draggable: '按空格提起，使用上下方向键移动。按空格放下，按 Esc 取消。' },
+        announcements: {
+          onDragStart: ({ active }) => `已提起 ${sceneById.get(String(active.id))?.scene_meta.scene_label}`,
+          onDragOver: ({ over }) => over ? `目标位置 ${visibleIds.indexOf(String(over.id)) + 1} / ${visibleIds.length}` : undefined,
+          onDragEnd: ({ over }) => over ? `已放下，位置 ${visibleIds.indexOf(String(over.id)) + 1}` : '排序已取消',
+          onDragCancel: () => '排序已取消',
+        },
+      }}
+      onDragStart={() => onReordering(true)} onDragCancel={() => onReordering(false)}
+      onDragEnd={({ active, over }) => {
+        onReordering(false);
+        const from = visibleIds.indexOf(String(active.id));
+        const to = visibleIds.indexOf(String(over?.id));
+        if (from < 0 || to < 0 || from === to) return;
+        const reordered = arrayMove(visibleIds, from, to);
+        const visibleSet = new Set(visibleIds);
+        let index = 0;
+        // A filtered list can move only the rows visible in that list.
+        const next = orderedIds.map(id => visibleSet.has(id) ? reordered[index++] : id);
+        setOrder(next);
+        try { localStorage.setItem(orderKey, JSON.stringify(next)); } catch { /* Keep the session order. */ }
+      }}>
+      <SortableContext items={visibleIds} strategy={verticalListSortingStrategy}>
+        {visible.map(session => <SceneRow key={session.scene_id} session={session} selected={selected === session.scene_id}
+          activity={activity[session.scene_id]} disabled={disabled} sortable={sortable} onSelect={() => onSelect(session.scene_id)}
+          onContextMenu={event => onContextMenu(event, session)} />)}
+      </SortableContext>
+    </DndContext>
+    {!!sessions.length && !visible.length && <p className="chat-session-caption" role="status">没有找到匹配的对话</p>}
+    {!sessions.length && <p className="chat-session-caption">连接 Being 后创建场景</p>}
+  </nav>;
+}
+
+export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connected, scope, scopeReady, onScope, onCopy, onSession, visible = true, onReveal, createRequest = 0, beingName = "Being", onHome, orderKey }: {
+  orderKey: string;
   beingName?: string;
   onHome?: () => void;
   createRequest?: number;
@@ -28,6 +175,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
   const [width, setWidth] = usePanelWidth("scenes", 320);
   const [pinned, setPinned] = useState(() => { try { return localStorage.getItem("beings:scenes-pinned") === "true"; } catch { return false; } });
   const [query, setQuery] = useState("");
+  const [reordering, setReordering] = useState(false);
   const search = useRef<HTMLInputElement>(null);
   const options = useRef<HTMLDetailsElement>(null);
   const [open, setOpen] = useState(false);
@@ -93,7 +241,6 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
   const collapse = () => { setMenu(undefined); pin(false); trigger.current?.focus(); };
   const reveal = () => { pin(true); onReveal?.(); };
   useEffect(() => { if (pinned && visible) search.current?.focus(); }, [pinned, visible]);
-  const matches = (session: ChatScene) => session.scene_meta.scene_label.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase());
   return (
     <>
       <div className="chat-scene-control">
@@ -106,7 +253,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
         </button>
       </div>
       {panelHost && createPortal(<DrawerPresence open={visible && expanded}><WorkspaceDrawer edge="left" ref={panel} style={{ width }} id="chat-session-panel" className="chat-session-panel" open={visible && expanded} data-pinned={drawerPinned} aria-label="场景列表"
-        onKeyDown={event => { if (event.key === "Escape" && !editing && !open && !deleting && !menu) { event.preventDefault(); if (options.current?.open) { options.current.open = false; options.current.querySelector("summary")?.focus(); } else collapse(); } }}>
+        onKeyDown={event => { if (event.key === "Escape" && !event.defaultPrevented && !reordering && !editing && !open && !deleting && !menu) { event.preventDefault(); if (options.current?.open) { options.current.open = false; options.current.querySelector("summary")?.focus(); } else collapse(); } }}>
         <PanelResizeHandle panel={panel} label="调整场景列表宽度" width={width} onResize={setWidth} initial={320} min={240} max={480} reserve={48} edge="right" disabled={!pinned} />
         {drawerPinned && <div className="chat-session-titlebar">
           <strong>{beingName}</strong>
@@ -130,31 +277,17 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
           </details>
         </div>
         <div className="chat-session-group"><span>场景对话</span><button id="new-chat-session" type="button" aria-label="新建场景" title="新建场景" disabled={!connected || busy || !sessions.length} onClick={() => edit("create")}><Icon name="plus" /></button></div>
-        <nav className="chat-session-list" aria-label="切换场景">
-          {sessions.map(session => <Fragment key={session.scene_id}>
-
-            {matches(session) && <button key={session.scene_id} data-scene-id={session.scene_id} type="button"
-            aria-label={`切换到场景：${session.scene_meta.scene_label}`} aria-current={scene?.scene_id === session.scene_id ? "true" : undefined}
-            onContextMenu={event => {
-              if (busy || !connected) return;
-              event.preventDefault();
-              event.stopPropagation();
-              const bounds = event.currentTarget.getBoundingClientRect();
-              setMenu({ scene: session, x: Math.max(8, Math.min(event.clientX || bounds.left, window.innerWidth - 176)),
-                y: Math.max(8, Math.min(event.clientY || bounds.bottom, window.innerHeight - 100)) });
-            }}
-            title={session.scene_meta.scene_label} disabled={busy || !connected} onClick={() => void change("select", session.scene_id)}>
-            <span>{session.scene_meta.scene_label}</span>
-            {activity[session.scene_id] ? <span className="chat-session-activity" data-status={activity[session.scene_id]}
-              title={CHAT_SCENE_ACTIVITY_LABELS[activity[session.scene_id]]}>
-              <span className="chat-session-activity-icon" aria-hidden="true" />
-              {CHAT_SCENE_ACTIVITY_LABELS[activity[session.scene_id]]}
-            </span> : scene?.scene_id === session.scene_id && <span className="chat-session-current" aria-hidden="true" />}
-          </button>}</Fragment>)}
-
-          {!!sessions.length && !sessions.some(matches) && <p className="chat-session-caption" role="status">没有找到匹配的对话</p>}
-          {!sessions.length && <p className="chat-session-caption">连接 Being 后创建场景</p>}
-        </nav>
+        <SceneList key={orderKey} orderKey={orderKey} sessions={sessions} selected={scene?.scene_id} activity={activity}
+          query={query} disabled={busy || !connected} onSelect={id => void change("select", id)}
+          onReordering={dragging => { if (dragging) setMenu(undefined); setReordering(dragging); }}
+          onContextMenu={(event, session) => {
+            if (busy || !connected) return;
+            event.preventDefault();
+            event.stopPropagation();
+            const bounds = event.currentTarget.getBoundingClientRect();
+            setMenu({ scene: session, x: Math.max(8, Math.min(event.clientX || bounds.left, window.innerWidth - 176)),
+              y: Math.max(8, Math.min(event.clientY || bounds.bottom, window.innerHeight - 100)) });
+          }} />
         <label className="chat-session-context-toggle">
           <input type="checkbox" checked={scope === "all"} disabled={!scopeReady || !scene}
             onChange={event => onScope(event.target.checked ? "all" : "current")} />

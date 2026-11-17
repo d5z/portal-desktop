@@ -50,7 +50,7 @@ function LoadedAttachmentCard({part, endpoint, localImage}: {part: AttachmentPar
     {(localImage?.src || preview) ? <AttachmentImage blob={localImage?.blob || imageBlob} src={localImage?.src || preview} name={part.name} endpoint={endpoint} id={part.attachment_id} onImageLoad={(img)=>rememberImageSize(endpoint,part.attachment_id,img.naturalWidth,img.naturalHeight)}/> : <div className={`attachment-image-placeholder${previewError ? "" : " attachment-image-skeleton"}`} style={imagePreviewSize(endpoint,part.attachment_id)} role="status" aria-label={previewError || `正在加载图片 ${part.name}`} aria-busy={!previewError}>{previewError || null}</div>}
     {!localImage && previewError && <AttachmentDownload endpoint={endpoint} id={part.attachment_id} name={part.name}>下载原图</AttachmentDownload>}
   </section>;
-  return <section className="attachment-card" aria-label={part.name}>
+  return <section className="attachment-card attachment-file-card" aria-label={part.name}>
     {part.parse_status==='failed' && <p className="attachment-error" role="alert">解析失败，可重试或下载原件</p>}
 
     <AttachmentFilePreview part={part} endpoint={endpoint}/>

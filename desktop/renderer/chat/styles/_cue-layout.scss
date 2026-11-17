@@ -31,16 +31,16 @@
 .message.being .content,
 .message.user .content {
   border: 0;
-  border-radius: 20px;
+  border-radius: 22px;
   box-shadow: none;
 }
 
 .message.being .content {
-  padding: 10px 14px;
+  padding: 10px 16px;
 }
 
 .message.user .content {
-  padding: 10px 14px;
+  padding: 10px 16px;
   color: #fff;
 }
 
@@ -142,15 +142,17 @@
 #input-area {
   position: relative;
   padding: 8px 12px;
-  border: 1px solid color-mix(in srgb, var(--text) 12%, transparent);
-  border-radius: 26px;
+  --prompt-shadow: 0 2px 8px rgb(0 0 0 / 4%), 0 4px 40px rgb(0 0 0 / 4%);
+
+  border: 1px solid var(--border);
+  border-radius: 22px;
   background: var(--composer-surface, var(--bg));
-  box-shadow: 0 5px 18px rgb(0 0 0 / 6%);
+  box-shadow: var(--prompt-shadow);
 }
 
 #input-area:focus-within {
-  border-color: color-mix(in srgb, var(--text) 24%, transparent);
-  box-shadow: 0 5px 18px rgb(0 0 0 / 8%);
+  border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  box-shadow: var(--prompt-shadow);
 }
 
 #input-area #input-row {

@@ -370,7 +370,19 @@
   overscroll-behavior: contain;
 }
 
-.chat-session-list > button {
+.chat-session-item {
+  position: relative;
+  flex-shrink: 0;
+  border-radius: 12px;
+}
+
+.chat-session-item[data-reordering] {
+  z-index: 1;
+  box-shadow: var(--panel-shadow);
+  background: var(--control);
+}
+
+.chat-session-select {
   display: flex;
   align-items: center;
   gap: 9px;
@@ -388,7 +400,7 @@
   text-align: left;
 }
 
-.chat-session-list > button > span:first-of-type {
+.chat-session-select > span:first-of-type {
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -396,19 +408,43 @@
   white-space: nowrap;
 }
 
-.chat-session-list > button[aria-current='true'] {
+.chat-session-panel .chat-session-select[aria-current='true'] {
   background: var(--selected);
-  color: var(--text);
-  font-weight: 500;
 }
 
-.chat-session-current {
-  flex-shrink: 0;
-  width: 6px;
-  height: 6px;
-  margin: 0 3px;
-  border-radius: 50%;
-  background: var(--green);
+.chat-session-item:has(.chat-session-grip) > .chat-session-select {
+  padding-inline-start: 42px;
+}
+
+.chat-session-grip {
+  position: absolute;
+  inset-block-start: 8px;
+  inset-inline-start: 8px;
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: var(--secondary);
+  cursor: grab;
+  touch-action: none;
+}
+
+.chat-session-grip svg {
+  width: 14px;
+  height: 14px;
+  stroke: none;
+  fill: currentcolor;
+}
+
+.chat-session-item[data-reordering] .chat-session-grip {
+  cursor: grabbing;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chat-session-item {
+    transition: none !important;
+  }
 }
 
 .chat-session-activity {
@@ -508,7 +544,7 @@
   }
 }
 
-.chat-session-panel button:hover:not(:disabled) {
+.chat-session-panel button:hover:not(:disabled):where(:not(.chat-session-select[aria-current='true'])) {
   background: var(--hover);
 }
 

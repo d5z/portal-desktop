@@ -134,6 +134,16 @@
   background: var(--text-dim);
   color: var(--bg);
 }
+#input-area #input-row #send-btn:not(.stop, :disabled) {
+  background: var(--chat-sent);
+  color: #fff;
+}
+#input-area #input-row #send-btn:not(.stop, :disabled):hover {
+  background: var(--chat-send-hover);
+}
+#input-area #input-row #send-btn:not(.stop, :disabled):active {
+  background: var(--chat-send-pressed);
+}
 #input-area #input-row #send-btn:disabled {
   background: var(--bg-soft);
   color: var(--text-muted);

@@ -16,6 +16,9 @@ import { BeingLibrary } from "./home-library";
 
 const beingTabs = [["profile", "详情"], ["library", "资料库"], ["computer", "电脑"]] as const;
 
+const beingAvatarPalettes = ["teal", "indigo", "clay", "blue"] as const;
+const avatarInitials = new Intl.Segmenter(undefined, { granularity: "grapheme" });
+
 const destinations = [
   ["bonfire", "篝火", "rail-bonfire"],
   ["firesides", "围炉", "rail-firesides"],
@@ -146,8 +149,9 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
     try { localStorage.setItem("beings:navigation-order", JSON.stringify(next)); } catch { /* Keep session order. */ }
   });
   const connected = Boolean(app.snapshot?.settings.hasToken);
+  const sceneOrderKey = `beings:scene-order:${JSON.stringify([app.snapshot?.settings.endpoint, app.snapshot?.settings.being])}`;
   return <nav className="workspace-rail" aria-label="主导航">
-    {app.startup === 'ready' && <ChatSceneIndicator
+    {app.startup === 'ready' && <ChatSceneIndicator orderKey={sceneOrderKey}
       beingName={name} onHome={() => void app.returnToMainChat()}
       createRequest={app.chatSessionCreateRequest}
       scene={app.snapshot?.chatScene} sessions={app.snapshot?.chatSessions} activity={app.chatSceneActivity}
@@ -207,7 +211,12 @@ export function BeingInfo({ app }: { app: AppModel }) {
   const privacyBack = useRef<HTMLButtonElement>(null);
   const closePrivacy = () => { setPrivacyOpen(false); requestAnimationFrame(() => privacyEntry.current?.focus()); };
   useEffect(() => { if (privacyOpen) privacyBack.current?.focus(); }, [privacyOpen]);
-  const name = town.displayName || app.snapshot?.settings.being || "Being";
+  const beingId = (app.snapshot?.settings.being || "").trim();
+  const name = town.displayName?.trim() || beingId || "Being";
+  let avatarHash = 2166136261;
+  for (const character of beingId) avatarHash = Math.imul(avatarHash ^ character.codePointAt(0)!, 16777619);
+  const avatarPalette = beingAvatarPalettes[(avatarHash >>> 0) % beingAvatarPalettes.length];
+  const initial = avatarInitials.segment(name)[Symbol.iterator]().next().value?.segment;
   const status = !app.snapshot?.settings.hasToken ? "未连接" : ({online:"已连接",connecting:"连接中",reconnecting:"重连中",offline:"已离线",degraded:"连接不稳定"}[app.connection] || "正在确认连接");
   const hidden = !app.beingInfoOpen || app.view !== "chat" || (app.subagentSettingsOpen && !app.settingsRoute);
   const browserAvailable = app.view === "chat" && !(app.subagentSettingsOpen && !app.settingsRoute);
@@ -241,14 +250,16 @@ export function BeingInfo({ app }: { app: AppModel }) {
     }}>
     <PanelResizeHandle panel={panel} label="调整 Being 信息宽度" width={width} onResize={setWidth} initial={320} max={900} reserve={396} disabled={hidden} />
     <div className="being-info-body">
-    <button className="close being-info-close" aria-label={privacyOpen ? "关闭隐私说明" : "关闭 Being 信息"} onClick={() => {
+    <button className="icon-button being-info-close" aria-label={privacyOpen ? "关闭隐私说明" : "关闭 Being 信息"} onClick={() => {
       if (privacyOpen) { closePrivacy(); return; }
       closeInfo();
-    }} />
+    }}><Icon name="chat-close" width={17} height={17} /></button>
     <div className="being-overview" hidden={privacyOpen}>
+    <div className="being-home-title">Being Home</div>
     <div className="being-profile">
-      <div className="being-avatar" aria-hidden="true">{name.slice(0, 1).toUpperCase()}</div>
-      <h2>{name}</h2><p className="being-status" data-online={app.connection === "online"}><span aria-hidden="true" />{status}</p>
+      <div className="being-avatar" data-palette={avatarPalette} aria-hidden="true">{initial}</div>
+      <h2>{name}</h2>
+      <p className="being-status" data-online={app.connection === "online"}><span aria-hidden="true" />{status}</p>
     </div>
     <div className="being-tabs" role="tablist" aria-label="Being 信息分类">
       {beingTabs.map(([key,label], index) => <button type="button" key={key} id={`being-${key}-tab`} role="tab" aria-selected={tab === key} aria-controls={`being-${key}-panel`} tabIndex={tab === key ? 0 : -1}
@@ -268,16 +279,18 @@ export function BeingInfo({ app }: { app: AppModel }) {
     <section id="being-profile-panel" role="tabpanel" tabIndex={0} aria-labelledby="being-profile-tab" hidden={tab !== "profile"}>
       <h3>当前状态</h3>
       <dl className="being-details">
-        <div><dt><Icon name="chat-outline" />当前场景</dt><dd>{app.snapshot?.chatScene?.scene_meta.scene_label || "尚未创建"}</dd></div>
-        <div><dt><Icon name="sun-20" />自主醒来</dt><dd><button className="being-wake-switch" type="button" role="switch" aria-label="自主醒来" aria-checked={app.sbsKnown && app.sbsEnabled} disabled={!app.snapshot?.settings.hasToken || !app.sbsKnown || app.chatLoading} onClick={() => app.toggleSbs()}>
+        <div><dt><Icon name="lucide-message-circle" />当前场景</dt><dd>{app.snapshot?.chatScene?.scene_meta.scene_label || "尚未创建"}</dd></div>
+        <div><dt><Icon name="lucide-sun" />自主醒来</dt><dd><button className="being-wake-switch" type="button" role="switch" aria-label="自主醒来" aria-checked={app.sbsKnown && app.sbsEnabled} disabled={!app.snapshot?.settings.hasToken || !app.sbsKnown || app.chatLoading} onClick={() => app.toggleSbs()}>
           <span>{app.sbsKnown ? app.sbsEnabled ? "已开启" : "已关闭" : "待同步"}</span><span className="being-wake-track" aria-hidden="true" />
         </button></dd></div>
       </dl>
       <h3>配置</h3>
-      <button className="being-action-row" onClick={() => app.openAppSettings()}><Icon name="web-grid" /><span className="being-action-copy">应用设置</span><Icon className="being-action-chevron" name="chevron-right-20" /></button>
-      <button className="being-action-row being-model-entry" disabled={!connected} onClick={() => app.openModelSettings()}><Icon name="settings-models" /><span className="being-action-copy"><strong>模型设置</strong><small>{connected ? currentModel || "正在读取模型…" : "连接后配置模型"}</small></span><Icon className="being-action-chevron" name="chevron-right-20" /></button>
-      <button ref={privacyEntry} className="being-action-row" onClick={() => setPrivacyOpen(true)}><Icon name="permission-shield" /><span className="being-action-copy">隐私说明</span><Icon className="being-action-chevron" name="chevron-right-20" /></button>
-      <button className="being-action-row being-connect" onClick={() => app.showSettings()}><Icon name="menu-settings" /><span className="being-action-copy">连接设置</span><Icon className="being-action-chevron" name="chevron-right-20" /></button>
+      <div className="being-config-actions">
+        <button className="being-action-row" onClick={() => app.openAppSettings()}><Icon name="lucide-layout-grid" /><span className="being-action-copy">应用设置</span><Icon className="being-action-chevron" name="chat-chevron-right" /></button>
+        <button className="being-action-row being-model-entry" disabled={!connected} onClick={() => app.openModelSettings()}><Icon name="lucide-layers" /><span className="being-action-copy">模型设置</span><small>{connected ? currentModel || "正在读取模型…" : "连接后配置模型"}</small><Icon className="being-action-chevron" name="chat-chevron-right" /></button>
+        <button ref={privacyEntry} className="being-action-row" onClick={() => setPrivacyOpen(true)}><Icon name="lucide-shield-check" /><span className="being-action-copy">隐私说明</span><Icon className="being-action-chevron" name="chat-chevron-right" /></button>
+        <button className="being-action-row being-connect" onClick={() => app.showSettings()}><Icon name="lucide-sliders-horizontal" /><span className="being-action-copy">连接设置</span><Icon className="being-action-chevron" name="chat-chevron-right" /></button>
+      </div>
     </section>
     <section id="being-library-panel" role="tabpanel" tabIndex={0} aria-labelledby="being-library-tab" hidden={tab !== "library"}>
       <RetainedBeingTab key={modelKey} active={libraryActive}><BeingLibrary api={app.api.home} active={libraryActive} onConnect={() => setTab('computer')} /></RetainedBeingTab>

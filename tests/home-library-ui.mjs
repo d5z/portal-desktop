@@ -134,7 +134,7 @@ try {
   await page.screenshot({ animations: 'disabled', path: 'output/playwright/home-library-recent-light.png' });
   await workspaceTab.hover();
   await page.locator('#being-info').screenshot({ animations: 'disabled', path: 'output/playwright/home-library-tab-hover.png' });
-  assert.equal(await workspaceTab.evaluate(el => getComputedStyle(el).borderRadius), '16px');
+  assert.equal(await workspaceTab.evaluate(el => getComputedStyle(el).borderRadius), '7px');
   const row = recent.locator('li').first();
   await workspaceTab.hover();
   await workspaceTab.focus();

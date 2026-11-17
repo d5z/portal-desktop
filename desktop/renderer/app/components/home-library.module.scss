@@ -1,12 +1,7 @@
 .library {
+  --library-card: light-dark(#f0f0f0, #2c2d2f);
   min-width: 0;
   font-size: 13px;
-
-  svg {
-    width: 20px;
-    height: 20px;
-    flex: none;
-  }
 }
 
 .heading {
@@ -31,6 +26,12 @@
   padding: 6px;
   border-radius: 8px;
   color: var(--secondary);
+
+  > svg {
+    width: 18px;
+    height: 18px;
+    flex: none;
+  }
 
   &:hover {
     background: var(--hover);
@@ -90,14 +91,14 @@
 .searchField {
   position: relative;
   display: block;
-  margin-bottom: 14px;
+  margin-bottom: 13px;
 
   > svg {
     position: absolute;
     left: 10px;
-    top: 10px;
-    width: 15px;
-    height: 15px;
+    top: 9px;
+    width: 16px;
+    height: 16px;
     color: var(--secondary);
     pointer-events: none;
   }
@@ -106,11 +107,11 @@
 .library .search {
   width: 100%;
   min-width: 0;
-  height: 35px;
+  height: 34px;
   padding: 7px 10px 7px 32px;
-  background: transparent;
-  border: 1px solid var(--line);
-  border-radius: 10px;
+  background: var(--library-card);
+  border: 1px solid transparent;
+  border-radius: 9px;
   color: var(--text);
   font: inherit;
   font-size: 12px;
@@ -154,61 +155,234 @@
   }
 }
 
-.files {
+.fileGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(108px, 100%), 1fr));
+  gap: 8px;
   list-style: none;
   margin: 0;
   padding: 0;
+}
 
-  li {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    border-radius: 9px;
+.fileGrid[data-layout='list'] {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 2px;
+  margin-inline: 8px;
+
+  .tile {
+    min-height: 44px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 0;
+    padding: 0;
+    border-radius: 12px;
+
+    &:is(:hover, :focus-within) { background: var(--hover); }
   }
 
-  li:is(:hover, :focus-within) {
-    background: var(--surface);
+  .thumbnail {
+    inset: 0 auto 0 8px;
+    width: 28px;
+    height: 28px;
+    margin: auto 0;
+    color: var(--secondary);
+  }
+
+  :is(.tileButton, .folderName) {
+    min-height: 44px;
+    margin: 0;
+    padding: 6px 38px 6px 44px;
+    flex-direction: row;
+    justify-content: flex-start;
+    gap: 8px;
+    text-align: start;
+  }
+
+  .folderName { padding-inline-end: 8px; }
+  .fileName { flex: 1; }
+  .fileSize { flex: none; }
+  .tileAction { top: 8px; right: 6px; }
+}
+
+.tile {
+  position: relative;
+  display: flex;
+  min-width: 0;
+  min-height: 148px;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--utility-radius);
+}
+
+.fileGrid[data-layout='grid'] .folderName {
+  flex: 1;
+  flex-direction: column;
+  padding: 98px 8px 8px;
+}
+
+.folderThumb {
+  position: absolute;
+  inset-block-start: 35px;
+  inset-inline: 0;
+  width: min(76px, 80%);
+  height: 54px;
+  margin-inline: auto;
+  border-radius: 5px;
+  background: light-dark(#4389e8, #386ebc);
+  perspective: 200px;
+  pointer-events: none;
+
+  &::before,
+  &::after {
+    position: absolute;
+    inset-inline-start: 0;
+    border-radius: inherit;
+    content: '';
+  }
+
+  &::before {
+    top: -7px;
+    width: 34px;
+    height: 16px;
+    background: inherit;
+  }
+
+  &::after {
+    inset: 8px 0 0;
+    background: linear-gradient(150deg, #75b7ff, #408cef);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / 30%), 0 4px 8px rgb(0 0 0 / 13%);
+    transform-origin: bottom;
+  }
+
+  > i {
+    position: absolute;
+    inset: 4px 13px 6px;
+    border-radius: 3px;
+    background: #fbfcff;
+    box-shadow: 0 0 4px rgb(20 57 96 / 25%);
+  }
+
+  > i:first-child {
+    background: #e6effa;
+    rotate: -5deg;
   }
 }
 
-.file {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex: 1;
-  min-width: 0;
-  min-height: 44px;
-  padding: 7px 6px;
-  text-align: left;
-  border-radius: 9px;
-
-  &:focus-visible {
-    outline: 2px solid var(--accent);
-    outline-offset: -2px;
+@media (prefers-reduced-motion: no-preference) {
+  .folderThumb > i,
+  .folderThumb::after,
+  .thumbnail > img {
+    transition: transform 180ms ease;
   }
 
-  small {
-    flex: none;
-    color: var(--secondary);
-    font-size: 11px;
-    font-variant-numeric: tabular-nums;
+  .folderTile:is(:hover, :focus-within) .folderThumb {
+    &::after { transform: rotateX(-23deg); }
+
+    > i { transform: translateY(-8px) rotate(5deg); }
+
+    > i:first-child { transform: translate(-5px, -5px) rotate(-2deg); }
+  }
+}
+
+.tileButton,
+.folderName {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border-radius: inherit;
+}
+
+.tileButton {
+  flex: 1;
+  flex-direction: column;
+  gap: 4px;
+  padding: 98px 8px 8px;
+}
+
+.thumbnail {
+  position: absolute;
+  z-index: 1;
+  inset-block-start: 18px;
+  inset-inline: 0;
+  display: grid;
+  place-items: center;
+  width: min(100%, 104px);
+  height: 76px;
+  margin-inline: auto;
+  pointer-events: none;
+
+  > img {
+    display: block;
+    max-width: 100%;
+    max-height: 76px;
+    object-fit: contain;
+    border-radius: 6px;
+    box-shadow: 0 3px 10px rgb(0 0 0 / 15%);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .tile:is(:hover, :focus-within) .thumbnail > img {
+    transform: perspective(460px) rotateX(4deg) rotateY(-6deg) scale(1.035);
+  }
+}
+
+.folderName {
+  min-height: 32px;
+  padding-inline: 8px;
+}
+
+.library :is(.tileButton, .folderName):is(:hover, :active):not(:disabled) {
+  background: transparent;
+}
+
+:is(.tileButton, .folderName):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+.library .tileAction {
+  position: absolute;
+  z-index: 2;
+  top: 2px;
+  right: 2px;
+  width: 28px;
+  height: 28px;
+
+  > svg {
+    width: 16px;
+    height: 16px;
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .tile:not(:hover, :focus-within) > .tileAction {
+    opacity: 0;
   }
 }
 
 .fileName {
-  flex: 1;
-  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
-  white-space: nowrap;
   text-overflow: ellipsis;
+  white-space: nowrap;
   font-size: 13px;
 }
 
-.library .folderArrow {
-  width: 14px;
-  height: 14px;
-  margin-right: 8px;
+.fileSize {
   color: var(--secondary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.recentEmpty,
+.empty {
+  border-radius: var(--utility-radius);
+  background: var(--library-card);
 }
 
 .empty {
@@ -216,7 +390,7 @@
   grid-template-columns: 28px minmax(0, 1fr);
   align-items: start;
   gap: 5px 12px;
-  padding: 28px 4px;
+  padding: 20px 12px;
   text-align: left;
 
   > svg {
@@ -306,18 +480,46 @@
 .toolbar {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 13px;
+}
+
+.viewModes {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 9px;
+  background: var(--library-card);
+
+  .iconButton {
+    width: 28px;
+    height: 28px;
+    padding: 6px;
+    border-radius: 7px;
+
+    > svg { width: 16px; height: 16px; }
+    &[aria-pressed='true'] { background: var(--selected); color: var(--text); }
+    &:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+  }
 }
 
 .tabs {
+  --library-tab-width: 60px;
+  --library-tab-gap: 4px;
+
+  position: relative;
+  isolation: isolate;
   display: flex;
   flex: 1;
-  gap: 4px;
+  gap: var(--library-tab-gap);
 
   button {
-    padding: 6px 12px;
-    border-radius: 16px;
+    flex: 0 0 var(--library-tab-width);
+    padding: 6px 10px;
+    white-space: nowrap;
+    border-radius: 7px;
     color: var(--secondary);
     font-size: 12px;
     font-weight: 400;
@@ -331,7 +533,7 @@
 
   button[aria-selected='true'],
   button[aria-selected='true']:hover:not(:disabled) {
-    background: var(--surface);
+    background: transparent;
     color: var(--text);
     font-weight: 550;
   }
@@ -342,60 +544,34 @@
   }
 }
 
+.tabs::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: -1;
+  width: var(--library-tab-width);
+  border-radius: 7px;
+  background: var(--library-card);
+  content: '';
+  pointer-events: none;
+  transition: transform 180ms ease;
+}
+
+.tabs[data-tab='workspace']::before {
+  transform: translateX(calc(100% + var(--library-tab-gap)));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .tabs::before {
+    transition: none;
+  }
+}
+
 .recentEmpty {
-  margin: 20px 0;
+  margin: 12px 0;
+  padding: 16px 12px;
   color: var(--secondary);
   font-size: 12px;
   line-height: 1.7;
-}
-
-.recentFiles {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-
-  li {
-    display: flex;
-    align-items: center;
-    gap: 2px;
-    border-radius: 9px;
-
-    &:hover {
-      background: var(--surface);
-    }
-  }
-
-  .iconButton {
-    width: 28px;
-    height: 28px;
-    margin-right: 3px;
-
-    svg {
-      width: 16px;
-      height: 16px;
-    }
-  }
-}
-
-.recentFile {
-  display: flex;
-  align-items: center;
-  flex: 1;
-  min-width: 0;
-  gap: 9px;
-  padding: 7px 5px;
-  text-align: left;
-  border-radius: 9px;
-
-  .recentName {
-    flex: 1;
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    font-size: 13px;
-    line-height: 1.5;
-  }
 }
 
 .fileSource {
@@ -410,37 +586,16 @@
   white-space: nowrap;
   opacity: 0;
 
-  .recentFiles li:hover &,
-  .recentFiles li:focus-within & {
+  .tile:hover &,
+  .tile:focus-within & {
     opacity: 1;
   }
 }
 
 .library .fileTypeIcon {
-  width: 28px;
-  height: 32px;
-  border-radius: 6px;
-
-  svg {
-    width: 20px;
-    height: 20px;
-  }
-}
-
-.library .recentFile .fileTypeIcon {
-  height: 28px;
-}
-
-.library .folderIcon {
-  width: 24px;
-  color: var(--secondary);
-}
-
-.library .file:hover:not(:disabled),
-.library .recentFile:hover:not(:disabled),
-.library .file:active:not(:disabled),
-.library .recentFile:active:not(:disabled) {
-  background: transparent;
+  width: 42px;
+  height: 46px;
+  border-radius: 8px;
 }
 
 .library .iconButton:hover:not(:disabled) {
