@@ -190,7 +190,8 @@ export function ImageGenerationAnswer({text,streaming,endpoint,scope,enabled,chi
     seen.add(identity);
     if(!enabled) return <div key={block.id} className="image-generation-message" role="status">已收到 {receipt.jobs.length} 张图片的任务回执。请在桌面客户端打开本对话以查询和显示图片。</div>;
     if(!endpoint) return <div key={block.id} className="image-generation-message"><ChatStatusRow title="无法确认此对话的 Being 连接，请重新打开对话。" tone="error" /></div>;
-    const statusInActions = standalone && receipt.jobs.length === 1 && document.documentElement.dataset.chatHost === 'desktop';
+    const statusInActions = standalone && receipt.jobs.length === 1
+      && typeof document !== 'undefined' && document.documentElement.dataset.chatHost === 'desktop';
     return <ImageGenerationMessage key={JSON.stringify([scope,endpoint,block.id,receipt])} receipt={receipt} endpoint={endpoint} statusInActions={statusInActions}/>;
   })}</div></MarkdownReferenceScope>;
 }

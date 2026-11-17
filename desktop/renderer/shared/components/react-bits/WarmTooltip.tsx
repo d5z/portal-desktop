@@ -164,6 +164,7 @@ const anchorOf = (rect: DOMRect, side: WarmTooltipSide, gap: number): [number, n
 };
 
 const layoutOf = (x: number, y: number, width: number, height: number, side: WarmTooltipSide) => {
+  if (typeof window === 'undefined') return { X: x, Y: y };
   if (horizontal(side)) {
     const X = clamp(x - width / 2, MARGIN, Math.max(MARGIN, window.innerWidth - MARGIN - width));
     return { X, Y: side === 'top' ? y - height : y };
