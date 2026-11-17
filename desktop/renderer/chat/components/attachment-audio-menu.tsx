@@ -7,7 +7,7 @@ import { useDismissAttachmentMenu } from './use-dismiss-attachment-menu';
 import { useCallback, useEffect, useLayoutEffect, useId, useRef, useState, type ReactNode, type CSSProperties, type KeyboardEvent } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { audioMenuPosition } from '../services/audio-menu-position';
-import { MessageAction } from './message-action-row';
+import { MessageAction } from '../../shared/components/message-action-slot';
 
 export type AudioMenuControls = {
   volume: number;
@@ -130,7 +130,7 @@ export function AttachmentAudioMenu({ name, children, controls }: { name: string
           const target = stacked ? '.audio-speed-back' : '.audio-speed-options [aria-pressed="true"]';
           popup.current?.querySelector<HTMLElement>(target + ':not([inert] *)')?.focus({ preventScroll: true });
         } else setSpeedOpen(true);
-      }}><Icon name="playback-speed" /><span>速度</span><small>{controls.speed}×</small><Icon className="audio-speed-chevron" name="chat-chevron-right" /></button>
+      }}><Icon name="chat-clock" /><span>速度</span><small>{controls.speed}×</small><Icon className="audio-speed-chevron" name="chat-chevron-right" /></button>
       {!stacked && <AnimatePresence>{speedOpen && <DropdownMenuMotion {...speedSurface}>{speedChoices}</DropdownMenuMotion>}</AnimatePresence>}
     </div>
     {children}

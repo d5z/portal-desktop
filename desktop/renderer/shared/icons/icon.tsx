@@ -3,15 +3,17 @@ import type { ComponentProps } from 'react';
 const glyphs = {
   'chat-edit': { viewBox: '0 0 24 24', content: (<><path d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z" /> <path d="m15 5 4 4" /></>) },
   'chat-close': { viewBox: '0 0 24 24', content: (<><path d="M18 6 6 18" /> <path d="m6 6 12 12" /></>) },
+  'chat-chevron-down': { viewBox: '0 0 24 24', content: <path d="m6 9 6 6 6-6" /> },
   'chat-chevron-right': { viewBox: '0 0 24 24', content: <path d="m9 18 6-6-6-6" /> },
+  'chat-clock': { viewBox: '0 0 24 24', content: <><circle cx="12" cy="12" r="10" /><path d="M12 6v6l4 2" /></> },
   'chat-copy': { viewBox: '0 0 24 24', content: (<>
-    <rect x="8" y="8" width="14" height="14" rx="2" />
-    <path d="M4 16a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2" />
+    <rect width="14" height="14" x="8" y="8" rx="2" ry="2" />
+    <path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2" />
   </>) },
-  'chat-more': { viewBox: '0 0 14 14', content: (<>
-    <circle cx="2.917" cy="7" r="1.167" />
-    <circle cx="7" cy="7" r="1.167" />
-    <circle cx="11.083" cy="7" r="1.167" />
+  'chat-more': { viewBox: '0 0 24 24', content: (<>
+    <circle cx="5" cy="12" r="1" />
+    <circle cx="12" cy="12" r="1" />
+    <circle cx="19" cy="12" r="1" />
   </>) },
   'chat-queue-grip': { viewBox: '0 0 14 14', content: (<>
     <circle cx="5.25" cy="2.917" r="1.167" /><circle cx="8.75" cy="2.917" r="1.167" />
@@ -106,7 +108,6 @@ const glyphs = {
   'update-download': { viewBox: '0 0 24 24', content: (<><path d="M12 3v11m0 0 4-4m-4 4-4-4M5 18v2h14v-2" /></>) },
   'more-filled': { viewBox: '0 0 24 24', content: (<><circle cx="5" cy="12" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="19" cy="12" r="1.5" /></>) },
   'volume': { viewBox: '0 0 24 24', content: (<><path d="M11 4 6 8H3v8h3l5 4zM15 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"/></>) },
-  'playback-speed': { viewBox: '0 0 24 24', content: (<><path d="M12 3a9 9 0 1 0 9 9M16 4l3 3m2 2v1M12 7v5l3 3"/></>) },
   'folder': { viewBox: '0 0 24 24', content: (<><path d="M3 6h7l2 3h9v11H3z"/></>) },
   'file-text-tall': { viewBox: '0 0 24 28', content: (<><rect x="4" y="2" width="16" height="24" rx="4" stroke="currentColor" strokeWidth="1.6"/><path d="M8 9h8M8 14h6M8 19h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round"/></>) },
   'plus': { viewBox: '0 0 24 24', content: (<><path d="M12 5v14M5 12h14"/></>) },

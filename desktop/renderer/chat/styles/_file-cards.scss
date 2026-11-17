@@ -101,7 +101,6 @@
       padding-inline-end: 0;
       color: var(--chat-file-text) !important;
     }
-    .attachment-file-action { display: none; }
   }
 
   .attachment-upload-card {
@@ -144,10 +143,13 @@
 
     .attachment-file-main {
       border-radius: inherit;
-      padding-inline-end: 0;
+      padding-inline-end: 16px;
       background: transparent;
+
+      &:focus-visible { outline: 1px solid var(--chat-bubble-link, var(--accent)); outline-offset: -1px; }
     }
 
+    .attachment-file-label small { opacity: 1; }
   }
 
   .attachment-upload-card { padding-inline: 16px; }

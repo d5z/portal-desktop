@@ -330,13 +330,18 @@
     gap: 6px;
   }
 
-  .message-action-time { color: light-dark(#6a6a6a, #a0a0a0); }
+  .message-action-time {
+    color: light-dark(#6a6a6a, #a0a0a0);
+    font-family: system-ui, 'PingFang SC', 'Being Noto Sans SC', sans-serif;
+  }
 
   .message-row-actions button[data-copy-failed] { color: light-dark(#d33145, #ff9da7); }
 
   .message-row-actions > button + button { margin-inline-start: -2px; }
 
-  .message-row-actions .message-more {
+  .message-row-actions :is(.message-more, .attachment-menu-trigger) {
+    color: var(--chat-bubble-secondary);
+
     &:is(:hover, [aria-expanded='true']) { background: var(--chat-bubble-hover); }
     &:active:not(:disabled) { background: var(--chat-bubble-pressed); }
   }
@@ -393,12 +398,22 @@
     }
 
     button {
+      display: grid;
+      place-items: center;
+      width: 24px;
+      height: 24px;
       padding: 0;
       border: 0;
+      border-radius: 4px;
       background: transparent;
-      color: var(--chat-bubble-link);
-      font: inherit;
+      color: var(--chat-bubble-secondary);
+      cursor: pointer;
+
+      &:hover { background: var(--chat-bubble-hover); }
+      &:focus-visible { outline: 1px solid currentColor; outline-offset: -1px; }
     }
+
+    small { flex: 1; min-width: 0; }
   }
 
   .message.user .content.attachment-message {
@@ -443,7 +458,7 @@
       &:has(.message-feedback, .attachment-download-progress, .message-action-status) { opacity: 1; }
       > :is(.message-feedback, .message-media-actions) { pointer-events: auto; }
       > :not(.message-feedback, .message-media-actions) { opacity: 0; }
-      .message-media-actions > .audio-menu-trigger { opacity: 0; pointer-events: none; }
+      .message-media-actions > :is(.audio-menu-trigger, .message-image-toggle) { opacity: 0; pointer-events: none; }
     }
   }
 

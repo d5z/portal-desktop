@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 import type { AttachmentPart } from '../services/attachment-messages';
 import { attachmentContentURL } from '../services/attachment-view';
 import { useNearViewport } from '../../shared/hooks/use-near-viewport';
-import { MessageAction } from './message-action-row';
+import { MessageAction } from '../../shared/components/message-action-slot';
 import { MessageError } from './message-error';
 export function attachmentProgress(part: AttachmentPart) {
   const p = part.progress;

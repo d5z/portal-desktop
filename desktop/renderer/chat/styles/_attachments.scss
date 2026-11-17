@@ -352,11 +352,6 @@
   color: var(--text-dim);
 }
 
-.attachment-file-action {
-  font-size: 17px;
-  opacity: 0.55;
-}
-
 .attachment-menu-trigger {
   display: grid;
   place-items: center;
@@ -384,13 +379,14 @@
   width: min(248px, calc(100vw - 16px));
   max-height: calc(100dvh - 16px);
   overflow: auto;
-  padding: 4px;
+  padding: var(--chat-menu-inset, 4px);
   gap: 2px;
   color: var(--text);
   font: 400 13px/20px var(--font-sans);
   isolation: isolate;
 
   &:popover-open { display: grid; }
+  &:focus { outline: none; }
 
   // React Bits GlideSelect-TS-CSS pill, adapted to the menu's row geometry.
   > .glide-select__pill {
@@ -408,6 +404,23 @@
   }
 
   [role='menuitem'] { @include chat-menu.action-row; }
+  .attachment-details-content > button { @include chat-menu.action-row; }
+
+  .attachment-details-content > .message-feedback {
+    margin: 0;
+
+    > button {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border-radius: 6px;
+    }
+
+    @media (pointer: coarse) {
+      > button { width: var(--touch-target); height: var(--touch-target); }
+    }
+  }
+
   &[data-gliding] [role='menuitem']:hover:not(:disabled, :active) { background: transparent; }
   .attachment-details:has(.attachment-segment) { max-height: 380px; overflow: auto; }
 }
@@ -511,10 +524,6 @@
 .attachment-file-label strong {
   font-size: 13px;
   font-weight: 500;
-}
-
-.attachment-file-action {
-  font-size: 15px;
 }
 
 .attachment-audio {

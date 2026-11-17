@@ -61,6 +61,7 @@
 
 // Hosts opt into hover/focus reveal without exposing their private class names.
 [data-copy-group]:is(:hover, :focus-within) .button,
+[data-copy-group]:has(:global(.attachment-menu-trigger[aria-expanded='true'])) .chat,
 .button:focus-visible {
   opacity: 1;
   pointer-events: auto;

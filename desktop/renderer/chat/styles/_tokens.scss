@@ -63,7 +63,7 @@
   --chat-queue-surface: #fcfcfc;
 }
 
-:root[data-chat-host='desktop'] {
+:root:has(.chat-root[data-chat-host='desktop']) {
   --chat-menu-surface: light-dark(#fff, #252525);
   --chat-menu-hover: var(--bg-soft);
   --chat-menu-pressed: var(--pressed-overlay);

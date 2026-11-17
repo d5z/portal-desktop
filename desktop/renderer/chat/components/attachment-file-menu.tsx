@@ -36,7 +36,7 @@ export function AttachmentFileMenu({ label, children }: { label: string; childre
     node.addEventListener('keydown', event => {
         if (dismiss(event)) return;
         if (!['ArrowUp', 'ArrowDown', 'Home', 'End'].includes(event.key)) return;
-        const items = Array.from(node.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]:enabled'));
+        const items = Array.from(node.querySelectorAll<HTMLButtonElement>('button:enabled'));
         const selected = items.indexOf(document.activeElement as HTMLButtonElement);
         const index = event.key === 'Home' ? 0 : event.key === 'End' ? items.length - 1
           : event.key === 'ArrowUp' ? selected > 0 ? selected - 1 : items.length - 1 : (selected + 1) % items.length;
@@ -62,17 +62,20 @@ export function AttachmentFileMenu({ label, children }: { label: string; childre
   }, [open]);
   return <>
     <button ref={trigger} type="button" className="attachment-menu-trigger" aria-label={label}
-      data-warm-tooltip={open ? undefined : '文件操作'}
+      data-warm-tooltip={open ? undefined : '更多消息操作'}
       aria-haspopup="menu" aria-expanded={open} aria-controls={id} popoverTarget={id} onKeyDown={dismiss} onClick={event => {
         if (!open && popup.current) popup.current.dataset.pointerMotion = String(event.detail > 0);
-      }}><Icon name="chat-more" width="16" height="16" /></button>
+      }}><Icon name="chat-more" width="14" height="14" strokeWidth="2" /></button>
     {createPortal(<div ref={popup} id={id} popover="auto" className="attachment-file-popover"
-      role="menu" aria-label={label} data-attachment-glide {...dropdownMenuPopover}
+      role="menu" aria-label={label} tabIndex={-1} data-attachment-glide {...dropdownMenuPopover}
       onToggle={event => {
-        const next = event.currentTarget.matches(':popover-open');
-        if (!next) clearMenuGlide(event.currentTarget);
-        else if (event.currentTarget.dataset.pointerMotion === 'false') {
-          event.currentTarget.querySelector<HTMLButtonElement>('button[role="menuitem"]:enabled')?.focus({ preventScroll: true });
+        if (event.target !== event.currentTarget) return;
+        const node = event.currentTarget;
+        const next = node.matches(':popover-open');
+        if (!next) clearMenuGlide(node);
+        else {
+          const first = node.dataset.pointerMotion === 'false' && node.querySelector<HTMLButtonElement>('button[role="menuitem"]:enabled');
+          (first || node).focus({ preventScroll: true });
         }
         setOpen(next);
       }}><span className="glide-select__pill" aria-hidden="true" />{children}</div>, document.body)}

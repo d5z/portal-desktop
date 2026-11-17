@@ -3,7 +3,8 @@ import { AttachmentAudioMenu, type AudioMenuControls } from './attachment-audio-
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {formatBytes} from '../../shared/lib/format-bytes';
 import {FileName} from '../../shared/components/file-name';
-import { MessageAction, MessageFileActions } from './message-action-row';
+import { MessageAction } from '../../shared/components/message-action-slot';
+import { MessageFileActions } from './message-action-row';
 import { MessageError } from './message-error';
 export function AttachmentDownload({endpoint, id, artifact, name, children, file, details, audioControls, iconOnly=false, apiBase='', request=fetch, onPreview, onDownloaded}: {
   onDownloaded?:()=>void; onPreview?:()=>void; request?:typeof fetch; apiBase?:string; endpoint: string; id: string; artifact?: string; name: string; children: string; file?:{size:number;mime:string}; details?:ReactNode; audioControls?:AudioMenuControls; iconOnly?:boolean;
@@ -54,22 +55,21 @@ export function AttachmentDownload({endpoint, id, artifact, name, children, file
     } catch(e){setStatus(kind==='download' ? (pending.signal.aborted ? '已取消下载' : '下载失败') : '');if(!pending.signal.aborted){failedAction.current=kind;setError(e instanceof Error ? e.message : '操作失败');}}
     finally{if(controller.current===pending){controller.current=null;setActiveAction('');}}
   }
-  const extension=name.split('.').pop()?.toLowerCase() || '';
+  const extension=name.match(/.+\.([^.]+)$/)?.[1] || '';
   const fileType=extension.toUpperCase() || '文件';
   const primary=downloaded ? '打开' : '下载';
   const canPreview=downloaded && !!onPreview;
   const cardAction=checking ? '正在检查本地文件' : canPreview ? '在右侧预览' : downloaded ? '使用系统应用打开' : '下载';
-  const imageAction = downloaded ? '打开原图' : children;
+  const imageAction = downloaded ? '打开' : children;
   const statusLabel = status + (downloading && progress.total ? ` · ${Math.min(99,Math.floor(progress.loaded / progress.total * 100))}% · ${formatBytes(progress.loaded)} / ${formatBytes(progress.total)}` : '');
   return <div className="attachment-download">
     {audioControls ? <AttachmentAudioMenu name={name} controls={audioControls}>
-      <button type="button" disabled={busy || checking} onClick={()=>void action(downloaded ? 'open' : 'download')}><Icon name={downloaded ? 'external-link' : 'download-tray'} fill="none" stroke="currentColor" strokeWidth="1.7" /><span>{primary}</span></button>
-      {downloaded && <button type="button" disabled={busy} onClick={()=>void action('reveal')}><Icon name="folder" fill="none" stroke="currentColor" strokeWidth="1.7" /><span>打开所在位置</span></button>}
+      <button type="button" data-audio-menu-focus="download" disabled={busy || checking} onClick={()=>void action(downloaded ? 'open' : 'download')}><Icon name={downloaded ? 'chat-external-link' : 'chat-download'} /><span>{primary}</span></button>
+      {downloaded && <button type="button" data-audio-menu-focus="location" disabled={busy} onClick={()=>void action('reveal')}><Icon name="folder" fill="none" stroke="currentColor" strokeWidth="1.7" /><span>打开所在位置</span></button>}
     </AttachmentAudioMenu> : file ? <div className="attachment-file-row">
-      <button className="attachment-file-main" type="button" disabled={busy || checking} title={cardAction} aria-label={`${canPreview ? '预览' : primary} ${name}`} onClick={()=>canPreview ? onPreview!() : void action(downloaded ? 'open' : 'download')}>
-        <span className="attachment-file-icon" aria-hidden="true"><Icon name="chat-file" width="18" height="18" strokeWidth="1.65" /></span>
+      <button className="attachment-file-main" type="button" disabled={busy || checking} title={cardAction} aria-label={`${canPreview ? '预览' : primary} ${name}`} aria-description={`${fileType} · ${formatBytes(file.size)}`} onClick={()=>canPreview ? onPreview!() : void action(downloaded ? 'open' : 'download')}>
+        <span className="attachment-file-icon" aria-hidden="true"><Icon name="chat-file" width="18" height="18" /></span>
         <span className="attachment-file-label"><FileName name={name} /><small>{fileType} · {formatBytes(file.size)}</small></span>
-        <span className="attachment-file-action" aria-hidden="true">{checking ? '…' : downloaded ? '↗' : '↓'}</span>
       </button>
       {(downloaded || details) && <MessageFileActions name={name}>
         {canPreview && <button type="button" role="menuitem" disabled={busy} onClick={()=>void action('open')}><Icon name="chat-external-link" />用系统应用打开</button>}
@@ -77,14 +77,16 @@ export function AttachmentDownload({endpoint, id, artifact, name, children, file
         {details}
       </MessageFileActions>}
     </div> : iconOnly ? <button type="button" className="attachment-download-icon" disabled={busy || checking}
-      aria-label={imageAction} title={imageAction} onClick={()=>void action(downloaded ? 'open' : 'download')}>
-      <Icon name={downloaded ? 'external-link' : 'chat-download'} width="16" height="16" />
+      aria-busy={busy || checking} aria-label={imageAction} title={imageAction} onClick={()=>void action(downloaded ? 'open' : 'download')}>
+      <Icon name={busy || checking ? 'chat-busy' : downloaded ? 'chat-external-link' : 'chat-download'} width="18" height="18" />
     </button> : <button type="button" disabled={busy || checking} onClick={()=>void action(downloaded ? 'open' : 'download')}>{checking ? '正在检查…' : downloaded ? '打开' : downloading ? '正在下载…' : children}</button>}
     {inActions ? <MessageAction>
       {downloading && <div className="attachment-download-progress">
+        <button type="button" aria-label="取消下载" title="取消下载" onClick={()=>controller.current?.abort()}>
+          <Icon name="chat-close" width="16" height="16" />
+        </button>
         <small role="status">{statusLabel}</small>
         <progress aria-label={`${name} 下载进度`} max={progress.total || undefined} value={progress.total ? progress.loaded : undefined} />
-        <button type="button" onClick={()=>controller.current?.abort()}>取消下载</button>
       </div>}
       {!downloading && !error && status && <small className="message-action-status" role="status">{status}</small>}
       {error && <MessageError reason={`${name} · ${error}`} disabled={busy || checking}

@@ -15,18 +15,19 @@
   .message-image-stack {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-auto-rows: 104px;
     gap: 8px;
   }
 
   .message-image-stack > * {
     min-width: 0;
-    height: 104px;
   }
 
   .message-image-group :is(.attachment-card-host, .attachment-image-card, .attachment-image-upload, .attachment-image-placeholder, .attachment-image-failure) {
     width: 100%;
     height: 100%;
     min-height: 0;
+    border-radius: 16px;
   }
 
   .message-image-group :is(.attachment-image-thumbnail, [data-slot='image-thumbnail']) {
@@ -63,6 +64,7 @@
 
     &:hover { background: var(--hover-overlay); }
     &:focus-visible { outline: 1px solid currentColor; }
+    &[aria-expanded='true'] > svg { rotate: 180deg; }
   }
 
   .content > :is(.markdown-image-only, .markdown-image-group) {
@@ -98,6 +100,28 @@
 [data-chat-host='desktop'] #messages .message {
   .content > .markdown-image-only > [data-slot='image-thumbnail'] { overflow: hidden; }
 
+  .attachment-image-card:not(.message-image-group *) > .attachment-image-thumbnail {
+    width: fit-content;
+    height: auto;
+    border: 0;
+    background: transparent;
+
+    > img {
+      max-width: 100%;
+      max-height: 360px;
+    }
+  }
+
+  :is(.attachment-image-thumbnail, [data-slot='image-thumbnail']):focus-visible {
+    outline: 2px solid white;
+    outline-offset: -4px;
+    box-shadow: inset 0 0 0 4px #202020;
+  }
+
+  @media (forced-colors: active) {
+    :is(.attachment-image-thumbnail, [data-slot='image-thumbnail']):focus-visible { outline-color: Highlight; }
+  }
+
   &.user :is(.attachment-image-skeleton, .attachment-image-card > .attachment-image-failure):not(.message-image-group *) {
     // Loading and the failure placeholder share the approved attachment frame.
     width: 320px !important;
@@ -129,56 +153,39 @@
     > .markdown-image-only { margin-block-end: 0; }
   }
 
-  .message-image-toggle {
+  .message-media-actions > .message-image-toggle {
+    width: 24px;
+    height: 24px;
+    margin: 0;
+    margin-inline-start: -2px;
+    padding: 0;
     color: var(--chat-bubble-secondary);
 
-    > svg { width: 14px; height: 14px; }
+    > svg { width: 14px; height: 14px; stroke-width: 2; }
     &:hover { background: var(--chat-bubble-hover); }
     &:active { background: var(--chat-bubble-pressed); }
+    &:focus-visible { outline-offset: -1px; }
   }
 
   @media (pointer: coarse) {
-    .message-image-toggle {
+    .message-media-actions > .message-image-toggle {
       width: var(--touch-target);
       height: var(--touch-target);
     }
   }
 
   @media (min-width: 521px) and (hover: hover) and (pointer: fine) {
-    &.user {
-      --chat-deck-toggle-start: auto;
-      --chat-deck-toggle-end: calc(95% + 8px);
-      --chat-deck-actions-margin: 0 -16px;
-      --chat-deck-actions-padding: 0 30px;
+    // The deck reserves room for the fan. Side actions line up with the front photo.
+    &.being .message-bubble-body:has(.content > .markdown-image-group:only-child .message-image-deck) {
+      margin-inline-end: calc(-.13 * min(320px, var(--message-bubble-width)));
     }
 
-    .message-bubble-row:is(
-      :has(.content > .markdown-image-group:only-child .message-image-deck),
-      :has(.attachment-message > div:only-child > .message-image-group .message-image-deck):not(
-        :has(.attachment-message > div > :not(.message-image-group, .attachment-message-copy:empty))
-      )
-    ) {
-      .message-image-toggle {
-        position: absolute;
-        z-index: 1;
-        inset-inline-start: var(--chat-deck-toggle-start, calc(87% + 8px));
-        inset-inline-end: var(--chat-deck-toggle-end, auto);
-        inset-block-end: 4px;
-        margin: 0;
-      }
+    &.user .message-bubble-body:has(.attachment-message > div:last-child > .attachment-image-group:last-child > .message-image-deck) {
+      margin-inline-start: calc(-.05 * min(320px, var(--message-bubble-width)));
+    }
 
-      .message-row-actions {
-        min-height: 28px;
-        margin-inline: var(--chat-deck-actions-margin, -41.6px 0);
-        padding-inline: var(--chat-deck-actions-padding, 30px 0);
-      }
-
+    &.being .message-bubble-row:has(.content > .markdown-image-group:only-child .message-image-deck) {
       .message-row-actions > button { display: none; }
-
-      &:not(:focus-within, :has(.message-bubble-body:hover, .message-row-actions:hover)) .message-image-toggle {
-        opacity: 0;
-        pointer-events: none;
-      }
     }
   }
 }

@@ -269,3 +269,101 @@ html[data-platform='darwin'] .toolbar {
 html[data-platform='darwin'] .viewer {
   padding-top: 112px;
 }
+
+.viewer.attachment {
+  padding: 66px 24px 64px;
+
+  &::backdrop { background: rgb(25 25 27 / 86%); backdrop-filter: none; }
+  &:has(.thumbnails) { padding-bottom: 88px; }
+
+  .toolbar {
+    top: 16px;
+    left: auto;
+    right: 16px;
+    gap: 6px;
+
+    > button { order: 1; }
+  }
+
+  .name, .position, .hint, .controls output, .controlDivider { display: none; }
+  .stage { scrollbar-width: none; }
+
+  .controls {
+    inset: auto 16px 16px auto;
+    transform: none;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+    background: transparent;
+    backdrop-filter: none;
+  }
+
+  :is(.toolbar, .controls) button:not(:global(.message-feedback) > button) {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    min-width: 0;
+    padding: 0;
+    border-radius: 8px;
+    background: rgb(255 255 255 / 9%);
+    font: inherit;
+
+    &:hover:not(:disabled) { background: rgb(255 255 255 / 18%); }
+    &:active:not(:disabled) { background: rgb(255 255 255 / 26%); }
+  }
+
+  @media (pointer: coarse) {
+    :is(.toolbar, .controls) button:not(:global(.message-feedback) > button) {
+      width: 44px;
+      height: 44px;
+    }
+  }
+
+  @media (max-width: 520px) {
+    &:has(.thumbnails) { padding-bottom: 116px; }
+    .controls { right: 50%; transform: translateX(50%); }
+    .thumbnails { bottom: 60px; max-width: calc(100% - 32px); }
+  }
+}
+
+.thumbnails {
+  position: absolute;
+  bottom: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 6px;
+  max-width: calc(100% - 276px);
+  padding: 3px;
+  overflow: auto hidden;
+  scrollbar-width: thin;
+
+  > button {
+    position: relative;
+    flex: none;
+    width: 56px;
+    height: 42px;
+    padding: 0;
+    overflow: hidden;
+    border-radius: 6px;
+    opacity: 0.68;
+
+    &:is(:hover, :focus-visible, [aria-current='true']) { opacity: 1; }
+    &[aria-current='true']::after {
+      position: absolute;
+      inset: 0;
+      border: 1px solid white;
+      border-radius: inherit;
+      content: '';
+      pointer-events: none;
+    }
+  }
+
+  img { display: block; width: 100%; height: 100%; object-fit: cover; }
+}
+
+html[data-platform='darwin'] .viewer.attachment {
+  padding-top: 100px;
+  .toolbar { top: 56px; }
+}

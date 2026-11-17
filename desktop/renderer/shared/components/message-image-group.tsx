@@ -1,8 +1,9 @@
 import { Children, useCallback, useId, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { Icon } from '../icons/icon';
+import { MessageAction } from './message-action-slot';
 import Stack from './react-bits-stack/Stack';
 
-export function MessageImageGroup({ children }: { children: ReactNode }) {
+export function MessageImageGroup({ children, className = '' }: { children: ReactNode; className?: string }) {
   const [expanded, setExpanded] = useState(false);
   const [firstIndex, setFirstIndex] = useState(0);
   const imagesId = useId();
@@ -23,7 +24,8 @@ export function MessageImageGroup({ children }: { children: ReactNode }) {
       start.moved = true;
     }
   };
-  return <div className="message-image-group" role="group" aria-label={`${cards.length} 张图片`}>
+  return <div className={`message-image-group ${className}`.trim()} role="group" aria-label={`${cards.length} 张图片`}
+    data-expanded={expanded}>
     {expanded ? <div id={imagesId} className="message-image-stack">{children}</div> :
       <div ref={bindDeck} id={imagesId} className="message-image-deck"
         onPointerDownCapture={event => { if (event.isPrimary && event.button === 0) press.current = { id: event.pointerId, x: event.clientX, y: event.clientY, moved: false }; }}
@@ -38,13 +40,12 @@ export function MessageImageGroup({ children }: { children: ReactNode }) {
             bindDeck(deck.current);
           }} />
       </div>}
-    <button type="button" className="message-image-toggle" aria-controls={imagesId}
+    <MessageAction><button type="button" className="message-image-toggle" aria-controls={imagesId}
       aria-label={toggleLabel} title={toggleLabel} aria-expanded={expanded} onClick={() => {
-        if (!expanded) setFirstIndex(topIndex.current);
+        if (expanded) setFirstIndex(topIndex.current);
         setExpanded(!expanded);
       }}>
-      <Icon name={expanded ? 'chevron-down-12' : 'disclosure-down'} width="16" height="16" fill="none" stroke="currentColor"
-        strokeWidth="1.6" style={{ transform: expanded ? 'rotate(180deg)' : undefined }} />
-    </button>
+      <Icon name="chat-chevron-down" width="14" height="14" />
+    </button></MessageAction>
   </div>;
 }

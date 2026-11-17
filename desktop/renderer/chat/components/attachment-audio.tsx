@@ -1,6 +1,6 @@
 import { Icon } from '../../shared/icons/icon';
 import {AttachmentDownload} from './attachment-download';
-import { MessageAction } from './message-action-row';
+import { MessageAction } from '../../shared/components/message-action-slot';
 import { MessageError } from './message-error';
 import {useEffect,useRef,useState} from 'react';
 const time=(value:number)=>Number.isFinite(value) ? `${Math.floor(value/60)}:${String(Math.floor(value%60)).padStart(2,'0')}` : '0:00';

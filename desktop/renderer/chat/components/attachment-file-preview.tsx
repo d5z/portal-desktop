@@ -4,7 +4,7 @@ import {parsedPage} from '../services/attachment-view';
 import {AttachmentDownload} from './attachment-download';
 import {AttachmentDetails} from './attachment-details';
 import {useAttachmentDownloadBridge} from './use-attachment-download-bridge';
-import { MessageAction } from './message-action-row';
+import { MessageAction } from '../../shared/components/message-action-slot';
 import { MessageError } from './message-error';
 export function AttachmentFilePreview({part,endpoint}:{part:AttachmentPart;endpoint:string}) {
   const [busy,setBusy]=useState(false),[error,setError]=useState('');

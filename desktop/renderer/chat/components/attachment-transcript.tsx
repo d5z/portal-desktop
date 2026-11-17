@@ -2,7 +2,7 @@ import {displayTranscript} from '../services/audio-transcript';
 import {useEffect,useState} from 'react';
 import type {AttachmentPart} from '../services/attachment-messages';
 import {parsedPage} from '../services/attachment-view';
-import { MessageAction } from './message-action-row';
+import { MessageAction } from '../../shared/components/message-action-slot';
 import { MessageError } from './message-error';
 export function AttachmentTranscript({part,endpoint}:{part:AttachmentPart;endpoint:string}) {
   const [text,setText]=useState(''),[error,setError]=useState(false),[attempt,setAttempt]=useState(0);

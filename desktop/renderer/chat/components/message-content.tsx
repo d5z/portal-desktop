@@ -1,11 +1,12 @@
 import {AttachmentImageUpload} from './attachment-image-upload';
 import {AttachmentProcessing} from './attachment-processing';
 import {formatBytes} from '../../shared/lib/format-bytes';
-import { useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useLayoutEffect, useState, type ReactNode } from 'react';
 import type { Message } from '../models/chat';
 import { attachmentMessageReader, messageReferences, type AttachmentMessage } from '../services/attachment-messages';
 import { viewRequest } from '../services/attachment-view';
 import { AttachmentCard } from './attachments';
+import { AttachmentImageGallery } from './attachment-image';
 import { useNearViewport } from '../../shared/hooks/use-near-viewport';
 import { CommandMessageText } from './command-message';
 import { FileName } from '../../shared/components/file-name';
@@ -22,14 +23,15 @@ function renderAttachmentRuns<T>(items: T[], isImage: (item: T) => boolean, rend
       while (index < items.length && isImage(items[index])) index++;
     }
     result.push(index === start + 1 ? render(items[start], start) :
-      <MessageImageGroup key={start}>{items.slice(start, index).map((item, offset) => render(item, start + offset))}</MessageImageGroup>);
+      <MessageImageGroup key={start} className="attachment-image-group">{items.slice(start, index).map((item, offset) => render(item, start + offset))}</MessageImageGroup>);
   }
   return result;
 }
 
 export function hasAttachmentMessage(message: Message) { return message.role === 'user' && (!!message.attachmentUploads?.length || !!message.attachmentViews?.length || messageReferences(message.text).length > 0); }
 export function originalMessageText(message: Message) {
-  return message.attachmentViews?.map(v => v.parts.filter(p => p.type === 'text').map(p => p.text).join('\n')).join('\n') ?? (hasAttachmentMessage(message) ? '附件消息' : message.text);
+  return message.attachmentViews?.flatMap(view => view.parts.filter(part => part.type === 'text').map(part => part.text)).join('\n')
+    ?? (hasAttachmentMessage(message) && (!message.attachmentUploads?.length || message.text.startsWith('[发送了')) ? '' : message.text);
 }
 export function AttachmentMessageContent({message}: {message: Message}) {
   const { ref, ready } = useNearViewport<HTMLDivElement>(!!message.attachmentUploads?.length || !!message.attachmentViews?.length);
@@ -57,7 +59,10 @@ function LoadedAttachmentMessage({message}: {message: Message}) {
   }, [ids, endpoint, hasViews, attempt, service]);
   const cached=ids ? ids.split(',').map(id=>service.cache.get(id)).filter((view):view is AttachmentMessage=>!!view) : [];
   const views = hasViews ? message.attachmentViews! : cached.length===ids.split(',').length ? cached : fetched.key===JSON.stringify([endpoint,ids]) ? fetched.views : [];
-  if (!views.length && message.attachmentUploads?.length) return <div className="content attachment-message">
+  if (!views.length && message.attachmentUploads?.length) return <div className="content attachment-message"><div>
+    {!message.text.startsWith('[发送了') && message.text.trim() && <div className="attachment-message-copy">
+      <p className="attachment-original-text"><CommandMessageText text={message.text}/></p>
+    </div>}
     {renderAttachmentRuns(message.attachmentUploads, file => !!file.blob && isPreviewImage(file.mime), (file, index) => {
       const p = file.progress, complete = p?.phase === 'complete', failed = p?.phase === 'failed';
       const percent = complete ? 100 : Math.min(99, Math.floor((p?.loaded || 0) / (p?.total || file.size) * 100));
@@ -68,17 +73,37 @@ function LoadedAttachmentMessage({message}: {message: Message}) {
         <small>{formatBytes(p?.loaded || 0)} / {formatBytes(p?.total || file.size)}</small>
       </section>;
     })}
-    {!message.text.startsWith('[发送了') && <p className="attachment-original-text"><CommandMessageText text={message.text}/></p>}
-  </div>;
+  </div></div>;
   if (!views.length) return <div className="content attachment-fallback"><p role="status">{error || '正在加载附件消息…'}</p>{error && <button onClick={() => { setError(''); setAttempt(attempt + 1); }}>重试加载</button>}<details><summary>查看原始消息</summary><pre>{message.text}</pre></details></div>;
-  return <div className="content attachment-message">{views.map(view => <div key={view.message_id}>
-    {view.channel !== 'portal' && <small>{view.channel} · {view.scene_label}</small>}
-    {renderAttachmentRuns(view.parts.filter(part=>part.type==='attachment'), part => isPreviewImage(part.mime), (part, index) =>
-      <AttachmentCard key={part.attachment_id} part={part} endpoint={endpoint} localImage={views.length===1 ? localImages[index] : undefined}/>)}
-    <AttachmentProcessing items={[message]} />
-    <div className="attachment-message-copy">
-      {view.parts.filter(part=>part.type==='text').map((part,i)=><p className="attachment-original-text" key={i}><CommandMessageText text={part.text}/></p>)}
-    </div>
-    {['unknown','failed','cancelled'].includes(view.delivery_status) && <small role="status">{delivery[view.delivery_status]}</small>}
-  </div>)}</div>;
+  return <div className="content attachment-message">{views.map(view => {
+    const parts = view.parts.filter(part => part.type === 'attachment' || part.text.trim());
+    const content: ReactNode[] = [];
+    let attachmentIndex = 0;
+    for (let start = 0; start < parts.length;) {
+      const type = parts[start].type;
+      let end = start + 1;
+      while (parts[end]?.type === type) end++;
+      const run = parts.slice(start, end);
+      if (type === 'text') {
+        content.push(<div key={start} className="attachment-message-copy">
+          {run.map((part, index) => part.type === 'text' &&
+            <p className="attachment-original-text" key={index}><CommandMessageText text={part.text}/></p>)}
+        </div>);
+      } else {
+        const attachments = run.filter(part => part.type === 'attachment');
+        content.push(<Fragment key={start}>{renderAttachmentRuns(attachments, part => isPreviewImage(part.mime),
+          (part, index) => <AttachmentCard key={part.attachment_id} part={part} endpoint={endpoint}
+            localImage={views.length === 1 ? localImages[attachmentIndex + index] : undefined}/>)}</Fragment>);
+        attachmentIndex += attachments.length;
+      }
+      start = end;
+    }
+    return <div key={view.message_id}>
+      {view.channel !== 'portal' && <small>{view.channel} · {view.scene_label}</small>}
+      <AttachmentImageGallery ids={parts.flatMap(part => part.type === 'attachment' && isPreviewImage(part.mime) ? [part.attachment_id] : [])}
+        endpoint={endpoint}>{content}</AttachmentImageGallery>
+      <AttachmentProcessing items={[message]} />
+      {['unknown','failed','cancelled'].includes(view.delivery_status) && <small role="status">{delivery[view.delivery_status]}</small>}
+    </div>;
+  })}</div>;
 }

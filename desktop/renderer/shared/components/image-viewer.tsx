@@ -2,13 +2,18 @@ import clsx from 'clsx';
 import styles from './image-viewer.module.scss';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { Icon } from '../icons/icon';
 
 /** Shared top-layer viewer for generated images and uploaded attachments. */
-export type ImageViewerNavigation = { index: number; total: number; previous(): void; next(): void };
-export function ImageViewer({ src, name, onClose, actions, notice, onLoad, onError, navigation }: {
+export type ImageViewerNavigation = {
+  index: number; total: number; previous(): void; next(): void;
+  thumbnails?: { items: readonly { src: string; name: string }[]; select(index: number): void };
+};
+export function ImageViewer({ src, name, onClose, actions, notice, onLoad, onError, navigation, appearance }: {
   src?: string; name: string; onClose(): void; actions: ReactNode; notice?: ReactNode;
   onLoad?(): void; onError?(): void;
   navigation?: ImageViewerNavigation;
+  appearance?: 'attachment';
 }) {
   const dialog = useRef<HTMLDialogElement>(null), stage = useRef<HTMLDivElement>(null), image = useRef<HTMLImageElement>(null);
   const [natural, setNatural] = useState({ width: 0, height: 0 });
@@ -52,7 +57,8 @@ export function ImageViewer({ src, name, onClose, actions, notice, onLoad, onErr
     node.addEventListener('wheel', wheel, {passive:false});
     return () => node.removeEventListener('wheel', wheel);
   }, [scale, ready, minimum]);
-  return createPortal(<dialog ref={dialog} className={styles.viewer} aria-label={`图片预览：${name}`} onClose={onClose}
+  return createPortal(<dialog ref={dialog} className={clsx(styles.viewer, appearance === 'attachment' && styles.attachment)}
+    aria-label={`图片预览：${name}`} onClose={onClose}
     onClick={event => { if (event.target === event.currentTarget) dialog.current?.close(); }}
     onKeyDown={event => {
       // Portals still bubble through React parents, including expanded intelligent UI.
@@ -67,7 +73,9 @@ export function ImageViewer({ src, name, onClose, actions, notice, onLoad, onErr
       if (event.key === '0') { event.preventDefault(); reset(); }
     }}>
     <div className={styles.toolbar}>
-      <button type="button" autoFocus aria-label="关闭图片预览" title="关闭（Esc）" onClick={() => dialog.current?.close()}>×</button>
+      <button type="button" autoFocus aria-label="关闭图片预览" title="关闭（Esc）" onClick={() => dialog.current?.close()}>
+        <Icon name="chat-close" width="20" height="20" strokeWidth="1.5" />
+      </button>
       <span className={styles.name} title={name}>{name}</span>
       {navigation && <output className={styles.position} aria-label="图片位置" aria-live="polite">{navigation.index + 1} / {navigation.total}</output>}
       <div className={styles.actions}>{actions}</div>
@@ -96,16 +104,25 @@ export function ImageViewer({ src, name, onClose, actions, notice, onLoad, onErr
       </div>
     </div>
     {notice && <div className={styles.notice}>{notice}</div>}
-    {navigation && navigation.total > 1 && <div className={styles.navigation} role="group" aria-label="同批图片切换">
+    {navigation && !navigation.thumbnails && navigation.total > 1 && <div className={styles.navigation} role="group" aria-label="同批图片切换">
       <button type="button" className={styles.previous} aria-label="上一张图片" title="上一张（←）" disabled={navigation.index === 0} onClick={navigation.previous}>‹</button>
       <button type="button" className={styles.next} aria-label="下一张图片" title="下一张（→）" disabled={navigation.index === navigation.total - 1} onClick={navigation.next}>›</button>
+    </div>}
+    {navigation?.thumbnails && <div className={styles.thumbnails} role="group" aria-label="同批图片">
+      {navigation.thumbnails.items.map((item, index) => <button key={item.src} type="button" aria-label={`查看 ${item.name}`}
+        aria-current={index === navigation.index ? 'true' : undefined} onClick={() => navigation.thumbnails!.select(index)}>
+        <img src={item.src} alt="" loading="lazy" draggable={false} />
+      </button>)}
     </div>}
     <div className={styles.controls} role="group" aria-label="图片缩放">
       <button type="button" disabled={!ready || scale <= minimum} aria-label="缩小图片" title="缩小（−）" onClick={() => changeScale(scale / 1.25)}>−</button>
       <output aria-label="缩放比例">{ready ? `${Math.round(scale * 100)}%` : '—'}</output>
       <button type="button" disabled={!ready || scale >= 8} aria-label="放大图片" title="放大（+）" onClick={() => changeScale(scale * 1.25)}>+</button>
       <span className={styles.controlDivider} />
-      <button type="button" disabled={!ready} title="适应窗口（0）" onClick={reset}>适应窗口</button>
+      <button type="button" disabled={!ready} aria-label="适应窗口" title="适应窗口（0）" onClick={reset}>
+        {appearance === 'attachment' ? <Icon name="expand" width="17" height="17" stroke="currentColor" fill="none" strokeWidth="1.8"
+          strokeLinecap="round" strokeLinejoin="round" /> : '适应窗口'}
+      </button>
     </div>
     <small className={styles.hint}>{navigation && navigation.total > 1 ? '← → 切换图片 · ' : ''}滚轮缩放 · 放大后拖动查看 · Esc 关闭</small>
   </dialog>, document.body);

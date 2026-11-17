@@ -500,16 +500,16 @@ function ChatView({
                   {item.role === "system" && <span>系统消息</span>}
                   {state.historyScope === "all" && !isGlobalBeingMessage(item) && <span className="message-scene" title={item.sceneId || "这条历史消息未提供场景标记"}>{sceneName(item, state.currentScene, state.sceneNames)}</span>}
                 </div>
-                <MessageActionRow media={!mobileWeb && hasAttachmentMessage(item)} actions={<>
+                <MessageActionRow media={!mobileWeb} actions={<>
                   {item.createdAt !== undefined && Number.isFinite(item.createdAt) && <time className="message-action-time">{actionClock.format(item.createdAt)}</time>}
-                  <CopyMessage appearance="chat" text={splitSchedulingHint(originalMessageText(item)).text} copy={bridge.copyText} />
+                  {originalMessageText(item).trim() && <CopyMessage appearance="chat" text={splitSchedulingHint(originalMessageText(item)).text} copy={bridge.copyText} />}
                   {mobileWeb && <button type="button" className="message-more" data-message-more={item.id} aria-label="更多消息操作"
                     data-warm-tooltip={messageMenu.trigger === item.id ? undefined : '更多消息操作'}
                     aria-haspopup="menu" aria-expanded={messageMenu.trigger === item.id}
                     onClick={event => messageMenu.showMenu(event.currentTarget, {
                       text: splitSchedulingHint(originalMessageText(item)).text, time: item.createdAt, fallbackTime: item.timestamp,
                     })}>
-                    <Icon name="chat-more" width="14" height="14" fill="currentColor" stroke="none" />
+                    <Icon name="chat-more" width="14" height="14" />
                   </button>}
                   {!mobileWeb && item.retry && <MessageError reason={item.queueNotice} retryLabel={item.retryLabel} retry={() => void item.retry?.()} />}
                 </>}>
