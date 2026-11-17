@@ -67,5 +67,6 @@ try {
   console.log('PASS packaged profile reopen: current bundled Portal path, retained connection/workspace/settings/plugin records/data, existing plugin active.');
 } finally {
   if (app) await app.close();
-  await rm(directory, { recursive: true, force: true });
+  // Windows can keep the relocated executable locked briefly after Electron exits.
+  await rm(directory, { recursive: true, force: true, maxRetries: 10, retryDelay: 250 });
 }
