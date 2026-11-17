@@ -4,7 +4,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { HomeBounds, HomeState } from '../../shared/home';
 import { HOME_ORIGIN, viewerNavigation } from './protocol';
-import { HomeTransport, ViewerExpired } from './transport';
+import { HomeTransport, ViewerExpired, type HomeViewerLog } from './transport';
 /** One local canvas + isolated desktop-cookie session, retained across layout changes. */
 export class HomeViewer {
   private view?: WebContentsView;
@@ -16,13 +16,14 @@ export class HomeViewer {
   private current = 0;
   private removeIpc?: () => void;
   constructor(private window: () => BrowserWindow | null, private publish: (phase: HomeState['viewer']) => void,
-    private assets: string) {}
+    private assets: string, private log: HomeViewerLog = () => {}) {}
   open(url: string, computerId: string) {
     this.close();
     const owner = this.window();
     if (!owner || owner.isDestroyed()) throw new Error('请先打开客户端窗口。');
     if (!viewerNavigation(url, computerId)) throw new Error('无效的云电脑地址。');
     const generation = ++this.current;
+    const log: HomeViewerLog = (event, fields) => this.log(event, { ...fields, computer_id: computerId, viewer_generation: generation });
     const jar = session.fromPartition(`home-viewer-${randomUUID()}`, { cache: false });
     const localURL = pathToFileURL(path.join(this.assets, 'home-viewer.html')).href;
     const assets = new Set(['home-viewer.html', 'home-viewer.js', 'home-viewer.css'].map(file => pathToFileURL(path.join(this.assets, file)).href));
@@ -43,8 +44,8 @@ export class HomeViewer {
     this.previewWindow.contentView.addChildView(view); this.attachedTo = this.previewWindow;
     view.setBounds({ x: 0, y: 0, width: 1200, height: 800 });
     const current = () => this.current === generation && !view.webContents.isDestroyed();
-    const fail = (phase: 'error' | 'expired') => { if (current()) { this.close(); this.publish(phase); } };
-    const transport = new HomeTransport(jar, computerId, event => { if (current()) view.webContents.send('home-viewer:event', event); }, () => fail('expired'));
+    const fail = (phase: 'error' | 'expired') => { if (current()) { log('viewer_failed', { phase }); this.close(); this.publish(phase); } };
+    const transport = new HomeTransport(jar, computerId, event => { if (current()) view.webContents.send('home-viewer:event', event); }, () => fail('expired'), undefined, log);
     this.transport = transport;
     jar.cookies.on('changed', (_event, cookie, cause, removed) => {
       if (removed && !['overwrite', 'expired-overwrite'].includes(cause) && cookie.name === 'bh_desktop') fail('expired');

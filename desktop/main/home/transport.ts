@@ -3,6 +3,7 @@ import WebSocket from 'ws';
 import { HOME_ORIGIN } from './protocol';
 import type { BrowserInput, BrowserState, ViewerEvent } from '../../shared/home-viewer';
 const MAX_PACKET = 16 * 1024 * 1024;
+export type HomeViewerLog = (event: string, fields: Record<string, string | number | boolean | undefined>) => void;
 export class ViewerExpired extends Error {}
 export function validateInput(value: unknown, state: BrowserState): BrowserInput {
   if (!value || typeof value !== 'object') throw new Error('无效操作。');
@@ -46,9 +47,10 @@ export class HomeTransport {
   private inputVersion = 0;
   private queue: Promise<unknown> = Promise.resolve();
   private queued = 0;
+  private controls: Promise<unknown> = Promise.resolve();
   private base: string;
   constructor(private jar: Session, id: string, private emit: (event: ViewerEvent) => void,
-    private expired: () => void, private origin = HOME_ORIGIN) {
+    private expired: () => void, private origin = HOME_ORIGIN, private log: HomeViewerLog = () => {}) {
     if (!/^[\w-]+$/.test(id)) throw new Error('无效电脑标识。');
     this.base = `${origin}/desktop/${id}/browser/`;
   }
@@ -85,10 +87,17 @@ export class HomeTransport {
       signal: AbortSignal.any([this.abort.signal, AbortSignal.timeout(15_000)]),
       headers: { Origin: this.origin, 'Sec-Fetch-Site': 'same-origin', 'Sec-Fetch-Mode': 'cors', ...(body ? { 'Content-Type': 'application/json' } : {}) },
       ...(body ? { method: 'POST', body: JSON.stringify(body) } : {}),
+    }).catch(error => {
+      this.log('request_failed', { route, reason: 'network' });
+      throw error;
     });
     if (this.closed) throw new ViewerExpired('查看会话已关闭。');
-    if ([401, 403, 410].includes(response.status)) { this.expired(); throw new ViewerExpired('查看会话已过期，请重新打开。'); }
+    if ([401, 403, 410].includes(response.status)) {
+      this.log('session_expired', { route, status: response.status });
+      this.expired(); throw new ViewerExpired('查看会话已过期，请重新打开。');
+    }
     if (!response.ok) {
+      this.log('request_failed', { route, status: response.status });
       if (body) this.cancelInput();
       throw new Error(response.status === 409 ? '控制状态已变化，请确认画面后重新接管。' : '连接暂时中断，请查看画面后重试。');
     }
@@ -97,7 +106,7 @@ export class HomeTransport {
   private accept(raw: any): BrowserState {
     if (!raw || typeof raw.ready !== 'boolean' || typeof raw.can_control !== 'boolean') throw new Error('无法读取浏览器状态。');
     // Do not send tab URLs or any server-provided arbitrary fields across IPC.
-    this.state = { ready: raw.ready, can_control: raw.can_control, controlled_elsewhere: raw.controller === 'human' && !raw.can_control, controller: String(raw.controller),
+    this.state = { ready: raw.ready, can_control: raw.can_control, owns_control: raw.can_control, controlled_elsewhere: raw.controller === 'human' && !raw.can_control, controller: String(raw.controller),
       lease_remaining_seconds: Number(raw.lease_remaining_seconds) || 0, view_mode: raw.view_mode === 'native' ? 'native' : 'page',
       frame_width: Number(raw.frame_width), frame_height: Number(raw.frame_height),
       ...(raw.live_view !== undefined ? { live_view: { available: raw.live_view?.available === true, protocol: String(raw.live_view?.protocol) } } : {}) };
@@ -120,16 +129,37 @@ export class HomeTransport {
     // A renewal extends an existing lease; it must not discard typing already
     // queued by this viewer. Claims/releases deliberately invalidate old input.
     if (action !== 'renew') this.cancelInput();
-    try {
-      const raw = await (await this.request('control', { action })).json();
-      if (version !== this.controlVersion || (action !== 'release' && !this.active)) {
-        if (!this.closed && !this.active && action !== 'release' && raw.can_control)
-          await this.request('control', { action: 'release' }).catch(() => {});
-        throw new Error('控制操作已取消。');
+    const result = this.controls.catch(() => {}).then(async () => {
+      const started = Date.now();
+      this.log('control_request', { action: String(action), request_id: version });
+      try {
+        if (action !== 'release' && (version !== this.controlVersion || !this.active)) throw new Error('控制操作已取消。');
+        const raw = await (await this.request('control', { action })).json();
+        if (version !== this.controlVersion || (action !== 'release' && !this.active)) {
+          if (!this.closed && !this.active && action !== 'release' && raw.can_control) {
+            // The hidden viewer still owns a claim that finished after hiding.
+            await this.request('control', { action: 'release' });
+            this.log('hidden_claim_released', { request_id: version });
+          }
+          throw new Error('控制操作已取消。');
+        }
+        this.leaseAllowed = action !== 'release' && raw.can_control === true;
+        const state = this.accept(raw);
+        this.log('control_result', { action: String(action), request_id: version, elapsed_ms: Date.now() - started,
+          controller: state.controller === 'human' ? 'human' : state.controller === 'being' ? 'being' : 'unknown',
+          owns_control: state.owns_control, can_control: state.can_control, lease_remaining_seconds: state.lease_remaining_seconds });
+        return state;
+      } catch (error) {
+        if (version === this.controlVersion) this.cancelInput();
+        this.log('control_failed', { action: String(action), request_id: version, elapsed_ms: Date.now() - started });
+        throw error;
+      } finally {
+        // State reads sent during this operation must not overwrite its result.
+        if (version === this.controlVersion) this.controlVersion++;
       }
-      this.leaseAllowed = action !== 'release' && raw.can_control === true;
-      return this.accept(raw);
-    } catch (error) { if (version === this.controlVersion) this.cancelInput(); throw error; }
+    });
+    this.controls = result;
+    return result;
   }
   setActive(active: boolean) {
     if (active === this.active) return;
@@ -138,7 +168,7 @@ export class HomeTransport {
       this.controlVersion++;
       const release = this.state?.can_control;
       this.cancelInput();
-      if (release) void this.control('release').catch(() => {});
+      if (release) void this.control('release').catch(() => {}); // control() records the unconfirmed release.
     }
   }
   private cancelInput() { this.inputVersion++; this.leaseAllowed = false; }
@@ -177,7 +207,7 @@ export class HomeTransport {
     });
     this.socket = socket;
     const current = () => !this.closed && this.socket === socket && this.streamId === id;
-    socket.on('open', () => { if (current()) this.emit({ type: 'stream', id, kind: 'open' }); });
+    socket.on('open', () => { if (current()) { this.log('stream_open', { stream_id: id }); this.emit({ type: 'stream', id, kind: 'open' }); } });
     socket.on('message', (raw, binary) => {
       if (!current()) return;
       const data = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as ArrayBuffer);
@@ -192,9 +222,10 @@ export class HomeTransport {
       if (current() && [401, 403, 410].includes(response.statusCode || 0)) this.expired();
       response.destroy(); socket.terminate();
     });
-    socket.on('error', () => { /* close carries the credential-free result */ });
+    socket.on('error', () => { if (current()) this.log('stream_error', { stream_id: id }); });
     socket.on('close', code => {
       if (!current()) return;
+      this.log('stream_closed', { stream_id: id, code });
       this.cancelInput(); this.clearPending();
       if (code === 4001) this.expired();
       else this.emit({ type: 'stream', id, kind: 'close', code });
@@ -216,17 +247,20 @@ export class HomeTransport {
   }
   private clearPending() { this.outstanding.clear(); this.bytes = 0; clearTimeout(this.ackTimer); this.ackTimer = undefined; }
   disconnect() {
+    this.log('stream_disconnected', { stream_id: this.streamId, owns_control: this.state?.owns_control });
     this.streamId++; this.cancelInput();
     const socket = this.socket; this.socket = undefined; socket?.terminate(); this.clearPending();
   }
   async close() {
     if (this.closed) return;
     const release = this.state?.can_control;
+    this.log('viewer_closed', { owns_control: release });
     this.closed = true; this.active = false; this.controlVersion++; this.abort.abort(); this.disconnect();
     if (release) await this.jar.fetch(this.base + 'control', {
       method: 'POST', credentials: 'include', redirect: 'error', cache: 'no-store', signal: AbortSignal.timeout(3000),
       headers: { Origin: this.origin, 'Sec-Fetch-Site': 'same-origin', 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'release' }),
-    }).catch(() => {});
+    }).then(response => this.log('close_release', { status: response.status }))
+      .catch(() => this.log('close_release_failed', {}));
   }
 }

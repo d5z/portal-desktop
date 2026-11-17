@@ -19,6 +19,7 @@ let reconnect: ReturnType<typeof setTimeout> | undefined, pollTimer: ReturnType<
 let retry = 0, epoch = 0, lastRenew = 0, frameURL: string | undefined;
 let mode: 'stream' | 'snapshot' | 'unavailable' | undefined;
 let inputEpoch = 0;
+let releasing = false, releaseUnconfirmed = false;
 let fitFrame = 0;
 // Reparenting a native view can coalesce resize notifications. Reapply noVNC's
 // public fit API after layout settles, including presentation and zoom changes.
@@ -59,17 +60,20 @@ class Channel {
 function clearInput() { inputEpoch++; composing = false; keyboard.value = ''; keyboard.blur(); }
 function render() {
   const controlling = !!state?.can_control && !preview && visible && live;
+  const ownsControl = !!state?.owns_control;
   document.body.classList.toggle('controlling', controlling);
-  control.textContent = controlling ? '交还 Being' : '接管浏览器';
-  control.disabled = busy || !state?.ready || !live || !!state.controlled_elsewhere;
-  status.textContent = controlling ? '由你接管' : state?.controlled_elsewhere ? '其他窗口接管中' : '仅观看';
+  control.textContent = ownsControl ? '交还 Being' : '接管浏览器';
+  control.disabled = busy || (!ownsControl && (!state?.ready || !live || !!state.controlled_elsewhere));
+  status.textContent = releasing ? '正在交还…' : ownsControl
+    ? controlling ? '由你接管' : live ? '仍由你接管（暂停）' : '仍由你接管'
+    : state?.controlled_elsewhere ? '其他窗口接管中' : '仅观看';
   keyboard.disabled = !controlling;
 }
 function loading(text: string) {
   live = false; clearInput(); loader.hidden = false; loadingText.textContent = text; render();
 }
-function painted() { live = true; retry = 0; loader.hidden = true; notice.hidden = true; void api.request('painted'); render(); }
-function showError() { notice.textContent = '操作未确认，请查看画面后重试。'; notice.hidden = false; clearInput(); }
+function painted() { live = true; retry = 0; loader.hidden = true; if (!releaseUnconfirmed) notice.hidden = true; void api.request('painted'); render(); }
+function showError(message = '操作未确认，请查看画面后重试。') { notice.textContent = message; notice.hidden = false; clearInput(); }
 function background() { return getComputedStyle(document.documentElement).getPropertyValue('--bg').trim(); }
 function stopStream() {
   epoch++; clearTimeout(reconnect); reconnect = undefined;
@@ -115,6 +119,7 @@ async function snapshot(current: number) {
 }
 function accept(next: BrowserState) {
   state = next;
+  if (releaseUnconfirmed && !next.owns_control) { releaseUnconfirmed = false; notice.hidden = true; }
   if (!next.can_control) clearInput();
   const nextMode = !next.ready ? 'unavailable' : next.live_view === undefined ? 'snapshot'
     : next.live_view.available && next.live_view.protocol === 'rfb' ? 'stream' : 'unavailable';
@@ -136,10 +141,16 @@ async function poll() {
   finally { polling = false; if (!stopped) pollTimer = setTimeout(() => void poll(), visible ? 2000 : 10_000); }
 }
 control.addEventListener('click', async () => {
-  if (busy) return; busy = true; render();
-  try { accept(await api.request('control', state?.can_control ? 'release' : 'claim')); lastRenew = Date.now(); }
-  catch { showError(); await poll(); }
-  finally { busy = false; render(); }
+  if (busy) return;
+  const action = state?.owns_control ? 'release' : 'claim';
+  busy = true; releasing = action === 'release'; render();
+  try { accept(await api.request('control', action)); lastRenew = Date.now(); releaseUnconfirmed = false; notice.hidden = true; }
+  catch {
+    releaseUnconfirmed = action === 'release';
+    showError(action === 'release' ? '交还未确认，请重试或等待租约到期。' : undefined);
+    await poll();
+  }
+  finally { busy = false; releasing = false; render(); }
 });
 document.querySelector('#expand')!.addEventListener('click', () => void api.request('expand'));
 api.subscribe(event => {

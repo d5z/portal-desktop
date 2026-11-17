@@ -1,6 +1,8 @@
 /** This contract carries no URL, cookie or OAuth credential. */
 export interface BrowserState {
   ready: boolean; can_control: boolean; controlled_elsewhere?: boolean; controller: string; lease_remaining_seconds: number;
+  /** Last server-confirmed ownership; local input can be paused while this remains true. */
+  owns_control?: boolean;
   view_mode: 'native' | 'page'; frame_width: number; frame_height: number;
   live_view?: { available: boolean; protocol: string };
 }
