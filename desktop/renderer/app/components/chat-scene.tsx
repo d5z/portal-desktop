@@ -246,15 +246,22 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
   const search = useRef<HTMLInputElement>(null);
   const [optionsExpanded, setOptionsExpanded] = useState(false);
   const options = useRef<HTMLDetailsElement>(null);
-  const [open, setOpen] = useState(false);
+  const [detail, setDetail] = useState<"current" | ChatScene>();
+  const detailScene = detail === "current" ? scene : detail;
   const [editing, setEditing] = useState<"create" | "bind" | null>(null);
   const [renaming, setRenaming] = useState<string>();
   const [deleting, setDeleting] = useState<ChatScene>();
-  const [menu, setMenu] = useState<{ scene: ChatScene; x: number; y: number }>();
+  const [menu, setMenu] = useState<{ scene: ChatScene; opener: HTMLButtonElement; x: number; y: number }>();
   const menuRef = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const node = menuRef.current;
+    if (!menu || !node) return;
+    node.style.left = `${Math.max(8, Math.min(menu.x, window.innerWidth - node.offsetWidth - 8))}px`;
+    node.style.top = `${Math.max(8, Math.min(menu.y, window.innerHeight - node.offsetHeight - 8))}px`;
+    node.querySelector("button")?.focus({ preventScroll: true });
+  }, [menu]);
   useEffect(() => {
     if (!menu) return;
-    menuRef.current?.querySelector<HTMLButtonElement>("button")?.focus();
     const close = () => setMenu(undefined);
     const outside = (event: PointerEvent) => { if (!menuRef.current?.contains(event.target as Node)) close(); };
     window.addEventListener("pointerdown", outside, true);
@@ -305,7 +312,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
     catch (error) { setError(error instanceof Error ? error.message : String(error)); }
     finally { changing.current = false; setBusy(false); }
   };
-  const expanded = pinned || Boolean(editing || deleting || open || menu || renaming);
+  const expanded = pinned || Boolean(editing || deleting || detail || menu || renaming);
   const pin = (next: boolean) => {
     setPinned(next);
     try { localStorage.setItem("beings:scenes-pinned", String(next)); } catch { /* Keep the session preference. */ }
@@ -332,7 +339,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
         </button>
       </div>
       {panelHost && createPortal(<DrawerPresence open={visible && expanded}><WarmTooltipGroup delay={300} warmWindow={350} travel={0} tooltipClassName="rail-tooltip"><WorkspaceDrawer edge="left" ref={panel} style={{ width }} id="chat-session-panel" className="chat-session-panel" data-warm-tooltip-scope open={visible && expanded} data-pinned={drawerPinned} data-scene-sidebar aria-label="场景列表"
-        onKeyDown={event => { if (event.key === "Escape" && !event.defaultPrevented && !reordering && !editing && !open && !deleting && !menu && !renaming) { event.preventDefault(); if (options.current?.open) { options.current.open = false; options.current.querySelector("summary")?.focus(); } else collapse(); } }}>
+        onKeyDown={event => { if (event.key === "Escape" && !event.defaultPrevented && !reordering && !editing && !detail && !deleting && !menu && !renaming) { event.preventDefault(); if (options.current?.open) { options.current.open = false; options.current.querySelector("summary")?.focus(); } else collapse(); } }}>
         <PanelResizeHandle panel={panel} label="调整场景列表宽度" width={width} onResize={setWidth} initial={320} min={240} max={480} reserve={48} edge="right" disabled={!pinned} />
         {drawerPinned && <div className="chat-session-titlebar">
           <strong>{beingName}</strong>
@@ -348,7 +355,7 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
           <details ref={options} className="chat-session-options" onToggle={event => setOptionsExpanded(event.currentTarget.open)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false; }}>
             <summary aria-label="场景列表选项" data-warm-tooltip="场景列表选项"><Icon name="more-filled" /></summary>
             <AnimatePresence>{optionsExpanded && <DropdownMenuMotion className="chat-session-options-popover">
-              <button type="button" disabled={!scene} onClick={() => { options.current?.removeAttribute("open"); setOpen(true); }}><Icon name="web-info" /><span>场景详情</span></button>
+              <button type="button" disabled={!scene} onClick={() => { options.current?.removeAttribute("open"); setDetail("current"); }}><Icon name="web-info" /><span>场景详情</span></button>
               <button type="button" disabled={!connected || busy || !sessions.length} onClick={() => { options.current?.removeAttribute("open"); edit("bind"); }}><Icon name="web-link" /><span>绑定已有场景</span></button>
               <hr />
               <button type="button" aria-label="关闭场景列表" onClick={collapse}><Icon name="chevron-left-20" /><span>收起列表</span><kbd>Esc</kbd></button>
@@ -369,9 +376,9 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
             if (busy || !connected) return;
             event.preventDefault();
             event.stopPropagation();
-            const bounds = event.currentTarget.getBoundingClientRect();
-            setMenu({ scene: session, x: Math.max(8, Math.min(event.clientX || bounds.left, window.innerWidth - 176)),
-              y: Math.max(8, Math.min(event.clientY || bounds.bottom, window.innerHeight - 100)) });
+            const opener = event.currentTarget;
+            const bounds = opener.getBoundingClientRect();
+            setMenu({ scene: session, opener, x: event.clientX || bounds.left, y: event.clientY || bounds.bottom });
           }} />
         <label className="chat-session-context-toggle">
           <input type="checkbox" checked={scope === "all"} disabled={!scopeReady || !scene}
@@ -383,18 +390,23 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
         <WarmTooltipAnchors rootRef={panel} appearance={sceneTooltipAppearance} />
       </WorkspaceDrawer></WarmTooltipGroup></DrawerPresence>, panelHost)}
       {createPortal(<AnimatePresence>{menu && <DropdownMenuMotion ref={menuRef} className="chat-session-context-menu" role="menu" aria-label="场景操作"
-        style={{ left: menu.x, top: menu.y }} onContextMenu={event => { event.preventDefault(); event.stopPropagation(); }}
+        onContextMenu={event => { event.preventDefault(); event.stopPropagation(); }}
         onKeyDown={event => {
           const buttons = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>("button"));
           if (event.key === "Escape" || event.key === "Tab") {
             event.preventDefault(); setMenu(undefined);
-            document.querySelector<HTMLButtonElement>(`.chat-session-list button[data-scene-id="${globalThis.CSS.escape(menu.scene.scene_id)}"]`)?.focus();
+            menu.opener.focus({ preventScroll: true });
           } else if (["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
             event.preventDefault();
             const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
             buttons[event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (event.key === "ArrowUp" ? -1 : 1) + buttons.length) % buttons.length]?.focus();
           }
         }}>
+        <button role="menuitem" type="button" onClick={() => {
+          menu.opener.focus({ preventScroll: true });
+          setDetail(menu.scene);
+          setMenu(undefined);
+        }}>场景详情</button>
         <button role="menuitem" type="button" onClick={() => { setRenaming(menu.scene.scene_id); setError(""); setMenu(undefined); }}>重命名</button>
         <button role="menuitem" type="button" className="danger" onClick={() => { setDeleting(menu.scene); setError(""); setMenu(undefined); }}>删除场景</button>
       </DropdownMenuMotion>}</AnimatePresence>, document.body)}
@@ -436,31 +448,31 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
         id="chat-scene-dialog"
         className="utility-dialog"
         aria-labelledby="chat-scene-heading"
-        open={open}
-        onClose={() => setOpen(false)}
+        open={!!detail}
+        onClose={() => setDetail(undefined)}
         dismissOnBackdrop
       >
         <div className="dialog-heading">
-          <h2 id="chat-scene-heading">当前场景</h2>
-          <button className="close" type="button" aria-label="关闭场景详情" onClick={() => setOpen(false)} />
+          <h2 id="chat-scene-heading">{detail === "current" ? "当前场景" : "场景详情"}</h2>
+          <button className="close" type="button" aria-label="关闭场景详情" onClick={() => setDetail(undefined)} />
         </div>
-        <p className="chat-scene-name">{label}</p>
-        <p className="utility-subtitle">
+        <p className="chat-scene-name">{detailScene?.scene_meta.scene_label || "场景标记不可用"}</p>
+        {(detail === "current" || detailScene?.scene_id === scene?.scene_id) && <p className="utility-subtitle">
           {scene
             ? connected
               ? "从这里发送的对话会带上这个场景。"
               : "连接 Being 后，发送的对话会带上这个场景。"
             : "客户端场景不可用，暂时无法发送消息。请查看客户端的启动提示。"}
-        </p>
-        {scene && <>
+        </p>}
+        {detailScene && <>
           <dl className="chat-scene-details">
             <dt>场景 ID</dt>
-            <dd><code id="chat-scene-id">{scene.scene_id}</code></dd>
+            <dd><code id="chat-scene-id">{detailScene.scene_id}</code></dd>
             <dt>客户端</dt>
-            <dd>{scene.scene_meta.client}</dd>
+            <dd>{detailScene.scene_meta.client}</dd>
           </dl>
           <div className="files-footer">
-            <button id="copy-chat-scene" type="button" onClick={() => onCopy(scene.scene_id)}>复制场景 ID</button>
+            <button id="copy-chat-scene" type="button" onClick={() => onCopy(detailScene.scene_id)}>复制场景 ID</button>
           </div>
         </>}
       </Dialog>

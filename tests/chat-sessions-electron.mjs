@@ -31,7 +31,7 @@ try {
           createRequest={app.chatSessionCreateRequest}
           activity={app.chatSceneActivity}
           scope={app.chatHistoryScope} scopeReady={!app.chatLoading && app.chatHistoryScopeKnown}
-          onScope={scope => app.changeChatHistoryScope(scope)} onCopy={() => {}}
+          onScope={scope => app.changeChatHistoryScope(scope)} onCopy={id => { (window as any).copiedSceneId = id; }}
           onSession={(operation,value,sceneId) => app.changeChatSession(operation,value,sceneId)} />
         <SbsControl known={app.sbsKnown} enabled={app.sbsEnabled} origin={app.chatSbsOrigin}
           showContent={app.chatShowSbsMessages} allScenes={app.chatHistoryScope==='all'}
@@ -177,13 +177,32 @@ try {
   await page.getByRole('button',{name:'创建并进入'}).click();
   await page.locator('#chat-session-editor').waitFor({state:'hidden'});
   await page.waitForFunction(async () => (await window.beings.snapshot()).chatSessions.length === 2);
+  const discussion = await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id);
+  assert.notEqual(discussion,original);
+  await page.getByLabel('场景列表选项',{exact:true}).click();
+  await page.getByRole('button',{name:'场景详情',exact:true}).click();
+  const currentDetails = page.getByRole('dialog',{name:'当前场景',exact:true});
+  await currentDetails.getByText(discussion,{exact:true}).waitFor();
+  await currentDetails.getByRole('button',{name:'关闭场景详情'}).click();
+  const originalRow = page.getByRole('button',{name:'切换到场景：桌面·测试设备'});
+  await originalRow.click({button:'right'});
+  await page.getByRole('menuitem',{name:'场景详情',exact:true}).and(page.locator(':focus')).waitFor();
+  await page.keyboard.press('Enter');
+  const rowDetails = page.getByRole('dialog',{name:'场景详情',exact:true});
+  await rowDetails.getByText('桌面·测试设备',{exact:true}).waitFor();
+  await rowDetails.getByText(original,{exact:true}).waitFor();
+  await rowDetails.getByText('portal-desktop/test',{exact:true}).waitFor();
+  await rowDetails.getByRole('button',{name:'复制场景 ID'}).click();
+  assert.equal(await page.evaluate(() => window.copiedSceneId),original);
+  assert.equal(await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id),discussion);
+  await page.keyboard.press('Escape');
+  await rowDetails.waitFor({state:'hidden'});
+  await originalRow.and(page.locator(':focus')).waitFor();
   await chat.locator('#input').fill('方案内容');
   await chat.locator('#send-btn').click();
   await chat.getByText('回复：方案内容',{exact:true}).waitFor();
   assert.equal(await visibilityState('isChecked'),false);
   assert.equal(await chat.getByText('SBS 全局测试消息',{exact:true}).count(),0);
-  const discussion = await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id);
-  assert.notEqual(discussion,original);
   await chat.locator('#input').fill('方案草稿');
   await page.getByRole('button',{name:'切换到场景：桌面·测试设备'}).click();
   await chat.locator('#input').waitFor();
