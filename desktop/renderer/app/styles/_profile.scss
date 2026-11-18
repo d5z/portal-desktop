@@ -97,17 +97,20 @@
   margin: 8px 0 0;
 }
 
+.being-computer-screen,
+.being-computer-live-preview {
+  aspect-ratio: 16 / 9;
+}
+
 .being-computer-screen {
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 12px;
+  gap: 8px;
   width: 100%;
-  min-height: 160px;
-  aspect-ratio: 16 / 10;
-  max-height: 280px;
-  padding: 20px 16px;
+  min-height: min-content;
+  padding: 16px;
   border-radius: 16px;
   background: var(--surface);
   text-align: center;
@@ -533,8 +536,6 @@
 .being-computer-live-preview {
   position: relative;
   width: 100%;
-  aspect-ratio: 1280 / 900;
-  min-height: 160px;
   overflow: hidden;
   background: var(--surface);
 

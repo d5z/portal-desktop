@@ -33,7 +33,7 @@ const bundle = await build({ stdin: { resolveDir: process.cwd(), loader: 'tsx', 
         <aside id="being-info" className="being-info" style={{width:320,flexBasis:320}}>
           <div className="being-overview"><div className="being-profile"><div className="being-avatar">W</div><h2>Willow</h2></div>
           <div className="being-tabs"><button>详情</button><button>动态</button><button>资料库</button><button aria-selected="true">电脑</button></div>
-          <div className="being-info-content"><section hidden={!active}><BeingComputer name="Willow" api={api} active={active} available={available} context="fixture" browserHost={host}/></section><p hidden={active}>Library content</p></div></div>
+          <div className="being-info-content"><section id="being-computer-panel" hidden={!active}><BeingComputer name="Willow" api={api} active={active} available={available} context="fixture" browserHost={host}/></section><p hidden={active}>Library content</p></div></div>
         </aside>
       </div></main><dialog><p>Settings fixture</p><button onClick={()=>document.querySelector('dialog').close()}>Close settings</button></dialog></>;
   }
@@ -52,6 +52,11 @@ try {
   await page.goto(`http://127.0.0.1:${server.address().port}`);
   await page.getByRole('button', { name: '唤醒', exact: true }).waitFor();
   assert.deepEqual(await page.evaluate(() => window.actions), []);
+  const assertScreenRatio = async selector => {
+    const { width, height } = await page.locator(selector).boundingBox();
+    assert.ok(Math.abs(height - width * 9 / 16) < 1, `${selector} must be 16:9 at width ${width}, got height ${height}`);
+  };
+  await assertScreenRatio('.being-computer-screen');
   await mkdir('output/playwright', { recursive: true });
   await page.locator('#being-info').screenshot({ path: 'output/playwright/home-sleeping.png' });
   await page.getByRole('button', { name: '唤醒', exact: true }).click();
@@ -63,6 +68,12 @@ try {
   await expand.waitFor();
   await page.locator('.being-computer-preview img').waitFor();
   await page.waitForFunction(() => window.layouts.at(-1)?.presentation === 'preview' && window.layouts.at(-1)?.visible);
+  for (const width of [320, 480, 320]) {
+    await page.locator('#being-info').evaluate((panel, width) => {
+      panel.style.width = panel.style.flexBasis = width + 'px';
+    }, width);
+    await assertScreenRatio('.being-computer-live-preview');
+  }
   assert.equal(await page.locator('.cloud-browser-pane').isVisible(), false, 'waking must not expand the profile');
   assert.equal(await page.locator('.being-profile').isVisible(), true);
   const profileWidth = (await page.locator('#being-info').boundingBox()).width;
@@ -151,9 +162,12 @@ try {
     await page.getByRole('button', { name: '唤醒', exact: true }).waitFor();
     assert.equal(await page.locator('.being-info-content').evaluate(el => el.scrollWidth > el.clientWidth), false);
   }
+  const computerButtons = ['.being-computer-controls button', '.being-computer-primary'];
+  const lightColors = await page.evaluate(selectors => selectors.map(selector => getComputedStyle(document.querySelector(selector)).color), computerButtons);
   await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; document.body.setAttribute('data-ds-dark-theme', ''); });
-  await page.waitForFunction(() => getComputedStyle(document.querySelector('.being-computer-controls button')).color !== 'rgb(36, 36, 36)');
-  await page.waitForFunction(() => getComputedStyle(document.querySelector('.being-computer-primary')).color === 'rgb(27, 28, 30)');
+  await page.waitForFunction(({ selectors, colors }) => selectors.every((selector, index) =>
+    getComputedStyle(document.querySelector(selector)).color !== colors[index]
+  ), { selectors: computerButtons, colors: lightColors });
   await page.locator('#being-info').screenshot({ path: 'output/playwright/home-narrow-dark.png' });
   assert.deepEqual(errors, []);
   console.log('PASS Home UI: preview before explicit expansion, separate full-height pane, unchanged profile, retained tab/route/collapse session, modal/menu occlusion, maximize, expiration, binding and responsive layouts.');

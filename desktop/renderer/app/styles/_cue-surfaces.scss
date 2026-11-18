@@ -445,12 +445,6 @@
   box-shadow: none;
 }
 
-#being-info #being-computer-panel .being-computer-screen {
-  min-height: 152px;
-  max-height: none;
-  aspect-ratio: auto;
-}
-
 /* Final settings pass: one quiet surface language for navigation, controls, and app cards. */
 #client-settings-dialog {
   --settings-sidebar: var(--surface);
