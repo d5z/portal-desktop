@@ -161,7 +161,7 @@ function ImageGenerationCard({job, endpoint, being, report, statusInActions, mul
       <span className="image-generation-progress" role="progressbar" aria-label={label} />
     </div>}
     {status && <>
-      <div className="image-generation-status-frame" aria-hidden="true" />
+      <div className="image-generation-status-frame" aria-hidden="true"><PictureIcon /></div>
       {statusInActions ? <MessageAction>{status}</MessageAction> : status}
     </>}
     <div className="image-generation-caption-row">

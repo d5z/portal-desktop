@@ -86,6 +86,12 @@
   background: var(--chat-subtle-surface, var(--bg-soft));
 }
 
+.image-generation-status-frame {
+  display: grid;
+  place-items: center;
+  color: var(--text-dim);
+}
+
 .image-generation-dither {
   position: absolute;
   inset: 0;

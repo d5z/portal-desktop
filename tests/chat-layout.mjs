@@ -19,6 +19,11 @@ const history = bodies.flatMap((content,i)=>['being','user'].map((role,j)=>({seq
 const generation = {type:'being.image-generation',version:1,being_id:'fixture',jobs:[{
   index:1,title:'多张生成结果',submission:'accepted',generation_id:'gen_gallery',client_request_id:'gallery',error_code:null,
 }]};
+const generationHistory = [
+  generation,
+  {...generation,jobs:[{...generation.jobs[0],title:'结果待核对',generation_id:'gen_uncertain',client_request_id:'uncertain'}]},
+  {...generation,jobs:[{...generation.jobs[0],title:'提交拒绝',submission:'rejected',generation_id:null,client_request_id:'rejected',error_code:'FIXTURE_LIMIT'}]},
+].map((receipt,index) => ({seq:index+1,role:'being',content:JSON.stringify(receipt),scene_id:'layout',at:new Date().toISOString()}));
 let generatedOnly = false;
 const server=createServer((req,res)=>{
   const url=new URL(req.url,'http://localhost');
@@ -30,8 +35,12 @@ const server=createServer((req,res)=>{
       outputs:Array.from({length:4},(_,index)=>({id:'result-'+index,view_url:origin+'/wide.svg?generated='+index,mime:'image/png'})),
     }));
   }
+  if(url.pathname==='/api/image-generations/gen_uncertain'){
+    res.setHeader('Content-Type','application/json');
+    return res.end(JSON.stringify({id:'gen_uncertain',client_request_id:'uncertain',status:'uncertain',availability:'pending',outputs:[]}));
+  }
   if(url.pathname==='/api/stream/active'){res.writeHead(204);res.end();return;}
-  if(url.pathname.startsWith('/api/')){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(url.pathname==='/api/history'?{messages:generatedOnly ? [{seq:1,role:'being',content:JSON.stringify(generation),scene_id:'layout',at:new Date().toISOString()}] : history}:{being_name:'Willow',sbs_enabled:false}));return;}
+  if(url.pathname.startsWith('/api/')){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(url.pathname==='/api/history'?{messages:generatedOnly ? generationHistory : history}:{being_name:'Willow',sbs_enabled:false}));return;}
   res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><style>body{margin:0}iframe{display:block;border:0;width:100vw;height:100vh}</style><iframe src="/loom.html?scene_id=layout&scene_label=布局检查"></iframe>');
 });
 await new Promise(r=>server.listen(Number(process.env.CHAT_LAYOUT_PORT)||0,'127.0.0.1',r));
@@ -175,6 +184,24 @@ try{
   await actions.getByRole('button',{name:'更多消息操作',exact:true}).press('Enter');
   const downloads = generated.getByRole('menuitem',{name:/^下载原图 多张生成结果/});
   assert.deepEqual(await downloads.allTextContents(),[1,2,3,4].map(index => `下载原图 多张生成结果 ${index}`));
+  await generated.keyboard.press('Escape');
+  await generated.locator('html').evaluate(node => node.dataset.theme = 'dark');
+  for (const [title, status] of [['结果待核对','结果待核对'], ['提交拒绝','提交未受理']]) {
+    const card = generated.getByRole('region',{name:title,exact:true});
+    await card.scrollIntoViewIfNeeded();
+    const row = card.locator('xpath=ancestor::*[@data-message-hover]');
+    await row.getByRole('status').getByText(status,{exact:true}).waitFor();
+    const placeholder = card.locator('.image-generation-status-frame > svg');
+    await placeholder.waitFor({timeout:3000});
+    assert.ok(await placeholder.evaluate(icon => {
+      const image = icon.getBoundingClientRect(), frame = icon.parentElement.getBoundingClientRect();
+      return Math.abs(image.left + image.width / 2 - frame.left - frame.width / 2) < 1 &&
+        Math.abs(image.top + image.height / 2 - frame.top - frame.height / 2) < 1;
+    }), 'The unavailable-image icon is centered in the placeholder');
+    const feedback = row.locator('[data-message-actions]');
+    await feedback.getByRole('button',{name:'错误原因'}).waitFor();
+    assert.equal(await feedback.getByRole('button',{name:'重新查询状态'}).count(),title==='结果待核对' ? 1 : 0);
+  }
   await generated.close();
   console.log('PASS: chat Markdown, attachments and composer fit 1100/640/380/300px, with intact code and vertical reading.');
 }finally{await browser?.close();await new Promise(r=>server.close(r));}
