@@ -86,7 +86,6 @@ const glyphs = {
   // Composer controls use the 20 px geometry from the Codex desktop reference.
   'chat-arrow-up': { viewBox: '0 0 20 20', content: <path d="M10 16.667V3.333m-5.833 5.834L10 3.333l5.833 5.834" strokeWidth="1.33" /> },
   'chat-composer-stop': { viewBox: '0 0 20 20', content: <rect width="11" height="11" x="4.5" y="4.5" rx="1.25" fill="currentColor" stroke="none" /> },
-  'chat-composer-stop-compact': { viewBox: '0 0 18 18', content: <rect width="6" height="6" x="6" y="6" rx="1" fill="currentColor" stroke="none" /> },
   'chat-queue': { viewBox: '0 0 20 20', content: <path d="M3.33 3.33V11q0 4 4 4h9.33m-2.08-2.08L16.66 15l-2.08 2.08M7.5 5h6.67M7.5 9.58h4.17" strokeWidth="1.33" /> },
   'chat-file': { viewBox: '0 0 24 24', content: (<><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z" /> <path d="M14 2v5a1 1 0 0 0 1 1h5" /> <path d="M10 9H8" /> <path d="M16 13H8" /> <path d="M16 17H8" /></>) },
   'chat-image': { viewBox: '0 0 24 24', content: (<><rect width="18" height="18" x="3" y="3" rx="2" ry="2" /> <circle cx="9" cy="9" r="2" /> <path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21" /></>) },

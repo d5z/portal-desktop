@@ -32,7 +32,10 @@ try{
   await sendControl.and(page.getByRole('button',{name:'发送消息',exact:true})).waitFor();
   await input.fill('开始任务');await input.press('Enter');
   await page.getByRole('button',{name:'停止处理',exact:true}).waitFor();
-  await page.locator('#send-btn svg rect').waitFor();
+  const stopGlyph = sendControl.locator('svg rect');
+  await stopGlyph.waitFor();
+  const { width: stopWidth, height: stopHeight } = await stopGlyph.boundingBox();
+  assert.ok(stopWidth >= 9 && stopHeight >= 9, 'Desktop stop glyph must fit the standard composer icon size');
   await input.fill('反向检查');
   await sendControl.and(page.getByRole('button',{name:'引导',exact:true})).waitFor();
   await input.fill('稍后发送');

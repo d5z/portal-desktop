@@ -22,7 +22,6 @@ export function ComposerSend({ label, action, stopping, disabled, alternate, mob
   const hasChoices = !!alternate && !disabled;
   const visible = hasChoices && !!openedBy;
   const submitIcon = mobileWeb ? 'chat-arrow-up' : 'chat-send';
-  const stopIcon = mobileWeb ? 'chat-composer-stop' : 'chat-composer-stop-compact';
   if (!hasChoices && openedBy) setOpenedBy(undefined);
   useEffect(() => {
     if (hasChoices && matchMedia('(hover: hover)').matches && trigger.current?.matches(':hover')) {
@@ -95,7 +94,7 @@ export function ComposerSend({ label, action, stopping, disabled, alternate, mob
           if (wasTouch && hasChoices) setOpenedBy('touch');
           else act(onSubmit);
         }}>
-        <Icon name={stopping ? 'chat-busy' : action === 'stop' ? stopIcon : submitIcon} />
+        <Icon name={stopping ? 'chat-busy' : action === 'stop' ? 'chat-composer-stop' : submitIcon} />
       </button>
     </ChatActionTooltip>
     <AnimatePresence>{visible && alternate && <DropdownMenuMotion className="composer-queue-tip" id={popupId} role="group" aria-label="发送选项">
