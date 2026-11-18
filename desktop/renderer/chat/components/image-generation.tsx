@@ -5,6 +5,7 @@ import { imageGenerationBlocks } from '../../../shared/image-generation-blocks';
 import { Markdown } from '../../shared/components/markdown';
 import { MarkdownReferenceScope } from '../../shared/components/markdown-references';
 import { MessageAction } from '../../shared/components/message-action-slot';
+import { MessageImageGroup } from '../../shared/components/message-image-group';
 import { RemoteImage, RemoteImageGroup } from '../../shared/components/remote-image';
 import { ImageGenerationDownload } from './image-generation-download';
 import { imageGenerationQuery, watchImageGeneration, type GenerationViewState } from '../services/image-generations';
@@ -87,14 +88,13 @@ function GenerationDither({ animated }: { animated: boolean }) {
   return <canvas ref={canvas} className="image-generation-dither" aria-hidden="true" />;
 }
 
-function GeneratedPhoto({ src, name, downloadName, multiple, onError }: {
-  src: string; name: string; downloadName: string; multiple: boolean; onError(): void;
+function GeneratedPhoto({ src, name, loaded, onLoad, onError, children }: {
+  src: string; name: string; loaded: boolean; onLoad(): void; onError(): void; children: ReactNode;
 }) {
-  const [loaded, setLoaded] = useState(false);
   return <div className="image-generation-photo" data-loaded={loaded} aria-busy={!loaded}>
-    <RemoteImage src={src} name={name} onLoad={() => setLoaded(true)} onError={onError} />
+    <RemoteImage src={src} name={name} onLoad={onLoad} onError={onError} />
     {!loaded && <div className="image-generation-loading"><GenerationDither animated /></div>}
-    {loaded && <ImageGenerationDownload src={src} name={downloadName} inMenu={multiple} />}
+    {children}
   </div>;
 }
 function ImageGenerationCard({job, endpoint, being, report, statusInActions, multiple}: {
@@ -104,6 +104,7 @@ function ImageGenerationCard({job, endpoint, being, report, statusInActions, mul
   const { ref, ready } = useNearViewport<HTMLElement>();
   const [state,setState] = useState<GenerationViewState>({busy:true,canQuery:false});
   const [imageAttempt,setImageAttempt] = useState(0);
+  const [loadedImages, setLoadedImages] = useState<Record<string, number>>({});
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const watcher = useRef<ReturnType<typeof watchImageGeneration> | null>(null);
   useEffect(() => {
@@ -133,12 +134,28 @@ function ImageGenerationCard({job, endpoint, being, report, statusInActions, mul
   const status = !active && (ready && (!outputs.length || imageFailed) || state.notice) &&
     <ChatStatusRow title={statusTitle} detail={state.notice || (snapshot?.status === 'failed' ? snapshot.error_code || undefined : undefined)}
       tone={failed ? 'error' : 'neutral'} retry={retry} mediaStatus />;
+  const hasMultipleOutputs = outputs.length > 1;
+  const grouped = hasMultipleOutputs && typeof document !== 'undefined' && document.documentElement.dataset.chatHost === 'desktop';
+  const photos = outputs.map(({view_url: src}, index) => {
+    const key = `${src}:${imageAttempt}`;
+    const loaded = loadedImages[src] === imageAttempt;
+    const download = loaded && <ImageGenerationDownload key={key} src={src}
+      name={hasMultipleOutputs ? `${job.title} ${index + 1}` : job.title} inMenu={multiple || hasMultipleOutputs} />;
+    return {
+      download,
+      photo: <GeneratedPhoto key={key} src={src} name={job.title} loaded={loaded}
+        onLoad={() => setLoadedImages(previous => previous[src] === imageAttempt ? previous : {...previous,[src]:imageAttempt})}
+        onError={() => setFailedImage(src)}>{!grouped && download}</GeneratedPhoto>,
+    };
+  });
   return <section ref={ref} className="image-generation-card" aria-label={job.title} data-generation-id={snapshot?.id || job.generation_id || undefined}>
-    {outputs.length > 0 && !imageFailed ? <div className="image-generation-images">{outputs.map((output, index) =>
-      <GeneratedPhoto key={`${output.view_url}:${imageAttempt}`} src={output.view_url} name={job.title}
-        downloadName={outputs.length > 1 ? `${job.title} ${index + 1}` : job.title}
-        multiple={multiple || outputs.length > 1} onError={() => setFailedImage(output.view_url)} />
-    )}</div> : active && <div className="image-generation-placeholder" data-active={active} data-status={snapshot?.status}
+    {photos.length > 0 && !imageFailed ? <>
+      <div className="image-generation-images">{grouped
+        ? <MessageImageGroup className="generated-image-group" count={photos.length} initiallyExpanded>{photos.map(({photo}) => photo)}</MessageImageGroup>
+        : photos.map(({photo}) => photo)}</div>
+      {/* Keep downloads mounted while the same photos switch between the grid and deck. */}
+      {grouped && photos.map(({download}) => download)}
+    </> : active && <div className="image-generation-placeholder" data-active={active} data-status={snapshot?.status}
       data-phase={snapshot?.stage === 'validate_convert' ? 'refining' : snapshot?.status === 'running' ? 'running' : 'queued'} aria-busy="true">
       <GenerationDither animated={snapshot?.status === 'running'} />
       <span className="image-generation-progress" role="progressbar" aria-label={label} />

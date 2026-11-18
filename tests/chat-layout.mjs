@@ -16,12 +16,22 @@ const bodies = [
   '![布局检查](data:image/svg+xml;base64,'+Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="160"><rect width="1600" height="160" fill="#cce5ff"/></svg>').toString('base64')+')',
 ];
 const history = bodies.flatMap((content,i)=>['being','user'].map((role,j)=>({seq:i*2+j+1,role,content,scene_id:'layout',at:'2026-10-10T08:00:00Z'})));
+const generation = {type:'being.image-generation',version:1,being_id:'fixture',jobs:[{
+  index:1,title:'多张生成结果',submission:'accepted',generation_id:'gen_gallery',client_request_id:'gallery',error_code:null,
+}]};
+let generatedOnly = false;
 const server=createServer((req,res)=>{
   const url=new URL(req.url,'http://localhost');
   if(url.pathname==='/wide.svg'){res.setHeader('Content-Type','image/svg+xml');res.end('<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="160"><rect width="1600" height="160" fill="#cce5ff"/></svg>');return;}
   if(assets.has(url.pathname)){res.setHeader('Content-Type',url.pathname.endsWith('.js')?'text/javascript':url.pathname.endsWith('.css')?'text/css':'text/html; charset=utf-8');res.end(assets.get(url.pathname));return;}
+  if(url.pathname==='/api/image-generations/gen_gallery'){
+    res.setHeader('Content-Type','application/json');
+    return res.end(JSON.stringify({id:'gen_gallery',client_request_id:'gallery',status:'succeeded',stage:'complete',availability:'available',
+      outputs:Array.from({length:4},(_,index)=>({id:'result-'+index,view_url:origin+'/wide.svg?generated='+index,mime:'image/png'})),
+    }));
+  }
   if(url.pathname==='/api/stream/active'){res.writeHead(204);res.end();return;}
-  if(url.pathname.startsWith('/api/')){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(url.pathname==='/api/history'?{messages:history}:{being_name:'Willow',sbs_enabled:false}));return;}
+  if(url.pathname.startsWith('/api/')){res.setHeader('Content-Type','application/json');res.end(JSON.stringify(url.pathname==='/api/history'?{messages:generatedOnly ? [{seq:1,role:'being',content:JSON.stringify(generation),scene_id:'layout',at:new Date().toISOString()}] : history}:{being_name:'Willow',sbs_enabled:false}));return;}
   res.setHeader('Content-Type','text/html; charset=utf-8');res.end('<!doctype html><style>body{margin:0}iframe{display:block;border:0;width:100vw;height:100vh}</style><iframe src="/loom.html?scene_id=layout&scene_label=布局检查"></iframe>');
 });
 await new Promise(r=>server.listen(Number(process.env.CHAT_LAYOUT_PORT)||0,'127.0.0.1',r));
@@ -141,5 +151,30 @@ try{
   assert.equal(await touchCopy.evaluate(el => getComputedStyle(el).pointerEvents), 'auto');
   assert.equal((await touchCopy.boundingBox()).width, 44);
   await touchPage.close();
+  generatedOnly = true;
+  const generated = await browser.newPage({viewport:{width:1100,height:850},reducedMotion:'reduce'});
+  await generated.goto(origin+'/loom.html?scene_id=layout&history_scope='+encodeURIComponent('https://echo.beings.town/fixture'));
+  const results = generated.getByRole('region', { name:'多张生成结果' });
+  await results.locator('.image-generation-photo[data-loaded="true"]').nth(3).waitFor();
+  const actions = results.locator('xpath=ancestor::*[@data-message-hover]').locator('[data-message-actions]');
+  await results.getByRole('button',{name:'预览 多张生成结果'}).last().hover();
+  const collapse = actions.getByRole('button',{name:'收起图片',exact:true});
+  await collapse.click({timeout:3000});
+  const photoGroup = results.getByRole('group',{name:'4 张图片',exact:true});
+  await photoGroup.locator('.stack-card[data-top] button').waitFor();
+  await photoGroup.getByLabel('图片堆叠，方向键翻看').press('ArrowRight');
+  const second = photoGroup.locator('.stack-card[data-top] img');
+  assert.match(await second.getAttribute('src'),/generated=1$/);
+  await actions.getByRole('button',{name:'展开 4 张图片',exact:true}).click();
+  const expandedPhotos = photoGroup.locator('.message-image-stack img');
+  assert.equal(await expandedPhotos.count(),4);
+  await generated.waitForFunction(() => Array.from(document.querySelectorAll('.generated-image-group .message-image-stack img'))
+    .every(img => img.naturalWidth && Math.abs(img.clientHeight - img.clientWidth * img.naturalHeight / img.naturalWidth) < 1));
+  await collapse.click();
+  assert.match(await second.getAttribute('src'),/generated=1$/);
+  await actions.getByRole('button',{name:'更多消息操作',exact:true}).press('Enter');
+  const downloads = generated.getByRole('menuitem',{name:/^下载原图 多张生成结果/});
+  assert.deepEqual(await downloads.allTextContents(),[1,2,3,4].map(index => `下载原图 多张生成结果 ${index}`));
+  await generated.close();
   console.log('PASS: chat Markdown, attachments and composer fit 1100/640/380/300px, with intact code and vertical reading.');
 }finally{await browser?.close();await new Promise(r=>server.close(r));}

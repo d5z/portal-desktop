@@ -555,7 +555,7 @@
     width: min(var(--chat-attachment-width), 100%);
   }
 
-  .message.being .message-bubble-body:has(> .image-generation-answer > .image-generation-message[data-count='1']:only-child .image-generation-photo[data-loaded='true']:only-child) {
+  .message.being .message-bubble-body:has(> .image-generation-answer > .image-generation-message[data-count='1']:only-child .image-generation-images > .image-generation-photo[data-loaded='true']:only-child) {
     width: fit-content;
     max-width: min(var(--chat-attachment-width), 100%);
 

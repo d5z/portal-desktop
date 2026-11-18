@@ -138,6 +138,23 @@
   #messages .message .message-image-group .message-image-stack > * { height: var(--chat-image-grid-row-height); min-width: 0; }
   #messages .message .message-image-group .attachment-image-card { height: 100%; }
 
+  .generated-image-group .message-image-deck .image-generation-photo { height: 100%; }
+
+  #messages .message .generated-image-group .message-image-stack {
+    > .image-generation-photo { height: auto; }
+
+    [data-slot='image-thumbnail'] {
+      width: fit-content;
+      height: auto;
+    }
+
+    img {
+      width: auto;
+      height: auto;
+      max-height: var(--chat-image-max-height);
+    }
+  }
+
   #messages .message .attachment-image-skeleton {
     width: min(var(--chat-attachment-width), 100%) !important;
     height: 196px !important;

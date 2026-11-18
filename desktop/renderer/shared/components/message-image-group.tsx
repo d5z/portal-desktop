@@ -3,12 +3,13 @@ import { Icon } from '../icons/icon';
 import Stack from './react-bits-stack/Stack';
 import { MessageAction, MessageActionSlot } from './message-action-slot';
 
-export function MessageImageGroup({ count, className, children }: {
+export function MessageImageGroup({ count, className, children, initiallyExpanded = false }: {
   count: number;
   className: string;
   children: ReactNode;
+  initiallyExpanded?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(initiallyExpanded);
   const [firstIndex, setFirstIndex] = useState(0);
   const imagesId = useId();
   const topIndex = useRef(0);
