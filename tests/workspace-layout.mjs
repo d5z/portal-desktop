@@ -438,6 +438,8 @@ try {
   const mainChat = await page.locator('#chat-view').boundingBox();
   const mainInfo = await info.boundingBox();
   const mainRail = await rail.boundingBox();
+  const mainToolbar = await page.locator('#chat-view > .topbar').boundingBox();
+  assert.equal(mainToolbar.height, 72, 'The desktop floating header uses the reviewed height');
   assert.equal(mainChat.y, 8, 'Chat keeps the shared top gutter');
   assert.equal(mainInfo.y, mainChat.y, 'Auxiliary panes share the chat top edge');
   assert.equal(mainRail.x + mainRail.width, mainChat.x, 'Navigation joins the content without an extra gutter');
@@ -481,7 +483,7 @@ try {
     const identity = await page.locator('.pair-name').boundingBox();
     assert.ok(identity.x + identity.width <= actions.x, 'Split chat identity stays clear of its actions');
     assert.equal(toolbar.y, c.y);
-    assert.equal(toolbar.height, 88, 'Every chat width keeps the shared floating header');
+    assert.equal(toolbar.height, mainToolbar.height, 'Every chat width keeps the shared floating header');
     assert.ok(sceneControl.x + sceneControl.width <= actions.x, 'Scene picker and chat actions must not overlap');
     assert.ok(actions.x + actions.width <= toolbar.x + toolbar.width);
   }

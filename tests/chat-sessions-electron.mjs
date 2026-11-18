@@ -94,6 +94,8 @@ try {
   ` }, bundle: true, platform: 'node', external: ['electron'], outfile: path.join(directory, 'main.cjs') });
   application = await electron.launch({ args: [path.join(directory,'main.cjs')], env: {...process.env} });
   const page = await application.firstWindow();
+  // Keep animated menu bounds out of the native pointer-readiness checks.
+  await page.emulateMedia({reducedMotion:'reduce'});
   page.setDefaultTimeout(15000);
   const errors=[]; page.on('pageerror',error=>errors.push(error.message));
   const chat = page.frameLocator('iframe');

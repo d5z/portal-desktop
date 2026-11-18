@@ -232,6 +232,9 @@ try {
   // Chromium touch input exercises the real native scrolling path.
   const touch = await page.context().newCDPSession(page);
   await touch.send('Emulation.setTouchEmulationEnabled', {enabled:true,maxTouchPoints:1});
+  // A coarse pointer changes message layout. Measure the start of the gesture after reflow.
+  await child().waitForFunction(() => matchMedia('(pointer: coarse)').matches);
+  await expectBottom('Touch emulation reflow stays pinned before the gesture');
   const box = await messages.boundingBox();
   const x = Math.round(box.x + box.width / 2), y = Math.round(box.y + box.height / 3);
   const touchBefore = await messages.evaluate(el => el.scrollTop);
