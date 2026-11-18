@@ -8,16 +8,15 @@ import { createChatRuntime } from '../desktop/renderer/chat/services/runtime';
 import { SceneQueueStore } from '../desktop/renderer/chat/services/scene-queue';
 import { HistoryCache } from '../desktop/renderer/chat/services/history-cache';
 
-it('opens subagent configuration before selection when missing, unknown or disabled', () => {
+it('allows subagent commands without a separate client-side configuration gate', () => {
   const configure = vi.fn();
   for (const state of [{}, { subagentConfigured: false }, { subagentConfigured: true, subagentEnabled: false }]) {
-    expect(canUseComposerCommand('subagent', state, configure)).toBe(false);
+    expect(canUseComposerCommand('subagent', state, configure)).toBe(true);
   }
-  expect(configure).toHaveBeenCalledTimes(3);
   expect(canUseComposerCommand('subagent', { subagentConfigured: true, subagentEnabled: true }, configure)).toBe(true);
   expect(canUseComposerCommand('image', {}, configure)).toBe(true);
   expect(canUseComposerCommand('ui', {}, configure)).toBe(true);
-  expect(configure).toHaveBeenCalledTimes(3);
+  expect(configure).not.toHaveBeenCalled();
 });
 
 it('recognizes only explicit leading slash commands, including aliases and combinations', () => {

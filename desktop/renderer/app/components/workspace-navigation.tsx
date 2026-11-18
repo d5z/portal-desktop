@@ -17,6 +17,7 @@ import type { AppModel } from "../models/app";
 import { useModel } from "../../shared/hooks/use-model";
 import { BeingComputer } from "./being-computer";
 import { BeingLibrary } from "./home-library";
+import { beingModelRequest } from '../services/being-model-network';
 
 const beingTabs = [["profile", "详情"], ["library", "资料库"], ["computer", "电脑"]] as const;
 
@@ -228,7 +229,9 @@ export function BeingInfo({ app }: { app: AppModel }) {
   useEffect(() => {
     let active = true;
     if (!hidden && connected && !app.subagentSettingsOpen) {
-      void app.api.beingModelConfig().then(config => {
+      void beingModelRequest(app.snapshot?.settings.endpoint, '/api/llm/config').then(async response => {
+        const config = await response.json();
+        if (!response.ok) throw new Error(config.error || 'request failed');
         if (active) setModelPreview({ key: modelKey, label: typeof config.model === 'string' ? config.model : '查看与配置' });
       }).catch(() => { if (active) setModelPreview(previous => previous.key === modelKey && previous.label ? previous : { key: modelKey, label: '查看与配置' }); });
     }

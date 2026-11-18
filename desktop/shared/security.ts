@@ -1,8 +1,9 @@
-// read-only is retained only for existing profiles; never silently widen their permissions.
-export type PermissionMode = 'read-only' | 'supervised' | 'auto-review' | 'full-access';
-export interface ToolApprovalView { id: string; title: string; message: string; detail: string; expiresAt: number; rememberScope?: string }
+export type PermissionMode = 'supervised' | 'full-access';
+export interface ToolApprovalView { id: string; title: string; message: string; detail: string; expiresAt: number }
 export function permissionMode(value: unknown): PermissionMode {
-  if (value === undefined) return 'auto-review';
-  if (value === 'read-only' || value === 'supervised' || value === 'auto-review' || value === 'full-access') return value;
-  throw new Error('无效的工具权限模式。');
+  if (value === undefined || value === 'auto-review' || value === 'read-only') return 'supervised';
+  if (value === 'supervised' || value === 'full-access') return value;
+  throw new Error('无效的电脑操作权限。');
 }
+// Leave room for execution and error delivery within the cloud's 120s tool budget.
+export const TOOL_APPROVAL_TIMEOUT_MS = 60_000;

@@ -12,7 +12,7 @@ import { macDmgIdentifier, verifyMacSignature } from './desktop/main/updates/mac
 import pkg from './package.json';
 
 const binary = path.resolve('resources', process.platform === 'win32' ? 'heart-portal.exe' : 'heart-portal');
-const extraResource = [binary, path.resolve('resources/HEART-PORTAL-LICENSE'), path.resolve('resources/branding'), path.resolve('resources/runtime-bundle.json'), path.resolve('node_modules/npm'), path.resolve('resources/node-bin')];
+const extraResource = [binary, path.resolve('resources/portal-runtime'), path.resolve('resources/HEART-PORTAL-LICENSE'), path.resolve('resources/branding'), path.resolve('resources/runtime-bundle.json'), path.resolve('node_modules/npm'), path.resolve('resources/node-bin')];
 const rendererName = 'main_window';
 const macLocalTest = process.env.PORTAL_DESKTOP_MAC_LOCAL_TEST === '1';
 const macIdentity = macLocalTest ? '-' : signing.identity;

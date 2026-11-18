@@ -14,7 +14,7 @@ export class SettingsStore {
   constructor(private directory: string, private storage: SecretStorage, private binary: string) {
     this.settings = { endpoint: '', being: '', hasToken: false, workspace: path.join(os.homedir(), 'portal-desktop Workspace'),
       portalBinary: binary, portalName: `portal-desktop-${os.hostname().replace(/[^a-zA-Z0-9_-]/g, '-').slice(0, 50)}`,
-      autoStart: false, backgroundEnabled: true, allowExec: true, kitsEnabled: true, permissionMode: 'auto-review' };
+      autoStart: false, backgroundEnabled: true, allowExec: true, kitsEnabled: true, permissionMode: 'supervised' };
   }
   async load() {
     let raw: string;
@@ -62,7 +62,7 @@ export class SettingsStore {
       return;
     }
   }
-  async save(input: SaveSettings) {
+  async save(input: SaveSettings, persist = true) {
     if (!input || typeof input !== 'object') throw new Error('无效的设置。');
     const mode = permissionMode(input.permissionMode ?? this.settings.permissionMode);
     const connection = this.resolveConnection(input);
@@ -83,10 +83,12 @@ export class SettingsStore {
       portalConfigPath: input.portalConfigPath || undefined, portalEnvironmentPath: input.portalEnvironmentPath || undefined };
     const { hasToken: _, ...publicSettings } = next;
     const credential = this.storage.encryptString(JSON.stringify({ link: connection.link, relaySecret: connection.relaySecret })).toString('base64');
-    await mkdir(this.directory, { recursive: true, mode: 0o700 });
-    const temporary = path.join(this.directory, 'connection.json.tmp');
-    await writeFile(temporary, JSON.stringify({ version: 1, settings: publicSettings, credential }), { mode: 0o600 });
-    await rename(temporary, path.join(this.directory, 'connection.json'));
+    if (persist) {
+      await mkdir(this.directory, { recursive: true, mode: 0o700 });
+      const temporary = path.join(this.directory, 'connection.json.tmp');
+      await writeFile(temporary, JSON.stringify({ version: 1, settings: publicSettings, credential }), { mode: 0o600 });
+      await rename(temporary, path.join(this.directory, 'connection.json'));
+    }
     this.connection = connection;
     this.settings = next;
   }

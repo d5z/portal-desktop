@@ -261,8 +261,7 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
         </div>
         <div id="settings-panel-models" role="tabpanel" aria-labelledby="settings-tab-models" hidden={activeTab !== 'models'}>
           {open && activeTab === 'models' && <>
-            <SubagentModelSettings app={app} embedded inline onBusyChange={setModelBusy} onDetailChange={setModelDetail} detailOpen={Boolean(modelDetail)}
-              subagentConfiguration={route === 'connection' && <ConnectionSettings model={app} embedded inline locked={modelBusy} />} />
+            <SubagentModelSettings app={app} embedded onBusyChange={setModelBusy} onDetailChange={setModelDetail} detailOpen={Boolean(modelDetail)} />
           </>}
         </div>
         <div id="settings-panel-portal" role="tabpanel" aria-labelledby="settings-tab-portal" hidden={activeTab !== 'portal'}>
@@ -442,18 +441,6 @@ export const ConnectionSettings = memo(function ConnectionSettings({ model, embe
     if (app.settingsOpen && app.formError) error.current?.focus();
   }, [app.settingsOpen, app.formError]);
   const imported = Boolean(form?.portalConfigPath);
-  const [subagentEnabled, setSubagentEnabled] = useState<boolean>();
-  // Saving/discarding rebuilds the form while this surface remains mounted.
-  // Refresh its persisted baseline without fetching again on every draft edit.
-  useEffect(() => {
-    if (!app.settingsOpen || section !== 'subagent') return;
-    let active = true;
-    setSubagentEnabled(undefined);
-    void app.api.subagentConfig().then(config => {
-      if (active) setSubagentEnabled(config.enabled !== false);
-    }).catch(() => { if (active) { app.formError = '无法读取 subagent 开关状态'; app.changed(); } });
-    return () => { active = false; };
-  }, [app, app.settingsOpen, section, app.connectionFormRevision]);
   return (
     <SettingsSurface embedded={embedded} className={inline ? "settings-inline-form" : undefined}
       open={app.settingsOpen}
@@ -561,7 +548,7 @@ export const ConnectionSettings = memo(function ConnectionSettings({ model, embe
                 }
               />
             </SettingsItem>
-            <SettingsItem label="允许命令执行" description="同时受下方工具权限模式约束" htmlFor="exec-input">
+            <SettingsItem label="允许命令执行" description="同时受下方电脑操作权限约束" htmlFor="exec-input">
               <input
                 id="exec-input"
                 type="checkbox"
@@ -584,21 +571,13 @@ export const ConnectionSettings = memo(function ConnectionSettings({ model, embe
               />
             </SettingsItem>
             <section className="permission-settings-section"><div className="permission-section-heading"><strong>访问权限</strong><small>主助手与子代理共用</small></div>
-              <PermissionPicker value={form?.permissionMode ?? 'auto-review'} onChange={mode => app.editForm('permissionMode', mode)}/>
+              <PermissionPicker value={form?.permissionMode ?? 'supervised'} onChange={mode => app.editForm('permissionMode', mode)}/>
               <p className="permission-note">仅适用于 Portal 调用，主助手和子代理共用。</p>
             </section>
           </div>
           </>}
           {section === 'subagent' && <div className="settings-item-list">
-            <SettingsItem label="启用 subagent" htmlFor="subagent-enabled-input" description="允许 Being 在场景内委派子任务，关闭后保留模型配置。">
-                <input id="subagent-enabled-input" type="checkbox" role="switch"
-                  checked={form?.subagentEnabled ?? subagentEnabled ?? false}
-                  disabled={saving || subagentEnabled === undefined}
-                  onChange={event => app.editForm('subagentEnabled', event.target.checked)} />
-            </SettingsItem>
-            {form?.subagentSetup && <p className="field-help">{form.subagentSetup.provider} / {form.subagentSetup.model} · 随连接保存</p>}
-            {!inline && <button type="button" disabled={saving || !(form?.subagentEnabled ?? subagentEnabled ?? false)} onClick={() => app.openSubagentSettings(true)}>配置模型</button>}
-            {form?.subagentSetup && <button type="button" className="text-button" disabled={saving} onClick={() => app.editForm("subagentSetup", undefined)}>取消本次 subagent 配置</button>}
+            <p className="field-help">subagent 随客户端自动启用，并直接继承当前 Being 的模型、接口和思考强度。请在“模型”设置中修改。</p>
           </div>}
           <p ref={error} tabIndex={-1} className="form-error" id="settings-error" role="alert">
             {app.formError}

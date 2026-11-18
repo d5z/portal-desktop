@@ -586,6 +586,17 @@
   user-select: none;
 }
 
+.composer-queue-item:has(.composer-queue-notice) {
+  flex-wrap: wrap;
+  height: auto;
+  min-height: 36px;
+  padding-block: 6px;
+
+  .composer-queue-content {
+    flex-basis: calc(100% - 40px);
+  }
+}
+
 .composer-queue-drag-handle {
   position: relative;
   display: grid;
@@ -702,8 +713,11 @@
 }
 
 .composer-queue-notice {
-  flex-shrink: 0;
-  cursor: help;
+  flex: 0 0 100%;
+  display: block;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  color: var(--danger);
   font-size: 12px;
 }
 

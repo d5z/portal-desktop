@@ -1,193 +1,171 @@
-import { WorkspaceDrawer } from "../../shared/components/workspace-drawer";
-import type { SettingsDetail } from "../../shared/components/settings-surface";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { WorkspaceDrawer } from '../../shared/components/workspace-drawer';
+import type { SettingsDetail } from '../../shared/components/settings-surface';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { PanelResizeHandle, usePanelWidth } from '../../shared/components/panel-resize';
 import { ChatSettings } from '../../chat/components/settings';
-import { ChatState, type ChatRuntime, type LlmConfig, type ConfigResult, type Preset } from '../../chat/models/chat';
+import { ChatState, type ChatRuntime, type ConfigResult, type LlmConfig } from '../../chat/models/chat';
 import { errorText } from '../../shared/models/store';
+import type { SubagentSetup, SubagentStatus } from '../../../shared/types';
 import type { AppModel } from '../models/app';
-import { subagentCatalog } from '../models/subagent-catalog';
-import type { SubagentSetup } from '../../../shared/types';
+import { beingModelRequest } from '../services/being-model-network';
 
-/** Same model page, with a local Portal adapter instead of Heart's HTTP API. */
-export function SubagentModelSettings({ app, embedded = false, inline = false, onBusyChange, onDetailChange, detailOpen = false, subagentConfiguration }: { app: AppModel; embedded?: boolean; inline?: boolean; onBusyChange?: (busy: boolean) => void; onDetailChange?: (detail: SettingsDetail | null) => void; detailOpen?: boolean; subagentConfiguration?: ReactNode }) {
+export function SubagentModelSettings({ app, embedded = false, onBusyChange, onDetailChange, detailOpen: _detailOpen = false }: {
+  app: AppModel;
+  embedded?: boolean;
+  onBusyChange?: (busy: boolean) => void;
+  onDetailChange?: (detail: SettingsDetail | null) => void;
+  detailOpen?: boolean;
+}) {
   const panel = useRef<HTMLDivElement>(null);
   const closeButton = useRef<HTMLButtonElement>(null);
-  const [width, setWidth] = usePanelWidth("being", 320);
-  useEffect(() => { closeButton.current?.focus(); }, []);
-  const staged = inline || app.subagentFromConnection;
+  const [width, setWidth] = usePanelWidth('being', 320);
   const [busy, setBusy] = useState(false);
-  useEffect(() => { onBusyChange?.(busy); }, [busy, onBusyChange]);
-  useEffect(() => () => { onBusyChange?.(false); }, [onBusyChange]);
-  const [beingPreset, setBeingPreset] = useState<Preset>();
-  const [catalogHint, setCatalogHint] = useState('');
-  const updateBeingCatalog = (config: LlmConfig) => {
-    const catalog = subagentCatalog(config);
-    setBeingPreset(catalog.current);
-    setCatalogHint(catalog.copyBlockedReason || (catalog.current ? '可使用 Being 当前模型的名称、接口地址和协议；服务端密钥不会自动复制。' : '当前 Being 模型缺少可复用的接口信息，可从列表选择或自定义。'));
-    return catalog;
-  };
-  const [target, setTarget] = useState<"Heart" | "subagent">(app.modelSettingsTarget || "subagent");
-  const [visited, setVisited] = useState(() => new Set([app.modelSettingsTarget || "subagent"]));
+  const [target, setTarget] = useState<'Heart' | 'subagent'>('Heart');
+  const [mode, setMode] = useState<'inherit' | 'custom'>('inherit');
+  const [status, setStatus] = useState<SubagentStatus | null>(null);
+  const [notice, setNotice] = useState('');
+  const [error, setError] = useState('');
+  const [custom, setCustom] = useState<SubagentSetup>({ provider: 'portal-custom', model: '', base_url: '', api: 'openai-completions', api_key: '', thinking: 'medium' });
+  useEffect(() => { closeButton.current?.focus(); }, []);
+  useEffect(() => onBusyChange?.(busy), [busy, onBusyChange]);
+  useEffect(() => () => onBusyChange?.(false), [onBusyChange]);
+  const refreshStatus = useCallback(async () => {
+    if (!app.api.subagentStatus) throw new Error('状态接口尚未加载，请重启客户端以加载更新。');
+    const next = await app.api.subagentStatus();
+    setStatus(next);
+    return next;
+  }, [app]);
+  useEffect(() => {
+    let active = true;
+    void Promise.all([app.api.subagentConfig(), refreshStatus()]).then(([config, next]) => {
+      if (!active) return;
+      setMode(next.inheritModel ? 'inherit' : 'custom');
+      setCustom({ ...config, provider: config.provider || 'portal-custom', api: config.api || 'openai-completions', api_key: '' });
+    }).catch(error => { if (active) setError(errorText(error)); });
+    const refresh = () => { void refreshStatus().catch(error => { if (active) setError(errorText(error)); }); };
+    const unsubscribeTasks = app.api.onSceneTasks?.(refresh);
+    const unsubscribePortal = app.api.onPortal?.(refresh);
+    return () => { active = false; unsubscribeTasks?.(); unsubscribePortal?.(); };
+  }, [app, refreshStatus]);
+
+  const endpoint = app.snapshot?.settings.endpoint;
   const being = useMemo(() => {
     const state = new ChatState();
     let revision = 0;
     const runtime: Pick<ChatRuntime, 'loadLlmConfig' | 'applyConfigChange'> & Partial<Pick<ChatRuntime, 'request'>> = {
-      ...(app.api.beingModelCatalog ? { request: async (path: string, init?: RequestInit) => {
+      request: async (path: string, init?: RequestInit) => {
         const url = new URL(path, 'https://local.invalid');
         const kind = url.pathname.split('/').pop() as 'routes' | 'models' | 'keys';
         if (!['routes', 'models', 'keys'].includes(kind)) throw new Error('不支持的模型接口。');
-        const input = kind === 'keys' ? JSON.parse(String(init?.body || '{}')) : { route: url.searchParams.get('route') || undefined };
-        const result = await app.api.beingModelCatalog!({ ...input, kind });
-        return Response.json(result.data, { status: result.status });
-      } } : {}),
+        const query = kind === 'models' && url.searchParams.get('route') ? `?route=${encodeURIComponent(url.searchParams.get('route')!)}` : '';
+        return beingModelRequest(endpoint, `/api/llm/${kind}${query}`, { ...init, method: kind === 'keys' ? 'POST' : 'GET' });
+      },
       async loadLlmConfig() {
         const request = ++revision;
         state.configLoading = true;
         state.configStatus = '';
         state.changed();
         try {
-          if (!app.snapshot?.settings.hasToken) throw new Error('请先保存 Being 连接，再配置 Being 模型。subagent 可先配置。');
-          if (typeof app.api.beingModelConfig !== 'function') throw new Error('客户端接口尚未更新，请重新打开 Desktop。');
-          const config = await app.api.beingModelConfig();
-          if (request === revision) { state.config = config as LlmConfig; updateBeingCatalog(state.config); }
-        } catch (error) { if (request === revision) { state.configStatus = errorText(error); state.configStatusClass = 'error'; } }
-        finally { if (request === revision) { state.configLoading = false; state.changed(); } }
+          if (!app.snapshot?.settings.hasToken) throw new Error('请先保存 Being 连接。');
+          const response = await beingModelRequest(endpoint, '/api/llm/config');
+          const config = await response.json().catch(() => ({}));
+          if (!response.ok) throw new Error(config.error || '无法读取 Being 模型配置。');
+          if (request === revision) state.config = config as LlmConfig;
+        } catch (error) {
+          if (request === revision) { state.configStatus = errorText(error); state.configStatusClass = 'error'; }
+        } finally {
+          if (request === revision) { state.configLoading = false; state.changed(); }
+        }
       },
       async applyConfigChange(patch) {
         try {
           if (!app.snapshot?.settings.hasToken) throw new Error('请先保存 Being 连接。');
-          const result = await app.api.beingModelConfig(patch) as ConfigResult;
-          if (result.config) { state.config = result.config; updateBeingCatalog(result.config); }
-          state.configStatus = result.ok ? (result.rolled_back ? '已恢复上次可用配置' : '设置已更新') : result.error || '设置未能保存';
+          const response = await beingModelRequest(endpoint, '/api/llm/config', {
+            method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch),
+          });
+          const data = await response.json().catch(() => ({}));
+          const result = { ...data, ...(!response.ok ? { ok: false, http_status: data.http_status || response.status } : {}) } as ConfigResult;
+          if (result.config) state.config = result.config;
+          state.configStatus = result.ok ? (result.rolled_back ? '已恢复上次可用配置' : 'Being 模型已更新') : result.error || '设置未能保存';
           state.configStatusClass = result.ok ? 'success' : 'error';
           return result;
-        } catch (error) { state.configStatus = errorText(error); state.configStatusClass = 'error'; return { ok: false }; }
-        finally { state.changed(); }
-      },
-    };
-    return { state, runtime, dispose: () => { ++revision; } };
-  }, [app]);
-  const adapter = useMemo(() => {
-    const state = new ChatState();
-    let disposed = false, revision = 0, readable = false, configEnabled = false;
-    const providers = ['anthropic', 'openai', 'openrouter', 'gemini', 'groq', 'xai', 'portal-custom'];
-    let presets: Preset[] = [];
-    const runtime: Pick<ChatRuntime, 'loadLlmConfig' | 'applyConfigChange'> = {
-      async loadLlmConfig() {
-        disposed = false;
-        const request = ++revision;
-        state.configStatus = "";
-        state.configLoading = true;
-        state.changed();
-        try {
-          if (typeof app.api.subagentConfig !== 'function')
-            throw new Error('客户端接口尚未更新，请完全退出并重新打开 Desktop 后重试。');
-          const config = staged && app.form?.subagentSetup ? app.form.subagentSetup : await app.api.subagentConfig();
-          if (disposed || request !== revision) return;
-          readable = true;
-          configEnabled = staged && typeof app.form?.subagentEnabled === "boolean" ? app.form.subagentEnabled : config.enabled !== false;
-          state.config = { enabled: configEnabled, base_url: config.base_url, api: config.api, provider: config.provider === 'google' ? 'gemini' : config.provider, model: config.model, thinking: config.thinking, presets };
-          if (app.snapshot?.settings.hasToken) {
-            try {
-              const beingConfig = await app.api.beingModelConfig() as LlmConfig;
-              if (disposed || request !== revision) return;
-              const catalog = updateBeingCatalog(beingConfig);
-              presets = catalog.presets;
-              state.config = { ...state.config, presets };
-            } catch { if (!disposed && request === revision) setCatalogHint('暂时无法读取 Being 模型列表，可先添加自定义模型。'); }
-          }
-        } catch (error) {
-          if (!disposed && request === revision) { state.configStatus = errorText(error); state.configStatusClass = 'error'; }
-        } finally { if (!disposed && request === revision) { state.configLoading = false; state.changed(); } }
-      },
-      async applyConfigChange(patch) {
-        if (!readable) return { ok: false };
-        const enabled = typeof patch.enabled === "boolean" ? patch.enabled
-          : staged ? (app.form?.subagentEnabled ?? configEnabled) : (configEnabled || !state.config?.model);
-        const input: SubagentSetup = { enabled, ...(patch.base_url ? { base_url: String(patch.base_url), api: String(patch.api || 'openai-completions') } : { base_url: '', api: '' }), provider: patch.base_url ? 'portal-custom' : String(patch.provider || ''), model: String(patch.model || '').trim(), api_key: String(patch.api_key || ''), thinking: String(patch.thinking || 'medium') };
-        if (input.enabled !== false && (!providers.includes(input.provider) || !input.model)) {
-          state.configStatus = '请选择服务商并填写模型名称。';
-          state.changed();
-          return { ok: false };
-        }
-        setBusy(true);
-        try {
-          if (staged) {
-            // Blank means retain an already staged key just as Portal retains a stored key.
-            const previous = app.form?.subagentSetup;
-            if (!input.api_key && previous?.provider === input.provider && previous?.base_url === input.base_url) input.api_key = previous.api_key;
-            app.editForm('subagentSetup', input);
-            if (inline) {
-              state.config = { enabled: input.enabled !== false, provider: input.provider, model: input.model, thinking: input.thinking, base_url: input.base_url, api: input.api, presets };
-              state.configStatus = '已加入待保存配置，请点击下方保存按钮应用。';
-              state.configStatusClass = 'success';
-              state.changed();
-            } else app.closeSubagentSettings();
-          } else {
-            if (!app.snapshot) throw new Error('请先连接 Being。');
-            const next = await app.api.save({ ...app.snapshot.settings, subagentSetup: input });
-            app.applySnapshot(next, true);
-            state.config = { enabled: input.enabled !== false, provider: input.provider, model: input.model, thinking: input.thinking, base_url: input.base_url, api: input.api, presets };
-            state.configStatus = input.enabled === false ? 'subagent 已关闭，模型配置已保留。' : 'subagent 配置已保存，Portal 已启动。';
-            state.configStatusClass = 'success';
-            state.changed();
-          }
-          configEnabled = input.enabled !== false;
-          return { ok: true };
         } catch (error) {
           state.configStatus = errorText(error);
           state.configStatusClass = 'error';
-          state.changed();
           return { ok: false };
-        } finally { if (!disposed) setBusy(false); }
+        } finally { state.changed(); }
       },
     };
-    return { state, runtime, dispose: () => { disposed = true; ++revision; } };
-  }, [app, staged, inline]);
-  useEffect(() => () => { adapter.dispose(); being.dispose(); }, [adapter, being]);
-  const formRevision = useRef(app.connectionFormRevision);
-  useEffect(() => {
-    const rebuilt = formRevision.current !== app.connectionFormRevision;
-    formRevision.current = app.connectionFormRevision;
-    if (inline && !app.form?.subagentSetup && (rebuilt || adapter.state.configStatus.startsWith('已加入待保存配置'))) {
-      void adapter.runtime.loadLlmConfig();
-    }
-  }, [inline, app.form?.subagentSetup, app.connectionFormRevision, adapter]);
+    return { state, runtime, dispose: () => { ++revision; } };
+  }, [app, endpoint]);
+
+  useEffect(() => () => being.dispose(), [being]);
   const close = () => { if (!busy) app.closeSubagentSettings(); };
-  const switchTarget = (value: "Heart" | "subagent") => {
-    if (busy) return;
-    setTarget(value);
-    setVisited(previous => new Set([...previous, value]));
+  const save = async () => {
+    if (busy || !app.snapshot) return;
+    setBusy(true); setError(''); setNotice('');
+    try {
+      const next = await app.api.save({ ...app.snapshot.settings,
+        ...(mode === 'custom' ? { subagentSetup: custom, subagentInherit: false } : { subagentInherit: true }) });
+      app.applySnapshot(next, true);
+      setCustom(current => ({ ...current, api_key: '' }));
+      await refreshStatus();
+      setNotice('模型验证成功，已应用并重启 Portal。');
+    } catch (error) { setError(errorText(error)); }
+    finally { setBusy(false); }
   };
-  const Panel = embedded ? "div" : WorkspaceDrawer;
-  return <Panel id="subagent-model-panel" ref={panel} className={embedded ? "embedded-model-settings" : undefined} style={embedded ? undefined : {width, flexBasis:width}}>
+  const updateCustom = (patch: Partial<SubagentSetup>) => setCustom(current => ({ ...current, ...patch }));
+  const Panel = embedded ? 'div' : WorkspaceDrawer;
+  return <Panel id="subagent-model-panel" ref={panel} className={embedded ? 'embedded-model-settings' : undefined} style={embedded ? undefined : { width, flexBasis: width }}>
     {!embedded && <PanelResizeHandle panel={panel} label="调整模型设置宽度" width={width} onResize={setWidth} initial={320} min={240} max={640} reserve={396} />}
     <aside id="settings-panel" aria-label="模型设置" onKeyDown={event => { if (!embedded && event.key === 'Escape') { event.stopPropagation(); close(); } }}>
       <div className="settings-header panel-header" hidden={embedded}>
-        <div><div className="settings-title-line"><h2>模型设置</h2></div>
-          <p>{target === 'Heart' ? '选择当前 Being 使用的模型' : staged ? '选择 subagent 模型，随连接一起安装与配置' : '配置本机 subagent 使用的模型'}</p>
-        </div>
+        <div><div className="settings-title-line"><h2>模型设置</h2></div><p>Being 与 subagent 模型</p></div>
         <button ref={closeButton} type="button" className="btn-close" aria-label="关闭模型设置" disabled={busy} onClick={close}>✕</button>
       </div>
-      <div className="model-target-header" hidden={detailOpen}><div className="toggle-group model-targets" role="tablist" aria-label="模型配置对象">
-        {(['Heart', 'subagent'] as const).map(value => <button key={value} type="button" role="tab" id={`model-tab-${value}`} aria-controls={`model-content-${value}`} aria-selected={target === value} tabIndex={target === value ? 0 : -1}
-          onKeyDown={event => {
-            if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key) || busy) return;
-            event.preventDefault();
-            const next = event.key === 'Home' ? 'Heart' : event.key === 'End' ? 'subagent' : target === 'Heart' ? 'subagent' : 'Heart';
-            switchTarget(next);
-            document.getElementById(`model-tab-${next}`)?.focus();
-          }} className={target === value ? 'active' : ''} disabled={busy} onClick={() => switchTarget(value)}>{value === 'Heart' ? 'Being 模型' : 'subagent'}</button>)}
-      </div></div>
-      {(['Heart', 'subagent'] as const).map(value => <div key={value} id={`model-content-${value}`} role="tabpanel" aria-labelledby={`model-tab-${value}`} className="model-target-content" hidden={target !== value}>
-        {visited.has(value) && <ChatSettings state={value === 'Heart' ? being.state : adapter.state} runtime={value === 'Heart' ? being.runtime : adapter.runtime}
-          copyPreset={value === 'subagent' ? beingPreset : undefined} catalogHint={value === 'subagent' ? catalogHint : undefined}
-          onEnableSubagent={value === 'subagent' && !staged ? () => app.enableSubagent() : undefined}
-          onDetailChange={value === target ? onDetailChange : undefined}
-          open contentOnly target={value} pending={value === 'subagent' && Boolean(app.form?.subagentSetup)} staged={value === 'subagent' && staged} close={close} onBusy={setBusy} />}
-        {value === 'subagent' && <div hidden={detailOpen}>{subagentConfiguration}</div>}
-      </div>)}
+      {(error || status && status.health !== 'ok') && <section className="subagent-health-status error" aria-label="subagent 状态" role="alert">
+        <strong>{error ? 'subagent 配置未应用' : 'subagent 配置出错'}</strong>
+        <p>{error || status?.message}</p>
+        <button type="button" className="text-button" disabled={busy} onClick={() => setTarget('subagent')}>重新配置</button>
+      </section>}
+      <div className="toggle-group model-targets" role="group" aria-label="模型配置对象">
+        <button type="button" className={target === 'Heart' ? 'active' : ''} aria-pressed={target === 'Heart'} disabled={busy} onClick={() => setTarget('Heart')}>Being 模型</button>
+        <button type="button" className={target === 'subagent' ? 'active' : ''} aria-pressed={target === 'subagent'} disabled={busy} onClick={() => setTarget('subagent')}>subagent</button>
+      </div>
+      <div hidden={target !== 'Heart'}><ChatSettings state={being.state} runtime={being.runtime} onDetailChange={target === 'Heart' ? onDetailChange : undefined}
+        open contentOnly target="Heart" staged={false} pending={false} close={close} onBusy={setBusy} /></div>
+      <form hidden={target !== 'subagent'} className="subagent-custom-editor" aria-label="subagent 配置" onSubmit={event => { event.preventDefault(); void save(); }}>
+        <label className="field-label" htmlFor="subagent-source">模型来源</label>
+        <select id="subagent-source" className="field-input" value={mode} onChange={event => { setMode(event.target.value as typeof mode); setNotice(''); }} disabled={busy}>
+          <option value="inherit">自部署模型（默认）</option><option value="custom">自定义 subagent</option>
+        </select>
+        <p className="field-help">{mode === 'inherit' ? '使用 glm5.3flash，通过当前 Being 连接自动认证，无需填写模型密钥。' : '只影响 subagent，不改动 Being 模型。密钥留空时，沿用本机为同一 Being、同一接口保存的密钥。'}</p>
+        {mode === 'custom' && <>
+          <label className="field-label" htmlFor="subagent-custom-provider">服务商</label>
+          <select id="subagent-custom-provider" className="field-input" value={custom.provider || 'portal-custom'} onChange={event => updateCustom({ provider: event.target.value, api_key: '' })} disabled={busy}>
+            {['portal-custom', 'openrouter', 'openai', 'anthropic', 'google', 'groq', 'xai'].map(value => <option key={value} value={value}>{value === 'portal-custom' ? '自定义接口' : value}</option>)}
+          </select>
+          <label className="field-label" htmlFor="subagent-custom-model">模型名称</label>
+          <input id="subagent-custom-model" className="field-input" required value={custom.model} onChange={event => updateCustom({ model: event.target.value })} disabled={busy} />
+          {custom.provider === 'portal-custom' && <>
+            <label className="field-label" htmlFor="subagent-custom-url">接口地址</label>
+            <input id="subagent-custom-url" className="field-input" required type="url" value={custom.base_url || ''} onChange={event => updateCustom({ base_url: event.target.value, api_key: '' })} disabled={busy} spellCheck={false} />
+            <label className="field-label" htmlFor="subagent-custom-api">接口协议</label>
+            <select id="subagent-custom-api" className="field-input" value={custom.api || 'openai-completions'} onChange={event => updateCustom({ api: event.target.value })} disabled={busy}>
+              {['openai-completions', 'openai-responses', 'anthropic-messages', 'google-generative-ai'].map(value => <option key={value}>{value}</option>)}
+            </select>
+          </>}
+          <label className="field-label" htmlFor="subagent-custom-key">API 密钥</label>
+          <input id="subagent-custom-key" className="field-input" type="password" autoComplete="off" placeholder="输入新密钥；留空沿用同接口凭据" value={custom.api_key} onChange={event => updateCustom({ api_key: event.target.value })} disabled={busy} />
+          <label className="field-label" htmlFor="subagent-custom-thinking">思考强度</label>
+          <select id="subagent-custom-thinking" className="field-input" value={custom.thinking} onChange={event => updateCustom({ thinking: event.target.value })} disabled={busy}>
+            {['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'].map(value => <option key={value}>{value}</option>)}
+          </select>
+        </>}
+        <p className="field-help">先验证模型调用，成功后应用并重启 Portal；失败时保留原配置。运行中的任务可能中断。</p>
+        <div className="settings-actions"><button type="submit" className="btn-apply" disabled={busy || !status}>{busy ? '正在验证并应用…' : '验证并应用 subagent 配置'}</button></div>
+        {notice && <p role="status">{notice}</p>}
+      </form>
     </aside>
   </Panel>;
 }

@@ -5,6 +5,11 @@ import type { ActivityEntry } from '../desktop/renderer/chat/models/chat';
 const start = (id?: string, name = 'portal_exec') => newToolActivity([], { call_id: id, name, input: { command: 'echo hello' } }, `row-${id}`, 1)!;
 
 describe('tool activity identity and details', () => {
+  it('shows the recovery action returned by Portal for a failed execution', () => {
+    const entries=[start('timeout')];
+    completeToolActivity(entries,{call_id:'timeout',result:{isError:true,content:[{type:'text',text:'partial output\nCommand timed out'}],next_action:'长任务使用 background=true'}});
+    expect(entries[0]).toMatchObject({error:true,resultDetail:'partial output\nCommand timed out',nextAction:'长任务使用 background=true'});
+  });
   it('pairs concurrent calls by identity, ignoring duplicates and unknown result ids', () => {
     const entries = [start('a'), start('b')];
     completeToolActivity(entries, { tool_use_id: 'a', content: 'first', is_error: false });

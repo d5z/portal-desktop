@@ -35,9 +35,23 @@ const app = Object.assign(new Store(), {modelSettingsTarget:'Heart',snapshot:{se
     {id:'vendor/new',name:'新版模型',release_date:'2026-10-01',context:262144,source:'catalog'},
     {id:'vendor/expired',name:'过期密钥模型'}, {id:'vendor/fail',name:'失败模型'}, {id:'vendor/rollback',name:'回退模型'}
    ]:[{id:input.route+'/model',name:input.route==='slow'?'过期响应':'官方模型'}]}};
-  },subagentConfig:async()=>({provider:'openai',model:'local-model',thinking:'high'})
+  },subagentStatus:async()=>({inheritModel:true,health:'ok'}),subagentConfig:async()=>({provider:'openai',model:'local-model',thinking:'high'})
  },closeSubagentSettings(){window.closeCalls=(window.closeCalls||0)+1},applySnapshot(){}
 });
+
+const originalFetch = window.fetch.bind(window);
+window.fetch = async (target, init = {}) => {
+ const url = new URL(String(target), location.href);
+ if (url.protocol !== 'beings:' || url.hostname !== 'chat') return originalFetch(target, init);
+ const kind = url.pathname.split('/').pop();
+ if (kind === 'config') {
+   const data = await app.api.beingModelConfig(init.body ? JSON.parse(init.body) : undefined);
+   return Response.json(data, {status:data.ok === false ? data.http_status || 400 : 200});
+ }
+ const input = kind === 'keys' ? JSON.parse(init.body) : {route:url.searchParams.get('route')};
+ const result = app.api.beingModelCatalog ? await app.api.beingModelCatalog({...input, kind}) : {status:200,data:kind==='routes'?{routes:[]}:{models:[]}};
+ return Response.json(result.data, {status:result.status});
+};
 createRoot(document.getElementById('root')).render(<StrictMode><div className="workspace-body" style={{height:'100vh'}}><main className="workspace-stage">本地模型设置验证</main><SubagentModelSettings app={app}/></div></StrictMode>);
 `,
     loader: "tsx",
@@ -203,11 +217,11 @@ else {
     await page
       .getByLabel("API 密钥", { exact: true })
       .fill("custom-fixture-key");
-    await page.getByRole("tab", { name: "subagent", exact: true }).click();
+    await page.getByRole("button", { name: "subagent", exact: true }).click();
     await page
-      .getByRole("heading", { name: "local-model", exact: true })
+      .getByLabel("模型来源", { exact: true })
       .waitFor();
-    await page.getByRole("tab", { name: "Being 模型", exact: true }).click();
+    await page.getByRole("button", { name: "Being 模型", exact: true }).click();
     assert.equal(
       await page.getByLabel("模型 ID", { exact: true }).inputValue(),
       "exact/model-id",

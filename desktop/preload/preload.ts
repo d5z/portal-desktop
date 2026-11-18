@@ -131,6 +131,7 @@ const api: DesktopAPI = {
   browserState: () => ipcRenderer.invoke('beings:browser-state'),
   openBrowser: url => ipcRenderer.invoke('beings:browser-open', url),
   copyText: text => ipcRenderer.invoke('beings:clipboard-copy', text),
+  copyImage: (data, mime) => ipcRenderer.invoke('beings:clipboard-image', data, mime),
   editChat: command => ipcRenderer.invoke('beings:chat-edit', command),
   editSelection: command => ipcRenderer.invoke('beings:selection-edit', command),
   browserAction: action => ipcRenderer.invoke('beings:browser-action', action),
@@ -174,7 +175,26 @@ const api: DesktopAPI = {
   openKits: () => ipcRenderer.invoke('beings:kits-open'),
   openTownLink: route => ipcRenderer.invoke('beings:town-open', route),
   snapshot: () => ipcRenderer.invoke('beings:snapshot'),
-  save: input => ipcRenderer.invoke('beings:save', input),
+  save: async input => {
+    if (input.subagentInherit === undefined && !input.subagentSetup) return ipcRenderer.invoke('beings:save', input);
+    const { key, url, body } = await ipcRenderer.invoke('beings:subagent-network-prepare', input);
+    const response = await fetch(url, {
+      method: 'POST', credentials: 'omit', cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', 'X-Subagent-Access': key },
+      body,
+    });
+    // DevTools retains the original response; the form displays the safe summary.
+    if (!response.ok && response.headers.has('X-Subagent-Error')) {
+      await response.arrayBuffer();
+      throw new Error(decodeURIComponent(response.headers.get('X-Subagent-Error')!));
+    }
+    if (!response.ok) {
+      const value = await response.json();
+      throw new Error(value.error || `subagent 配置失败（HTTP ${response.status}）。`);
+    }
+    await response.arrayBuffer();
+    return ipcRenderer.invoke('beings:subagent-network-result', key);
+  },
   toolApprovalPending: () => ipcRenderer.invoke('beings:tool-approval-pending'),
   answerToolApproval: (id, allowed) => ipcRenderer.invoke('beings:tool-approval-answer', id, allowed),
   onToolApproval: callback => {
@@ -182,9 +202,8 @@ const api: DesktopAPI = {
     ipcRenderer.on('beings:tool-approval', listener);
     return () => ipcRenderer.removeListener('beings:tool-approval', listener);
   },
-  beingModelCatalog: input => ipcRenderer.invoke('beings:model-catalog', input),
-  beingModelConfig: patch => ipcRenderer.invoke("beings:model-config", patch),
   sceneTasks: () => ipcRenderer.invoke('beings:scene-tasks'),
+  subagentTaskDetails: (endpoint, taskIds) => ipcRenderer.invoke('beings:subagent-task-details', endpoint, taskIds),
   recentChatHistory: endpoint => ipcRenderer.invoke('beings:recent-chat-history', endpoint),
   onSceneTasks: callback => {
     const listener = (_event: unknown, snapshot: import('../shared/types').SceneTaskSnapshot) => callback(snapshot);
@@ -192,6 +211,7 @@ const api: DesktopAPI = {
     return () => ipcRenderer.removeListener('beings:scene-tasks', listener);
   },
   subagentConfig: () => ipcRenderer.invoke('beings:subagent-config'),
+  subagentStatus: () => ipcRenderer.invoke('beings:subagent-status'),
   choose: kind => ipcRenderer.invoke('beings:choose', kind),
   startPortal: () => ipcRenderer.invoke('beings:portal-start'),
   restartPortal: () => ipcRenderer.invoke('beings:portal-restart'),

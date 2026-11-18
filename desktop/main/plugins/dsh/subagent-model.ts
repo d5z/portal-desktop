@@ -8,7 +8,7 @@ import type { DshModelCompatibility, DshServiceConfig } from '../../../shared/ds
 export async function resolveSubagentModel(directory: string, settings: Settings, env = process.env): Promise<{ compatibility: DshModelCompatibility; services?: DshServiceConfig }> {
   const unavailable = (message: string) => ({ compatibility: { supported: false, message } });
   let document;
-  try { document = parse(await readFile(settings.portalConfigPath || path.join(directory, 'subagent-portal.toml'), 'utf8')); }
+  try { document = parse(await readFile(settings.portalConfigPath || path.join(directory, 'desktop-portal.toml'), 'utf8')); }
   catch (error) {
     return unavailable((error as NodeJS.ErrnoException).code === 'ENOENT' ? '尚未配置 subagent 模型。' : '无法读取 subagent 配置，请检查本机 Portal 配置文件。');
   }

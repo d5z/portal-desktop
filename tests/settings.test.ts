@@ -18,8 +18,8 @@ it('persists credentials encrypted, reloads and preserves them on workspace-only
   try {
     const store = new SettingsStore(dir, storage, process.execPath);
     await store.load(); expect(store.connection).toBeNull();
-    expect(store.settings.permissionMode).toBe('auto-review');
-    expect(parse(portalConfig(store.settings))).toMatchObject({ security: { permission_mode: 'auto-review' } });
+    expect(store.settings.permissionMode).toBe('supervised');
+    expect(parse(portalConfig(store.settings))).toMatchObject({ security: { permission_mode: 'supervised' } });
     expect(store.settings.allowExec).toBe(true);
     expect(store.settings.kitsEnabled).toBe(true);
     expect(parse(portalConfig(store.settings))).toMatchObject({ kits_enabled: true, tools: { exec: true, screenshot: true, custom_tools_enabled: true } });
@@ -49,14 +49,17 @@ it('persists credentials encrypted, reloads and preserves them on workspace-only
     await expect(store.save({ ...store.settings, portalName: 'bad\nname' })).rejects.toThrow();
     await expect(store.save({ ...store.settings, workspace: '../outside' })).rejects.toThrow();
     await expect(store.save({ ...store.settings, permissionMode: 'invalid' as any })).rejects.toThrow('权限');
-    await store.save({ ...store.settings, permissionMode: 'read-only' });
-    const restricted = new SettingsStore(dir, storage, process.execPath); await restricted.load();
-    expect(restricted.settings.permissionMode).toBe('read-only');
-    await restricted.save({ ...restricted.settings, permissionMode: 'auto-review' });
-    const automatic = new SettingsStore(dir, storage, '/client/heart-portal');
-    await automatic.load();
-    expect(automatic.settings.permissionMode).toBe('auto-review');
-    expect(parse(portalConfig(automatic.settings))).toMatchObject({ security: { permission_mode: 'auto-review' } });
+    for (const legacyMode of ['auto-review', 'read-only']) {
+      const saved = JSON.parse(await readFile(path.join(dir, 'connection.json'), 'utf8'));
+      saved.settings.permissionMode = legacyMode;
+      await writeFile(path.join(dir, 'connection.json'), JSON.stringify(saved));
+      const migrated = new SettingsStore(dir, storage, process.execPath); await migrated.load();
+      expect(migrated.settings.permissionMode).toBe('supervised');
+      expect(parse(portalConfig(migrated.settings))).toMatchObject({ security: { permission_mode: 'supervised' } });
+    }
+    await store.save({ ...store.settings, permissionMode: 'full-access' });
+    const always = new SettingsStore(dir, storage, process.execPath); await always.load();
+    expect(always.settings.permissionMode).toBe('full-access');
   } finally { await rm(dir, { recursive: true, force: true }); }
 });
 

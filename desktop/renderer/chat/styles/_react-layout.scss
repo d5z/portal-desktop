@@ -261,6 +261,16 @@ button.step2-back {
   padding: 9px 0;
 }
 
+.scene-task-status,
+.scene-task-brief {
+  display: block;
+}
+
+.scene-task-brief {
+  color: var(--text, #30352f);
+  font-weight: 500;
+}
+
 .scene-task-list small {
   display: block;
   overflow-wrap: anywhere;

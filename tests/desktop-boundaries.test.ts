@@ -183,7 +183,7 @@ describe('Portal save input boundary', () => {
     const input = { workspace: '', portalBinary: '', portalName: '', autoStart: false, allowExec: true, kitsEnabled: true,
       subagentEnabled: false, subagentSetup: { provider: 'openai', model: 'fixture', api_key: '', thinking: 'medium' } };
     await invoke(input);
-    expect(save).toHaveBeenCalledExactlyOnceWith(input);
+    expect(save).toHaveBeenCalledExactlyOnceWith(input, undefined);
     expect(order).toEqual(['before', 'save', 'after', 'snapshot']);
   });
 });

@@ -82,6 +82,10 @@ export class AppModel extends Store {
   toastCopied = false;
   settingsOpen = false;
   subagentSettingsOpen = false;
+  subagentTaskIds: string[] = [];
+  subagentSelectedTaskId?: string;
+  openSubagentTasks(taskIds: string[], selectedId?: string) { this.subagentTaskIds = taskIds; this.subagentSelectedTaskId = selectedId; this.changed(); }
+  closeSubagentTasks = () => { this.subagentTaskIds = []; this.changed(); };
   subagentFromConnection = false;
   modelSettingsTarget: "Heart" | "subagent" = "Heart";
   openSubagentSettings(fromConnection = false) {
@@ -371,6 +375,7 @@ export class AppModel extends Store {
       this.snapshot?.settings.endpoint === next.settings.endpoint &&
       this.snapshot?.settings.being === next.settings.being);
     const sameChat = sameBeing && this.snapshot?.chatScene?.scene_id === next.chatScene?.scene_id;
+    if (!sameChat || reload) this.subagentTaskIds = [];
     if (reload || !next.settings.hasToken || (this.snapshot && next.settings.endpoint !== this.snapshot.settings.endpoint)) {
       this.logsRequest = "";
       this.logsLoading = false;
@@ -811,7 +816,7 @@ export class AppModel extends Store {
       autoStart: s.autoStart,
       backgroundEnabled: Boolean(s.backgroundEnabled),
       allowExec: s.allowExec,
-      permissionMode: s.permissionMode ?? 'auto-review',
+      permissionMode: s.permissionMode ?? 'supervised',
       kitsEnabled: s.kitsEnabled,
       portalConfigPath: s.portalConfigPath,
       portalEnvironmentPath: s.portalEnvironmentPath,

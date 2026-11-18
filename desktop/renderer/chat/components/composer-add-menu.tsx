@@ -8,9 +8,8 @@ import { ComposerMenuIcon } from '../../shared/icons/composer-menu';
 import type { ChatState } from '../models/chat';
 
 
-export function ComposerAddMenu({ state, onUpload, onSelect, subagentAction }: {
+export function ComposerAddMenu({ state, onUpload, onSelect }: {
   state: ChatState; onUpload: () => void; onSelect: () => void;
-  subagentAction?: { label: string; run(): void };
 }) {
   const id = useId();
   const trigger = useRef<HTMLButtonElement>(null);
@@ -66,10 +65,10 @@ export function ComposerAddMenu({ state, onUpload, onSelect, subagentAction }: {
       <div role="separator"/>
       {composerCommands.map(command => <button key={command.id} className="composer-command-main" type="button" role="menuitem" title={command.description} onClick={() => {
         close();
-        if (!canUseComposerCommand(command.id, state, subagentAction?.run)) return;
+        if (!canUseComposerCommand(command.id, state)) return;
         state.draft = insertComposerCommand(state.draft, command.id);
         state.changed(); onSelect();
-      }}><ComposerMenuIcon chat kind={command.id}/><span className="composer-menu-copy"><strong>{command.label}</strong>{command.id === 'subagent' && subagentAction && <small>{subagentAction.label}</small>}</span></button>)}
+      }}><ComposerMenuIcon chat kind={command.id}/><span className="composer-menu-copy"><strong>{command.label}</strong></span></button>)}
     </div>
   </div>;
 }

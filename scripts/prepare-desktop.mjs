@@ -27,6 +27,8 @@ if (binaryExists) {
     console.log('Bundled Portal is incompatible with this client; rebuilding the local engine.');
     await import('./build-portal.mjs');
   }
+  const { preparePortalRuntime } = await import('./prepare-portal-runtime.mjs');
+  await preparePortalRuntime();
   await writeRuntimeBundle();
 }
 console.log('Prepared local Loom assets (no CDN requests).');

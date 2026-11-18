@@ -246,6 +246,13 @@ function createStreamRuntime(state: any, options: any): any {
   let replayingSettledReply = false;
   let replayingInitialEvents = false;
   let replayRunStartedAt: number | undefined;
+  let lastServerError: string | undefined;
+  function repeatedServerError(data: any) {
+    const message = data.message || "unknown error";
+    if (lastServerError === message) return true;
+    lastServerError = message;
+    return false;
+  }
   function setStreamScene(scene: any) {
     state.activeScene = {
       ...scene,
@@ -1316,6 +1323,8 @@ function createStreamRuntime(state: any, options: any): any {
   }
 
   function markProgress(type: any, data: any) {
+    if (type === "meta" && (data.continuation === true ||
+        (data.stream_id && data.stream_id !== currentStreamId))) lastServerError = undefined;
     if (type === "meta") showContinuationMarker(data);
     if (!PROGRESS_EVENTS.has(type)) return;
     const active = type !== "message_stop" && type !== "error";
@@ -1324,6 +1333,7 @@ function createStreamRuntime(state: any, options: any): any {
       if (type === "content_block_delta" && !data?.delta?.text) return;
       if ((type === "thinking" || type === "reasoning") &&
           !(data?.text || data?.delta?.text || (typeof data?.delta === "string" && data.delta))) return;
+      lastServerError = undefined;
       replayTransportOnly = false;
       autonomousHandedOff = false;
       if (currentRun?.end) {
@@ -1725,6 +1735,8 @@ function createStreamRuntime(state: any, options: any): any {
             if (myEpoch !== writerEpoch) continue;
             traceStreamEvent('sse', eventType, data, liveSeq);
             if (options.routeEvent?.(eventType, data)) continue;
+            // Ignore a repeated terminal error before it moves the run again.
+            if (eventType === "error" && repeatedServerError(data)) continue;
             splitStreamProgress(eventType, data);
             markProgress(eventType, data);
             if (["content_block_delta", "thinking", "reasoning", "tool_use", "tool_result", "message_stop", "error"].includes(eventType)) sawSceneEvent = true;
@@ -2038,6 +2050,14 @@ function createStreamRuntime(state: any, options: any): any {
       await spliceSend(text, filesOverride || [...pendingFiles], sendOptions);
       return;
     }
+    // A new turn supersedes the previous terminal activity marker. Keep the
+    // completed run in the transcript, but stop exposing its error/timeout/
+    // stopped state as the live scene status while the new request starts.
+    if (currentRun?.end) {
+      currentRun = null;
+      actionLogClear();
+      changed();
+    }
     const replyBaseline = new Set(state.items);
     const submittedAt = Date.now();
     const sendingScene = { ...state.currentScene };
@@ -2057,6 +2077,7 @@ function createStreamRuntime(state: any, options: any): any {
     // Recovery identities belong to one request. A failed new POST (or reader
     // before its first meta event) must not probe the previous completed turn.
     currentStreamId = lastStreamId = null;
+    lastServerError = undefined;
     replyRunSettled = false;
     pendingReply = { baseline: replyBaseline, submittedAt, phase: "processing" };
     timedOutReply = null;
@@ -3339,6 +3360,7 @@ function createStreamRuntime(state: any, options: any): any {
     }
 
     isStreaming = true;
+    if (data.stream_id !== lastStreamId) lastServerError = undefined;
     currentStreamId = data.stream_id || null;
     if (currentStreamId) lastStreamId = currentStreamId;
     writerEpoch++; // F2: 接管写权
@@ -3372,6 +3394,8 @@ function createStreamRuntime(state: any, options: any): any {
       events.forEach((item: any, index: number) => processReplayEvent(item.event, item.data || {}, Number(item.seq) || undefined,
         index <= (settledThrough.get(eventScenes[index]) ?? -1)));
     } finally { replayingInitialEvents = false; replayRunStartedAt = undefined; }
+
+    if (!isStreaming) return; // An error in the buffered events already ended this replay.
 
     if (data.finished) {
       // 先渲染已累积的文字，再 finalize
@@ -3589,6 +3613,7 @@ function createStreamRuntime(state: any, options: any): any {
       }
       return;
     }
+    if (eventType === "error" && repeatedServerError(eventData)) return;
     splitStreamProgress(eventType, eventData);
     if (replayingSettledReply && ['thinking', 'reasoning', 'tool_use', 'tool_result'].includes(eventType)) return;
     if (!replayingSettledReply) markProgress(eventType, eventData);
@@ -3885,7 +3910,8 @@ function createStreamRuntime(state: any, options: any): any {
     syncConnection: (next: any) => { connState = next; applyDotClass(); },
     acceptReplay: replayStream,
     acceptSceneEvent: (type: any, data: any, settled = false) => {
-      if ((type === "meta" && !data.persisted) || type === "usage") return;
+      if (type === "meta" && !data.persisted) { lastServerError = undefined; return; }
+      if (type === "usage") return;
       // A boundary is not the start of another run. Shared streams may replay
       // stops for idle scenes; opening a run here creates a phantom "已结束 0 秒".
       if (!settled && !isStreaming && PROGRESS_EVENTS.has(type) && type !== "message_stop" && type !== "error") {

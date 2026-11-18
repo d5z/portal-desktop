@@ -160,13 +160,15 @@ export function createChatBridge(state: ChatState) {
           return;
         case 'beings:scene-tasks':
           if (data.revision !== revision || data.endpoint !== new URLSearchParams(location.search).get('history_scope') || !Array.isArray(data.tasks) || data.tasks.length > 200) return;
-          if (!data.tasks.every((t: any) => t && typeof t.id === 'string' && typeof t.sceneId === 'string' && Number.isFinite(t.createdAt) && ['queued','running','done','failed','cancelled','interrupted','budget_exhausted','timeout'].includes(t.status))) return;
+          if (!data.tasks.every((t: any) => t && typeof t.id === 'string' && typeof t.sceneId === 'string' && Number.isFinite(t.createdAt) &&
+            (!('brief' in t) || typeof t.brief === 'string') && (!('turns' in t) || Number.isSafeInteger(t.turns)) &&
+            ['queued','running','done','failed','cancelled','interrupted','budget_exhausted','timeout'].includes(t.status))) return;
           if (typeof data.subagentConfigured === 'boolean') state.subagentConfigured = data.subagentConfigured;
           if (typeof data.subagentEnabled === 'boolean') state.subagentEnabled = data.subagentEnabled;
           runtime.updateSceneTasks(data.tasks, data.subagentReady === true);
           return;
         case 'beings:permission-state':
-          if (data.revision !== revision || !['read-only', 'supervised', 'auto-review', 'full-access'].includes(data.mode)) return;
+          if (data.revision !== revision || !['supervised', 'full-access'].includes(data.mode)) return;
           state.permissionMode = data.mode;
           state.permissionMenuOpen = data.open === true;
           state.changed();

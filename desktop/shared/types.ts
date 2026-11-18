@@ -33,6 +33,7 @@ export interface SaveSettings {
   permissionMode?: import('./security').PermissionMode;
   subagentEnabled?: boolean;
   subagentSetup?: SubagentSetup;
+  subagentInherit?: boolean;
   connectionLink?: string;
   workspace: string;
   portalBinary: string;
@@ -49,13 +50,50 @@ export interface PortalState { phase: PortalPhase; pid?: number; managed?: boole
 export interface BackgroundState { supported: boolean; installed: boolean; enabled: boolean; running: boolean; existing: boolean; label?: string; pid?: number; message: string }
 export interface ChatScene { scene_id: string; scene_meta: { client: string; scene_label: string; portal_name?: string; portal_status?: PortalPhase } }
 export interface RecentChatMessage { seq: number; role: 'user' | 'being' | 'assistant'; content: string; at: string; scene_id: string; scene_label: string }
-export type ChatSceneActivity = 'queued' | 'thinking' | 'replying' | 'working' | 'waiting' | 'reconnecting' | 'timeout' | 'done' | 'error' | 'stopped';
+export type ChatSceneActivity = 'queued' | 'thinking' | 'replying' | 'working' | 'waiting' | 'reconnecting' | 'timeout' | 'done' | 'error' | 'send-failed' | 'task-failed' | 'stopped';
 export const CHAT_SCENE_ACTIVITY_LABELS: Record<ChatSceneActivity, string> = {
   queued: '排队中', thinking: '思考中', replying: '回复中', working: '执行中', waiting: '等待最终回复',
   reconnecting: '恢复连接中', timeout: '等待超时', done: '已回复', error: '执行异常', stopped: '已停止',
+  'send-failed': '消息未发送', 'task-failed': '后台任务失败',
 };
-export interface SceneTask { id: string; sceneId: string; status: "queued" | "running" | "done" | "failed" | "cancelled" | "interrupted" | "budget_exhausted" | "timeout"; createdAt: number; endedAt?: number; error?: string }
+export const CHAT_SCENE_ACTIVITY_ACTIONS: Partial<Record<ChatSceneActivity, string>> = {
+  'send-failed': '有附件消息未能发送。打开场景，在输入框上方查看原因，重试附件处理或删除排队消息。',
+  'task-failed': '后台任务未完成。打开场景的执行详情查看原因；需要继续时，请让 Being 修正后重试。',
+  error: '本轮执行遇到异常。打开场景查看错误详情；修正原因后再重试。',
+  timeout: '尚未收到回复。打开场景核对执行记录和连接状态，确认后再重试。',
+};
+export interface SceneTask { id: string; sceneId: string; status: "queued" | "running" | "done" | "failed" | "cancelled" | "interrupted" | "budget_exhausted" | "timeout"; createdAt: number; endedAt?: number; brief?: string; turns?: number; error?: string }
 export interface SceneTaskSnapshot { endpoint: string; tasks: SceneTask[]; subagentReady?: boolean; subagentConfigured?: boolean; subagentEnabled?: boolean }
+export interface SubagentStep {
+  at: number;
+  kind: 'started' | 'thinking' | 'tool' | 'tool-result' | 'message' | 'turn-end' | 'finished';
+  callId?: string;
+  name?: string;
+  input?: string;
+  output?: string;
+  failed?: boolean;
+}
+export interface SubagentTaskDetail { taskId: string; steps: SubagentStep[] }
+export interface SubagentConfig extends Omit<SubagentSetup, 'api_key'> {
+  inherit_model: boolean;
+  validated_at?: number;
+  api_key_configured: boolean;
+}
+export interface SubagentStatus {
+  enabled: boolean;
+  inheritModel: boolean;
+  configured: boolean;
+  provider: string;
+  model: string;
+  thinking: string;
+  apiKeyConfigured: boolean;
+  baseUrl?: string;
+  api?: string;
+  ready: boolean;
+  health: 'ok' | 'warning' | 'error';
+  message: string;
+  lastTask?: SceneTask;
+}
 export interface Snapshot { settings: Settings; portal: PortalState; background?: BackgroundState; chatScene?: ChatScene; chatSessions?: ChatScene[]; notice?: string }
 export interface ClientStartup { supported: boolean; enabled: boolean; message: string }
 export interface NotificationPreferences { enabled: boolean; mail: boolean; firesides: boolean; bonfire: boolean; scenes: boolean }
@@ -94,6 +132,7 @@ export interface DesktopAPI {
   browserState(): Promise<BrowserState>;
   openBrowser(url?: string): Promise<void>;
   copyText(text: string): Promise<void>;
+  copyImage(data: ArrayBuffer, mime: string): Promise<void>;
   editChat(command: ChatEditCommand): Promise<boolean>;
   editSelection(command: ChatEditCommand): Promise<boolean>;
   browserAction(action: BrowserAction): Promise<void>;
@@ -126,12 +165,12 @@ export interface DesktopAPI {
   openTownLink(route: string): Promise<void>;
   snapshot(): Promise<Snapshot>;
   save(input: SaveSettings): Promise<Snapshot>;
-  beingModelCatalog?(input: { kind: 'routes' | 'models' | 'keys'; route?: string; api_key?: string }): Promise<{ status: number; data: Record<string, unknown> }>;
-  beingModelConfig(patch?: Record<string, string | number | boolean>): Promise<Record<string, unknown>>;
   recentChatHistory(endpoint: string): Promise<RecentChatMessage[]>;
   sceneTasks(): Promise<SceneTaskSnapshot>;
+  subagentTaskDetails?(endpoint: string, taskIds: string[]): Promise<SubagentTaskDetail[]>;
   onSceneTasks(callback: (snapshot: SceneTaskSnapshot) => void): () => void;
-  subagentConfig(): Promise<Omit<SubagentSetup, 'api_key'>>;
+  subagentConfig(): Promise<SubagentConfig>;
+  subagentStatus?(): Promise<SubagentStatus>;
   connectionDefaults(input: Pick<SaveSettings, 'connectionLink'>): Promise<{ portalName: string; source?: string }>;
   choose(kind: 'workspace'): Promise<string | null>;
   startPortal(): Promise<PortalState>;

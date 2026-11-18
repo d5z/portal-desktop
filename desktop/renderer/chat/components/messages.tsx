@@ -1,3 +1,4 @@
+import type { SceneTask } from '../../../shared/types';
 import StatusMark from '../../shared/components/react-bits/status-mark/StatusMark';
 import { Icon } from '../../shared/icons/icon';
 import { SceneScheduling } from './scheduling';
@@ -35,6 +36,7 @@ function ActivityStep({ entry, finished }: { entry: ActivityEntry; finished: boo
     {open && <div className="run-entry-detail">
       {thought ? <><p>{detail}</p>{entry.duration ? <small>{duration(entry.duration)}</small> : null}</> : <div className="run-tool-details">
         {(entry.arg || entry.result) && <p>{[entry.arg, entry.result].filter(Boolean).join('\n')}</p>}
+        {entry.nextAction && <p role="note">{entry.nextAction}</p>}
         {(entry.exitCode !== undefined || entry.durationMs !== undefined || entry.totalOutputBytes !== undefined) && <dl>
           {entry.exitCode !== undefined && <><dt>退出码</dt><dd>{entry.exitCode}</dd></>}
           {entry.durationMs !== undefined && <><dt>耗时</dt><dd>{(entry.durationMs / 1000).toLocaleString(undefined, { maximumFractionDigits: 2 })} 秒</dd></>}
@@ -47,13 +49,26 @@ function ActivityStep({ entry, finished }: { entry: ActivityEntry; finished: boo
     </div>}
   </details>;
 }
-export function ChatActivity({ run, sceneLabel, showDetails = true, showProgress = true, errorAlreadyShown = false }: {
-  run: Run; sceneLabel?: string; showDetails?: boolean; showProgress?: boolean; errorAlreadyShown?: boolean;
+function SubagentActivity({ tasks, onOpen }: { tasks?: SceneTask[]; onOpen?: (taskIds: string[], selectedId?: string) => void }) {
+  if (!tasks?.length || !onOpen) return null;
+  const active = tasks.filter(task => task.status === 'running' || task.status === 'queued').length;
+  const failed = tasks.filter(task => ['failed', 'interrupted', 'budget_exhausted', 'timeout'].includes(task.status)).length;
+  const completed = tasks.filter(task => task.status === 'done').length;
+  const status = active ? 'running' : failed ? 'failed' : 'done';
+  return <button type="button" className="run-subagent-activity" data-status={status}
+    aria-label="查看子智能体执行详情" onClick={() => onOpen(tasks.map(task => task.id))}>
+    <span className="run-subagent-icons" aria-hidden="true"><Icon name="chat-wrench" /></span>
+    <span className="run-subagent-copy"><strong>子智能体 · {tasks.length}</strong><span>{active ? `${active} 运行中` : failed ? `${failed} 异常` : completed === tasks.length ? '已完成' : '已结束'}</span></span>
+    <Icon name="chat-chevron-right" />
+  </button>;
+}
+export function ChatActivity({ run, sceneLabel, showDetails = true, showProgress = true, onOpenSubagents, errorAlreadyShown = false }: {
+  run: Run; sceneLabel?: string; showDetails?: boolean; showProgress?: boolean; errorAlreadyShown?: boolean; onOpenSubagents?: (taskIds: string[], selectedId?: string) => void;
 }) {
   const status = run.status || run.outcome || "thinking";
   const repeatError = status === 'error' && errorAlreadyShown;
-  if (showDetails || (run.end && run.entries.some(entry => entry.type === 'tool' && entry.error))) {
-    return <DetailedChatActivity run={run} sceneLabel={sceneLabel} repeatError={repeatError} />;
+  if (showDetails || (onOpenSubagents && run.scheduling?.tasks.length) || (run.end && run.entries.some(entry => entry.type === 'tool' && entry.error))) {
+    return <DetailedChatActivity run={run} sceneLabel={sceneLabel} repeatError={repeatError} onOpenSubagents={onOpenSubagents} showTrace={showDetails || !onOpenSubagents} />;
   }
   const attention = !repeatError && ["error", "timeout", "stopped"].includes(status) && (status !== "stopped" || !run.stopHistorySeq);
   const artifacts = [...new Set(run.entries.flatMap(entry => entry.artifactPath ? [entry.artifactPath] : []))];
@@ -79,10 +94,14 @@ function DetailedChatActivity({
   run,
   sceneLabel,
   repeatError,
+  onOpenSubagents,
+  showTrace = true,
 }: {
   run: Run;
   sceneLabel?: string;
   repeatError: boolean;
+  showTrace?: boolean;
+  onOpenSubagents?: (taskIds: string[], selectedId?: string) => void;
 }) {
   const [open, setOpen] = useState(false),
     [now, setNow] = useState(Date.now);
@@ -132,8 +151,9 @@ function DetailedChatActivity({
         </span>
         <span className="run-caption">
           <span className="run-label" title={run.hint || run.arg || summary}>
-            {summary}
+            {showTrace ? summary : run.end ? '思考过程' : '思考中'}
           </span>
+          {!!run.scheduling?.tasks.length && onOpenSubagents && <span className="run-delegation-label">子智能体协作</span>}
           {run.autonomousOrigin
             ? <span className="message-scene" title="后台自主活动，与当前场景对话分别显示">{run.autonomousOrigin === 'callback' ? 'SBS 自主回调' : 'SBS 自主活动'}</span>
             : sceneLabel && <span className="message-scene" title={run.sceneId}>{sceneLabel}</span>}
@@ -144,7 +164,8 @@ function DetailedChatActivity({
           <Icon name="chat-chevron-right" />
         </span>
       </summary>
-      {open && <div className="run-body">
+      <SubagentActivity tasks={run.scheduling?.tasks} onOpen={onOpenSubagents} />
+      {open && showTrace && <div className="run-body">
         {(showElapsed || tools.length > 0) && <div className="run-metrics">
           {showElapsed && <span title="总耗时" aria-label="总耗时">
             {duration(Math.max(0, Math.floor(((run.end || now) - run.start) / 1000)))}
@@ -155,7 +176,7 @@ function DetailedChatActivity({
         </div>}
         {run.hint && <p className="run-hint">{run.hint}</p>}
         {!run.end && run.context && <p className="run-hint">{run.context}</p>}
-        {run.scheduling && <SceneScheduling {...run.scheduling} />}
+        {run.scheduling && !onOpenSubagents && <SceneScheduling {...run.scheduling} />}
         <div className="run-list">
           {run.entries.map((entry, i) => <ActivityStep key={entry.id || entry.toolCallId || i}
             entry={entry} finished={!!run.end} />)}

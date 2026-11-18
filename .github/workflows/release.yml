@@ -136,6 +136,9 @@ jobs:
         run: node tests/packaged-resources.mjs
       - name: Verify packaged Node runtime and plugin host without system Node
         run: npm run test:packaged-runtime
+      - name: Verify subagent with the bundled Portal runtime
+        if: runner.os == 'macOS'
+        run: npm run test:subagent-runtime
       - name: Verify cloud viewer resources inside ASAR
         if: runner.os == 'macOS'
         run: node tests/home-viewer-electron.mjs --packaged

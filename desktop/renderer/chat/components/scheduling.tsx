@@ -23,9 +23,10 @@ export function SceneScheduling({ tasks, hint }: { tasks: SceneTask[]; hint: str
     <h4><span className={active ? 'scene-task-spinner' : ''} aria-hidden="true" />场景调度 · subagent{active ? ` · ${active} 项进行中` : ''}</h4>
     {hint && <pre>{hint}</pre>}
     {tasks.length > 0 && <p>后台任务独立执行，结果由 Being 在对应场景回复。工具执行完成不代表回复已经到达。</p>}
-    <ul>{[...tasks].reverse().slice(0, 30).map(task => <li key={task.id}>
-      <span>{labels[task.status]}</span>
-      <small>{new Date(task.createdAt).toLocaleString()} · {task.id}</small>
+    <ul>{[...tasks].reverse().slice(0, 30).map(task => <li key={task.id} data-status={task.status}>
+      <span className="scene-task-status">{labels[task.status]}</span>
+      <strong className="scene-task-brief">{task.brief || '后台子任务'}</strong>
+      <small>{new Date(task.createdAt).toLocaleString()} · {task.id}{task.turns ? ` · ${task.turns} 轮` : ''}</small>
       {task.error && <p className="scene-task-error">{task.error}</p>}
     </li>)}</ul>
   </section>;

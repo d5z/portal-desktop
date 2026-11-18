@@ -13,7 +13,7 @@ const directories: string[] = [];
 afterEach(async () => { vi.unstubAllGlobals(); vi.restoreAllMocks(); await Promise.all(directories.splice(0).map(p => rm(p, { recursive: true, force: true }))); });
 async function fixture(model?: Record<string, unknown>, enabled = true) {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'dsh-subagent-')); directories.push(dir);
-  if (model) await writeFile(path.join(dir, 'subagent-portal.toml'), stringify({ subagent: { enabled, model } }));
+  if (model) await writeFile(path.join(dir, 'desktop-portal.toml'), stringify({ subagent: { enabled, model } }));
   return dir;
 }
 it('uses the existing custom subagent endpoint/key for independent streaming and reflects model changes', async () => {
@@ -60,7 +60,7 @@ it('does not reuse a disabled model and allows local APIs without a key',async()
 });
 it('uses the configured Portal file and provider-specific environment key without exposing it in status',async()=>{
   const dir=await fixture({provider:'openrouter',model:'vendor/model'});
-  const result=await resolveSubagentModel('/unused',{portalConfigPath:path.join(dir,'subagent-portal.toml')} as Settings,{OPENROUTER_API_KEY:'test-secret'});
+  const result=await resolveSubagentModel('/unused',{portalConfigPath:path.join(dir,'desktop-portal.toml')} as Settings,{OPENROUTER_API_KEY:'test-secret'});
   expect(result.services).toMatchObject({baseUrl:'https://openrouter.ai/api/v1',apiKey:'test-secret'});
   expect(JSON.stringify(result.compatibility)).not.toContain('test-secret');
   expect((await resolveSubagentModel(dir,{} as Settings,{})).compatibility.message).toContain('OAuth');
@@ -76,7 +76,7 @@ it('reports Being contract incompatibility without creating a conversational tur
 it('checks Being before reading the fallback configuration and reports the selected source',async()=>{
   const dir=await fixture();
   const request=vi.fn(async()=>{
-    await writeFile(path.join(dir,'subagent-portal.toml'),stringify({subagent:{enabled:true,model:{provider:'portal-custom',api:'openai-completions',model:'fallback-after-being',base_url:'http://localhost:1234/v1'}}}));
+    await writeFile(path.join(dir,'desktop-portal.toml'),stringify({subagent:{enabled:true,model:{provider:'portal-custom',api:'openai-completions',model:'fallback-after-being',base_url:'http://localhost:1234/v1'}}}));
     return Response.json({model:'being-first'});
   });
   const resolved=await resolvePluginModel(dir,{} as Settings,true,request);

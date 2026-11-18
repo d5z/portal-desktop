@@ -9,6 +9,7 @@ import type { PluginRegistry } from '../plugins/registry';
 import { remoteImage } from '../chat/remote-image';
 import { HTML_PREVIEW_RUNTIME, htmlPreviewPolicy } from './html-preview';
 import type { ConnectorNetwork } from '../home/network';
+import type { SubagentModelNetwork } from '../portal/subagent-network';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -25,10 +26,25 @@ const CHAT_ASSETS = new Set(['loom.html', 'chat.js', 'highlight.css', 'chat.css'
 export function registerLocalProtocol(assets: string, proxy: ChatProxy, plugins?: PluginRegistry, downloads = new AttachmentDownloads(app.getPath('userData'), async current => {
   const result=await dialog.showOpenDialog({title:'选择附件下载位置',defaultPath:current || app.getPath('downloads'),properties:['openDirectory','createDirectory']});
   return result.canceled ? undefined : result.filePaths[0];
-}, file => shell.openPath(file), file => shell.showItemInFolder(file)), localFiles?: LocalFilePreviews, dshPlugins?: DshPluginManager, connectors?: ConnectorNetwork) {
+}, file => shell.openPath(file), file => shell.showItemInFolder(file)), localFiles?: LocalFilePreviews, dshPlugins?: DshPluginManager, connectors?: ConnectorNetwork, subagent?: SubagentModelNetwork, shellURL: () => string = () => 'beings://desktop/') {
   proxy.onAttachmentUploaded = (token,endpoint,id,checksum) => downloads.bindSource(token,endpoint,id,checksum);
   protocol.handle('beings', async request => {
     const url = new URL(request.url);
+    if (url.hostname === 'chat' && ['/api/llm/config', '/api/llm/routes', '/api/llm/models', '/api/llm/keys'].includes(url.pathname)) {
+      const shell = new URL(shellURL());
+      const origin = `${shell.protocol}//${shell.host}`;
+      const source = request.headers.get('Origin');
+      if (source && source !== origin && source !== 'beings://chat') return new Response(null, { status: 403 });
+      const headers = { 'Access-Control-Allow-Origin': source || origin, Vary: 'Origin' };
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: {
+        ...headers, 'Access-Control-Allow-Methods': 'GET, PATCH, POST', 'Access-Control-Allow-Headers': 'Content-Type, X-Portal-Being-Endpoint',
+      } });
+      const response = await proxy.handle(request);
+      const resultHeaders = new Headers(response.headers);
+      for (const [key, value] of Object.entries(headers)) resultHeaders.set(key, value);
+      return new Response(response.body, { status: response.status, statusText: response.statusText, headers: resultHeaders });
+    }
+    if (url.hostname === 'desktop' && subagent?.matches(url.pathname)) return subagent.handle(request);
     if (url.hostname === 'desktop' && url.pathname.startsWith('/api/v1/me/') && connectors) return connectors.handle(request);
     if (url.hostname === 'desktop' && dshPlugins?.matches(url.pathname)) return dshPlugins.resource(request);
     if (url.hostname === 'chat' && url.pathname === '/api/remote-image') return remoteImage(request);

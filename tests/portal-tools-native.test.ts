@@ -156,12 +156,13 @@ it.skipIf(process.platform !== 'win32').each([
 
     // Keep negative coverage in a mode that actually restricts these operations.
     await portal.stop();
-    await portal.start({ ...settings, permissionMode: 'read-only' }, connection);
+    await portal.start({ ...settings, permissionMode: 'supervised' }, connection);
     await vi.waitFor(() => expect(portal.state.phase, portal.state.message).toBe('connected'), { timeout: 15_000 });
     const deniedPath = path.join(root, 'denied.png');
     const deniedCapture = await rpc('tools/call', { name: 'portal_screenshot', arguments: { path: deniedPath, region: '0,0,24,24' } });
     expect(deniedCapture.isError, JSON.stringify(deniedCapture)).toBe(true);
-    const deniedRead = await rpc('tools/call', { name: 'portal_file_read', arguments: { path: outside } });
+    await writeFile(path.join(root, '.env'), 'isolated-test-secret');
+    const deniedRead = await rpc('tools/call', { name: 'portal_file_read', arguments: { path: path.join(root, '.env') } });
     expect(deniedRead.isError, JSON.stringify(deniedRead)).toBe(true);
     expect(await readFile(deniedPath).catch(() => null)).toBeNull();
     expect(portal.state.phase).toBe('connected');

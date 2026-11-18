@@ -7,12 +7,15 @@ const statuses = new Set(['queued', 'running', 'done', 'failed', 'cancelled', 'i
 export function publicSceneTasks(document: unknown, scenes: Set<string>): SceneTask[] {
   const tasks = (document as { tasks?: unknown })?.tasks;
   if (!Array.isArray(tasks)) return [];
-  return tasks.filter(t => t && typeof t.task_id === 'string' && typeof t.scene_id === 'string' && scenes.has(t.scene_id) && statuses.has(t.status)
+  return tasks.filter(t => t && typeof t.task_id === 'string' &&
+    (t.scene_id == null || t.scene_id === '' || typeof t.scene_id === 'string' && scenes.has(t.scene_id)) && statuses.has(t.status)
     && Number.isFinite(t.created_ms)).slice(-200).map(t => ({
-      id: t.task_id.slice(0, 256), sceneId: t.scene_id, status: t.status,
+      id: t.task_id.slice(0, 256), sceneId: t.scene_id || '', status: t.status,
       createdAt: t.created_ms, endedAt: Number.isFinite(t.ended_ms) ? t.ended_ms : undefined,
+      ...(typeof t.brief_head === 'string' ? { brief: t.brief_head.slice(0, 200) } : {}),
+      ...(Number.isSafeInteger(t.turns) && t.turns >= 0 ? { turns: t.turns } : {}),
       // Task errors may contain upstream response bodies or credentials. Never expose them here.
-      error: t.status === 'failed' ? (/\b401\b/.test(String(t.error)) ? '模型鉴权失败，请检查 subagent 密钥' : 'subagent 执行失败，请查看本机诊断') : undefined,
+      error: t.status === 'failed' ? (/\b401\b/.test(String(t.error)) ? '模型鉴权失败，请检查“模型”设置中的接口凭据' : 'subagent 执行失败，请查看本机诊断') : undefined,
     }));
 }
 

@@ -8,6 +8,29 @@ import { quietProgressRuns } from '../desktop/renderer/chat/models/reply-bubbles
 const run: Run = {kind:'run',id:'quiet',start:1,status:'working',label:'处理任务',hint:'',arg:'',
   entries:[{type:'tool',text:'private diagnostic output',artifactPath:'/tmp/report.html'}]};
 const render = (value: Run, showDetails = false) => renderToStaticMarkup(createElement(ChatActivity,{run:value,showDetails}));
+it.each([true, false])('exposes delegated work even when reasoning visibility is %s', showDetails => {
+  const delegated: Run = {...run, scheduling: { hint: '', tasks: [
+    {id:'child-a',sceneId:'a',createdAt:1,status:'running',brief:'Python 文件校验\n用内置运行环境写入文件'},
+    {id:'child-b',sceneId:'a',createdAt:2,status:'done',brief:'Node 文件校验\n读回并校验'},
+  ]}};
+  const html = renderToStaticMarkup(createElement(ChatActivity, {run:delegated,showDetails,onOpenSubagents:()=>{}}));
+  expect(html.match(/aria-label="查看子智能体执行详情"/g)).toHaveLength(1);
+  expect(html).not.toContain('Python 文件校验');
+  expect(html).toContain('子智能体 · 2');
+  expect(html).toContain('1 运行中');
+  expect(html).toContain('子智能体协作');
+  const entry = html.indexOf('aria-label="查看子智能体执行详情"');
+  expect(entry).toBeGreaterThan(html.indexOf('</summary>'));
+  expect(entry).toBeLessThan(html.indexOf('</details>'));
+  expect(html).not.toContain('run-subagent-messages');
+  expect(html).not.toMatch(/<details[^>]*\bopen[= >]/);
+  expect(html).not.toContain('用内置运行环境写入文件');
+  expect(html).not.toContain('private diagnostic output');
+  const finished = {...delegated,end:3,scheduling:{hint:'',tasks:delegated.scheduling!.tasks.map(task=>({...task,status:'failed' as const}))}};
+  const completed = renderToStaticMarkup(createElement(ChatActivity, {run:finished,showDetails,onOpenSubagents:()=>{}}));
+  expect(completed).toContain('2 异常');
+  expect(completed).not.toContain('查看本轮 subagent 执行详情');
+});
 it('shows an accessible three-dot bubble without mounting the trace and preserves file results', () => {
   const html = render(run);
   expect(html).toContain('thinking-dots');

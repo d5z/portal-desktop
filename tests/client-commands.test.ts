@@ -1,8 +1,10 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { ClientCommandServer } from '../desktop/main/chat/client-server';
+import { ApprovalDialogs } from '../desktop/main/chat/approval-dialogs';
+import { ToolApproval } from '../desktop/main/chat/tool-approval';
 import { handleClientCommand, type ClientHistory } from '../desktop/renderer/chat/services/client-commands';
 
 const history: ClientHistory = {
@@ -13,6 +15,32 @@ const history: ClientHistory = {
   scenes: async () => [{ sceneId: 'a', messageCount: 2 }, { sceneId: 'b', label: '讨论', messageCount: 3, lastActive: '2026-09-21T00:00:00Z' }],
 };
 describe('client commands', () => {
+  it('returns allow-once through the actual HTTP approval channel without cancelling consent', async () => {
+    const directory = await mkdtemp(path.join(os.tmpdir(), 'client-approval-'));
+    let shown!: () => void;
+    const ready = new Promise<void>(resolve => { shown = resolve; });
+    const dialogs = new ApprovalDialogs(view => { if (view) shown(); });
+    const approval = new ToolApproval(() => 'supervised', input => dialogs.request(input));
+    const server = new ClientCommandServer(path.join(directory, 'client.json'), () => 'fixture', (request, signal) => approval.request(request, signal));
+    try {
+      await server.start();
+      const { port, token } = JSON.parse(await readFile(path.join(directory, 'client.json'), 'utf8'));
+      const post = () => fetch(`http://127.0.0.1:${port}/command`, { method:'POST', headers:{authorization:`Bearer ${token}`}, body:JSON.stringify({
+        endpoint:'fixture',verb:'security-approve',args:JSON.stringify({tool:'portal_exec',workspace:directory,arguments:{command:'echo approved'}}),
+      }) }).then(res => res.json());
+      const response = post();
+      await ready;
+      const firstId = dialogs.current()!.id;
+      const concurrent = post();
+      dialogs.answer(firstId, true);
+      expect(await response).toEqual({text:'allow-once'});
+      await vi.waitFor(() => expect(dialogs.current()?.id).toBeTruthy());
+      expect(dialogs.current()!.id).not.toBe(firstId);
+      dialogs.answer(dialogs.current()!.id, true);
+      expect(await concurrent).toEqual({text:'allow-once'});
+      expect(dialogs.current()).toBeNull();
+    } finally { await server.close(); await rm(directory, {recursive:true,force:true}); }
+  });
   it('uses explicit or calling scene, gives actionable empty/missing errors', async () => {
     expect(await handleClientCommand(history, 'context', '', 'a')).toContain('Scene a');
     expect(await handleClientCommand(history, 'context', ' b ', 'a')).toContain('Scene b');

@@ -10,9 +10,31 @@ import { SceneQueueStore } from '../desktop/renderer/chat/services/scene-queue';
 it('only exposes bounded, scene-scoped task status and generic auth errors', () => {
   const task = { task_id: 'task1', scene_id: 'a', status: 'failed', created_ms: 10, error: '401 secret-key', brief_head: 'private instructions' };
   expect(publicSceneTasks({ tasks: [task, {...task, scene_id:'other'}]}, new Set(['a']))).toEqual([
-    { id:'task1', sceneId:'a', status:'failed', createdAt:10, endedAt:undefined, error:'模型鉴权失败，请检查 subagent 密钥' },
+    { id:'task1', sceneId:'a', status:'failed', createdAt:10, endedAt:undefined, brief:'private instructions', error:'模型鉴权失败，请检查“模型”设置中的接口凭据' },
   ]);
   expect(publicSceneTasks({}, new Set(['a']))).toEqual([]);
+});
+it('retains unscoped task metadata while presenting it beside the current scene turn', () => {
+  const task = { task_id: 'unscoped', status: 'running', created_ms: 10 };
+  const output = publicSceneTasks({ tasks: [task, { ...task, task_id: 'null', scene_id: null },
+    { ...task, task_id: 'invalid', scene_id: 123 }, { ...task, task_id: 'other', scene_id: 'other' }] }, new Set(['a']));
+  expect(output.map(task => [task.id, task.sceneId])).toEqual([['unscoped', ''], ['null', '']]);
+  const user: any = { kind: 'message', role: 'user', id: 'current', sceneId: 'a', createdAt: 1, text: 'task' };
+  expect(withScheduling([user], output)).toHaveLength(2);
+  expect(withScheduling([user], output)[1]).toMatchObject({ kind: 'run', sceneId: 'a', scheduling: { tasks: output } });
+});
+it('keeps a run with its preceding scene message when its timer predates the server timestamp', () => {
+  const input:any[] = [
+    {kind:'message',role:'user',id:'old',sceneId:'a',createdAt:10,text:'old task'},
+    {kind:'message',role:'user',id:'new',sceneId:'a',createdAt:50,text:'new task'},
+    {kind:'run',id:'current-run',sceneId:'a',start:49,entries:[],label:'思考中'},
+  ];
+  const old:any = {id:'old-task',sceneId:'a',createdAt:20,endedAt:30,status:'done'};
+  const current:any = {id:'new-task',sceneId:'a',createdAt:60,status:'running'};
+  const output:any[] = withScheduling(input,[old,current]);
+  expect(output.find(item=>item.id==='current-run').scheduling.tasks).toEqual([current]);
+  expect(output.find(item=>item.id==='scheduling-old').scheduling.tasks).toEqual([old]);
+  expect(output.some(item=>item.id==='scheduling-new')).toBe(false);
 });
 it('observes atomic ledger replacement without polling and stops on dispose', async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(),'scene-task-watch-'));
@@ -54,7 +76,7 @@ it('background work stays active after a partial reply without changing another 
   runtime.updateSceneTasks([{id:'t',sceneId:'a',createdAt,endedAt:createdAt+100,status:'done'}]);
   expect(activity.mock.lastCall?.[0].a).toBe('waiting');
   runtime.updateSceneTasks([{id:'t',sceneId:'a',createdAt,status:'failed'}]);
-  expect(activity.mock.lastCall?.[0].a).toBe('error');
+  expect(activity.mock.lastCall?.[0].a).toBe('task-failed');
   runtime.dispose();
 });
 
@@ -272,7 +294,7 @@ it('shows failed delegated work even when another task completed', async () => {
     const tasks:any[]=[{id:'ok',sceneId:'a',createdAt:at,endedAt:at+10,status:'done'},
       {id:'bad',sceneId:'a',createdAt:at,endedAt:at+20,status:'failed'}];
     runtime.updateSceneTasks(tasks);
-    expect(activity.mock.lastCall?.[0].a).toBe('error');
+    expect(activity.mock.lastCall?.[0].a).toBe('task-failed');
     const input:any[]=[{kind:'message',role:'user',id:'u',sceneId:'a',createdAt:at-1,text:'two tasks'}];
     expect(withScheduling(input,tasks)[1]).toMatchObject({status:'error',label:'后台任务异常'});
   } finally {runtime.dispose();}

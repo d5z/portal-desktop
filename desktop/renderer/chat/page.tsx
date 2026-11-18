@@ -213,7 +213,7 @@ export function ChatView({
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
-  const timelineItems = replyBubbles(sceneItems(withScheduling(state.items.filter(item => item.kind !== "message" || !item.queued), state.sceneTasks), state.historyScope, state.currentScene, state.showSbsMessages));
+  const timelineItems = replyBubbles(sceneItems(withScheduling(state.items.filter(item => item.kind !== "message" || !item.queued), state.sceneTasks, state.currentScene), state.historyScope, state.currentScene, state.showSbsMessages));
   const historyWindow=useHistoryWindow(state.historyLoading ? [] : timelineItems,JSON.stringify([state.historyScope,state.currentScene.sceneId,state.showSbsMessages]),before=>runtime.loadOlderHistory(before));
   const visibleItems=historyWindow.items;
   const progressRuns = quietProgressRuns(timelineItems);
@@ -373,10 +373,9 @@ export function ChatView({
     : state.sendWillQueue ? canChooseFollowUp ? 'steer' : 'queue' : 'send';
   const sendLabel = state.stopping ? '正在停止' : action === 'stop' ? '停止处理' : readingFiles ? '正在读取附件'
     : action === 'steer' ? '引导' : action === 'queue' ? '排队' : '发送消息';
-  const configureSubagent = parent !== window && location.protocol === 'beings:' ? () => bridge.send({ type: 'beings:subagent-settings' }) : undefined;
   function sendDraft(mode?: "interrupt") {
     if (state.stopping || readingFiles) return;
-    if (!parseComposerCommands(state.draft).commands.every(command => canUseComposerCommand(command, state, subagentAction?.run))) return;
+    if (!parseComposerCommands(state.draft).commands.every(command => canUseComposerCommand(command, state))) return;
     releaseAnchor();
     scrollLock.current = true;
     void runtime.send(state.draft, null, { mode });
@@ -415,21 +414,6 @@ export function ChatView({
   const attachmentMenuMessageId = messageMenu.attachmentOpener?.closest('[data-message-id]')?.getAttribute('data-message-id');
   const { selection, setSelection, addToChat } = useMessageSelection(messages, composer, nativeTouch);
   useChatShortcuts(bridge, !contextMenuOpen && !messageMenu.isOpen && !nativeTouch ? selection?.text : undefined, addToChat, isMac);
-  const [subagentEnabling, setSubagentEnabling] = useState(false);
-  const [subagentEnableFailed, setSubagentEnableFailed] = useState(false);
-  async function enableSubagent() {
-    if (subagentEnabling) return;
-    setSubagentEnabling(true);
-    setSubagentEnableFailed(false);
-    const ok = await bridge.enableSubagent();
-    if (!ok) setSubagentEnableFailed(true);
-    setSubagentEnabling(false);
-  }
-  const subagentAction = configureSubagent && (state.subagentConfigured !== true ? { label: '去配置', run: configureSubagent }
-    : state.subagentEnabled === false ? {
-        label: subagentEnabling ? '正在启用…' : subagentEnableFailed ? '重试启用' : '启用',
-        run: () => { void enableSubagent(); },
-      } : undefined);
   useEffect(() => {
     const search = new ConversationSearch((path, init) => runtime.request(path, init));
     const abort = new AbortController();
@@ -673,6 +657,7 @@ export function ChatView({
                 showProgress={progressRuns.has(item.id)}
                 errorAlreadyShown={previous?.kind === "message" && previous.role === "system" &&
                   previous.sceneId === item.sceneId && previous.text.startsWith("⚠")}
+                onOpenSubagents={parent !== window && location.protocol === 'beings:' ? (taskIds, selectedId) => bridge.send({ type: 'beings:subagent-tasks-open', taskIds, selectedId }) : undefined}
                 sceneLabel={state.historyScope === "all" ? sceneName(item, state.currentScene, state.sceneNames) : undefined}
               />
             );
@@ -873,11 +858,10 @@ export function ChatView({
             </div>
             <div id="input-row">
               {!editingQueued && <ComposerAddMenu state={state} onUpload={() => fileInput.current?.click()} onSelect={() => requestAnimationFrame(() => composer.current?.focus())}
-                subagentAction={subagentAction}/>}
+               />}
               <ChatComposer
                 state={state}
                 onExamples={openExamples}
-                subagentAction={subagentAction}
                 key={state.currentScene.sceneId || "global"}
                 textareaRef={composer}
                 id="input"

@@ -1,5 +1,5 @@
 import { app, dialog, net, type BrowserWindow } from 'electron';
-import { access } from 'node:fs/promises';
+import { access, readFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import type { SaveSettings } from '../../shared/types';
 import { BackgroundPoll } from '../app/background-poll';
@@ -9,11 +9,11 @@ import { SettingsStore } from '../app/settings';
 import { ChatProxy } from '../chat/proxy';
 import { verifyBeingConnection } from '../chat/ready';
 import { ClientInstall } from '../updates/client-install';
-import { loadRuntimeBundle, restoreRuntimeMode, RuntimeRollbackError, RuntimeUpdater, type RuntimeUpdateResult } from '../updates/runtime';
-import { BackgroundPortal } from './background';
+import { loadRuntimeBundle, RuntimeRollbackError, RuntimeUpdater, type RuntimeUpdateResult } from '../updates/runtime';
+import { atomic, BackgroundPortal } from './background';
 import { ExternalPortalObserver } from './external';
 import { OrphanPortalRecovery } from './orphan';
-import { setSubagentEnabled, setupSubagent } from './subagent-setup';
+import { readSubagentConfig, setSubagentEnabled, saveSubagentPreferences, syncSubagentModel } from './subagent-setup';
 import { PortalSupervisor } from './supervisor';
 import { PortalTakeover } from './takeover';
 import { WindowsForcePortal } from './windows-force';
@@ -99,9 +99,31 @@ export async function createPortalController(options: {
     if (app.isPackaged) await loadRuntimeBundle(process.resourcesPath);
     if (replacing) await portal.stop();
     await store.save(store.settings);
+    // Default inference uses the current Loom identity, independently of the Being's main model.
+    let subagentChanged = false;
+    const generatedConfigPath = path.join(directory, 'desktop-portal.toml');
+    const ownsGeneratedConfig = !store.settings.portalConfigPath || store.settings.portalConfigPath === generatedConfigPath;
+    if (ownsGeneratedConfig) {
+      try {
+        subagentChanged = await syncSubagentModel(directory, store.settings, store.connection, net.fetch.bind(net) as typeof fetch);
+        if (!store.settings.portalConfigPath) {
+          await store.save({ ...store.settings, portalConfigPath: generatedConfigPath });
+        }
+      } catch (error) {
+        // A changed identity must never run with the previous Being's model token.
+        // Keep other Portal tools available, but disable the rejected default.
+        subagentChanged = (await readSubagentConfig(directory, store.settings)).enabled !== false;
+        const configPath = await setSubagentEnabled(directory, {
+          ...store.settings, portalConfigPath: generatedConfigPath,
+        }, false);
+        await store.save({ ...store.settings, portalConfigPath: configPath });
+        errorLog.report('subagent-model-sync', error);
+      }
+    }
     if (store.settings.backgroundEnabled) {
       await portal.stop();
       try {
+        if (subagentChanged && background.state.enabled) await background.disable();
         await background.enable(store.settings, store.connection);
         await new RuntimeUpdater(directory, background).waitReady(background.installedService!);
       } catch (error) {
@@ -126,22 +148,36 @@ export async function createPortalController(options: {
     const previous = targets.find(item => item.service?.name);
     return { portalName: previous?.service?.name || store.settings.portalName, source: previous?.root };
   };
-  const save = async (input: SaveSettings) => {
+  const save = async (input: SaveSettings, modelRequest: typeof fetch = net.fetch.bind(net) as typeof fetch) => {
     const previous = { ...store.settings }; const previousConnection = store.connection;
-    await store.save(input);
-    options.connectionChanged();
+    let modelBackup: { path: string; contents: string | null } | undefined;
+    let modelWritten = false, restartAttempted = false;
     try {
+      // Stage the candidate in memory while model verification and Portal
+      // takeover are still reversible. SettingsStore commits the connection
+      // file only after this transaction reaches a successful start.
+      await store.save(input, false);
+      options.connectionChanged();
       await verifyConnection();
+      // Reject a candidate before takeover can stop the currently working engine.
+      if (input.subagentSetup || input.subagentInherit === true || input.subagentEnabled !== undefined) {
+        const file = store.settings.portalConfigPath || path.join(directory, 'desktop-portal.toml');
+        const contents = await readFile(file, 'utf8').catch((error: NodeJS.ErrnoException) => {
+          if (error.code === 'ENOENT') return null;
+          throw error;
+        });
+        modelBackup = { path: file, contents };
+      }
+      if (input.subagentSetup || input.subagentInherit === true) {
+        const configPath = await saveSubagentPreferences(directory, store.settings, input.subagentSetup, store.connection!, modelRequest);
+        modelWritten = true;
+        await store.save({ ...store.settings, portalConfigPath: configPath }, false);
+      }
       await takeover.run(store.connection!, 'manual', async replacing => {
+        restartAttempted = true;
         // Discovery may import an old configuration during takeover. The switches
         // explicitly saved in this operation must take precedence over that file.
         store.settings = { ...store.settings, allowExec: input.allowExec, kitsEnabled: input.kitsEnabled };
-        if (input.subagentSetup) {
-          await portal.stop();
-          if (background.state.enabled) await background.disable();
-          const configPath = await setupSubagent(directory, store.settings, input.subagentSetup);
-          await store.save({ ...store.settings, portalConfigPath: configPath });
-        }
         if (input.subagentEnabled !== undefined) {
           await portal.stop();
           if (background.state.enabled) await background.disable();
@@ -152,7 +188,17 @@ export async function createPortalController(options: {
       });
       await publishCurrentPortal();
     } catch (error) {
+      if (modelBackup && (modelWritten || input.subagentEnabled !== undefined)) {
+        if (restartAttempted) {
+          await portal.stop();
+          if (background.state.enabled) await background.disable();
+        }
+        if (modelBackup.contents === null) await rm(modelBackup.path, { force: true });
+        else await atomic(modelBackup.path, modelBackup.contents);
+      }
       if (previousConnection) await store.save({ ...previous, connectionLink: previousConnection.link + '&relay_secret=' + encodeURIComponent(previousConnection.relaySecret) });
+      else { store.connection = null; store.settings = previous; }
+      options.connectionChanged();
       throw error;
     }
   };
@@ -291,13 +337,8 @@ export async function createPortalController(options: {
           if (runtimeUpdate.phase !== 'skipped') {
             if (runtimeUpdate.phase === 'current' || runtimeUpdate.phase === 'updated') {
               const service = background.installedService!;
-              await store.save({ ...store.settings, portalConfigPath: service.generatedConfig ? undefined : service.configPath, workspace: service.cwd || store.settings.workspace });
-              await restoreRuntimeMode(background, store.settings, async () => {
-                await portal.start(store.settings, connection);
-                await portal.waitReady();
-              },
-                true);
-              if (store.settings.backgroundEnabled) await updater.waitReady(background.installedService!);
+              await store.save({ ...store.settings, portalConfigPath: service.configPath, workspace: service.cwd || store.settings.workspace });
+              await startClientPortal(false);
               if (installIntent) await finishClientInstall();
             }
             await publishCurrentPortal();

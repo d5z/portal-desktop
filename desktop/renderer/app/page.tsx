@@ -25,6 +25,7 @@ import { KitInstall } from "../town/components/kit-install";
 import { ChatSearch } from "./components/search";
 import { ConnectionSettings, ClientSettings } from "./components/settings";
 import { SubagentModelSettings } from "./components/subagent-model-settings";
+import { SubagentTasks } from "./components/subagent-tasks";
 import { Diagnostics } from "./components/diagnostics";
 import { PermissionSettings, ToolApprovalDialog } from './components/permissions';
 import { EditContextMenu } from "../shared/components/context-menu";
@@ -181,6 +182,7 @@ export function App({ model }: { model: AppModel }) {
             </WorkspaceDrawer>}</DrawerPresence>
             </div>
           </div>
+          <SubagentTasks app={app} />
           <AttachmentFileViewer scope={`${app.chatSource}:${app.snapshot?.chatScene?.scene_id || ''}`} frame={frame}>
             <BeingInfo app={app} />
           </AttachmentFileViewer>

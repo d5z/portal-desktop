@@ -1,5 +1,6 @@
 import type { ChatItem, Message, Run } from './chat';
 import type { SceneTask } from '../../../shared/types';
+import type { MessageScene } from './scenes';
 
 /** Keep the wire text intact for history matching; separate Desktop metadata only for presentation. */
 export function splitSchedulingHint(text: string) {
@@ -15,13 +16,13 @@ export function splitSchedulingHint(text: string) {
  * History may not contain transient reasoning runs; in that case create one
  * presentation-only process row. Do not change wire messages or runtime state.
  */
-export function withScheduling(items: ChatItem[], tasks: SceneTask[]): ChatItem[] {
+export function withScheduling(items: ChatItem[], tasks: SceneTask[], currentScene?: MessageScene): ChatItem[] {
   const users = items.filter((item): item is Message => item.kind === 'message' && item.role === 'user');
   // Most turns have no scheduling metadata. Avoid matching every historical
   // run to a user (and allocating another timeline) on each streamed frame.
   if (!tasks.length && !users.some(user => splitSchedulingHint(user.text).hint)) return items;
   const owner = (sceneId: string | undefined, at: number) => users
-    .filter(user => user.sceneId === sceneId && user.createdAt != null && user.createdAt <= at)
+    .filter(user => (sceneId ? user.sceneId === sceneId : currentScene?.sceneId ? user.sceneId === currentScene.sceneId : true) && user.createdAt != null && user.createdAt <= at)
     .sort((a, b) => b.createdAt! - a.createdAt!)[0];
   const groups = new Map<string, { user: Message; hint: string; tasks: SceneTask[]; run?: Run }>();
   for (const user of users) groups.set(user.id, { user, hint: splitSchedulingHint(user.text).hint, tasks: [] });
@@ -29,9 +30,13 @@ export function withScheduling(items: ChatItem[], tasks: SceneTask[]): ChatItem[
     const user = owner(task.sceneId, task.createdAt);
     if (user) groups.get(user.id)!.tasks.push(task);
   }
+  const precedingUsers = new Map<string | undefined, Message>();
   for (const item of items) {
+    if (item.kind === 'message' && item.role === 'user') precedingUsers.set(item.sceneId, item);
     if (item.kind !== 'run') continue;
-    const user = owner(item.sceneId, item.start);
+    // Run timers can start before the server timestamps the user message.
+    // The transcript's scene/turn order keeps that run with its actual bubble.
+    const user = precedingUsers.get(item.sceneId);
     const group = user && groups.get(user.id);
     if (group && !group.run) group.run = item;
   }
@@ -54,6 +59,8 @@ export function withScheduling(items: ChatItem[], tasks: SceneTask[]): ChatItem[
       label: '思考过程', hint: '', arg: '', synthetic: true,
     };
     run.scheduling = { hint: group.hint, tasks: assigned };
+    const briefs = assigned.map(task => task.brief).filter((brief): brief is string => Boolean(brief));
+    if (briefs.length) run.context = briefs.length === 1 ? briefs[0] : `${briefs.length} 个任务：${briefs.slice(0, 2).join('、')}`;
     // A stage reply ends a breath, but does not finish its delegated work.
     if (active) {
       run.end = undefined;

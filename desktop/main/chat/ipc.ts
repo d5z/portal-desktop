@@ -1,10 +1,12 @@
 import { app, type BrowserWindow } from 'electron';
+import path from 'node:path';
 import type { PluginEventTopic } from '../../../plugins/sdk';
 import type { RegisterHandler } from '../app/ipc';
 import { SettingsStore } from '../app/settings';
-import { readSubagentState } from '../portal/status';
+import { readSubagentState, subagentHealth } from '../portal/status';
 import { readSubagentConfig } from '../portal/subagent-setup';
 import { SceneTaskObserver } from '../portal/subagent-tasks';
+import { readSubagentActivity } from '../portal/subagent-activity';
 import { PortalSupervisor } from '../portal/supervisor';
 import { ChatProxy } from './proxy';
 import { RecentChatHistory } from './recent-history';
@@ -15,36 +17,11 @@ export function registerChatIpc(options: {
   publishPluginEvent(topic: PluginEventTopic): void;
 }) {
   const { handle, directory, store, portal, proxy, chatSessions, window: getWindow, publishPluginEvent } = options;
-  handle('beings:model-catalog', async (input: { kind: string; route?: string; api_key?: string }) => {
-    if (!input || !['routes', 'models', 'keys'].includes(input.kind) ||
-      (input.kind !== 'routes' && (typeof input.route !== 'string' || !input.route || input.route.length > 256)) ||
-      (input.kind === 'keys' && (typeof input.api_key !== 'string' || !input.api_key.trim() || input.api_key.length > 16384)))
-      throw new Error('无效的模型目录请求。');
-    const path = '/api/llm/' + input.kind + (input.kind === 'models' ? '?route=' + encodeURIComponent(input.route!) : '');
-    const response = await proxy.handle(new Request('beings://chat' + path, {
-      method: input.kind === 'keys' ? 'POST' : 'GET',
-      headers: { 'Content-Type': 'application/json' },
-      ...(input.kind === 'keys' ? { body: JSON.stringify({ route: input.route, api_key: input.api_key }) } : {}),
-    }));
-    return { status: response.status, data: await response.json().catch(() => ({ error: '无法读取模型目录。' })) };
-  });
-  handle('beings:model-config', async (patch?: Record<string, unknown>) => {
-    if (patch !== undefined && (!patch || Array.isArray(patch) || typeof patch !== 'object' ||
-      Object.entries(patch).some(([key, value]) => !['model', 'provider', 'base_url', 'api_key', 'thinking', 'temperature', 'rollback'].includes(key) || !['string', 'number', 'boolean'].includes(typeof value)) || JSON.stringify(patch).length > 16384))
-      throw new Error('无效的模型配置。');
-    const response = await proxy.handle(new Request('beings://chat/api/llm/config', {
-      method: patch === undefined ? 'GET' : 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      ...(patch === undefined ? {} : { body: JSON.stringify(patch) }),
-    }));
-    const data = await response.json();
-    if (!response.ok && patch === undefined) throw new Error(data.error || '无法读取或保存 Being 模型配置。');
-    return { ...data, ...(!response.ok ? { ok: false, http_status: data.http_status || response.status } : {}) };
-  });
   const taskSnapshot = async () => {
     const endpoint = store.connection?.endpoint || '';
     const settings = store.settings, phase = portal.state.phase, pid = portal.state.pid;
-    const subagent = await readSubagentState(portal.state.runtimePath || directory, pid);
+    const subagent = await readSubagentState(portal.state.runtimePath || directory, pid,
+      settings.portalConfigPath || path.join(directory, 'desktop-portal.toml'), endpoint);
     const tasks = await sceneTasks.configure(subagent?.state_dir);
     const current = endpoint === store.connection?.endpoint && settings.portalConfigPath === store.settings.portalConfigPath &&
       phase === portal.state.phase && pid === portal.state.pid;
@@ -71,8 +48,26 @@ export function registerChatIpc(options: {
   portal.on('state', publishTasks);
   app.once('will-quit', () => { portal.off('state', publishTasks); sceneTasks.close(); });
   handle('beings:scene-tasks', taskSnapshot);
+  handle('beings:subagent-task-details', async (endpoint: string, taskIds: string[]) => {
+    if (endpoint !== store.connection?.endpoint || !Array.isArray(taskIds) || taskIds.length > 200 ||
+      !taskIds.every(id => typeof id === 'string' && /^sub_[a-zA-Z0-9_-]{1,100}$/.test(id))) throw new Error('无效的 subagent 任务请求。');
+    const pid = portal.state.pid;
+    const engine = await readSubagentState(portal.state.runtimePath || directory, pid,
+      store.settings.portalConfigPath || path.join(directory, 'desktop-portal.toml'), endpoint);
+    if (!engine) return [];
+    const available = await sceneTasks.configure(engine.state_dir);
+    const allowed = new Set(available.map(task => task.id));
+    const connection = store.connection;
+    const details = await Promise.all(taskIds.filter(id => allowed.has(id)).map(id =>
+      readSubagentActivity(engine.state_dir, id, [connection?.token || '', connection?.relaySecret || ''])));
+    return endpoint === store.connection?.endpoint && pid === portal.state.pid ? details : [];
+  });
   const recentHistory = new RecentChatHistory(proxy, () => store.connection);
   handle('beings:recent-chat-history', (endpoint: string) => recentHistory.read(endpoint));
   handle('beings:subagent-config', () => readSubagentConfig(directory, store.settings));
+  handle('beings:subagent-status', async () => {
+    const [config, snapshot] = await Promise.all([readSubagentConfig(directory, store.settings), taskSnapshot()]);
+    return subagentHealth(config, snapshot, portal.state.phase);
+  });
   return { taskSnapshot };
 }

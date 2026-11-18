@@ -363,12 +363,13 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
       } catch (error) {
         if (next.saved.attachment && !disposed && !next.cancelled) {
           next.saved.phase = next.saved.attachment.delivery === 'sending' || next.saved.attachment.delivery === 'unknown' ? 'sending' : 'failed';
+          next.saved.error = error instanceof Error ? error.message : '附件处理失败';
           try { await queueStore.write(next.saved); } catch { /* Keep existing conservative checkpoint. */ }
-          next.entry.message.queueNotice = error instanceof Error ? error.message : '附件处理失败';
+          next.entry.message.queueNotice = next.saved.error;
           next.entry.message.retryLabel = '重试附件处理';
           if (next.saved.phase === 'failed') next.entry.message.retry = async () => {
             for (const file of next.saved.files) if (file.parseFailed) { file.jobId = undefined; file.forceParse = true; file.parseFailed = false; }
-            next.saved.phase = 'queued'; await queueStore.write(next.saved);
+            next.saved.phase = 'queued'; next.saved.error = undefined; await queueStore.write(next.saved);
             next.entry.message.retry = undefined; next.entry.message.queueNotice = undefined; scheduleDrain(); publish();
           };
         } else if (sendQueue.includes(next)) {
@@ -398,11 +399,11 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
     const repliedAt = session.runtime?.replyCompletedAt?.() || 0;
     if (!['thinking','replying'].includes(status)) {
       if (currentTasks.some((t: any) => ['failed','interrupted','budget_exhausted','timeout'].includes(t.status) &&
-          (!t.endedAt || t.endedAt > repliedAt))) return 'error';
+          (!t.endedAt || t.endedAt > repliedAt))) return 'task-failed';
       if (session.submittedAt && currentTasks.some((t: any) => t.status === 'done' && t.endedAt > repliedAt)) return 'waiting';
     }
     return status && ["queued", "thinking", "replying", "working", "waiting", "reconnecting"].includes(status) ? status :
-      queued ? "queued" : failed ? "error" : status;
+      queued ? "queued" : failed ? "send-failed" : status;
   };
   function publish() {
     if (disposed || !selected) return;
@@ -554,11 +555,11 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
             if (row.phase === 'preparing') row.phase = 'queued';
             attachQueued(target, entry, row);
             if (row.phase === 'failed') {
-              entry.message.queueNotice = '上次附件处理失败，请重试或取消';
+              entry.message.queueNotice = row.error || '上次附件处理失败，请重试或删除这条排队消息';
               entry.message.retryLabel = '重试附件处理';
               entry.message.retry = async () => {
                 for (const file of row.files) if (file.parseFailed) { file.jobId = undefined; file.forceParse = true; file.parseFailed = false; }
-                row.phase = 'queued'; await queueStore.write(row); entry.message.retry = undefined; entry.message.queueNotice = undefined; scheduleDrain(); publish();
+                row.phase = 'queued'; row.error = undefined; await queueStore.write(row); entry.message.retry = undefined; entry.message.queueNotice = undefined; scheduleDrain(); publish();
               };
             }
           }

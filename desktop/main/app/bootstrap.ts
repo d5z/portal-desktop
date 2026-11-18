@@ -19,6 +19,7 @@ import { resolvePluginModel } from '../plugins/dsh/being-model';
 import { BackgroundPortal } from '../portal/background';
 import { createPortalController } from '../portal/controller';
 import { registerPortalIpc } from '../portal/ipc';
+import { SubagentModelNetwork } from '../portal/subagent-network';
 import { PortalSupervisor } from '../portal/supervisor';
 import { TOWN_ORIGIN, TownClient, TownCredentials, type TownRequestEvent } from '../town/client';
 import { registerTownIpc } from '../town/ipc';
@@ -66,6 +67,7 @@ export function createDesktopApplication(options: DesktopOptions) {
   let stopBackgroundPoll = () => { };
   let stopResourceMonitor = () => { };
   const errorLog = new ClientErrorLog(userData, () => [store?.connection?.token || '', store?.connection?.relaySecret || '']);
+  const subagentNetwork = new SubagentModelNetwork(shellURL, error => errorLog.report('subagent-model', error), (url, init) => net.fetch(url as string, init));
   const mutations = new MutationQueue();
   const exclusive = mutations.run;
   const cleanupForQuit = async () => {
@@ -180,7 +182,7 @@ export function createDesktopApplication(options: DesktopOptions) {
         return net.fetch(request, { bypassCustomProtocolHandlers: true });
       });
     }
-    registerLocalProtocol(assets, proxy, plugins, attachmentDownloads, localFiles, dshPlugins, connectorNetwork);
+    registerLocalProtocol(assets, proxy, plugins, attachmentDownloads, localFiles, dshPlugins, connectorNetwork, subagentNetwork, shellURL);
     configureLocalSession(shellURL, () => notifications.state.supported && notifications.state.preferences.enabled);
     const commands = await createDesktopCommands({ directory, store, plugins, chatSessions, errorLog, shellURL, window: () => lifecycle.window });
     const { approvalDialogs } = commands;
@@ -217,6 +219,7 @@ export function createDesktopApplication(options: DesktopOptions) {
     const snapshot = chat.registerSessions(handle, exclusive, () => portalController.notice, () => closePluginSessions());
     registerPortalIpc({
       handle, exclusive, controller: portalController, snapshot,
+      network: subagentNetwork, isQuitting: () => lifecycle.quitting,
       beforeSave: () => { cancelTownPairing?.(); approvalDialogs.cancel(); },
       afterSave: async () => {
         closePluginSessions(); proxy.abortAll();

@@ -118,10 +118,10 @@ try {
   }
   await page.locator('#chat-frame').evaluate(el=>{el.style.width='';el.style.maxWidth='';});
   await chat.getByRole('button',{name:'快捷设置工作权限'}).click();
-  const menu=page.getByRole('menu',{name:'工作权限',exact:true});
+  const menu=page.getByRole('menu',{name:'电脑操作权限',exact:true});
   await menu.waitFor();
-  assert.equal(await page.getByRole('dialog',{name:'工作权限',exact:true}).count(),0);
-  assert.equal(await menu.getByRole('menuitemradio',{name:/帮我批准/}).getAttribute('aria-checked'),'true');
+  assert.equal(await page.getByRole('dialog',{name:'电脑操作权限',exact:true}).count(),0);
+  assert.equal(await menu.getByRole('menuitemradio',{name:/每次询问/}).getAttribute('aria-checked'),'true');
   const initialPid=(await page.evaluate(()=>window.beings.snapshot())).portal.pid;
   await page.screenshot({path:'output/playwright/permissions-packaged-menu.png'});
   await page.locator('html').evaluate(el=>el.dataset.theme='dark');
@@ -134,20 +134,20 @@ try {
   await chat.getByRole('button',{name:'快捷设置工作权限'}).click();await menu.waitFor();
   await chat.getByRole('button',{name:'快捷设置工作权限'}).click();await menu.waitFor({state:'hidden'});
   await chat.getByRole('button',{name:'快捷设置工作权限'}).click();
-  await menu.getByRole('menuitemradio',{name:/帮我批准/}).click();await menu.waitFor({state:'hidden'});
+  await menu.getByRole('menuitemradio',{name:/每次询问/}).click();await menu.waitFor({state:'hidden'});
   assert.equal((await page.evaluate(()=>window.beings.snapshot())).portal.pid,initialPid,'Current mode is a no-op');
   await chat.getByRole('button',{name:'快捷设置工作权限'}).click();
-  assert.equal(await menu.getByRole('menuitemradio',{name:/帮我批准/}).getAttribute('aria-checked'),'true');
-  const beforeSupervised=relayGeneration;
-  await menu.press('ArrowUp');await menu.press('Enter');await menu.waitFor({state:'hidden'});
-  await reconnectedAfter(beforeSupervised);
+  assert.equal(await menu.getByRole('menuitemradio',{name:/每次询问/}).getAttribute('aria-checked'),'true');
+  assert.equal(await menu.getByRole('menuitemradio').count(),2);
+  await menu.press('Escape');await menu.waitFor({state:'hidden'});
   assert.equal((await page.evaluate(()=>window.beings.snapshot())).settings.permissionMode,'supervised');
-  await chat.getByRole('button',{name:'快捷设置工作权限'}).getByText('请求批准',{exact:true}).waitFor();
   // Wait for the new runtime's relay after changing modes.
   await page.waitForFunction(async()=> (await window.beings.snapshot()).portal.phase === 'running');
   for(let i=0;i<100&&!relay;i++) await new Promise(r=>setTimeout(r,100));
   assert.ok(relay,'Bundled Portal must connect');
-  const ordinary=await call('echo sandbox>sandbox.txt');
+  const ordinaryCall=call('echo sandbox>sandbox.txt');
+  await page.getByRole('button',{name:'允许这一次',exact:true}).click();
+  const ordinary=await ordinaryCall;
   assert.notEqual(ordinary.result?.isError,true,JSON.stringify(ordinary));
   const denied=call('', 'portal_exec', {command:'echo denied>denied.txt',sandbox_permissions:'require_escalated',justification:'Test host approval'});
   await page.getByRole('button',{name:'拒绝',exact:true}).click();
@@ -166,24 +166,25 @@ try {
   if(process.platform==='darwin') {
     await writeFile(path.join(directory,'outside-secret'), 'private-test-content');
     const outside=call('cat ../outside-secret');
+    await page.getByRole('button',{name:'允许这一次',exact:true}).click();
     const blocked=await outside;
     assert.equal(blocked.result?.isError,true,JSON.stringify(blocked));
     assert.doesNotMatch(JSON.stringify(blocked),/private-test-content/);
   }
   await chat.getByRole('button',{name:'快捷设置工作权限'}).click();
   const beforeFull=relayGeneration;
-  await menu.getByRole('menuitemradio',{name:/完全访问/}).click();
+  await menu.getByRole('menuitemradio',{name:/始终允许/}).click();
   await reconnectedAfter(beforeFull);
   const full=await call('echo full>full.txt');
   assert.notEqual(full.result?.isError,true,JSON.stringify(full));
   assert.match(await readFile(path.join(workspace,'full.txt'),'utf8'),/full/);
-  const beforeFinalReadonly=relayGeneration;
-  await page.evaluate(async()=>{const s=await window.beings.snapshot();await window.beings.save({...s.settings,permissionMode:'read-only'});});
-  await reconnectedAfter(beforeFinalReadonly);
-  assert.match(JSON.stringify(await call('echo forbidden>readonly.txt')),/denied by permission mode/);
-  const readonlyWrite=await call('', 'portal_file_write', {path:'readonly.txt',content:'blocked'});
-  assert.match(JSON.stringify(readonlyWrite),/denied by permission mode/);
-  await assert.rejects(access(path.join(workspace,'readonly.txt')));
+  const beforeFinalSupervised=relayGeneration;
+  await page.evaluate(async()=>{const s=await window.beings.snapshot();await window.beings.save({...s.settings,permissionMode:'supervised'});});
+  await reconnectedAfter(beforeFinalSupervised);
+  const finalWrite=call('', 'portal_file_write', {path:'refused.txt',content:'blocked'});
+  await page.getByRole('button',{name:'拒绝',exact:true}).click();
+  assert.match(JSON.stringify(await finalWrite),/approval|denied|rejected/i);
+  await assert.rejects(access(path.join(workspace,'refused.txt')));
   console.log('PASS packaged app: unified add menu handles keyboard, UI toggles, examples and real file chooser; composer and menus fit 900/640/380/300px; permission dropdown and real approval/sandbox execution work.');
 } finally {
   if(page) await page.evaluate(()=>window.beings.stopPortal()).catch(()=>{});

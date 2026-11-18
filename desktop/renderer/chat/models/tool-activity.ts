@@ -51,6 +51,8 @@ export function completeToolActivity(entries: ActivityEntry[], data: Payload): A
   entry.error = typeof metadata.is_error === 'boolean' ? metadata.is_error
     : typeof metadata.isError === 'boolean' ? metadata.isError : entry.exitCode !== undefined && entry.exitCode !== 0;
   entry.resultDetail = bounded(detail);
+  entry.nextAction = entry.error ? typeof metadata.next_action === 'string' ? bounded(metadata.next_action)
+    : '查看错误详情，修正命令、输入文件或授权问题后再试。' : undefined;
   const summary = (contentText(data.summary) || detail).trim().replace(/\s+/g, ' ');
   entry.result = summary.length > 120 ? summary.slice(0, 119) + '…' : summary || (entry.error ? '工具执行失败，服务端未返回详情' : '');
   entry.durationMs = nonnegative(metadata.duration_ms);

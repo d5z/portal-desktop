@@ -664,6 +664,16 @@
   line-height: 1.6;
 }
 
+#subagent-model-panel .model-inheritance-note {
+  margin: 0 22px 4px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  color: var(--muted, #838b83);
+  background: color-mix(in srgb, var(--surface, #f3f4ef) 72%, transparent);
+  font-size: 12px;
+  line-height: 1.55;
+}
+
 #subagent-model-panel .btn-close {
   flex: none;
   display: grid;
@@ -922,3 +932,15 @@
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
+#subagent-model-panel .subagent-health-status {
+  display: grid;
+  gap: 4px;
+  margin: 12px 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border-subtle);
+  font-size: 13px;
+}
+#subagent-model-panel .subagent-health-status.error { color: var(--text-danger, #a33); border-color: color-mix(in srgb, currentColor 35%, transparent); }
+#subagent-model-panel .subagent-custom-editor { display: grid; gap: 8px; padding: 12px 0; }
+#subagent-model-panel .subagent-custom-editor .settings-actions { display: flex; gap: 8px; margin-top: 8px; }

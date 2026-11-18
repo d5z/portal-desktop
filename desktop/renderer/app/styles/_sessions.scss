@@ -604,11 +604,20 @@ html[data-local-sidebar] .chat-session-panel[data-pinned='true'][data-scene-side
   content: '✓';
 }
 
-.chat-session-activity[data-status='error'] {
+.chat-session-activity:is(
+  [data-status='error'],
+  [data-status='send-failed'],
+  [data-status='task-failed']
+) {
   color: var(--danger, #b34b43);
 }
 
-.chat-session-activity[data-status='error'] .chat-session-activity-icon::after {
+.chat-session-activity:is(
+    [data-status='error'],
+    [data-status='send-failed'],
+    [data-status='task-failed']
+  )
+  .chat-session-activity-icon::after {
   content: '!';
   font-weight: 600;
 }

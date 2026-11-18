@@ -54,7 +54,7 @@ export function useChatBridge(
     };
   }, [app, frame, app.startup, app.view, app.chatSource]);
   useEffect(() => {
-    app.post({ type: 'beings:permission-state', mode: app.snapshot?.settings.permissionMode ?? 'auto-review', open: app.permissionSettingsOpen,
+    app.post({ type: 'beings:permission-state', mode: app.snapshot?.settings.permissionMode ?? 'supervised', open: app.permissionSettingsOpen,
       revision: new URL(frame.current?.src || 'https://invalid').searchParams.get('revision') });
   }, [app, frame, app.snapshot?.settings.permissionMode, app.permissionSettingsOpen, app.chatSource]);
   useEffect(() => {
@@ -129,6 +129,11 @@ export function useChatBridge(
         }).catch(() => {});
         return;
       }
+      if (message.type === 'beings:subagent-tasks-open') {
+        if (Array.isArray(message.taskIds) && message.taskIds.length > 0 && message.taskIds.length <= 200 &&
+          message.taskIds.every((id: unknown) => typeof id === 'string' && id.length <= 256)) app.openSubagentTasks(message.taskIds, typeof message.selectedId === 'string' && message.taskIds.includes(message.selectedId) ? message.selectedId : undefined);
+        return;
+      }
       if (message.type === 'beings:subagent-enable' && typeof message.id === 'string' && message.id.length <= 64) {
         const reply = (ok: boolean) => {
           if (frame.current === target && new URL(target.src).searchParams.get('revision') === message.revision)
@@ -165,6 +170,15 @@ export function useChatBridge(
             app.post({ type: 'beings:chat-edit-result', id: message.id, revision: message.revision, ok });
         };
         void app.api.copyText(message.text).then(() => reply(true), () => reply(false));
+        return;
+      }
+      if (message.type === 'beings:image-copy' && typeof message.id === 'string' && message.id.length <= 64 &&
+          typeof message.revision === 'string' && message.revision.length <= 128 &&
+          (message.data instanceof ArrayBuffer || ArrayBuffer.isView(message.data)) && message.data.byteLength > 0 && message.data.byteLength <= 128 * 1024 * 1024 &&
+          typeof message.mime === 'string' && /^image\/(png|jpeg|gif|webp)$/.test(message.mime)) {
+        const raw = message.data instanceof ArrayBuffer ? message.data : message.data.buffer.slice(message.data.byteOffset, message.data.byteOffset + message.data.byteLength);
+        const reply = (ok: boolean, error?: string) => event.source?.postMessage({ type: 'beings:image-copy-result', id: message.id, revision: message.revision, ok, ...(error ? { error } : {}) }, { targetOrigin: event.origin });
+        void app.api.copyImage(raw, message.mime).then(() => reply(true), error => reply(false, error instanceof Error ? error.message : '复制图片失败'));
         return;
       }
       if (message.type === "beings:chat-edit" && typeof message.id === "string" && message.id.length <= 64 &&
@@ -220,7 +234,7 @@ export function useChatBridge(
         return;
       }
       if (message.type === 'beings:permission-state-request') {
-        app.post({ type: 'beings:permission-state', mode: app.snapshot?.settings.permissionMode ?? 'auto-review', open: app.permissionSettingsOpen, revision: message.revision });
+        app.post({ type: 'beings:permission-state', mode: app.snapshot?.settings.permissionMode ?? 'supervised', open: app.permissionSettingsOpen, revision: message.revision });
         return;
       }
       if (message.type === 'beings:permission-dismiss') { app.closePermissionSettings(); return; }

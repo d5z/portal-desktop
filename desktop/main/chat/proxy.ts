@@ -130,6 +130,17 @@ export class ChatProxy {
     let notice: { key: string; sequence: number } | undefined;
     try {
       let body: ArrayBuffer | string | undefined = ['POST', 'PATCH'].includes(request.method) ? await request.arrayBuffer() : undefined;
+      if (body && ['/api/llm/config', '/api/llm/keys'].includes(local.pathname)) {
+        let input;
+        try { input = JSON.parse(new TextDecoder().decode(body)); }
+        catch { clearTimeout(timeout); cleanup(); return Response.json({ error: '无效的模型请求。' }, { status: 400 }); }
+        const valid = input && typeof input === 'object' && !Array.isArray(input) && body.byteLength <= 16384 &&
+          (local.pathname === '/api/llm/keys'
+            ? typeof input.route === 'string' && input.route.length > 0 && input.route.length <= 256 &&
+              typeof input.api_key === 'string' && input.api_key.trim().length > 0
+            : Object.entries(input).every(([key, value]) => ['model', 'provider', 'base_url', 'api', 'api_key', 'thinking', 'temperature', 'rollback', 'sbs_enabled'].includes(key) && ['string', 'number', 'boolean'].includes(typeof value)));
+        if (!valid) { clearTimeout(timeout); cleanup(); return Response.json({ error: '无效的模型请求。' }, { status: 400 }); }
+      }
       if (isChatSend) {
         let message;
         try {

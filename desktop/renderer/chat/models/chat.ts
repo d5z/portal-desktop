@@ -81,6 +81,7 @@ export interface ActivityEntry {
   result?: string;
   inputDetail?: string;
   resultDetail?: string;
+  nextAction?: string;
   exitCode?: number;
   durationMs?: number;
   outputTruncated?: boolean;

@@ -2,6 +2,26 @@ import { expect, it, vi } from 'vitest';
 import { createSceneRuntime } from '../desktop/renderer/chat/services/scene-runtime';
 import { SceneQueueStore } from '../desktop/renderer/chat/services/scene-queue';
 
+it('explains a restored failed send and clears its status when the row is removed', async () => {
+  const row:any={id:'failed',endpoint:'fixture',scene:{sceneId:'a'},text:'附件任务',files:[],createdAt:1,phase:'failed',error:'附件解析失败：report.pdf'};
+  const read=vi.spyOn(SceneQueueStore.prototype,'read').mockResolvedValue([row]);
+  const write=vi.spyOn(SceneQueueStore.prototype,'write').mockResolvedValue();
+  const activity=vi.fn();
+  const state:any={items:[],currentScene:{sceneId:'a'},draft:'',files:[],sceneTasks:[],changed:vi.fn()};
+  const runtime=createSceneRuntime(state,{onSceneActivity:activity},(local:any)=>({
+    isBusy:()=>false,sceneActivity:()=> 'done',syncConnection:()=>{},dispose:()=>{},start:async()=>{},
+    stageQueuedSend(text:string,files:any[]){const message:any={kind:'message',id:'failed',role:'user',text,queued:true,...local.currentScene};local.items.push(message);return {text,files,message};},
+  }));
+  try {
+    await runtime.start();
+    expect(activity.mock.lastCall?.[0].a).toBe('send-failed');
+    expect(state.items[0].queueNotice).toBe('附件解析失败：report.pdf');
+    await state.items[0].cancelQueued();
+    expect(activity.mock.lastCall?.[0].a).toBe('done');
+    expect(write).toHaveBeenCalledWith('failed');
+  } finally {runtime.dispose();read.mockRestore();write.mockRestore();}
+});
+
 it('queues same-scene input, allows priority interruption and cancellation, then drains in order', async () => {
   vi.useFakeTimers();
   const rows = new Map<string, any>();

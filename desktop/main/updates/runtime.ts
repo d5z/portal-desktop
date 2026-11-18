@@ -6,10 +6,11 @@ import type { Connection } from '../chat/connection';
 import type { Settings } from '../../shared/types';
 import { readPortalSample, readPortalReady } from '../portal/status';
 import { portalConfig } from '../portal/supervisor';
+import { ensurePortalRuntime, portalRuntimeId } from '../portal/task-runtime';
 import { parse as parseToml } from 'smol-toml';
 import type { InstallIntent } from './client-install';
 
-export interface RuntimeBundle { schema: 1; id: string; clientVersion: string; portalVersion: string; sha256: string; platform: string; arch: string }
+export interface RuntimeBundle { schema: 1; id: string; clientVersion: string; portalVersion: string; sha256: string; taskRuntimeId?: string; platform: string; arch: string }
 interface Journal { schema: 1; previous: Service; candidate: Service; enabled: boolean; previousPlist?: string; external?: Service[] }
 export interface RuntimeUpdateResult { phase: 'current' | 'updated' | 'skipped' | 'error'; message: string; portalVersion?: string }
 export class RuntimeRollbackError extends Error {}
@@ -31,6 +32,7 @@ export async function loadRuntimeBundle(resources: string): Promise<{ bundle: Ru
   compareVersions(bundle.portalVersion, bundle.portalVersion);
   const binary = path.join(resources, process.platform === 'win32' ? 'heart-portal.exe' : 'heart-portal');
   if (digest(await readFile(binary)) !== bundle.sha256) throw new Error('安装包内 Portal 校验失败，旧服务未修改。');
+  if (await portalRuntimeId(binary) !== bundle.taskRuntimeId) throw new Error('安装包内运行时版本与清单不一致。');
   return { bundle, binary };
 }
 
@@ -101,12 +103,14 @@ export class RuntimeUpdater {
     const previous = this.background.installedService;
     if (!previous || previous.existing || previous.kind === 'portable') return { phase: 'skipped', message: '尚未安装客户端管理的后台服务。' };
     if (digest(await readFile(binary)) !== bundle.sha256) throw new Error('Portal 文件校验失败，旧服务未修改。');
+    const runtime = bundle.taskRuntimeId ? await ensurePortalRuntime(binary, this.directory, bundle.taskRuntimeId) : undefined;
     // A client release owns one tested engine/runner pair. Preserve the user's
     // configuration, but always activate the binary covered by this manifest.
     if (previous.bundleId === bundle.id) {
       const installed = await readFile(path.join(previous.root, this.platform === 'win32' ? 'heart-portal.exe' : 'heart-portal'))
         .catch((error: NodeJS.ErrnoException) => { if (error.code === 'ENOENT') return null; throw error; });
-      if (installed && digest(installed) === bundle.sha256) return { phase: 'current', message: '客户端、Portal 与守护程序已同步。', portalVersion: bundle.portalVersion };
+      if (installed && digest(installed) === bundle.sha256 && previous.runtimeId === bundle.taskRuntimeId &&
+          (!runtime || previous.environment?.HEART_PORTAL_RUNTIME_DIR === runtime)) return { phase: 'current', message: '客户端、Portal 与守护程序已同步。', portalVersion: bundle.portalVersion };
     }
     let config = settings.portalConfigPath || previous.configPath || path.join(previous.root, 'portal.toml');
     // Missing ownership metadata is not proof that a legacy TOML is disposable.
@@ -124,8 +128,10 @@ export class RuntimeUpdater {
       item.service.label === previous.label)?.enabled ?? (await this.background.refresh()).enabled;
     const root = path.join(this.background.runtimeDirectory, randomUUID());
     if (generatedConfig) config = path.join(root, 'portal.toml');
+    const environment: Record<string, string> = { ...previous.environment, HEART_PORTAL_CLIENT_FILE: path.join(this.directory, '.portal-client.json'), ...(runtime ? { HEART_PORTAL_RUNTIME_DIR: runtime } : {}) };
+    if (!runtime) delete environment.HEART_PORTAL_RUNTIME_DIR;
     const candidate: Service = { label: previous.label, file: previous.file, root, existing: false, beingEndpoint: previous.beingEndpoint,
-      name: settings.portalName, environment: { ...previous.environment, HEART_PORTAL_CLIENT_FILE: path.join(this.directory, '.portal-client.json') }, bundleId: bundle.id, configPath: config, generatedConfig: Boolean(generatedConfig), cwd: settings.workspace,
+      name: settings.portalName, environment, bundleId: bundle.id, runtimeId: bundle.taskRuntimeId, configPath: config, generatedConfig: Boolean(generatedConfig), cwd: settings.workspace,
       fingerprint: fingerprint({ ...settings, portalConfigPath: generatedConfig ? undefined : config }, connection) };
     await mkdir(root, { recursive: true, mode: 0o700 });
     try {
@@ -150,6 +156,10 @@ export class RuntimeUpdater {
       await this.background.setService(candidate);
       await this.ready(candidate);
       await rm(this.journal);
+      await rm(path.join(previous.root, 'portal-runtime'), { recursive: true, force: true });
+      if (previous.runtimeId && previous.runtimeId !== candidate.runtimeId) {
+        await rm(path.join(this.directory, 'portal-runtimes', previous.runtimeId), { recursive: true, force: true });
+      }
       return { phase: 'updated', message: '旧 Portal 和守护已停止，已按原配置启动当前引擎与新守护。', portalVersion: bundle.portalVersion };
     } catch (error) {
       try { await this.recover(installIntent); }

@@ -61,7 +61,7 @@ try {
   assert.equal(missingModel.ok,false);
   assert.equal(missingModel.reason,'provider-missing');
   assert.deepEqual((await json('/dsh-pet-7340/state')).pets.main?.say,beforeMissingModel,'selecting a meme without a model must not publish a successful bubble');
-  await writeFile(path.join(temp,'subagent-portal.toml'), `[subagent]
+  await writeFile(path.join(temp,'desktop-portal.toml'), `[subagent]
 enabled = true
 [subagent.model]
 provider = "portal-custom"
@@ -160,7 +160,7 @@ api_key = "fixture-key"
   assert.equal((await json('/dsh-pet-7340/config')).main.pets[0].display,'web');
   assert.ok((await json('/dsh-pet-7340/todos')).todos.some(todo=>todo.id===created.todo.id && todo.done));
   // Refresh the existing subagent model without restarting plugins or reading legacy credentials.
-  await writeFile(path.join(temp,'subagent-portal.toml'), `[subagent]
+  await writeFile(path.join(temp,'desktop-portal.toml'), `[subagent]
 enabled = true
 [subagent.model]
 provider = "portal-custom"
@@ -188,7 +188,7 @@ api_key = "fixture-key"
   modelStatus = 200;
   notice = undefined;
   await new Promise(resolve=>setTimeout(resolve,2100));
-  await writeFile(path.join(temp,'subagent-portal.toml'),'[subagent]\nenabled = false\n');
+  await writeFile(path.join(temp,'desktop-portal.toml'),'[subagent]\nenabled = false\n');
   await manager.refreshModelCompatibility();
   assert.equal(manager.state().modelCompatibility.supported,false);
   const unavailable=await json(memeRoute,'POST');

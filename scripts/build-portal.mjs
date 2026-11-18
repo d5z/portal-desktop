@@ -22,3 +22,6 @@ if (!existing?.equals(await readFile(built))) {
   } finally { await rm(temporary, { force: true }); }
 }
 console.log(`Bundled ${name} for ${process.platform}/${process.arch}.`);
+
+const { preparePortalRuntime } = await import('./prepare-portal-runtime.mjs');
+await preparePortalRuntime();

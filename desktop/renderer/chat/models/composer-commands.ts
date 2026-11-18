@@ -8,12 +8,8 @@ export const composerCommands = [
 export type ComposerCommand = typeof composerCommands[number];
 export type ComposerCommandId = ComposerCommand['id'];
 
-/** Desktop owns local subagent configuration; remote clients may not expose it. */
-export function canUseComposerCommand(command: ComposerCommandId, state: { subagentConfigured?: boolean; subagentEnabled?: boolean }, onConfigureSubagent?: () => void): boolean {
-  if (command === 'subagent' && onConfigureSubagent && (state.subagentConfigured !== true || state.subagentEnabled === false)) {
-    onConfigureSubagent();
-    return false;
-  }
+/** The client always provisions subagent from the current Being model. */
+export function canUseComposerCommand(_command: ComposerCommandId, _state?: { subagentConfigured?: boolean; subagentEnabled?: boolean }, _onConfigureSubagent?: () => void): boolean {
   return true;
 }
 

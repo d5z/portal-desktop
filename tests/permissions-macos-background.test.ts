@@ -6,7 +6,7 @@ import {createRequire} from 'node:module';
 import {BackgroundPortal} from '../desktop/main/portal/background';
 import {parseConnection} from '../desktop/main/chat/connection';
 const {WebSocketServer}=createRequire(import.meta.url)('ws');
-it.skipIf(process.platform !== 'darwin' || process.env.PORTAL_DESKTOP_NATIVE_PERMISSION_TESTS !== '1')('macOS native background downgrade enforces read-only after restart', async()=>{
+it.skipIf(process.platform !== 'darwin' || process.env.PORTAL_DESKTOP_NATIVE_PERMISSION_TESTS !== '1')('macOS native background downgrade enforces supervised after restart', async()=>{
   const root=await mkdtemp(path.join(os.tmpdir(),'permission-review-launchd-'));
   const workspace=path.join(root,'workspace'); await mkdir(workspace);
   const server=new WebSocketServer({host:'127.0.0.1',port:0});
@@ -40,12 +40,12 @@ it.skipIf(process.platform !== 'darwin' || process.env.PORTAL_DESKTOP_NATIVE_PER
     expect(await readFile(path.join(workspace,'initial.txt'),'utf8')).toBe('full');
     const oldRoot=background.installedService!.root;
     await background.disable();
-    await background.enable({...settings,permissionMode:'read-only'},connection);
+    await background.enable({...settings,permissionMode:'supervised'},connection);
     await vi.waitFor(()=>expect(generation).toBe(2),{timeout:20000});
     const runner=await readFile(path.join(background.installedService!.root,'run.sh'),'utf8');
     const result=await call('portal_file_write',{path:'after-downgrade.txt',content:'still writable'});
     expect(background.installedService!.root).not.toBe(oldRoot);
-    expect(runner).toContain("'--permission-mode' 'read-only'");
+    expect(runner).toContain("'--permission-mode' 'supervised'");
     await expect(readFile(path.join(workspace,'after-downgrade.txt'))).rejects.toMatchObject({code:'ENOENT'});
     expect(result.result?.isError).toBe(true);
   }finally{

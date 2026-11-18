@@ -243,7 +243,7 @@ it.skipIf(process.platform === 'win32')('shows terminal startup failure and expl
 
 it.skipIf(process.platform === 'win32')('rebuilds background policy on every permission change and reuses equivalent default settings', async () => {
   const f = await fixture();
-  for (const mode of ['full-access', 'read-only', 'supervised', 'auto-review'] as const) {
+  for (const mode of ['full-access', 'supervised'] as const) {
     const previousRoot = f.service.installedService?.root;
     await f.service.enable({ ...f.settings, permissionMode: mode }, f.connection);
     const service = f.service.installedService!;
@@ -260,7 +260,7 @@ it('replaces a stale or missing background engine at the same source path before
   const f = await fixture();
   const binary = path.join(f.root, 'source-engine');
   await writeFile(binary, 'old-engine', { mode: 0o700 });
-  const settings = { ...f.settings, portalBinary: binary, permissionMode: 'auto-review' as const };
+  const settings = { ...f.settings, portalBinary: binary, permissionMode: 'supervised' as const };
   await f.service.enable(settings, f.connection);
   const original = f.service.installedService!.root;
   await writeFile(binary, 'new-engine');
@@ -274,4 +274,27 @@ it('replaces a stale or missing background engine at the same source path before
   await f.service.enable(settings, f.connection);
   expect(f.service.installedService!.root).not.toBe(updated);
   expect(await readFile(path.join(f.service.installedService!.root, 'heart-portal'), 'utf8')).toBe('new-engine');
+});
+
+it('refreshes a service when only its bundled interpreters change and reuses the shared runtime', async () => {
+  const f = await fixture();
+  const source = path.join(f.root, 'portal-runtime');
+  await mkdir(path.join(source, 'python'), { recursive: true });
+  await mkdir(path.join(source, 'node'), { recursive: true });
+  for (const id of ['a'.repeat(64), 'b'.repeat(64)]) {
+    await writeFile(path.join(source, 'runtime.json'), JSON.stringify({ schema: 1, id, python: { version: '3', path: 'python/interpreter' }, node: { version: '24', path: 'node/interpreter' } }));
+    await writeFile(path.join(source, 'interpreter'), id);
+    await writeFile(path.join(source, 'python/interpreter'), id);
+    await writeFile(path.join(source, 'node/interpreter'), id);
+    const previous = f.service.installedService?.root;
+    await f.service.enable(f.settings, f.connection);
+    const current = f.service.installedService!.root;
+    expect(current).not.toBe(previous);
+    const shared = path.join(f.root, 'profile', 'portal-runtimes', id);
+    expect(JSON.parse(await readFile(path.join(shared, 'runtime.json'), 'utf8')).id).toBe(id);
+    expect(await readFile(path.join(current, 'run.sh'), 'utf8')).toContain(`HEART_PORTAL_RUNTIME_DIR='${shared}'`);
+    if (previous) await expect(stat(path.join(previous, 'portal-runtime'))).rejects.toMatchObject({ code: 'ENOENT' });
+    await f.service.enable(f.settings, f.connection);
+    expect(f.service.installedService!.root).toBe(current);
+  }
 });

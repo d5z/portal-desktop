@@ -9,6 +9,14 @@ async function main() {
   const archive = path.join(resources, 'app.asar');
   const assets = path.join(archive, '.vite/renderer/main_window');
   const manifest = JSON.parse(fs.readFileSync(path.join(archive, 'package.json'), 'utf8'));
+  // Task interpreters are independent of Electron and work after app relocation.
+  const taskRoot = path.join(resources, 'portal-runtime');
+  const task = JSON.parse(fs.readFileSync(path.join(taskRoot, 'runtime.json'), 'utf8'));
+  const python = path.join(taskRoot, task.python.path), node = path.join(taskRoot, task.node.path);
+  assert.equal(execFileSync(python, ['-I', '-B', '-c', 'import sys; print(sys.version.split()[0])'], {encoding:'utf8'}).trim(), task.python.version);
+  assert.equal(execFileSync(node, ['-p', 'process.versions.node'], {encoding:'utf8'}).trim(), task.node.version);
+  const taskNpm = path.join(taskRoot, process.platform === 'win32' ? 'node/bin/node_modules/npm/bin/npm-cli.js' : 'node/lib/node_modules/npm/bin/npm-cli.js');
+  assert.match(execFileSync(node, [taskNpm, '--version'], {encoding:'utf8'}).trim(), /^\d+\.\d+\.\d+$/);
   const npm = path.join(resources, 'npm/bin/npm-cli.js');
   assert.equal(execFileSync(process.execPath, [npm, '--version'], { encoding: 'utf8' }).trim(), manifest.dependencies.npm);
   const stage = path.join(process.cwd(), 'offline install');

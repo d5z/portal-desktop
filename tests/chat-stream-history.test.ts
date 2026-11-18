@@ -19,11 +19,12 @@ describe("stream progress and persisted replies", () => {
 
   function fixture() {
     const history: any[] = [];
+    let active: any = null;
     let stream!: ReadableStreamDefaultController<Uint8Array>;
     vi.stubGlobal("fetch", vi.fn(async (input: string) => {
       const url = new URL(input);
       if (url.pathname === "/api/history") return Response.json({ messages: history.filter(m => m.seq > Number(url.searchParams.get("after") || 0)) });
-      if (url.pathname === "/api/stream/active") return new Response(null, { status: 204 });
+      if (url.pathname === "/api/stream/active") return active ? Response.json(active) : new Response(null, { status: 204 });
       if (url.pathname === "/health") return new Response("OK fixture");
       if (url.pathname === "/api/chat/stream" && stream) return Response.json({ queued: true }, { status: 202 });
       if (url.pathname === "/api/chat/stream") return new Response(new ReadableStream({ start(controller) { stream = controller; } }));
@@ -31,12 +32,55 @@ describe("stream progress and persisted replies", () => {
     }));
     const state = new ChatState(), runtime = createChatRuntime(state);
     return { state, runtime, history,
+      setActive: (value: any) => { active = value; },
       raw: (text: string) => stream.enqueue(new TextEncoder().encode(text)),
       event: (event: string, data: object) => stream.enqueue(new TextEncoder().encode(`event: ${event}\ndata: ${JSON.stringify({ scene_id: "desktop-test", ...data })}\n\n`)),
       close: () => stream.close(),
       replies: () => state.items.filter((item): item is Message => item.kind === "message" && item.role === "being"),
     };
   }
+
+  it.each(['live', 'replay', 'routed'])('shows consecutive duplicate model errors once through %s', async transport => {
+    const f = fixture();
+    const error = {message:'LLM API error 429 Too Many Requests: Rate exceeded.'};
+    const errors = () => f.state.items.filter((item): item is Message => item.kind === 'message' && item.role === 'system');
+    try {
+      await f.runtime.start();
+      if (transport !== 'replay') {
+        await f.runtime.send('test rate limit');
+        await vi.advanceTimersByTimeAsync(0);
+        f.event('meta',{stream_id:'rate-limited'});
+        const scene = transport === 'routed' ? {scene_id:'other-scene'} : {};
+        f.event('error',{...error,...scene});f.event('error',{...error,...scene});
+        f.close();await vi.advanceTimersByTimeAsync(20);
+      } else {
+        f.setActive({stream_id:'rate-limited',scene_id:'desktop-test',finished:false,next_seq:3,
+          events:[{seq:1,event:'error',data:{scene_id:'desktop-test',...error}},{seq:2,event:'error',data:{scene_id:'desktop-test',...error}}]});
+        await vi.advanceTimersByTimeAsync(15000);
+      }
+      expect(errors()).toHaveLength(1);
+      expect(errors()[0]).toMatchObject({text:'⚠ '+error.message});
+      if (transport === 'routed') expect(errors()[0]).toMatchObject({sceneId:'other-scene'});
+    } finally {f.runtime.dispose();}
+  });
+
+  it('keeps distinct errors and the same error from a later stream', async () => {
+    const f=fixture();
+    const error={scene_id:'desktop-test',message:'rate limited'};
+    const errors=()=>f.state.items.filter((item): item is Message=>item.kind==='message'&&item.role==='system');
+    try {
+      await f.runtime.start();
+      f.setActive({stream_id:'first',scene_id:'desktop-test',finished:false,next_seq:4,events:[
+        {seq:1,event:'error',data:error},{seq:2,event:'error',data:{...error,message:'different failure'}},{seq:3,event:'error',data:{...error,message:'different failure'}}]});
+      await vi.advanceTimersByTimeAsync(10000);
+      expect(errors().map(item=>item.text)).toEqual(['⚠ rate limited','⚠ different failure']);
+      const repeated={...error,message:'different failure'};
+      f.setActive({stream_id:'second',scene_id:'desktop-test',finished:false,next_seq:3,events:[
+        {seq:1,event:'error',data:repeated},{seq:2,event:'error',data:repeated}]});
+      await vi.advanceTimersByTimeAsync(10000);
+      expect(errors().map(item=>item.text)).toEqual(['⚠ rate limited','⚠ different failure','⚠ different failure']);
+    } finally {f.runtime.dispose();}
+  });
 
   it('renders framed multiline SSE, ignores untyped data and discards incomplete acknowledgements', async () => {
     const f = fixture();

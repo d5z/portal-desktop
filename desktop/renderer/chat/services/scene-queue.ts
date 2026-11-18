@@ -10,6 +10,7 @@ export interface SavedSceneSend {
   /** Stable ordering within the local outbox. Older rows fall back to createdAt. */
   order?: number;
   phase: 'queued' | 'preparing' | 'sending' | 'failed';
+  error?: string;
   attachment?: import('./attachments').AttachmentTransfer;
   sendOptions?: { intelligentUI?: boolean; uiAction?: import('../../shared/intelligent-ui/surfaces').UIInteraction; uiSnapshot?: string };
 }

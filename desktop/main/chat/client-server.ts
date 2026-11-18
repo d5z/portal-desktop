@@ -1,4 +1,5 @@
 import type { ChatScene } from '../../shared/types';
+import { TOOL_APPROVAL_TIMEOUT_MS } from '../../shared/security';
 import { createServer, type Server } from 'node:http';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { mkdir, rename, writeFile, rm } from 'node:fs/promises';
@@ -49,7 +50,8 @@ export class ClientCommandServer {
         try {
           const text = await Promise.race([
             this.execute(data, controller.signal),
-            new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error('Client command timed out')); }, data.verb === 'security-approve' ? 120000 : 8000); }),
+            // Return the dialog's expiry before the upstream 120s tool deadline.
+            new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error(data.verb === 'security-approve' ? '审批队列或弹窗等待超时，操作未执行；请重新发起操作' : 'Client command timed out')); }, data.verb === 'security-approve' ? TOOL_APPROVAL_TIMEOUT_MS + 5000 : 8000); }),
           ]);
           if (this.currentEndpoint() !== endpoint) { reply(409, { error: 'Being connection changed' }); return; }
           if (typeof text !== 'string' || text.length > 256_000) throw new Error('Client response too large');

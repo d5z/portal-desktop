@@ -10,7 +10,7 @@ import type { ChatState } from '../models/chat';
 import { canUseComposerCommand, composerCommandQuery, insertComposerCommand, matchingComposerCommands, type ComposerCommandId } from '../models/composer-commands';
 
 /** Keep keystrokes out of the history render path; send always reads the live draft. */
-export function ChatComposer({ state, onKeyDown, subagentAction, onExamples, queueEdit, ...props }: Omit<RichComposerProps, 'value' | 'onChange'> & { state: ChatState; subagentAction?: { label: string; run(): void }; onExamples?: () => void; queueEdit?: { text: string; onChange: (text: string) => void } }) {
+export function ChatComposer({ state, onKeyDown, onExamples, queueEdit, ...props }: Omit<RichComposerProps, 'value' | 'onChange'> & { state: ChatState; onExamples?: () => void; queueEdit?: { text: string; onChange: (text: string) => void } }) {
   useModel(state);
   const [, redraw] = useReducer((version: number) => version + 1, 0);
   const id = useId();
@@ -29,7 +29,7 @@ export function ChatComposer({ state, onKeyDown, subagentAction, onExamples, que
   const active = Math.min(selected, actions.length - 1);
   const select = (command: ComposerCommandId | 'example') => {
     if (command === 'example') { setDismissed(state.draft); onExamples?.(); return; }
-    if (!canUseComposerCommand(command, state, subagentAction?.run)) { setDismissed(state.draft); return; }
+    if (!canUseComposerCommand(command, state)) { setDismissed(state.draft); return; }
     focusAfterSelection.current = true;
     state.draft = insertComposerCommand(state.draft, command);
     state.changed();
@@ -82,7 +82,7 @@ export function ChatComposer({ state, onKeyDown, subagentAction, onExamples, que
         aria-selected={active === index} title={command.description} tabIndex={-1} onMouseDown={event => event.preventDefault()}
         onMouseEnter={() => setSelected(index)} onClick={() => select(command.id)}>
         <ComposerMenuIcon chat kind={command.id}/>
-        <span className="composer-menu-copy"><strong>{command.label}</strong>{command.id === 'subagent' && subagentAction && <small>{subagentAction.label}</small>}</span>
+        <span className="composer-menu-copy"><strong>{command.label}</strong></span>
       </button>{command.id === 'ui' && onExamples && <ComposerExamples onSelect={() => select('example')} option={{ id: `${id}-${index + 1}`, selected: active === index + 1, onHover: () => setSelected(index + 1) }}/>}</div>;
       })}
     </DropdownMenuMotion>}</AnimatePresence>

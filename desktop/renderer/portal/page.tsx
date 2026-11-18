@@ -125,14 +125,13 @@ export function Portal({ model, embedded = false, configuration }: { model: AppM
           <div>
             <Icon name="folder-flat" />
             <strong>文件与搜索</strong>
-            <small>{snapshot?.settings.permissionMode === 'read-only' ? '旧版只读限制' : snapshot?.settings.permissionMode === 'full-access' ? '使用系统账户权限读写文件' : '读取普通文件；工作区外编辑需批准'}</small>
+            <small>{snapshot?.settings.permissionMode === 'full-access' ? '始终允许读写文件' : '每次修改文件前询问'}</small>
           </div>
           <div>
             <Icon name="terminal" />
             <strong>命令执行</strong>
             <small id="exec-label">
-              {!snapshot?.settings.allowExec ? '未启用' : snapshot.settings.permissionMode === 'read-only'
-                ? '只读模式下禁止' : snapshot.settings.permissionMode === 'full-access' ? '已允许本机命令' : '沙箱内直接执行，突破沙箱需批准'}
+              {!snapshot?.settings.allowExec ? '未启用' : snapshot.settings.permissionMode === 'full-access' ? '始终允许执行命令' : '每条命令执行前询问'}
             </small>
           </div>
           <div>
@@ -140,8 +139,7 @@ export function Portal({ model, embedded = false, configuration }: { model: AppM
             <strong>扩展工具</strong>
             <small id="kits-label">
               {snapshot?.settings.kitsEnabled
-                ? snapshot.settings.permissionMode === 'read-only' ? '只读模式下禁止调用'
-                  : snapshot.settings.permissionMode === 'full-access' ? 'Kits 与自定义工具已启用' : '扩展调用需要审批'
+                ? snapshot.settings.permissionMode === 'full-access' ? '始终允许调用扩展工具' : '每次调用前询问'
                 : "未启用"}
             </small>
           </div>

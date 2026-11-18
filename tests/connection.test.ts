@@ -85,4 +85,22 @@ describe('connection and credential boundary', () => {
     const response = await proxy.handle(new Request('beings://chat/api/status'));
     expect(response.status).toBe(502); expect(await response.text()).not.toContain(connection.token);
   });
+  it('keeps upstream model failures byte-for-byte and rejects invalid mutation input at the proxy boundary', async () => {
+    const calls: string[] = [];
+    const proxy = new ChatProxy(() => connection, async (_url, init) => {
+      calls.push(new TextDecoder().decode(init?.body as ArrayBuffer));
+      return new Response('raw upstream failure', { status: 429, headers: { 'Content-Type': 'text/plain' } });
+    });
+    const patch = JSON.stringify({ thinking: 'high' });
+    const response = await proxy.handle(new Request('beings://chat/api/llm/config', { method: 'PATCH', body: patch }));
+    expect(response.status).toBe(429);
+    expect(response.headers.get('content-type')).toBe('text/plain');
+    expect(await response.text()).toBe('raw upstream failure');
+    expect(calls).toEqual([patch]);
+    for (const body of ['{', 'null', JSON.stringify({workspace:'/private'}), JSON.stringify({model:{invalid:true}})]) {
+      expect((await proxy.handle(new Request('beings://chat/api/llm/config', { method:'PATCH',body }))).status).toBe(400);
+    }
+    expect(calls).toHaveLength(1);
+  });
+
 });

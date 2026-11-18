@@ -1,6 +1,7 @@
 // Invoked by Forge with Electron's ASAR-aware Node runtime, on every platform.
 const fs = require('node:fs');
 const path = require('node:path');
+const { execFileSync } = require('node:child_process');
 const { parse } = require('parse5');
 const [resources, renderer, ...external] = process.argv.slice(2);
 const archive = path.join(resources, 'app.asar');
@@ -22,7 +23,16 @@ const publicRoot = path.join(vite, 'renderer', renderer);
 compareTree('desktop/generated', publicRoot);
 for (const source of external) compareTree(source, path.join(resources, path.basename(source)));
 for (const [target, source] of expected) {
-  if (!fs.readFileSync(target).equals(fs.readFileSync(source))) throw new Error('Packaged file differs from build output: ' + target);
+  const original = fs.readFileSync(source), packaged = fs.readFileSync(target);
+  if (packaged.equals(original)) continue;
+  // osx-sign re-signs bundled interpreters and extension modules after copying.
+  // Their signature bytes change; scripts/data must still match exactly.
+  if (process.platform === 'darwin' && target.startsWith(path.join(resources, 'portal-runtime') + path.sep) &&
+      ['feedface','cefaedfe','feedfacf','cffaedfe','cafebabe','bebafeca','cafebabf','bfbafeca'].includes(original.subarray(0,4).toString('hex'))) {
+    execFileSync('/usr/bin/codesign', ['--verify', '--strict', target], {stdio:'pipe'});
+    continue;
+  }
+  throw new Error('Packaged file differs from build output: ' + target);
 }
 // Verify local links after Vite rewrites them, including hashed assets and fonts.
 let links = 0;

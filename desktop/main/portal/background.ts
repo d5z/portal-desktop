@@ -10,6 +10,7 @@ import { readPortalSample, readPortalReady, portalSampleState } from './status';
 import type { BackgroundState, PortalState, Settings } from '../../shared/types';
 import { permissionMode } from '../../shared/security';
 import { windowsEnvironment, windowsExecutable } from './windows';
+import { ensurePortalRuntime, portalRuntimeId } from './task-runtime';
 import { windowsLogCopy } from './windows-log-copy';
 
 // No shell interpolation or credentials in command arguments. Windows DPAPI input uses stdin.
@@ -58,11 +59,11 @@ export async function portableCommand(binary: string, action: 'stop' | 'status' 
 }
 const xml = (value: string) => value.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;').replaceAll("'", '&apos;');
 const hash = (value: string) => createHash('sha256').update(value).digest('hex').slice(0, 16);
-export interface Service { label: string; file: string; root: string; existing: boolean; kind?: 'portable'; login?: boolean; name?: string; beingEndpoint?: string; environmentPath?: string; environment?: Record<string, string>; fingerprint?: string; bundleId?: string; configPath?: string; generatedConfig?: boolean; cwd?: string; binary?: string }
+export interface Service { label: string; file: string; root: string; existing: boolean; kind?: 'portable'; login?: boolean; name?: string; beingEndpoint?: string; environmentPath?: string; environment?: Record<string, string>; fingerprint?: string; bundleId?: string; runtimeId?: string; configPath?: string; generatedConfig?: boolean; cwd?: string; binary?: string }
 export function fingerprint(settings: Settings, connection: Connection) {
   return hash(JSON.stringify([connection.link, settings.portalBinary, settings.portalConfigPath, settings.portalName,
     settings.workspace, settings.portalEnvironmentPath, settings.allowExec, settings.kitsEnabled,
-    permissionMode(settings.permissionMode), 'client-tools-v7-bounded-logs']));
+    permissionMode(settings.permissionMode), 'client-tools-v8-explicit-consent']));
 }
 export function launchAgent(label: string, root: string): string {
   return `<?xml version="1.0" encoding="UTF-8"?><!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd"><plist version="1.0"><dict>
@@ -360,7 +361,11 @@ if ([string]$t.State -eq 'Running' -and (Test-Path -LiteralPath $pidFile)) {
       ? await readFile(path.join(previous.root, this.platform === 'win32' ? 'heart-portal.exe' : 'heart-portal'))
         .catch((error: NodeJS.ErrnoException) => { if (error.code === 'ENOENT') return null; throw error; })
       : null;
-    if (previous && installedBytes?.equals(sourceBytes)) {
+    const runtimeId = await portalRuntimeId(settings.portalBinary);
+    const runtime = runtimeId ? await ensurePortalRuntime(settings.portalBinary, this.directory, runtimeId) : undefined;
+    const installedRuntimeId = previous?.runtimeId;
+    if (previous && installedBytes?.equals(sourceBytes) && runtimeId === installedRuntimeId &&
+        (!runtime || previous.environment?.HEART_PORTAL_RUNTIME_DIR === runtime)) {
       await this.load(previous); return this.refresh();
     }
     await access(settings.portalBinary, this.platform === 'win32' ? constants.F_OK : constants.X_OK);
@@ -370,8 +375,8 @@ if ([string]$t.State -eq 'Running' -and (Test-Path -LiteralPath $pidFile)) {
     let registrationChanged = false;
     let wasEnabled = false;
     let oldPlist: string | undefined;
-    const service: Service = { label: this.label, root, existing: false, name: settings.portalName, beingEndpoint: connection.endpoint, fingerprint: signature,
-      environment: { HEART_PORTAL_CLIENT_FILE: path.join(this.directory, '.portal-client.json') },
+    const service: Service = { label: this.label, root, existing: false, name: settings.portalName, beingEndpoint: connection.endpoint, fingerprint: signature, runtimeId,
+      environment: { HEART_PORTAL_CLIENT_FILE: path.join(this.directory, '.portal-client.json'), ...(runtime ? { HEART_PORTAL_RUNTIME_DIR: runtime } : {}) },
       file: this.platform === 'darwin' ? path.join(this.home, 'Library/LaunchAgents', this.label + '.plist') : '' };
     try {
       const binary = path.join(root, this.platform === 'win32' ? 'heart-portal.exe' : 'heart-portal');
@@ -382,12 +387,12 @@ if ([string]$t.State -eq 'Running' -and (Test-Path -LiteralPath $pidFile)) {
       if (!settings.portalConfigPath) await atomic(config, portalConfig(settings));
       if (this.platform === 'darwin') {
         await atomic(path.join(root, 'connection.url'), connection.link);
-        await atomic(path.join(root, 'run.sh'), unixRunner(root, config, settings, { HEART_PORTAL_CLIENT_FILE: path.join(this.directory, '.portal-client.json') }));
+        await atomic(path.join(root, 'run.sh'), unixRunner(root, config, settings, service.environment));
         oldPlist = await readFile(service.file, 'utf8').catch(() => undefined);
       } else {
         const encrypted = await this.powershell(`[Console]::In.ReadToEnd() | ConvertTo-SecureString -AsPlainText -Force | ConvertFrom-SecureString`, connection.link);
         await atomic(path.join(root, 'connection.dpapi'), encrypted.trim());
-        await atomic(path.join(root, 'run.ps1'), '\ufeff' + windowsRunner(root, config, settings, { HEART_PORTAL_CLIENT_FILE: path.join(this.directory, '.portal-client.json') }));
+        await atomic(path.join(root, 'run.ps1'), '\ufeff' + windowsRunner(root, config, settings, service.environment));
       }
       if (previous) { wasEnabled = (await this.refresh()).enabled; await this.unload(previous); }
       registrationChanged = true;
@@ -398,7 +403,10 @@ if ([string]$t.State -eq 'Running' -and (Test-Path -LiteralPath $pidFile)) {
       await this.refresh();
       // Persist ownership only after registration succeeds. Stable runtime survives app moves/updates.
       await atomic(path.join(this.directory, 'portal-service.json'), JSON.stringify(service));
-      // Keep the previous runtime: it may still own the original configuration.
+      if (previous && previous.root !== service.root) await rm(path.join(previous.root, 'portal-runtime'), { recursive: true, force: true });
+      if (previous?.runtimeId && previous.runtimeId !== service.runtimeId) {
+        await rm(path.join(this.directory, 'portal-runtimes', previous.runtimeId), { recursive: true, force: true });
+      }
       return this.state;
     } catch (error) {
       if (registrationChanged) {

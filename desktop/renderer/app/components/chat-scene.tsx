@@ -12,7 +12,7 @@ import { Icon } from '../../shared/icons/icon';
 import { createPortal } from "react-dom";
 import { useEffect, useLayoutEffect, useRef, useState, type MouseEvent } from "react";
 import type { ChatScene } from "../../../shared/types";
-import { CHAT_SCENE_ACTIVITY_LABELS, type ChatSceneActivity } from "../../../shared/types";
+import { CHAT_SCENE_ACTIVITY_ACTIONS, CHAT_SCENE_ACTIVITY_LABELS, type ChatSceneActivity } from "../../../shared/types";
 import type { HistoryScope } from "../../chat/models/scenes";
 import { PanelResizeHandle, usePanelWidth } from "../../shared/components/panel-resize";
 import { Dialog } from "../../shared/components/dialog";
@@ -151,7 +151,7 @@ function SceneRow({ session, selected, activity, disabled, sortable, onSelect, o
       title={label} disabled={disabled} onClick={onSelect} onContextMenu={onMenu}>
       <span>{label}</span>
       {activity && <span className="chat-session-activity" data-status={activity} aria-hidden="true"
-        title={CHAT_SCENE_ACTIVITY_LABELS[activity]}><SceneActivityIcon activity={activity} /></span>}
+        title={CHAT_SCENE_ACTIVITY_ACTIONS[activity] || CHAT_SCENE_ACTIVITY_LABELS[activity]}><SceneActivityIcon activity={activity} /></span>}
     </button>}
   </div>;
 }

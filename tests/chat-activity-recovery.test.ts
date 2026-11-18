@@ -15,7 +15,7 @@ beforeEach(() => {
 });
 afterEach(() => {vi.useRealTimers(); vi.unstubAllGlobals(); vi.restoreAllMocks();});
 
-async function fixture(apiPrefix = "") {
+async function fixture(apiPrefix = "", options: any = {}) {
   let active: any = null;
   let readActive: (() => Promise<Response>) | undefined;
   const history: any[] = [], posts: any[] = [];
@@ -40,7 +40,7 @@ async function fixture(apiPrefix = "") {
     return Response.json({sbs_enabled:true});
   });
   vi.stubGlobal('fetch', fetcher);
-  const state = new ChatState(), runtime = createChatRuntime(state, apiPrefix ? {connection:{api:"https://fixture.test" + apiPrefix,token:""}} : {});
+  const state = new ChatState(), runtime = createChatRuntime(state, apiPrefix ? {connection:{api:"https://fixture.test" + apiPrefix,token:""}, ...options} : options);
   await runtime.start();
   return {state,runtime,history,posts,fetcher,
     setActive: (value:any) => {active=value;},
@@ -139,6 +139,22 @@ it.each(['POST', 'reader before meta'])('shows a retryable error when a new %s f
     expect(f.state.items.filter(i=>i.kind==='message' && i.text==='second never delivered')).toHaveLength(1);
     expect(f.state.items.filter(i=>i.kind==='run').at(-1)).toMatchObject({status:'queued'});
   } finally {f.runtime.dispose();}
+});
+
+it('clears a terminal scene error when the next turn starts', async () => {
+  const activity = vi.fn();
+  const f = await fixture('', { onSceneActivity: activity });
+  try {
+    f.setPost(() => Response.json({ error: 'temporary failure' }, { status: 400 }));
+    await f.runtime.send('failed turn');
+    await vi.advanceTimersByTimeAsync(20);
+    expect(activity.mock.lastCall?.[0].room).toBe('error');
+
+    f.setPost(() => Response.json({ queued: true }, { status: 202 }));
+    await f.runtime.send('new turn');
+    await vi.advanceTimersByTimeAsync(20);
+    expect(activity.mock.lastCall?.[0].room).toBe('queued');
+  } finally { f.runtime.dispose(); }
 });
 
 it.each([false, true])('tracks a fresh 200 stream returned to a follow-up through EOF (final reply: %s)', async replied => {
