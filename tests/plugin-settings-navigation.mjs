@@ -32,6 +32,7 @@ try {
       return {subscribe:listener=>{listeners.add(listener);return()=>listeners.delete(listener)},getSnapshot:()=>snapshot,mutate:async edits=>{snapshot={...snapshot,value:{...snapshot.value,...Object.fromEntries(edits.map(edit=>[edit.path[0],edit.value]))},revision:snapshot.revision+1};listeners.forEach(fn=>fn());return true}};
     })();
     runtime.refreshForms=async()=>{};
+    runtime.commandUi={candidates:async()=>[{name:'preview',description:'本地界面测试'}]};
     app.plugins.library={plugins:[{manifest:{id:'official',name:'官方示例',version:'1.0.0',description:'管理官方插件的显示位置与权限。',author:'Town',capabilities:[],contributes:{views:[{id:'main',title:'打开官方页面'}],slots:[{id:'side',view:'main',location:'right-sidebar',title:'打开官方侧栏'}]}},enabled:true,source:{kind:'local',path:'/fixture'}}],problems:[]};
     app.plugins.changed();runtime.changed();app.changed();
   });
@@ -43,6 +44,14 @@ try {
   await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve))));
   assert(await page.locator('#client-main').evaluate(el=>el.inert));
   const bounds=await settings.boundingBox();
+  for (const [name, selector] of [['命令与面板','.dsh-command-section'],['兼容说明','.dsh-help']]) {
+    await settings.getByRole('button',{name,exact:true}).click();
+    const content = settings.locator(selector);
+    await content.waitFor();
+    assert.equal(await content.evaluate(node => node.offsetWidth), await settings.locator('.dsh-utility-section').evaluate(node => node.clientWidth),
+      `${name} uses the full settings content width`);
+    await settings.getByRole('button',{name:'收起公共设置',exact:true}).click();
+  }
   // Unmodified community editors/previews mount alongside the application root.
   await page.evaluate(()=>{
     const overlay=document.createElement('div');overlay.id='plugin-preview-fixture';

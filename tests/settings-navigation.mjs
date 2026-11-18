@@ -18,6 +18,17 @@ try {
   await page.goto(origin);
   await page.locator('#chat-frame').waitFor();
   const settings=page.locator('#client-settings-dialog');
+  const assertAlignedPage = async () => {
+    const panel = settings.locator('.settings-inline-body > [role="tabpanel"]:not([hidden])');
+    const offsets = await panel.evaluate(node => {
+      const body = node.parentElement, style = getComputedStyle(body);
+      const bodyLeft = body.getBoundingClientRect().left, content = node.getBoundingClientRect();
+      return [content.left - bodyLeft - parseFloat(style.paddingLeft),
+        bodyLeft + body.clientWidth - parseFloat(style.paddingRight) - content.right];
+    });
+    const title = await settings.locator('.settings-page-title').textContent();
+    assert.ok(offsets.every(offset => Math.abs(offset) < 1), `${title} fills the shared settings content area: ${offsets}`);
+  };
   for (const startup of ['loading', 'error', 'loading']) {
     await page.evaluate(value => { fixtureApp.startup = value; fixtureApp.changed(); }, startup);
     await page.locator('#startup-screen').waitFor({ state: 'visible' });
@@ -40,6 +51,7 @@ try {
   await settings.getByRole('button',{name:'本机配置 名称、工作目录、后台常驻与工具权限',exact:true}).click();
   await settings.locator('#workspace-input').fill('/fixture/retained-draft');
   await settings.getByRole('tab',{name:'外观与阅读',exact:true}).click();
+  await assertAlignedPage();
   await settings.getByRole('tab',{name:'Portal',exact:true}).click();
   await settings.getByRole('button',{name:'本机配置 名称、工作目录、后台常驻与工具权限',exact:true}).click();
   assert.equal(await settings.locator('#workspace-input').inputValue(),'/fixture/retained-draft');
@@ -99,15 +111,18 @@ try {
   // Each destination replaces only the right-hand page of the same native modal.
   await page.evaluate(()=>fixtureApp.openClientSettings());
   await settings.getByRole('tab',{name:'通用',exact:true}).click();
+  await assertAlignedPage();
   const frame=await settings.boundingBox();
   await page.evaluate(()=>{window.settingsOpenMutations=0;window.settingsObserver=new MutationObserver(records=>settingsOpenMutations+=records.length);settingsObserver.observe(document.querySelector('#client-settings-dialog'),{attributes:true,attributeFilter:['open']});});
   await settings.getByRole('button',{name:'通知设置 桌面通知、私信、围炉与场景提醒',exact:true}).click();
   assert.equal(await settings.locator('.settings-page-title').innerText(),'通知设置');
+  await assertAlignedPage();
   assert.equal(await settings.locator('#notification-enabled').isVisible(),true);
   assert.equal(await settings.locator('#client-startup-input').isVisible(),false);
   await settings.getByRole('button',{name:'返回通用',exact:true}).click();
   await settings.locator('#open-diagnostics').click();
   assert.equal(await settings.locator('.settings-page-title').innerText(),'连接诊断');
+  await assertAlignedPage();
   assert.equal(await settings.locator('#diagnostics-checks').isVisible(),true);
   assert.equal(await settings.locator('#client-startup-input').isVisible(),false);
   await settings.getByRole('button',{name:'返回通用',exact:true}).click();

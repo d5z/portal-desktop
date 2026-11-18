@@ -1229,6 +1229,10 @@ html[data-theme='dark'] .town-logo-light {
   margin: 0;
 }
 
+#client-settings-dialog .dsh-utility-section :is(.dsh-help, .dsh-command-section) {
+  max-width: none;
+}
+
 @media (max-width: 600px) {
   #client-settings-dialog .plugin-view-heading {
     display: none;
@@ -1771,10 +1775,6 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 /* Grouped cards keep related controls together and let dividers carry the rhythm. */
-#client-settings-dialog :is(#settings-panel-general, #settings-panel-appearance) {
-  max-width: 680px;
-}
-
 #client-settings-dialog .settings-group > h3,
 #client-settings-dialog .general-settings-group > h3 {
   margin: 0 0 9px;
