@@ -1,4 +1,4 @@
-import { Children, useCallback, useContext, useId, useRef, useState, type PointerEvent, type ReactNode } from 'react';
+import { Children, useCallback, useContext, useEffect, useId, useRef, useState, type PointerEvent, type ReactNode } from 'react';
 import { Icon } from '../icons/icon';
 import Stack from './react-bits-stack/Stack';
 import { MessageAction, MessageActionSlot } from './message-action-slot';
@@ -21,6 +21,38 @@ export function MessageImageGroup({ count, className, children }: {
     node?.querySelectorAll<HTMLElement>('.stack-card').forEach(card => { card.inert = !card.hasAttribute('data-top'); });
   }, []);
   const desktop = typeof document !== 'undefined' && document.documentElement.dataset.chatHost === 'desktop';
+  useEffect(() => {
+    if (!desktop || expanded) return;
+    const stack = deck.current?.querySelector<HTMLElement>('.stack');
+    if (!stack) return;
+    const verticalWheel = navigator.platform.startsWith('Win');
+    let lastWheel = -Infinity;
+    let distance = 0;
+    let advanced = false;
+    const wheel = (event: WheelEvent) => {
+      if (event.defaultPrevented || event.ctrlKey) return;
+      const { deltaMode, deltaX, deltaY } = event;
+      const horizontal = Math.abs(deltaX) > Math.abs(deltaY) * 1.2;
+      if (!horizontal && !(verticalWheel && Math.abs(deltaY) > Math.abs(deltaX) * 1.2)) return;
+      const delta = horizontal ? deltaX : deltaY;
+      event.preventDefault();
+      event.stopPropagation();
+      // Inertial events belong to the same gesture even after the card moves.
+      if (event.timeStamp - lastWheel > 220) {
+        distance = 0;
+        advanced = false;
+      }
+      lastWheel = event.timeStamp;
+      if (advanced) return;
+      distance = Math.sign(distance) === Math.sign(delta) ? distance + delta : delta;
+      if (Math.abs(distance) < (deltaMode === WheelEvent.DOM_DELTA_PIXEL ? 48 : 1)) return;
+      advanced = true;
+      // Use the vendor stack's existing keyboard action and card animation.
+      stack.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true, cancelable: true }));
+    };
+    stack.addEventListener('wheel', wheel, { passive: false });
+    return () => stack.removeEventListener('wheel', wheel);
+  }, [desktop, expanded]);
   const compact = !!useContext(MessageActionSlot) || desktop;
   const toggleLabel = expanded ? '收起图片' : `展开 ${count} 张图片`;
   const cards = Children.toArray(children);
