@@ -137,7 +137,15 @@ export function AttachmentAudioMenu({ name, children, controls }: { name: string
   </>;
   return <>
     <MessageAction><button ref={trigger} className="audio-menu-trigger" type="button" aria-label={`${name} 音频操作`} title="音频操作"
-      aria-haspopup="dialog" aria-expanded={open} aria-controls={id} popoverTarget={id} onClick={place}><Icon name="sliders" width="16" height="16" /></button></MessageAction>
+      aria-haspopup="dialog" aria-expanded={open} aria-controls={id} popoverTarget={id} onClick={event => {
+        const menu: HTMLDivElement & { showPopover(options: { source: HTMLButtonElement }): void } = popup.current!;
+        if (menu.matches(':popover-open')) return;
+        event.preventDefault();
+        // Set width and layout first. The native popover is measurable once shown.
+        flushSync(place);
+        menu.showPopover({ source: event.currentTarget });
+        flushSync(place);
+      }}><Icon name="sliders" width="16" height="16" /></button></MessageAction>
     {createPortal(<div ref={popup} id={id} popover="auto" className="audio-floating-menu" data-submenu-stacked={stacked || undefined}
       data-speed-page={stacked && speedOpen || undefined} style={position} {...menuGlide} {...dropdownMenuPopover} onToggle={event => {
         const next = event.currentTarget.matches(':popover-open');
