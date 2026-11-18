@@ -21,7 +21,8 @@ export function HomeFileThumbnail({ file, api, onOpen }: { file: HomeFileEntry; 
     const load = async () => {
       const { bytes } = await api.preview(file.path);
       if (disposed) return;
-      let blob: Blob | null;
+      const canvas = document.createElement('canvas');
+      // Keep only a 2x thumbnail in memory; opening the file still loads the original.
       if (pdf) {
         const pdfjs = await import('pdfjs-dist');
         if (disposed) return;
@@ -30,24 +31,25 @@ export function HomeFileThumbnail({ file, api, onOpen }: { file: HomeFileEntry; 
         const page = await doc.getPage(1);
         if (disposed) return;
         const original = page.getViewport({ scale: 1 });
-        const viewport = page.getViewport({ scale: 960 / Math.max(original.width, original.height) });
-        const canvas = document.createElement('canvas');
+        const viewport = page.getViewport({ scale: Math.min(208 / original.width, 152 / original.height) });
         canvas.width = Math.ceil(viewport.width);
         canvas.height = Math.ceil(viewport.height);
         await page.render({ canvas, viewport }).promise;
-        blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
       } else {
-        blob = new Blob([new Uint8Array(bytes)]);
+        const image = await createImageBitmap(new Blob([new Uint8Array(bytes)]));
+        if (disposed) { image.close(); return; }
+        const scale = Math.min(1, 208 / image.width, 152 / image.height);
+        canvas.width = Math.max(1, Math.round(image.width * scale));
+        canvas.height = Math.max(1, Math.round(image.height * scale));
+        canvas.getContext('2d')!.drawImage(image, 0, 0, canvas.width, canvas.height);
+        image.close();
       }
+      if (disposed) return;
+      const blob = await new Promise<Blob | null>(resolve => canvas.toBlob(resolve, 'image/png'));
       if (!disposed && blob) {
         objectUrl = URL.createObjectURL(blob);
-        const image = new Image();
-        image.src = objectUrl;
-        await image.decode();
-        if (!disposed) {
-          const scale = Math.min(104 / image.naturalWidth, 76 / image.naturalHeight);
-          setThumbnail({ url: objectUrl, width: image.naturalWidth * scale, height: image.naturalHeight * scale });
-        }
+        const scale = Math.min(104 / canvas.width, 76 / canvas.height);
+        setThumbnail({ url: objectUrl, width: canvas.width * scale, height: canvas.height * scale });
       }
     };
 

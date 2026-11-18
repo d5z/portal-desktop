@@ -14,7 +14,7 @@ const renderCode = (text: string, language: string, closed = true) =>
     previewMarkdownCode: false,
   }));
 function expectCompleteCode(html: string, text: string) {
-  const body = html.match(/<pre><code[^>]*>([\s\S]*?)<\/code><\/pre>/)?.[1];
+  const body = html.match(/<pre\b[^>]*><code[^>]*>([\s\S]*?)<\/code><\/pre>/)?.[1];
   expect(body?.replace(/<\/?span\b[^>]*>/g, "")).toBe(
     renderToStaticMarkup(createElement(Fragment, null, text)),
   );

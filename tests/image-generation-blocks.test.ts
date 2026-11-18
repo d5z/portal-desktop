@@ -30,7 +30,7 @@ describe('mixed image generation replies',()=>{
   });
   it('holds incomplete stream receipts and preserves prose on either side of complete streaming blocks',()=>{
     const partial='前文\n```json\n{"type":"being.image-generation",';
-    const html=render(partial,true);expect(html).toContain('前文');expect(html).toContain('正在接收');expect(html).not.toContain('image-generation-card');
+    const html=render(partial,true);expect(html).toContain('前文');expect(html).toContain('正在确认图片任务');expect(html).not.toContain('image-generation-card');
     const complete=render('前文\n'+json+'\n后文',true);
     expect(complete).toContain('前文');expect(complete).toContain('后文');expect(complete).not.toContain('image-generation-card');
   });

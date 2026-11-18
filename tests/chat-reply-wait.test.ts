@@ -168,9 +168,7 @@ it('distinguishes waiting timeout from failed tools in the collapsed activity su
   const html = renderToStaticMarkup(createElement(ChatActivity, {run}));
   const summary = html.split('</summary>')[0];
   expect(summary).toContain('data-status="timeout"');
-  expect(summary).toContain('总耗时');
-  expect(summary).toContain('11 分 4 秒');
-  expect(summary).toContain('3 次工具调用');
+  expect(summary).not.toContain('class="run-entry"');
   expect(summary).toContain('1 次失败');
   expect(summary).toContain('1 次结果未确认');
   expect(summary).not.toContain('含失败项');

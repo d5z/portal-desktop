@@ -138,6 +138,8 @@ function DetailedChatActivity({
             ? <span className="message-scene" title="后台自主活动，与当前场景对话分别显示">{run.autonomousOrigin === 'callback' ? 'SBS 自主回调' : 'SBS 自主活动'}</span>
             : sceneLabel && <span className="message-scene" title={run.sceneId}>{sceneLabel}</span>}
         </span>
+        {failed > 0 && <span className="run-failures">{failed} 次失败</span>}
+        {run.end && unconfirmed > 0 && <span>{unconfirmed} 次结果未确认</span>}
         <span className="run-chevron" aria-hidden="true">
           <Icon name="chat-chevron-right" />
         </span>

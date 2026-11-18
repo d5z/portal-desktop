@@ -43,7 +43,7 @@ describe('structured chat content', () => {
   it('keeps JSONL and incomplete fenced JSON visible without a format action', () => {
     for (const content of ['{"a":1}\n{"b":2}', '```json\n{"a":']) {
       const html = renderToStaticMarkup(createElement(Markdown, { content, chat: true }));
-      expect(html).toContain('<pre><code');
+      expect(html).toMatch(/<pre\b[^>]*><code/);
       expect(html).toContain('复制代码');
       expect(html).not.toContain('>格式化<');
     }

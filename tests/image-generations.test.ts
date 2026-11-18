@@ -30,7 +30,7 @@ describe('image receipt protocol and rendering',()=>{
   });
   it('holds streaming receipts and explains malformed receipts without starting Markdown rendering',()=>{
     const render=(text:string,streaming=false,enabled=true)=>renderToStaticMarkup(createElement(ImageGenerationAnswer,{text,streaming,enabled,endpoint:connection.endpoint,scope:'room',children:'markdown fallback'}));
-    expect(render('{"type":"being.image-generation",',true)).toContain('正在接收');
+    expect(render('{"type":"being.image-generation",',true)).toContain('正在确认图片任务');
     expect(render('{"type":"being.image-generation",')).toContain('不要重新生成');
     expect(render('普通消息')).toContain('markdown fallback');
     const html=render(JSON.stringify(receipt));

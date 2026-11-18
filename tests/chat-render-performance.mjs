@@ -6,6 +6,9 @@ import { chromium } from 'playwright';
 const paragraphs = Number(process.env.PERF_PARAGRAPHS || 90);
 const interval = Number(process.env.PERF_INTERVAL_MS || 16);
 const assets = new Map(await Promise.all(['loom.html','chat.js','chat.css','highlight.css'].map(async name=>['/'+name,await readFile('desktop/generated/'+name)])));
+if (process.env.PERF_DESKTOP === '1') {
+  assets.set('/loom.html', Buffer.from(assets.get('/loom.html').toString().replace('<html', '<html data-chat-host="desktop"')));
+}
 const id = n => 'msg_' + n.toString(16).padStart(64,'0');
 const receipt = {type:'being.image-generation',version:1,being_id:'fixture',jobs:[{index:1,title:'row 967',submission:'accepted',generation_id:'gen_perf',client_request_id:'perf',error_code:null}]};
 const history = Array.from({length:1000},(_,i)=>({seq:i+1,role:i%2?'being':'user',scene_id:'perf',content:`row ${i+1}\n\n历史第二段\n\n历史第三段`,at:'2026-10-22T01:00:00Z'}));
@@ -64,7 +67,7 @@ try {
   await page.locator('[data-history-seq="965"]').scrollIntoViewIfNeeded();
   await page.getByText('row 965',{exact:true}).waitFor();
   await page.locator('[data-history-seq="967"]').scrollIntoViewIfNeeded();
-  await page.waitForFunction(()=>document.querySelector('.image-generation-notice')?.textContent==='fixture').catch(async error=>{
+  await page.waitForFunction(()=>document.querySelector('[data-history-seq="967"] .chat-error-indicator')?.textContent.includes('fixture')).catch(async error=>{
     console.log(JSON.stringify({resources,errors,card:await page.locator('[data-history-seq="967"]').innerText()}));
     await page.screenshot({path:'test-results/performance-debug.png'});throw error;
   });
