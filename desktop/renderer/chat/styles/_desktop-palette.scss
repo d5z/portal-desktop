@@ -1371,7 +1371,7 @@
   #pending-files[data-expanded='true'] .pending-files-list {
     box-sizing: border-box;
     flex-wrap: wrap;
-    padding-inline-end: var(--chat-attachment-gap);
+    padding-inline-end: max(var(--chat-attachment-gap), var(--pending-remove-overhang));
     padding-block-start: var(--pending-remove-overhang);
     margin-block-start: calc(-1 * var(--pending-remove-overhang));
     scroll-padding-block-start: var(--pending-remove-overhang);
