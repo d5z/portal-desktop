@@ -97,6 +97,14 @@ try {
   const recent = page.locator('[role="tabpanel"][id$="-recent"]');
   const recentTab = page.getByRole('tab', { name: '最近', exact: true });
   const workspaceTab = page.getByRole('tab', { name: '工作区', exact: true });
+  const viewControls = page.getByRole('group', { name: '文件显示布局' });
+  const expectAlignedSearch = async () => {
+    const search = await page.getByRole('searchbox', { name: '搜索当前文件夹' }).boundingBox();
+    const controls = await viewControls.boundingBox();
+    assert.ok(search.x + search.width < controls.x, 'view controls sit to the right of search');
+    assert.ok(Math.abs(search.y + search.height / 2 - controls.y - controls.height / 2) <= 1, 'search and view controls share a row');
+    assert.ok(search.width > controls.width, 'search keeps room for text');
+  };
   await recent.locator('li').first().waitFor();
   await mkdir('output/playwright', { recursive: true });
   assert.equal(await recentTab.getAttribute('aria-selected'), 'true');
@@ -113,6 +121,7 @@ try {
   assert.equal(await recent.isVisible(), false);
   assert.equal(await files.getByRole('button', { name: 'notes.txt 5 B', exact: true }).count(), 1);
   assert.deepEqual(await page.evaluate(() => window.downloads), []);
+  await expectAlignedSearch();
   await page.screenshot({ animations: 'disabled', path: 'output/playwright/home-library-desktop.png' });
   await page.keyboard.press('ArrowLeft');
   assert.equal(await recentTab.getAttribute('aria-selected'), 'true');
@@ -265,6 +274,13 @@ try {
   await page.screenshot({ animations: 'disabled', path: 'output/playwright/home-library-narrow-dark.png' });
   const overflows = await page.locator('#being-info').evaluate(el => el.scrollWidth > el.clientWidth);
   assert.equal(overflows, false, 'narrow library must not overflow');
+  await page.locator('#being-info').evaluate(el => { el.style.width = el.style.flexBasis = '240px'; });
+  await workspaceTab.click();
+  await expectAlignedSearch();
+  await viewControls.getByRole('button', { name: '列表视图' }).click();
+  assert.equal(await files.getAttribute('data-layout'), 'list');
+  await viewControls.getByRole('button', { name: '网格视图' }).click();
+  await recentTab.click();
   await page.evaluate(() => { window.missingLocal = true; });
   await recent.getByRole('button', { name: '本机笔记.txt 本机', exact: true }).click();
   await localPreview.getByRole('alert').waitFor();

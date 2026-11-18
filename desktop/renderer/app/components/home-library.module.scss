@@ -110,10 +110,17 @@
   font-variant-numeric: tabular-nums;
 }
 
+.searchRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 13px;
+}
+
 .searchField {
   position: relative;
-  display: block;
-  margin-bottom: 13px;
+  flex: 1;
+  min-width: 0;
 
   > svg {
     position: absolute;
@@ -127,6 +134,7 @@
 }
 
 .library .search {
+  display: block;
   width: 100%;
   min-width: 0;
   height: 34px;

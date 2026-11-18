@@ -102,6 +102,15 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
   const search = query.trim().toLocaleLowerCase();
   const entries = search ? model.entries.filter(entry => entry.name.toLocaleLowerCase().includes(search)) : model.entries;
   const parts = model.path ? model.path.split('/') : [];
+  const viewControls = <div className={styles.viewModes} role="group" aria-label="文件显示布局">
+    {viewModes.map(([mode, label, icon]) => <IconButton key={mode} className={styles.iconButton} label={label}
+      aria-pressed={view === mode} onClick={() => {
+        setView(mode);
+        try { localStorage.setItem('beings:home-files-view', mode); } catch { /* Keep the current view. */ }
+      }}>
+      <Icon name={icon} />
+    </IconButton>)}
+  </div>;
   return <WarmTooltipGroup delay={300} travel={0} tooltipClassName={styles.fileTooltip}>
     <div ref={library} className={styles.library} data-warm-tooltip-scope>
     <div className={styles.toolbar}>
@@ -119,19 +128,10 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
           {label}
         </button>)}
     </div>
-    {tab === 'workspace' && <>
+    {tab === 'workspace' ? <>
       {model.loaded && entries.length > 0 && <span className={styles.count}>{entries.length} 项</span>}
       <IconButton className={styles.iconButton} label="刷新资料库" disabled={model.loading || model.busy} onClick={() => void model.load()}><Icon name="lucide-refresh-cw" /></IconButton>
-    </>}
-    <div className={styles.viewModes} role="group" aria-label="文件显示布局">
-      {viewModes.map(([mode, label, icon]) => <IconButton key={mode} className={styles.iconButton} label={label}
-        aria-pressed={view === mode} onClick={() => {
-          setView(mode);
-          try { localStorage.setItem('beings:home-files-view', mode); } catch { /* Keep the current view. */ }
-        }}>
-        <Icon name={icon} />
-      </IconButton>)}
-    </div>
+    </> : viewControls}
     </div>
     <section role="tabpanel" id={`${tabId}-recent`} aria-labelledby={`${tabId}-recent-tab`} hidden={tab !== 'recent'}>
       {!recent.entries.length && <p className={styles.recentEmpty}>打开本机或云电脑中的文件后，会显示在这里。</p>}
@@ -164,10 +164,13 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
         {parts.map((part, index) => <span key={index}><span aria-hidden="true">/</span><button type="button" title={part} aria-current={index === parts.length - 1 ? 'location' : undefined} onClick={() => navigate(parts.slice(0, index + 1).join('/'))}>{part}</button></span>)}
       </nav>
     </div>}
-    <label className={styles.searchField}>
-      <Icon name="lucide-search" />
-      <input className={styles.search} type="search" aria-label="搜索当前文件夹" placeholder="搜索文件" value={query} onChange={event => setQuery(event.target.value)} />
-    </label>
+    <div className={styles.searchRow}>
+      <label className={styles.searchField}>
+        <Icon name="lucide-search" />
+        <input className={styles.search} type="search" aria-label="搜索当前文件夹" placeholder="搜索文件" value={query} onChange={event => setQuery(event.target.value)} />
+      </label>
+      {tab === 'workspace' && viewControls}
+    </div>
     {model.error && <div className={styles.feedback} role="alert"><p>{model.error}</p><div><button type="button" disabled={model.loading || model.busy} onClick={() => void model.load()}>重试</button><button type="button" onClick={onConnect}>前往电脑栏</button></div></div>}
     <p className={styles.status} role="status" hidden={!model.busy && !model.loading && !model.notice}>{model.busy ? '正在保存文件…' : model.loading ? '正在读取工作区…' : model.notice || (model.loaded ? `${entries.length} 项${query ? '匹配结果' : ''}` : '')}</p>
     {model.loaded && !entries.length && <motion.div className={styles.empty}
