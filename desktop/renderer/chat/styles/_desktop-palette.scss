@@ -1415,6 +1415,7 @@
     border: 0;
     border-radius: var(--chat-prompt-attachment-radius);
     background: transparent;
+    overflow: visible;
   }
 
   #pending-files .pending-file-content {

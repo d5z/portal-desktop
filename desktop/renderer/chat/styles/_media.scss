@@ -105,8 +105,11 @@
   min-width: 20px;
   min-height: 20px;
   border-radius: 50%;
-  background: var(--bg) !important;
   font-size: 11px;
+}
+
+:root:not([data-chat-host='desktop']) .pending-file .remove {
+  background: var(--bg) !important;
 }
 
 .pending-file:has(.pending-file-preview) {
