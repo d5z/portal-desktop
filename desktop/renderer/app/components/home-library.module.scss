@@ -1,6 +1,29 @@
+@use '../../shared/styles/chat-menu';
+
 .library {
   min-width: 0;
   font-size: 13px;
+}
+
+.contextMenu {
+  @include chat-menu.surface(
+    var(--chat-menu-surface, var(--bg)),
+    var(--chat-menu-border, 1px solid var(--border)),
+    var(--chat-menu-shadow, 0 5px 14px #0002)
+  );
+
+  position: fixed;
+  z-index: 1000;
+  width: min(168px, calc(100vw - 16px));
+  max-height: calc(100dvh - 16px);
+  overflow: auto;
+  padding: 4px;
+  transform-origin: top left;
+  -webkit-app-region: no-drag;
+
+  > button {
+    @include chat-menu.action-row;
+  }
 }
 
 .heading {
