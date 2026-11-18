@@ -269,8 +269,12 @@
   padding: 0;
 }
 
+#being-info .being-info-content > #being-profile-panel {
+  padding-block-start: 6px;
+}
+
 #being-info #being-profile-panel h3 {
-  margin: 0 0 9px;
+  margin: 0 0 12px;
   color: var(--secondary);
   font-size: 12px;
   font-weight: 500;
@@ -284,12 +288,12 @@
 }
 
 #being-info .being-details {
-  margin-bottom: 20px;
+  margin-bottom: 28px;
 }
 
 #being-info :is(.being-details > div, .being-action-row) {
-  min-height: 46px;
-  padding: 8px 12px;
+  min-height: 52px;
+  padding: 10px 16px;
   border: 0;
 }
 
@@ -302,7 +306,7 @@
 #being-info .being-details dt {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
   color: var(--text);
   font-size: 13px;
   line-height: 18px;
@@ -326,7 +330,7 @@
 #being-info :is(.being-details > div + div, .being-action-row + .being-action-row)::after {
   content: '';
   position: absolute;
-  inset-inline: 12px;
+  inset-inline: 16px;
   top: 0;
   height: 1px;
   background: var(--line);
@@ -358,7 +362,7 @@
 }
 
 #being-info .being-action-row {
-  gap: 10px;
+  gap: 12px;
   border-radius: var(--utility-radius);
   background: transparent;
   font-size: 13px;

@@ -103,7 +103,9 @@ try {
   assert.equal(await files.isVisible(), false);
   assert.equal(await page.getByRole('button', { name: /隐藏最近|显示最近/ }).count(), 0);
   assert.equal(await recent.locator('li').count(), 7);
-  await recent.getByRole('button', { name: '从最近记录移除：notes.txt', exact: true }).click();
+  const removeNotes = recent.getByRole('button', { name: '从最近记录移除：notes.txt', exact: true });
+  await removeNotes.locator('xpath=ancestor::li').hover();
+  await removeNotes.click();
   assert.equal(await recent.getByText('notes.txt', { exact: true }).count(), 0);
   await recentTab.focus(); await page.keyboard.press('ArrowRight');
   assert.equal(await workspaceTab.getAttribute('aria-selected'), 'true');
@@ -139,7 +141,9 @@ try {
   await workspaceTab.hover();
   await workspaceTab.focus();
   const sourceTag = row.getByText('本机', { exact: true });
+  const removeRecent = row.getByRole('button', { name: /从最近记录移除/ });
   assert.equal(await sourceTag.evaluate(el => getComputedStyle(el).opacity), '0');
+  assert.equal(await removeRecent.evaluate(el => getComputedStyle(el).pointerEvents), 'none');
   await row.getByRole('button').first().focus();
   assert.equal(await sourceTag.evaluate(el => getComputedStyle(el).opacity), '1');
   await workspaceTab.focus();
@@ -147,15 +151,28 @@ try {
   assert.equal(await sourceTag.evaluate(el => getComputedStyle(el).opacity), '1');
   assert.equal(await sourceTag.evaluate(el => getComputedStyle(el).borderRadius), '5px');
   assert.equal(await row.getByRole('button').first().evaluate(el => getComputedStyle(el).backgroundColor), 'rgba(0, 0, 0, 0)');
-  await page.getByRole('tooltip').waitFor();
-  assert((await page.getByRole('tooltip').innerText()).includes('最近打开 ·'));
+  const fileTip = page.getByRole('tooltip');
+  await fileTip.getByText(/最近打开 ·/).waitFor();
   await page.locator('#being-info').screenshot({ animations: 'disabled', path: 'output/playwright/home-library-file-tooltip.png' });
   const rowColor = await row.evaluate(el => getComputedStyle(el).backgroundColor);
-  await row.getByRole('button', { name: /从最近记录移除/ }).hover();
-  assert.equal(await page.getByRole('tooltip').count(), 0);
-  assert.equal(await row.getByRole('button', { name: /从最近记录移除/ }).getAttribute('title'), '移除最近');
+  await removeRecent.hover();
+  await fileTip.getByText('移除最近记录', { exact: true }).waitFor();
+  await fileTip.getByText(/最近打开 ·/).waitFor({ state: 'detached' });
+  assert.equal(await removeRecent.getAttribute('title'), '');
+  assert.deepEqual(await removeRecent.evaluate(button => {
+    const hit = button.getBoundingClientRect(), tile = button.closest('li').getBoundingClientRect();
+    return [hit.top - tile.top, tile.right - hit.right, button.querySelector('svg').getBoundingClientRect().width];
+  }), [2, 2, 14]);
   assert.equal(await row.evaluate(el => getComputedStyle(el).backgroundColor), rowColor);
   await page.locator('#being-info').screenshot({ animations: 'disabled', path: 'output/playwright/home-library-remove-hover.png' });
+  await page.getByRole('button', { name: '列表视图', exact: true }).click();
+  await row.hover();
+  await removeRecent.hover();
+  assert.equal(await removeRecent.evaluate(button => {
+    const hit = button.getBoundingClientRect(), tile = button.closest('li').getBoundingClientRect();
+    return Math.abs(hit.top + hit.height / 2 - tile.top - tile.height / 2);
+  }), 0);
+  await page.getByRole('button', { name: '网格视图', exact: true }).click();
   await page.evaluate(() => { document.documentElement.dataset.theme = 'dark'; });
   await page.screenshot({ animations: 'disabled', path: 'output/playwright/home-library-recent-dark.png' });
   await page.evaluate(() => { document.documentElement.dataset.theme = 'light'; });
@@ -167,7 +184,9 @@ try {
   await page.getByRole('button', { name: '清除搜索' }).click();
   await files.getByRole('button', { name: '项目资料' }).click();
   await files.getByRole('button', { name: '报告 #%.txt 1.5 KiB' }).waitFor();
-  await page.getByRole('button', { name: '下载 报告 #%.txt', exact: true }).click();
+  const downloadReport = page.getByRole('button', { name: '下载 报告 #%.txt', exact: true });
+  await downloadReport.locator('xpath=ancestor::li').hover();
+  await downloadReport.click();
   await page.getByText('文件已保存', { exact: true }).waitFor();
   assert.deepEqual(await page.evaluate(() => window.downloads), ['项目资料/报告 #%.txt']);
   await page.getByRole('button', { name: '工作区', exact: true }).click();
@@ -176,7 +195,8 @@ try {
   await page.getByRole('button', { name: '工作区', exact: true }).click();
   assert.equal(await page.getByRole('button', { name: /上传文件|新建文件夹/ }).count(), 0);
   await page.getByRole('searchbox').fill('欢迎');
-  await files.getByRole('button', { name: '欢迎来到工作区.html 2 KiB', exact: true }).click();
+  const htmlFile = files.getByRole('button', { name: '欢迎来到工作区.html 2 KiB', exact: true });
+  await htmlFile.click();
   const dialog = page.getByRole('complementary', { name: '文件预览：欢迎来到工作区.html' });
   const html = page.frameLocator('iframe[title="云端 HTML 预览"]');
   await html.getByRole('heading', { name: 'Workspace preview fixture' }).waitFor();
@@ -191,7 +211,7 @@ try {
   assert((await dialog.locator('pre').innerText()).includes('<script>'));
   await page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'hidden' });
-  await page.waitForFunction(() => document.activeElement?.getAttribute('title') === '欢迎来到工作区.html');
+  await htmlFile.and(page.locator(':focus')).waitFor();
   assert.equal(await page.getByRole('searchbox').inputValue(), '欢迎');
   await page.getByRole('searchbox').fill('');
   await page.evaluate(() => { window.delayPreview = true; });
@@ -237,7 +257,9 @@ try {
   await recent.getByRole('button', { name: '本机笔记.txt 本机', exact: true }).click();
   await localPreview.getByRole('alert').waitFor();
   await localPreview.getByRole('button', { name: '关闭文件预览' }).click();
-  await recent.getByRole('button', { name: '从最近记录移除：本机笔记.txt', exact: true }).click();
+  const removeLocal = recent.getByRole('button', { name: '从最近记录移除：本机笔记.txt', exact: true });
+  await removeLocal.locator('xpath=ancestor::li').hover();
+  await removeLocal.click();
   assert.equal(await recent.getByText('本机笔记.txt', { exact: true }).count(), 0);
   assert.deepEqual(await page.evaluate(() => window.downloads), ['项目资料/报告 #%.txt']);
   assert.deepEqual(errors, []);

@@ -200,7 +200,11 @@
   .folderName { padding-inline-end: 8px; }
   .fileName { flex: 1; }
   .fileSize { flex: none; }
-  .tileAction { top: 8px; right: 6px; }
+  .tileAction {
+    top: 50%;
+    right: 6px;
+    transform: translateY(-50%);
+  }
 }
 
 .tile {
@@ -307,6 +311,7 @@
 @media (hover: hover) and (pointer: fine) {
   .tile:not(:hover, :focus-within) > .tileAction {
     opacity: 0;
+    pointer-events: none;
   }
 }
 
@@ -529,28 +534,24 @@
   color: var(--text);
 }
 
-.fileTooltip {
-  position: fixed;
-  z-index: 10020;
-  display: grid;
-  gap: 7px;
-  padding: 14px 16px;
-  border-radius: 14px;
+.library .removeRecent {
+  border-radius: 50%;
   background: var(--control);
-  color: var(--text);
-  box-shadow: 0 8px 28px #00000024;
-  pointer-events: none;
-  overflow-wrap: anywhere;
-  font-size: 12px;
-  line-height: 1.5;
 
-  strong {
-    font-size: 14px;
-    font-weight: 500;
-  }
+  > svg { width: 14px; height: 14px; }
+  &:hover:not(:disabled) { background: var(--selected); }
+  &:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
 }
 
-.tipType,
-.tipTime {
-  color: var(--secondary);
+.fileTooltip :global(.warm-tooltip__box) {
+  box-shadow: var(--popover-shadow);
+}
+
+.fileTooltip :global(.warm-tooltip__text) {
+  flex: none;
+  width: max-content;
+  max-width: min(248px, calc(100vw - 36px));
+  line-height: 16px;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
 }

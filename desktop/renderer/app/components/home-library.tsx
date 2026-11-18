@@ -1,21 +1,24 @@
 import { IconButton } from '../../shared/components/icon-button';
 import { formatBytes } from '../../shared/lib/format-bytes';
 import { Icon } from '../../shared/icons/icon';
-import { useContext, useEffect, useId, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { useContext, useEffect, useId, useRef, useState } from 'react';
 import { motion, useReducedMotion } from 'motion/react';
 import type { HomeAPI } from '../../../shared/home';
 import { useModel } from '../../shared/hooks/use-model';
 import { FileTypeIcon } from '../../shared/components/file-type-icon';
 import Folder from '../../shared/components/react-bits/Folder';
+import { WarmTooltipGroup } from '../../shared/components/react-bits/WarmTooltip';
+import { shellTooltipAppearance, WarmTooltipAnchors } from '../../shared/components/warm-tooltip-anchors';
 import { LocalFileAction } from '../../shared/components/local-file-link';
-import { homeRecentFiles, type RecentFile } from '../models/home-recent-files';
+import { homeRecentFiles } from '../models/home-recent-files';
 import { HomeLibrary } from '../models/home-library';
 import styles from './home-library.module.scss';
 import { HomeFilePanel } from './home-file-panel';
 import { HomeFileThumbnail } from './home-file-thumbnail';
 const folderPapers = [{}, {}];
 const viewModes = [['grid', '网格视图', 'lucide-layout-grid'], ['list', '列表视图', 'lucide-list']] as const;
+const libraryTooltipAppearance = { ...shellTooltipAppearance, side: 'top' as const, gap: 6, radius: 8, font: 12, px: 10, py: 6 };
+const recentFileTime = { month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false } as const;
 
 function LibraryListIcon({ name, directory }: { name: string; directory?: boolean }) {
   const glyph = directory ? 'lucide-folder' : /\.(png|jpe?g|gif|webp|avif|svg)$/i.test(name) ? 'chat-image' : 'chat-file';
@@ -40,23 +43,7 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
   const tileMotion = { layout: reduce ? false as const : 'position' as const, layoutDependency: view };
   const list = view === 'list';
   const tabId = useId();
-  const [tip, setTip] = useState<{ path: string; source: RecentFile['source']; left: number; top: number; width: number; above: boolean } | null>(null);
-  const hovered = recent.entries.find(entry => entry.path === tip?.path && entry.source === tip?.source);
-  const showTip = (element: HTMLButtonElement, entry: RecentFile) => {
-    const bounds = element.parentElement!.getBoundingClientRect();
-    const width = Math.min(320, bounds.width, innerWidth - 24);
-    const above = bounds.top > 150;
-    setTip({ path: entry.path, source: entry.source, width, left: Math.max(12, Math.min(bounds.left, innerWidth - width - 12)), top: above ? bounds.top - 8 : bounds.bottom + 8, above });
-  };
-  useEffect(() => {
-    if (!tip) return;
-    const close = () => setTip(null);
-    const escape = (event: KeyboardEvent) => { if (event.key === 'Escape') close(); };
-    window.addEventListener('scroll', close, true);
-    window.addEventListener('resize', close);
-    window.addEventListener('keydown', escape);
-    return () => { window.removeEventListener('scroll', close, true); window.removeEventListener('resize', close); window.removeEventListener('keydown', escape); };
-  }, [tip]);
+  const library = useRef<HTMLDivElement>(null);
   const [query, setQuery] = useState('');
   // Portaled previews must close when their retained tab is no longer visible.
   useEffect(() => { if (!active) store.closePreview(); }, [active, store]);
@@ -79,7 +66,8 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
   const search = query.trim().toLocaleLowerCase();
   const entries = search ? model.entries.filter(entry => entry.name.toLocaleLowerCase().includes(search)) : model.entries;
   const parts = model.path ? model.path.split('/') : [];
-  return <div className={styles.library}>
+  return <WarmTooltipGroup delay={300} travel={0} tooltipClassName={styles.fileTooltip}>
+    <div ref={library} className={styles.library} data-warm-tooltip-scope>
     <div className={styles.toolbar}>
     <div className={styles.tabs} role="tablist" aria-label="资料库内容" onKeyDown={event => {
       if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
@@ -102,7 +90,7 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
     <div className={styles.viewModes} role="group" aria-label="文件显示布局">
       {viewModes.map(([mode, label, icon]) => <IconButton key={mode} className={styles.iconButton} label={label}
         aria-pressed={view === mode} onClick={() => {
-          setView(mode); setTip(null);
+          setView(mode);
           try { localStorage.setItem('beings:home-files-view', mode); } catch { /* Keep the current view. */ }
         }}>
         <Icon name={icon} />
@@ -111,18 +99,20 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
     </div>
     <section role="tabpanel" id={`${tabId}-recent`} aria-labelledby={`${tabId}-recent-tab`} hidden={tab !== 'recent'}>
       {!recent.entries.length && <p className={styles.recentEmpty}>打开本机或云电脑中的文件后，会显示在这里。</p>}
-      <ul className={styles.fileGrid} data-layout={view} aria-label="最近的文件">{recent.entries.map(entry => <motion.li {...tileMotion} className={styles.tile} key={`${entry.source}:${entry.path}`} onMouseLeave={() => setTip(null)}>
+      <ul className={styles.fileGrid} data-layout={view} aria-label="最近的文件">{recent.entries.map(entry => <motion.li {...tileMotion} className={styles.tile} key={`${entry.source}:${entry.path}`}>
           {list ? <LibraryListIcon name={entry.name} /> : entry.source === 'cloud'
             ? <HomeFileThumbnail file={entry} api={active && tab === 'recent' ? api.files : undefined}
-                onOpen={model.busy ? undefined : () => { setTip(null); void model.open(entry); }} />
+                onOpen={model.busy ? undefined : () => void model.open(entry)} />
             : <span className={styles.thumbnail}><FileTypeIcon path={entry.path} className={styles.fileTypeIcon} glyph="chat-file" /></span>}
         <button className={styles.tileButton} type="button" disabled={entry.source === 'local' ? !openLocal : model.busy}
-          aria-describedby={hovered === entry ? `${tabId}-file-tip` : undefined}
-          onMouseEnter={event => showTip(event.currentTarget, entry)} onFocus={event => showTip(event.currentTarget, entry)} onBlur={() => setTip(null)}
-          onClick={() => { setTip(null); if (entry.source === 'local') openLocal?.(entry.path); else void model.open(entry); }}>
+          data-warm-tooltip={`${entry.name}\n最近打开 · ${new Date(entry.openedAt).toLocaleString('zh-CN', recentFileTime)}`}
+          onClick={() => { if (entry.source === 'local') openLocal?.(entry.path); else void model.open(entry); }}>
           <span className={styles.fileName}>{entry.name}</span><span className={styles.fileSource}>{entry.source === 'local' ? '本机' : '云电脑'}</span>
         </button>
-        <IconButton className={`${styles.iconButton} ${styles.tileAction}`} label={`从最近记录移除：${entry.name}`} title="移除最近" onMouseEnter={() => setTip(null)} onFocus={() => setTip(null)} onClick={() => { setTip(null); recent.remove(entry.path, entry.source); }}><Icon name="lucide-trash" /></IconButton>
+        <IconButton className={`${styles.iconButton} ${styles.tileAction} ${styles.removeRecent}`} label={`从最近记录移除：${entry.name}`}
+          title="" data-warm-tooltip="移除最近记录" onClick={() => recent.remove(entry.path, entry.source)}>
+          <Icon name="chat-close" />
+        </IconButton>
       </motion.li>)}</ul>
     </section>
     <section role="tabpanel" id={`${tabId}-workspace`} aria-labelledby={`${tabId}-workspace-tab`} hidden={tab !== 'workspace'}>
@@ -152,18 +142,18 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
             : <Folder items={folderPapers} size={0.42} theme={document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light'}
               openOn="hover" compactOpen openPaperInset={14} tilt={0.15} bounce={0} intro={false}
               draggable={false} zoomOnClick={false} onItemClick={() => { if (!model.busy) navigate(entry.path); }} />}
-          <button className={styles.folderName} type="button" title={entry.name} disabled={model.busy} onClick={() => navigate(entry.path)}>
+          <button className={styles.folderName} type="button" data-warm-tooltip={entry.name} disabled={model.busy} onClick={() => navigate(entry.path)}>
             <span className={styles.fileName}>{entry.name}</span>
           </button>
         </> : <>
           {list ? <LibraryListIcon name={entry.name} />
             : <HomeFileThumbnail file={entry} api={active && tab === 'workspace' ? api.files : undefined}
               onOpen={model.busy ? undefined : () => void model.open(entry)} />}
-          <button className={styles.tileButton} type="button" title={entry.name} disabled={model.busy} onClick={() => void model.open(entry)}>
+          <button className={styles.tileButton} type="button" data-warm-tooltip={entry.name} disabled={model.busy} onClick={() => void model.open(entry)}>
             <span className={styles.fileName}>{entry.name}</span>
             <small className={styles.fileSize}>{formatBytes(entry.size)}</small>
           </button>
-          <IconButton className={`${styles.iconButton} ${styles.tileAction}`} label={`下载 ${entry.name}`} title="下载文件"
+          <IconButton className={`${styles.iconButton} ${styles.tileAction}`} label={`下载 ${entry.name}`} title="" data-warm-tooltip="下载文件"
             disabled={model.busy} onClick={() => void model.download(entry.path)}>
             <Icon name="chat-download" />
           </IconButton>
@@ -171,12 +161,8 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
       </motion.li>
     ))}</ul>
     </section>
-    {active && tab === 'recent' && tip && hovered && createPortal(<div id={`${tabId}-file-tip`} role="tooltip" className={styles.fileTooltip}
-      style={{ left: tip.left, top: tip.top, width: tip.width, transform: tip.above ? 'translateY(-100%)' : undefined }}>
-      <span className={styles.tipType}>{hovered.source === 'local' ? '本机文件' : '云电脑文件'}</span>
-      <strong>{hovered.name}</strong>
-      <span className={styles.tipTime}>最近打开 · <time dateTime={new Date(hovered.openedAt).toISOString()}>{new Date(hovered.openedAt).toLocaleString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false })}</time></span>
-    </div>, document.body)}
     {active && <HomeFilePanel store={store} />}
-  </div>;
+    {active && <WarmTooltipAnchors rootRef={library} appearance={libraryTooltipAppearance} />}
+    </div>
+  </WarmTooltipGroup>;
 }

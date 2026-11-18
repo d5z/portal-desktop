@@ -1344,6 +1344,8 @@
   }
 
   #input-area #pending-files.active {
+    --pending-remove-overhang: 8px;
+
     position: relative;
     flex-wrap: nowrap;
     align-items: flex-start;
@@ -1367,9 +1369,13 @@
   }
 
   #pending-files[data-expanded='true'] .pending-files-list {
+    box-sizing: border-box;
     flex-wrap: wrap;
     padding-inline-end: var(--chat-attachment-gap);
-    max-height: calc(2 * var(--chat-prompt-attachment-height) + var(--chat-attachment-gap));
+    padding-block-start: var(--pending-remove-overhang);
+    margin-block-start: calc(-1 * var(--pending-remove-overhang));
+    scroll-padding-block-start: var(--pending-remove-overhang);
+    max-height: calc(2 * var(--chat-prompt-attachment-height) + var(--chat-attachment-gap) + var(--pending-remove-overhang));
     overflow: clip auto;
     overscroll-behavior-block: contain;
     scrollbar-width: thin;
@@ -1393,7 +1399,9 @@
 
   @media (max-height: 460px) {
     #composer-dock:has(.composer-queue-wrap, #pending-files.active) #input-row #input { max-height: 20dvh; }
-    #composer-dock:has(.composer-queue-wrap) #pending-files[data-expanded='true'] .pending-files-list { max-height: var(--chat-prompt-attachment-height); }
+    #composer-dock:has(.composer-queue-wrap) #pending-files[data-expanded='true'] .pending-files-list {
+      max-height: calc(var(--chat-prompt-attachment-height) + var(--pending-remove-overhang));
+    }
   }
 
   #pending-files .pending-file {
@@ -1469,14 +1477,13 @@
 
   #pending-files .pending-file .remove {
     position: absolute;
-    inset: 0 calc(-1 * var(--chat-attachment-gap)) auto auto;
-    padding-block-end: 8px;
+    inset-block-start: calc(-1 * var(--pending-remove-overhang));
+    inset-inline-end: calc(-1 * var(--pending-remove-overhang));
 
     &::before {
       content: '';
       position: absolute;
-      inset: 0 4px auto;
-      height: 16px;
+      inset: 4px;
       border-radius: 50%;
       background-color: var(--chat-reply-surface);
     }
@@ -1535,6 +1542,8 @@
   }
 
   @media (pointer: coarse) {
+    #input-area #pending-files.active { --pending-remove-overhang: 0px; }
+
     #pending-files .pending-file .remove {
       position: relative;
       inset: auto;
@@ -1543,7 +1552,7 @@
       width: var(--touch-target);
       height: var(--touch-target);
 
-      &::before { inset: 10px; height: auto; }
+      &::before { inset: 10px; }
       > svg { width: var(--chat-icon-compact); height: var(--chat-icon-compact); }
     }
 
