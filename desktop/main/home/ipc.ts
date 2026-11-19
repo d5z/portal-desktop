@@ -18,12 +18,8 @@ export function registerHomeIpc(handle: (channel: string, callback: (...args: an
   handle('beings:home-bounds', (bounds: HomeBounds) => viewer.setBounds(bounds));
   if (connectors) {
     if (network) {
-      const register = handle;
-      register('beings:home-connector-network-key', () => network.key);
-      handle = (channel, callback) => {
-        register(channel, callback);
-        if (channel !== 'beings:home-connector-open') network.handlers.set(channel.replace('beings:home-connector-', ''), callback);
-      };
+      network.forward = (request, session) => connectors.forward(request, session);
+      handle('beings:home-connector-network-key', () => network.key);
     }
     handle('beings:home-connector-catalog', (query: { q?: string; after?: string } = {}) => connectors.catalog(query));
     handle('beings:home-connector-local-kit-history', (after?: string) => connectors.localKitHistory(after));

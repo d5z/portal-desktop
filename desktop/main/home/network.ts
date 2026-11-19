@@ -3,10 +3,10 @@ import { CONNECTOR_NETWORK_METHODS, CONNECTOR_NETWORK_ROUTES } from '../../share
 import { publicErrorMessage } from '../../shared/errors';
 import { HomeError } from './protocol';
 
-/** Renderer-visible requests reuse the trusted Connector handlers; Home tokens stay in main. */
+/** Fixed Connector resources reuse Home authentication; tokens stay in main. */
 export class ConnectorNetwork {
   readonly key = randomUUID();
-  readonly handlers = new Map<string, (...args: any[]) => unknown>();
+  forward?: (request: Request, sessionVersion: number) => Promise<Response>;
   constructor(private shellURL: () => string) {}
 
   async handle(request: Request): Promise<Response> {
@@ -26,23 +26,21 @@ export class ConnectorNetwork {
     });
     const matched = routeOperations.find(item => request.method === 'OPTIONS' || CONNECTOR_NETWORK_METHODS[item.operation] === request.method);
     const operation = (matched?.operation || '') as keyof typeof CONNECTOR_NETWORK_METHODS;
-    const callback = this.handlers.get(operation);
-    if (!callback || (request.headers.has('Origin') && request.headers.get('Origin') !== origin)) return new Response(null, { status: 403 });
+    if (!matched || (request.headers.has('Origin') && request.headers.get('Origin') !== origin)) return new Response(null, { status: 403 });
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: {
       ...headers, 'Access-Control-Allow-Methods': [...new Set(routeOperations.map(item => CONNECTOR_NETWORK_METHODS[item.operation]))].join(', '),
-      'Access-Control-Allow-Headers': 'Content-Type, X-Connector-Access',
+      'Access-Control-Allow-Headers': 'Content-Type, X-Connector-Access, X-Home-Session',
     } });
     if (request.headers.get('X-Connector-Access') !== this.key) return new Response(null, { status: 403, headers });
     if (request.method !== CONNECTOR_NETWORK_METHODS[operation]) return new Response(null, { status: 405, headers });
-    let args: unknown;
-    try { args = request.method === 'GET' ? JSON.parse(url.searchParams.get('args') || '[]') : await request.json(); }
-    catch { return Response.json({ error: '无效的 Connector 请求。' }, { status: 400, headers }); }
-    if (!Array.isArray(args)) return Response.json({ error: '无效的 Connector 请求。' }, { status: 400, headers });
+    const session = request.headers.get('X-Home-Session');
+    if (session === null || !/^\d+$/.test(session)) return Response.json({ error: 'home_session_changed' }, { status: 409, headers });
+    if (!this.forward) return new Response(null, { status: 503, headers });
     try {
-      const value = await callback(...(matched?.args || []), ...args);
-      if (value === undefined) return new Response(null, { status: 204, headers });
-      const rejected = operation === 'lifecycle' && (value as { accepted: boolean }).accepted === false;
-      return Response.json(value, { status: rejected ? 409 : 200, headers });
+      const upstream = await this.forward(request, Number(session));
+      const responseHeaders = new Headers(upstream.headers);
+      for (const [name, value] of Object.entries(headers)) responseHeaders.set(name, value);
+      return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
     } catch (error) {
       return Response.json({ error: publicErrorMessage(error, 'Connector 请求失败，请重试。') }, {
         status: error instanceof HomeError && error.status >= 400 ? error.status : 502, headers,

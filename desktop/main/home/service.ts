@@ -23,7 +23,7 @@ export class HomeService {
   constructor(private client: HomeClient, private viewer: Viewer, private connection: () => Connection | null,
     private publish: (state: HomeState) => void) {}
   update(patch: Partial<HomeState> = {}) {
-    this.state = { ...this.state, ...patch, authenticated: this.client.authenticated, authenticating: this.client.authenticating };
+    this.state = { ...this.state, ...patch, authenticated: this.client.authenticated, authenticating: this.client.authenticating, sessionVersion: this.client.sessionVersion };
     this.publish(this.state); return this.state;
   }
   contextChanged() {

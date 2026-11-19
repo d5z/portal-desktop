@@ -4,6 +4,7 @@ export interface HomeOperation { id: string; computer_id: string; kind: string; 
 export type HomeAction = 'login' | 'cancel-login' | 'initialize' | 'bind' | 'wake' | 'stop' | 'recreate' | 'open' | 'close' | 'logout';
 export interface HomeState {
   authenticated: boolean;
+  sessionVersion?: number;
   authenticating: boolean;
   username?: string;
   beingName?: string;
@@ -140,7 +141,7 @@ export function connectorNetworkPath(operation: keyof typeof CONNECTOR_NETWORK_R
 export interface HomeConnectorAPI {
   catalog(query?: { q?: string; after?: string }): Promise<HomeConnectorCatalogPage>;
   localKitHistory(after?: string): Promise<HomeLocalKitHistoryPage>;
-  reportLocalKitHistory(input: { source_id: string; version: string }): Promise<HomeLocalKitHistory>;
+  reportLocalKitHistory(input: { source_id: string; version: string }, sessionVersion?: number): Promise<HomeLocalKitHistory>;
   installations(after?: string): Promise<HomeConnectorInstallationPage>;
   installation(installationId: string): Promise<HomeConnectorInstallation>;
   removeAccount(releaseId: string, connectionId: string): Promise<void>;
@@ -167,4 +168,34 @@ export interface HomeFilesAPI {
   list(path: string): Promise<HomeFileList>;
   preview(path: string): Promise<HomeFilePreview>;
   download(path: string): Promise<boolean>;
+}
+
+export function homeErrorMessage(status: number, code = '') {
+  if (code === 'kit_connector_management_disabled') return '当前环境未开放 Connector Kit 快捷管理。';
+  if (code === 'kit_connector_full_plan_required') return '此应用需要完整安装流程，暂不支持快捷连接。';
+  if (code === 'kit_connector_enable_changed' || code === 'needs_auth') return '账号或应用范围已变化，请返回详情重新核对。';
+  if (code === 'kit_connector_enable_in_progress') return '连接或安装正在处理中，请稍后刷新状态。';
+  if (code === 'kit_operation_changed') return '应用状态已变化，本次操作未提交，请核对最新状态后重试。';
+  if (code === 'kit_operation_in_progress') return '此应用有尚未完成的安装或变更任务，本次操作未提交，请稍后重试。';
+  if (code === 'kit_installation_removed') return '此应用已断开，请重新连接后再启用。';
+  if (code === 'kit_heart_binding_required') return '请先在电脑栏关联当前 Being，再恢复工具授权。';
+  if (code === 'kit_being_grant_changed') return '工具授权已变化，请刷新后重试。';
+  if (code === 'connector_account_identity_missing') return '尚未识别第三方账号，请重新连接并完成账号授权。';
+  if (code === 'kit_connection_auth_unavailable') return '当前没有可用的账号认证方式，请检查服务端配置。';
+  if (code === 'invalid_path') return '文件路径无效，请返回工作区重新选择。';
+  if (code === 'invalid_grant' || status === 401) return '登录已过期，请重新连接 Being Home。';
+  if (status === 0 || code === 'network') return '网络连接失败，请检查网络后重试。';
+  if (status === 400 || status === 422) return '请求参数无效，请返回详情重新操作。';
+  if (status === 404) return '应用或连接不存在，请刷新后重试。';
+  if (code === 'insufficient_scope') return 'Home 登录缺少所需权限，请在「电脑」栏退出 Home 后重新登录，授权全部权限。';
+  if (status === 403) return '当前账号没有所需权限，请重新连接并授权。';
+  if (code === 'connection_limit_reached') return '有效连接已达到 50 条上限，请先移除不再使用的连接。';
+  if (code === 'home_session_changed') return 'Home 账号已切换，请刷新后重试。';
+  if (code === 'kit_connector_tool_contract_changed') return '工具合同已变化，请核对刷新后的工具再确认。';
+  if (status === 409) return '当前状态与此操作冲突，请核对最新状态后重试。';
+  if (status === 429) return '请求过于频繁，请稍后重试。';
+  if (status === 507) return '云端存储空间已满。';
+  if (code === 'storage_not_ready') return '云端存储正在准备，请稍后刷新。';
+  if (status === 503) return 'Home 服务暂不可用，请稍后重试。';
+  return '连接失败，请检查网络后重试。';
 }

@@ -31,6 +31,15 @@ function utf8Prefix(value: string, limit: number) {
 export class HomeConnectors implements HomeConnectorAPI {
   constructor(private client: HomeClient, private openExternal: (url: string) => Promise<void>) {}
 
+  forward(request: Request, sessionVersion: number) {
+    const url = new URL(request.url);
+    return request.text().then(body => this.client.forward(url.pathname.slice('/api'.length) + url.search, {
+      method: request.method,
+      headers: request.headers.has('Content-Type') ? { 'Content-Type': request.headers.get('Content-Type')! } : {},
+      ...(body ? { body } : {}),
+    }, sessionVersion));
+  }
+
   private iconURL(value: string | null | undefined) {
     if (!value) return value ?? null;
     try { return new URL(value, homeURL('/')).href; }

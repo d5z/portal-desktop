@@ -61,8 +61,10 @@ export class HomeClient {
       try { response = await this.fetcher(homeURL(pathname), { ...init, redirect: 'error', signal }); }
       catch { throw new HomeError(0, 'network'); }
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new HomeError(response.status, typeof error.error === 'string' ? error.error : '');
+        const body = await response.text();
+        let code = '';
+        try { const value = JSON.parse(body); if (typeof value.error === 'string') code = value.error; } catch { /* Preserve non-JSON errors for Network. */ }
+        throw new HomeError(response.status, code, { body, contentType: response.headers.get('Content-Type') });
       }
       if (response.status === 204) return undefined as T;
       if (read) {
@@ -126,6 +128,20 @@ export class HomeClient {
       current();
       return result;
     } finally { this.requests.delete(request); }
+  }
+  /** Reuse session refresh/cancellation while preserving the actual HTTP response. */
+  async forward(pathname: string, init: RequestInit, sessionVersion: number) {
+    if (sessionVersion !== this.generation) throw new HomeError(409, 'home_session_changed');
+    try {
+      return await this.request<Response>(pathname, init, async response => new Response(await response.arrayBuffer(), {
+        status: response.status, headers: response.headers.get('Content-Type') ? { 'Content-Type': response.headers.get('Content-Type')! } : {},
+      })) ?? new Response(null, { status: 204 });
+    } catch (error) {
+      if (!(error instanceof HomeError) || !error.response) throw error;
+      return new Response(error.response.body || null, { status: error.status,
+        headers: error.response.contentType ? { 'Content-Type': error.response.contentType } : {},
+      });
+    }
   }
   cancelLogin() { this.cancelAuth?.(); }
   async login(changed: () => void) {

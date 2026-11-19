@@ -1,27 +1,59 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { DesktopAPI, PortalState, TownLiveState } from '../shared/types';
-import { CONNECTOR_NETWORK_METHODS, connectorNetworkPath } from '../shared/home';
+import { CONNECTOR_NETWORK_METHODS, connectorNetworkPath, homeErrorMessage } from '../shared/home';
 
 async function connectorRequest(operation: keyof typeof CONNECTOR_NETWORK_METHODS, ...args: unknown[]): Promise<any> {
   const key = await ipcRenderer.invoke('beings:home-connector-network-key');
+  const home = await ipcRenderer.invoke('beings:home-state');
   const method = CONNECTOR_NETWORK_METHODS[operation];
   const requestArgs = [...args];
-  while (requestArgs.length && requestArgs.at(-1) === undefined) requestArgs.pop();
   const url = new URL(`beings://desktop${connectorNetworkPath(operation, requestArgs)}`);
-  if (method === 'GET' && requestArgs.length) url.searchParams.set('args', JSON.stringify(requestArgs));
+  let body: unknown;
+  let sessionVersion = home.sessionVersion;
+  if (operation === 'catalog' || operation === 'legacy-catalog') {
+    const query = (requestArgs[0] || {}) as { q?: string; after?: string };
+    url.searchParams.set('limit', '12');
+    if (query.q?.trim()) {
+      let q = '';
+      for (const character of query.q.trim()) { if (new TextEncoder().encode(q + character).length > 100) break; q += character; }
+      if (q) url.searchParams.set('q', q);
+    }
+    if (query.after) url.searchParams.set('after', query.after);
+  } else if (operation === 'installations' || operation === 'local-kit-history') {
+    url.searchParams.set('limit', operation === 'installations' ? '50' : '12');
+    if (requestArgs[0]) url.searchParams.set('after', String(requestArgs[0]));
+  } else if (operation === 'lifecycle') {
+    body = { action: requestArgs[0], expected_revision: requestArgs[1], request_id: requestArgs[2] || crypto.randomUUID() };
+  } else if (operation === 'being-access') {
+    body = { enabled: requestArgs[0], expected_revision: requestArgs[1] };
+  } else if (method !== 'GET') {
+    body = requestArgs[0];
+    if (operation === 'report-local-kit-history' && requestArgs[1] !== undefined) sessionVersion = requestArgs[1];
+  }
   const response = await fetch(url.href, {
     method, credentials: 'omit', cache: 'no-store',
-    headers: { 'Content-Type': 'application/json', 'X-Connector-Access': key },
-    ...(method === 'GET' ? {} : { body: JSON.stringify(requestArgs) }),
+    headers: { ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), 'X-Connector-Access': key, 'X-Home-Session': String(sessionVersion) },
+    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
   if (response.status === 204) return;
-  const body = await response.text();
-  if (!body.trim()) throw new Error(response.ok ? 'Connector 返回空响应。' : `Connector 请求失败（HTTP ${response.status}）。`);
-  let value: { error?: unknown; accepted?: boolean };
-  try { value = JSON.parse(body) as { error?: unknown; accepted?: boolean }; }
-  catch { throw new Error('Connector 返回无效响应。'); }
-  if (!response.ok && !(operation === 'lifecycle' && response.status === 409 && value?.accepted === false)) {
-    throw new Error(typeof value?.error === 'string' ? value.error : `Connector 请求失败（HTTP ${response.status}）。`);
+  const text = await response.text();
+  let value: any;
+  try { value = text ? JSON.parse(text) : undefined; }
+  catch { if (response.ok) throw new Error('Connector 返回无效响应。'); }
+  if (!response.ok) {
+    const code = typeof value?.error === 'string' ? value.error : '';
+    const message = homeErrorMessage(response.status, code);
+    if (operation === 'catalog' && [404, 405].includes(response.status)) return connectorRequest('legacy-catalog', ...args);
+    if (operation === 'lifecycle' && response.status === 409) return { accepted: false, message };
+    throw Object.assign(new Error(message), { status: response.status, code });
+  }
+  if (operation === 'lifecycle') return { accepted: true };
+  if (!value) throw new Error('Connector 返回空响应。');
+  // Presentation normalization happens after DevTools has received the original body.
+  if (operation === 'catalog' || operation === 'legacy-catalog' || operation === 'detail') {
+    const items = operation === 'detail' ? [value] : value.items;
+    if (!Array.isArray(items)) throw new Error('统一应用目录响应无效。');
+    for (const item of items) if (item.icon_url) item.icon_url = new URL(item.icon_url, 'https://home.beings.town/').href;
   }
   return value;
 }
@@ -31,7 +63,7 @@ const api: DesktopAPI = {
     connectors: {
       catalog: query => connectorRequest('catalog', query),
       localKitHistory: after => connectorRequest('local-kit-history', after),
-      reportLocalKitHistory: input => connectorRequest('report-local-kit-history', input),
+      reportLocalKitHistory: (input, sessionVersion) => connectorRequest('report-local-kit-history', input, sessionVersion),
       installations: after => connectorRequest('installations', after),
       installation: installationId => connectorRequest('installation', installationId),
       removeAccount: (releaseId, connectionId) => connectorRequest('remove-account', releaseId, connectionId),
