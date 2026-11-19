@@ -92,7 +92,7 @@ export async function readPortalSample(file: string, pid: number, nonce: string)
     const s = await readStatus(file);
     const now = Date.now();
     if (!s || s.pid !== pid || !nonce || s.nonce !== nonce ||
-        !['starting', 'connecting', 'connected', 'retrying', 'auth_required', 'invalid', 'local'].includes(s.state)) return null;
+        !['starting', 'connecting', 'connected', 'retrying', 'handshake_rejected', 'auth_required', 'invalid', 'local'].includes(s.state)) return null;
     // Upstream publishes state changes with PID + per-launch nonce, without a
     // heartbeat timestamp. Callers first verify the selected process is alive;
     // never apply the legacy heartbeat expiry to this native protocol.
@@ -111,6 +111,7 @@ export function portalSampleState(sample: PortalSample | null, ready = false): P
   switch (sample.state) {
     case 'connected': return { phase: 'connected', message: 'Portal 已连接云端 Being，等待工具调用' };
     case 'retrying': return { phase: 'reconnecting', message: 'Relay 连接断开，Portal 正在自动重连' };
+    case 'handshake_rejected': return { phase: 'error', message: 'Relay 拒绝了 Portal 握手，仍在自动重试。请检查 Being 连接链接或查看日志中的拒绝原因。' };
     case 'auth_required': return { phase: 'error', message: '连接凭据已失效或被拒绝，请更新 Being 连接链接。' };
     case 'invalid': return { phase: 'error', message: 'Portal 连接配置无效，请检查连接链接。' };
     default: return { phase: 'starting', message: sample.state === 'local' ? 'Portal 本地服务已就绪' : 'Portal 正在连接…' };

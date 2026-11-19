@@ -2,7 +2,7 @@ import { expect, it } from 'vitest';
 import { mkdtemp, writeFile, rm } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
-import { readPortalSample, readPortalReady } from '../desktop/main/portal/status';
+import { readPortalSample, readPortalReady, portalSampleState } from '../desktop/main/portal/status';
 
 it('rejects stale, oversized and unrelated runtime status', async () => {
   const dir = await mkdtemp(path.join(os.tmpdir(), 'portal-status-'));
@@ -28,6 +28,12 @@ it('reads upstream state changes and readiness only for the current PID and laun
     expect(await readPortalSample(file, 123, 'launch')).toMatchObject({ native: true, state: 'connected' });
     expect(await readPortalSample(file, 124, 'launch')).toBeNull();
     expect(await readPortalSample(file, 123, 'previous')).toBeNull();
+    await writeFile(file, JSON.stringify({ pid: 123, nonce: 'launch', state: 'handshake_rejected' }));
+    expect(portalSampleState(await readPortalSample(file, 123, 'launch'))).toMatchObject({
+      phase: 'error', message: expect.stringContaining('Relay 拒绝了 Portal 握手'),
+    });
+    await writeFile(file, JSON.stringify({ pid: 123, nonce: 'launch', state: 'retrying' }));
+    expect(portalSampleState(await readPortalSample(file, 123, 'launch'))).toMatchObject({ phase: 'reconnecting' });
     await writeFile(file, JSON.stringify({ pid: 123, nonce: 'launch', version: '0.8.2' }));
     expect(await readPortalReady(file, 123, 'launch')).toBe(true);
     expect(await readPortalReady(file, 123, 'previous')).toBe(false);

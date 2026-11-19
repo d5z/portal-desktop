@@ -51,7 +51,8 @@ export async function createPortalController(options: {
   let runtimeUpdate: RuntimeUpdateResult = { phase: 'current', message: 'Portal 升级状态将在启动检查后显示。' };
   const verifyConnection = async () => {
     await reusePreviousConfig();
-    await verifyBeingConnection(store.connection, net.fetch.bind(net) as typeof fetch);
+    await verifyBeingConnection(store.connection, net.fetch.bind(net) as typeof fetch,
+      result => errorLog.info('portal-being-check', JSON.stringify(result)));
     startupNotice = undefined;
     startupConnectionNotice = undefined;
   };
@@ -92,6 +93,9 @@ export async function createPortalController(options: {
   });
   const startClientPortal = async (replacing = false, restart = false) => {
     if (!store.connection) throw new Error('请先连接 Being。');
+    errorLog.info('portal-start', JSON.stringify({ endpoint: store.connection.endpoint, portalName: store.settings.portalName,
+      mode: store.settings.backgroundEnabled ? 'background' : 'foreground', replacing, restart,
+      binary: store.settings.portalBinary, configPath: store.settings.portalConfigPath }));
     if (restart) {
       await portal.stop();
       if (background.state.enabled) await background.disable();
@@ -137,6 +141,8 @@ export async function createPortalController(options: {
       await portal.start(store.settings, store.connection);
       await portal.waitReady();
     }
+    errorLog.info('portal-local-ready', JSON.stringify({ endpoint: store.connection.endpoint, pid: portal.state.pid,
+      phase: portal.state.phase, relayVerified: portal.state.phase === 'connected' }));
   };
   const publishCurrentPortal = async () => { if (takeover.holdMessage || !portal.managing) await publishBackground(); };
   const connectionDefaults = async (input: Pick<SaveSettings, 'connectionLink'>) => {
@@ -157,6 +163,10 @@ export async function createPortalController(options: {
       // takeover are still reversible. SettingsStore commits the connection
       // file only after this transaction reaches a successful start.
       await store.save(input, false);
+      errorLog.info('portal-settings', JSON.stringify({ event: 'staged', endpoint: store.connection!.endpoint,
+        endpointChanged: previousConnection?.endpoint !== store.connection!.endpoint,
+        credentialChanged: previousConnection?.token !== store.connection!.token,
+        backgroundEnabled: store.settings.backgroundEnabled, portalName: store.settings.portalName }));
       options.connectionChanged();
       await verifyConnection();
       // Reject a candidate before takeover can stop the currently working engine.
@@ -187,7 +197,10 @@ export async function createPortalController(options: {
         await startClientPortal(replacing, true);
       });
       await publishCurrentPortal();
+      errorLog.info('portal-settings', JSON.stringify({ event: 'applied', endpoint: store.connection!.endpoint,
+        pid: portal.state.pid, phase: portal.state.phase }));
     } catch (error) {
+      errorLog.info('portal-settings', JSON.stringify({ event: 'rollback', endpoint: previousConnection?.endpoint, restartAttempted }));
       if (modelBackup && (modelWritten || input.subagentEnabled !== undefined)) {
         if (restartAttempted) {
           await portal.stop();
@@ -247,7 +260,16 @@ export async function createPortalController(options: {
   };
   let handlingConflict = false;
   let portalNoticeIdentity = '';
+  let diagnosticIdentity = '';
   portal.on('state', state => {
+    const diagnostic = { phase: state.phase, pid: state.pid, managed: state.managed, runtimePath: state.runtimePath,
+      endpoint: state.beingEndpoint, portalName: state.portalName, message: state.message };
+    const signature = JSON.stringify(diagnostic);
+    const diagnosticChanged = signature !== diagnosticIdentity;
+    if (diagnosticChanged) {
+      diagnosticIdentity = signature;
+      errorLog.info('portal-state-change', signature);
+    }
     // A background Portal can reconnect after the one-off startup check failed.
     // Retire that check's notice before notifying the renderer to refresh its snapshot.
     if (startupConnectionNotice && state.phase === 'connected' &&
@@ -257,7 +279,7 @@ export async function createPortalController(options: {
     const identity = JSON.stringify([state.portalName, state.beingEndpoint, state.phase, state.pid]);
     if (identity !== portalNoticeIdentity) { portalNoticeIdentity = identity; proxy.portalStateChanged(); }
     if (state.phase === 'error' || state.phase === 'external') {
-      if (state.logs.length) errorLog.report('portal-runtime', state.logs.slice(-60).join('\n'));
+      if (diagnosticChanged && state.logs.length) errorLog.report('portal-runtime', state.logs.slice(-60).join('\n'));
       state = { ...state, message: errorLog.report('portal-state', state.message, 'Portal 启动未完成，请查看日志后重试。') };
       portal.state = state;
     }

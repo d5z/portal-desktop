@@ -1,4 +1,4 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -43,7 +43,7 @@ async function fixture(startupNotice?: string) {
   vi.mocked(net.fetch).mockRejectedValue(new TypeError('fetch failed'));
   await controller.restoreStartup();
   expect(controller.notice).toContain('无法验证 Being 连接');
-  return { controller, store, portal, background, send };
+  return { controller, store, portal, background, send, errorLog };
 }
 
 it('clears the startup connection warning before a recovered background Portal notifies the renderer', async () => {
@@ -74,4 +74,35 @@ it('retains the warning until the same Being is connected and preserves unrelate
   expect(controller.notice).toContain('无法验证 Being 连接');
   portal.emit('state', { ...state, phase: 'connected' });
   expect(controller.notice).toBe('其他配置需要处理');
+});
+
+it('logs connection checks and real state changes without duplicating polling or engine output', async () => {
+  const { portal, store, errorLog } = await fixture();
+  const state: PortalState = { phase: 'reconnecting', beingEndpoint: store.connection!.endpoint,
+    pid: 123, managed: true, message: 'Relay 正在重试', logs: ['private engine output'] };
+  portal.emit('state', state);
+  portal.emit('state', { ...state, logs: ['more engine output'] });
+  portal.emit('state', { ...state, phase: 'connected', message: '已连接' });
+  await errorLog.flush();
+  const log = await readFile(errorLog.runtimeFile, 'utf8');
+  expect(log).toContain('[portal-being-check]');
+  expect(log).toContain('"stage":"request"');
+  expect(log.match(/\[portal-state-change\]/g)).toHaveLength(2);
+  expect(log).toContain('"pid":123');
+  expect(log).not.toMatch(/private engine output|more engine output|\?token=/);
+});
+
+it('captures an error summary once per state change while engine logs keep arriving', async () => {
+  const { portal, store, errorLog } = await fixture();
+  const report = vi.spyOn(errorLog, 'report');
+  const state: PortalState = { phase: 'error', beingEndpoint: store.connection!.endpoint,
+    pid: 123, managed: true, message: 'Relay 拒绝了 Portal 握手，仍在自动重试。', logs: ['first rejection'] };
+  portal.emit('state', state);
+  portal.emit('state', { ...state, logs: ['first rejection', 'retry scheduled'] });
+  portal.emit('state', { ...state, logs: ['first rejection', 'retry scheduled', 'more output'] });
+  expect(report.mock.calls.filter(([context]) => context === 'portal-runtime')).toEqual([
+    ['portal-runtime', 'first rejection'],
+  ]);
+  portal.emit('state', { ...state, pid: 456, logs: ['new process rejection'] });
+  expect(report.mock.calls.filter(([context]) => context === 'portal-runtime')).toHaveLength(2);
 });

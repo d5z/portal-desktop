@@ -31,7 +31,9 @@ export function registerDiagnosticsIpc(options: {
     checks.push({ name: '凭据保护', status: secretStorage.isEncryptionAvailable() ? 'ok' : 'error', detail: secretStorage.isEncryptionAvailable() ? '系统密钥库可用' : '系统密钥库不可用' });
     try { await access(store.settings.workspace); checks.push({ name: '工作目录', status: 'ok', detail: '目录可访问' }); }
     catch { checks.push({ name: '工作目录', status: 'warning', detail: '目录尚未创建或不可访问' }); }
-    try { await verifyBeingConnection(connection, net.fetch.bind(net) as typeof fetch); checks.push({ name: 'Being', status: 'ok', detail: '现有状态接口可访问；未发送消息或调用工具' }); }
+    try { await verifyBeingConnection(connection, net.fetch.bind(net) as typeof fetch,
+      result => errorLog.info('portal-being-check', JSON.stringify(result)));
+      checks.push({ name: 'Being', status: 'ok', detail: 'HTTP 状态接口可访问；Relay 连接结果请查看 Portal 状态' }); }
     catch (error) { checks.push({ name: 'Being', status: 'warning', detail: errorLog.report('being-diagnostics', error, 'Being 连接检查失败，请稍后重试。') }); }
     if (connection !== store.connection) throw new Error('连接已切换，请重新检查。');
     checks.push({ name: 'Portal', status: portal.state.phase === 'connected' ? 'ok' : portal.state.phase === 'error' ? 'error' : 'warning', detail: portal.state.message });
@@ -48,6 +50,9 @@ export function registerDiagnosticsIpc(options: {
       version: app.getVersion(), platform: `${process.platform}/${process.arch}`,
       capturedAt: new Date().toISOString(), workspace: store.settings.workspace,
       portal: { ...state, logs: undefined }, background: background.state,
+      configured: { endpoint: store.connection?.endpoint, portalName: store.settings.portalName,
+        binary: store.settings.portalBinary, configPath: store.settings.portalConfigPath,
+        backgroundEnabled: store.settings.backgroundEnabled },
       upgrade: options.upgrade(),
       runtimeDirectory: background.installedService?.root || directory
     });

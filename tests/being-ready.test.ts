@@ -20,3 +20,21 @@ it('blocks unauthenticated, unreachable, invalid and oversized responses without
   await expect(verifyBeingConnection(connection, failed)).rejects.toThrow('无法验证 Being 连接');
   await expect(verifyBeingConnection(connection, failed)).rejects.not.toThrow('private-token');
 });
+
+it('records the HTTP result and failing stage without URLs containing credentials or response bodies', async () => {
+  const diagnostic = vi.fn();
+  for (const [response, stage, status] of [
+    [new Response('private-token', { status: 403 }), 'http', 403],
+    [new Response('private-token'), 'response-body', 200],
+  ] as const) {
+    await expect(verifyBeingConnection(connection, async () => response, diagnostic)).rejects.toThrow();
+    expect(diagnostic).toHaveBeenLastCalledWith({ endpoint: connection.endpoint, route: '/api/status',
+      stage, status, ok: false, durationMs: expect.any(Number) });
+  }
+  await expect(verifyBeingConnection(connection, async () => { throw new Error(connection.link); }, diagnostic)).rejects.toThrow();
+  expect(diagnostic).toHaveBeenLastCalledWith(expect.objectContaining({ stage: 'request', status: undefined, ok: false }));
+  await verifyBeingConnection(connection, async () => Response.json({ name: 'Willow' }), diagnostic);
+  expect(diagnostic).toHaveBeenLastCalledWith(expect.objectContaining({ stage: 'validated', status: 200, ok: true }));
+  expect(diagnostic).toHaveBeenCalledTimes(4);
+  expect(JSON.stringify(diagnostic.mock.calls)).not.toMatch(/private-token|\?token/);
+});
