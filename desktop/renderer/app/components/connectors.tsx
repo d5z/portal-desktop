@@ -320,7 +320,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
     void synchronize().then(async changed => {
       const preparing = installationsRef.current.some(item => item.root_release_id === page.current?.release_id && item.desired_state === 'enabled' && ['preparing', 'waiting_device', 'unknown'].includes(item.status));
       if (!changed && !force && !preparing) return;
-      await load();
+      await load(query, false);
       if (page.current && !isLocalKit(page.current)) await refreshDetail(page.current.release_id, preferredAccounts.current.get(page.current.release_id));
     }).catch(e => setError(publicErrorMessage(e, '无法更新连接状态，请重试。')));
   };
