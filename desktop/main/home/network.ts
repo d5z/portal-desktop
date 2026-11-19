@@ -42,7 +42,7 @@ export class ConnectorNetwork {
       for (const [name, value] of Object.entries(headers)) responseHeaders.set(name, value);
       return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
     } catch (error) {
-      return Response.json({ error: publicErrorMessage(error, 'Connector 请求失败，请重试。') }, {
+      return Response.json({ error: error instanceof HomeError ? error.code : publicErrorMessage(error, 'Connector 请求失败，请重试。') }, {
         status: error instanceof HomeError && error.status >= 400 ? error.status : 502, headers,
       });
     }

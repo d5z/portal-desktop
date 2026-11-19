@@ -265,9 +265,9 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
       const home = await model.api.home?.state();
       if (request !== catalogRequest.current) return;
       resetHomeSession(home?.authenticated && !home.authenticating ? home.sessionVersion : undefined);
-      setAuthenticated(Boolean(home?.authenticated));
+      setAuthenticated(Boolean(home?.authenticated && !home.authenticating));
       setAuthenticating(Boolean(home?.authenticating));
-      if (!home?.authenticated) {
+      if (!home?.authenticated || home.authenticating) {
         toolsCache.current.clear();
         toolsInstallation.current = undefined;
         setCatalogError(home?.error ? publicErrorMessage(home.error) : ''); setCatalogEnabled(false); setCatalog([]); installationsRef.current = []; setInstallations([]); return;

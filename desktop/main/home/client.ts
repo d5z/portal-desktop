@@ -131,7 +131,7 @@ export class HomeClient {
   }
   /** Reuse session refresh/cancellation while preserving the actual HTTP response. */
   async forward(pathname: string, init: RequestInit, sessionVersion: number) {
-    if (sessionVersion !== this.generation) throw new HomeError(409, 'home_session_changed');
+    if (this.authenticating || sessionVersion !== this.generation) throw new HomeError(409, 'home_session_changed');
     try {
       return await this.request<Response>(pathname, init, async response => new Response(await response.arrayBuffer(), {
         status: response.status, headers: response.headers.get('Content-Type') ? { 'Content-Type': response.headers.get('Content-Type')! } : {},
