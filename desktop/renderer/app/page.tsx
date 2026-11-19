@@ -22,6 +22,7 @@ import { Town } from "../town/page";
 import { TownAuth } from "../town/components/auth";
 import { TownComposer } from "../town/components/composer";
 import { KitInstall } from "../town/components/kit-install";
+import { KitDelete } from "../town/components/kit-delete";
 import { ChatSearch } from "./components/search";
 import { ConnectionSettings, ClientSettings } from "./components/settings";
 import { SubagentModelSettings } from "./components/subagent-model-settings";
@@ -199,6 +200,7 @@ export function App({ model }: { model: AppModel }) {
       <ClientSettings model={app} />
       {!app.settingsRoute && <ConnectionSettings model={app} />}
       <KitInstall model={app.town} />
+      <KitDelete model={app.town} />
       <PermissionSettings app={app}/>
       <ToolApprovalDialog app={app}/>
       <Toast message={app.toastMessage} copied={app.toastCopied} />

@@ -83,7 +83,7 @@ export function KitInstall({ model }: { model: TownModel }) {
                 ? "正在安装…"
                 : town.installRetried
                   ? "重试安装"
-                  : "安装到本机"}
+                  : "安装"}
             </button>
           </div>
         </form>

@@ -583,6 +583,7 @@
 #client-settings-dialog .connector-search {
   position: relative;
   display: block;
+  flex-basis: 160px;
   min-width: 0;
 }
 
@@ -600,7 +601,7 @@
 #client-settings-dialog .connector-search input {
   height: 40px;
   min-height: 40px;
-  padding: 8px 48px 8px 40px;
+  padding: 8px 14px 8px 40px;
   border-radius: 24px;
   background: var(--control);
   transition:
@@ -700,9 +701,9 @@
 }
 
 #client-settings-dialog .connector-toolbar > button.connector-refresh {
-  position: absolute;
-  right: 4px;
+  position: static;
   display: grid;
+  flex: 0 0 32px;
   place-items: center;
   width: 32px;
   min-height: 32px;

@@ -19,16 +19,9 @@ export function registerKitsIpc(options: KitsIpcOptions) {
   const { handle, exclusive, window, store, kitInstaller } = options;
   handle('beings:kits', () => localKits(store.settings));
   handle('beings:kit-delete', (name: string) => exclusive(async () => {
-    const currentWindow = window();
-    if (!currentWindow) return { deleted: false, name };
     const library = await localKits(store.settings);
     const kit = library.kits.find(item => item.name === name);
     if (!kit) return { deleted: false, name };
-    const review = await dialog.showMessageBox(currentWindow, { type: 'warning', title: '删除本机 Kit',
-      message: `确定删除 ${name}？`,
-      detail: `将永久删除 ${kit.directory} 中的 Kit 文件、依赖和本地配置。此操作不会影响 Grove 中的条目。`,
-      buttons: ['取消', '删除'], defaultId: 0, cancelId: 0 });
-    if (review.response !== 1) return { deleted: false, name };
     await deleteLocalKit(store.settings, name);
     return { deleted: true, name };
   }));

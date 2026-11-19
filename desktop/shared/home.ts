@@ -47,8 +47,18 @@ export interface HomeConnectorCatalogItem {
   unavailable_reason: string | null;
   installation_ids: string[];
   local_install_url?: string | null;
+  local_install?: { kind: 'town'; source_id: string; used_before?: boolean } | null;
 }
 export interface HomeConnectorCatalogPage { enabled: boolean; items: HomeConnectorCatalogItem[]; next_after: string | null }
+export interface HomeLocalKitHistory {
+  id: string;
+  source_id: string;
+  name: string;
+  version: string;
+  created_time: string;
+  updated_time: string;
+}
+export interface HomeLocalKitHistoryPage { items: HomeLocalKitHistory[]; next_after: string | null }
 export interface HomeConnectorInstallation {
   id: string;
   install_key: string;
@@ -93,13 +103,13 @@ export interface HomeConnectorTool {
 }
 export interface HomeConnectorBeingAccess { enabled: boolean; revision: number; being_profile_id: string }
 export const CONNECTOR_NETWORK_METHODS = {
-  catalog: 'GET', installations: 'GET', installation: 'GET', detail: 'GET',
+  catalog: 'GET', 'legacy-catalog': 'GET', 'local-kit-history': 'GET', 'report-local-kit-history': 'POST', installations: 'GET', installation: 'GET', detail: 'GET',
   'remove-account': 'POST', preview: 'POST', confirm: 'POST', state: 'GET', advance: 'POST', cancel: 'POST',
   tools: 'GET', 'set-tool': 'PUT', 'being-access': 'PUT', 'get-being-access': 'GET', lifecycle: 'POST',
 } as const;
 /** Renderer-visible protocol paths mirror the corresponding Home API resource names. */
 export const CONNECTOR_NETWORK_ROUTES = {
-  catalog: '/api/v1/me/kit-catalog', installations: '/api/v1/me/kit-installations',
+  catalog: '/api/v1/me/app-catalog', 'legacy-catalog': '/api/v1/me/kit-catalog', 'local-kit-history': '/api/v1/me/local-kit-history', 'report-local-kit-history': '/api/v1/me/local-kit-history', installations: '/api/v1/me/kit-installations',
   installation: '/api/v1/me/kit-installations/:installation_id',
   detail: '/api/v1/me/kit-releases/:release_id/connector',
   'remove-account': '/api/v1/me/kit-releases/:release_id/connector-accounts/:connection_id/remove',
@@ -129,6 +139,8 @@ export function connectorNetworkPath(operation: keyof typeof CONNECTOR_NETWORK_R
 }
 export interface HomeConnectorAPI {
   catalog(query?: { q?: string; after?: string }): Promise<HomeConnectorCatalogPage>;
+  localKitHistory(after?: string): Promise<HomeLocalKitHistoryPage>;
+  reportLocalKitHistory(input: { source_id: string; version: string }): Promise<HomeLocalKitHistory>;
   installations(after?: string): Promise<HomeConnectorInstallationPage>;
   installation(installationId: string): Promise<HomeConnectorInstallation>;
   removeAccount(releaseId: string, connectionId: string): Promise<void>;
