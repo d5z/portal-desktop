@@ -1,3 +1,4 @@
+import type { HomeState } from '../../../shared/home';
 import { collectTownPages, paginatedViews, catalogPage, toolPage, PAGE_SIZE } from './pagination';
 import type { ToolEntry } from './tool-library';
 import { Store, errorText } from "../../shared/models/store";
@@ -177,7 +178,7 @@ type SendTarget = {
   beingId: string;
   reply?: FeedReply;
 };
-export type TownAPI = Pick<DesktopAPI, 'localApps' | 'associateApp' | 'unlinkApp' | 'town' | 'townLive' | 'onTownLive' | 'reconnectTown' | 'sendTown' | 'townAuth' | 'autoPairTown' | 'cancelTownPair' | 'pairTown' | 'saveTownToken' | 'copyText' | 'openBrowser' | 'openTownLink' | 'localKits' | 'deleteKit' | 'importKit' | 'prepareKit' | 'installKit' | 'discardKit' | 'openKits' | 'home'>;
+export type TownAPI = Pick<DesktopAPI, 'localApps' | 'associateApp' | 'unlinkApp' | 'town' | 'townLive' | 'onTownLive' | 'reconnectTown' | 'sendTown' | 'townAuth' | 'autoPairTown' | 'cancelTownPair' | 'pairTown' | 'saveTownToken' | 'copyText' | 'openBrowser' | 'openTownLink' | 'localKits' | 'deleteKit' | 'importKit' | 'prepareKit' | 'installKit' | 'discardKit' | 'openKits' | 'localKitHistoryCandidates' | 'home'>;
 export class TownModel extends Store {
   plugins?: import('../../plugins/model').PluginsModel;
   supportsLocalKits = true;
@@ -258,6 +259,48 @@ export class TownModel extends Store {
   plan?: KitInstallPlan & { sourceId: string };
   pendingDeleteKit?: LocalKit;
   localKitsRevision = 0;
+  localKitHistoryError = '';
+  localKitSources = new Map<string, string>();
+  private historySession?: number;
+  private historySynced = new Set<string>();
+  private historyFlight?: { session: number; promise: Promise<void> };
+  async syncLocalKitHistory(state?: HomeState): Promise<void> {
+    const home = state || await this.api.home?.state();
+    const session = home?.authenticated && !home.authenticating ? home.sessionVersion : undefined;
+    if (this.historySession !== session) {
+      this.historySession = session;
+      this.historySynced.clear(); this.localKitSources.clear(); this.localKitHistoryError = '';
+      this.changed();
+    }
+    if (session === undefined || !this.api.localKitHistoryCandidates || !this.api.home?.connectors) return;
+    if (this.historyFlight?.session === session) return this.historyFlight.promise;
+    const flight = (async () => {
+      try {
+        const candidates = await this.api.localKitHistoryCandidates!();
+        if (this.historySession !== session) return;
+        let failed = false;
+        for (const candidate of candidates) {
+          if (this.historySession !== session) return;
+          this.localKitSources.set(candidate.name, candidate.source_id);
+          const key = `${candidate.source_id}:${candidate.version}`;
+          if (this.historySynced.has(key)) continue;
+          const current = await this.api.home!.state();
+          if (!current.authenticated || current.authenticating || current.sessionVersion !== session) return;
+          try {
+            await this.api.home!.connectors!.reportLocalKitHistory({ source_id: candidate.source_id, version: candidate.version }, session);
+            if (this.historySession !== session) return;
+            this.historySynced.add(key);
+          } catch { failed = true; }
+        }
+        if (this.historySession === session) this.localKitHistoryError = failed ? '本机已安装，部分使用历史同步失败，请刷新重试。' : '';
+      } catch {
+        if (this.historySession === session) this.localKitHistoryError = '本机安装不受影响，使用历史暂未同步，请刷新重试。';
+      } finally { if (this.historySession === session) this.changed(); }
+    })();
+    this.historyFlight = { session, promise: flight };
+    try { await flight; } finally { if (this.historyFlight?.promise === flight) this.historyFlight = undefined; }
+  }
+
   prepareBusy = false;
   installBusy = false;
   installError = "";
@@ -317,6 +360,12 @@ export class TownModel extends Store {
     else this.changed();
   }
   start() {
+    void this.syncLocalKitHistory().catch(() => {});
+    let homeSession: number | undefined;
+    const stopHome = this.api.home?.subscribe(state => {
+      const session = state.authenticated && !state.authenticating ? state.sessionVersion : undefined;
+      if (session !== homeSession) { homeSession = session; void this.syncLocalKitHistory(state).catch(() => {}); }
+    });
     let active = true;
     const updateCatalog = () => {
       if (active && this.visible && this.catalogView() && !this.loading && (typeof document === 'undefined' || document.visibilityState !== 'hidden') && Date.now()-this.catalogUpdatedAt>=30000) void this.load(true);
@@ -339,6 +388,7 @@ export class TownModel extends Store {
       if (this.autoPairId) void this.api.cancelTownPair(this.autoPairId).catch(() => {});
       this.autoPairId = undefined;
       this.authBusy = false;
+      stopHome?.(); this.historySession = undefined;
       ++this.lifecycleRevision;
       stop();
       clearTimeout(this.reconcileTimer);
@@ -1593,17 +1643,27 @@ export class TownModel extends Store {
     this.installError = "";
     this.changed();
     try {
+      const home = await this.api.home?.state().catch(() => undefined);
       const result = await this.api.installKit({
         ticket: plan.ticket,
         environment: { ...this.environment },
       });
       if (revision !== this.lifecycleRevision) return;
-      // History is best-effort and only records a completed installation.
-      void this.api.home?.connectors?.reportLocalKitHistory?.({ source_id: plan.sourceId, version: plan.version })?.catch(() => {});
+      let historyFailed = false;
+      const current = await this.api.home?.state().catch(() => undefined);
+      if (home?.authenticated && !home.authenticating && home.sessionVersion !== undefined && current?.authenticated && !current.authenticating && current.sessionVersion === home.sessionVersion) {
+        try {
+          await this.api.home!.connectors!.reportLocalKitHistory({ source_id: plan.sourceId, version: plan.version }, home.sessionVersion);
+          if (this.historySession === home.sessionVersion) this.historySynced.add(`${plan.sourceId}:${plan.version}`);
+        } catch { historyFailed = true; }
+      }
+      if (revision !== this.lifecycleRevision) return;
+      this.localKitHistoryError = historyFailed ? '本机已安装，使用历史同步失败，请刷新重试。' : '';
+      this.localKitSources.set(result.name, plan.sourceId);
       this.plan = undefined;
       this.environment = {};
       this.localKitsRevision++;
-      this.toast(`${result.name}：${result.message}`);
+      this.toast(`${result.name}：${result.message}${historyFailed ? ' 使用历史同步失败，请刷新重试。' : ''}`);
       if (this.view === "kits") {
         if (this.tab === "local" && !this.directId) await this.showInstalledKit(result.name);
         else await this.refreshInstalledKits();

@@ -22,14 +22,10 @@ const statusLabels = {
 } satisfies Record<HomeConnectorInstallation['status'] | HomeConnectorEnableState['status'], string>;
 const statusLabel = (status: HomeConnectorInstallation['status'] | HomeConnectorEnableState['status']) => statusLabels[status] || '状态待确认';
 const runtimeTabLabel = (runtime: string) => runtime === 'local' ? '本地' : '云端';
-const hasLocalRuntime = (kit: HomeConnectorCatalogItem) => (kit.runtimes || []).includes('local');
 const hasRemoteRuntime = (kit: HomeConnectorCatalogItem) => (kit.runtimes || []).some(runtime => runtime === 'shared' || runtime === 'cloud');
-const isLocalKit = (kit: HomeConnectorCatalogItem) => kit.local_install === undefined
-  ? hasLocalRuntime(kit) && !hasRemoteRuntime(kit)
-  : kit.local_install?.kind === 'town';
-const localSourceId = (kit: HomeConnectorCatalogItem) => kit.local_install?.source_id
-  || (kit.local_install === undefined && isLocalKit(kit) ? kit.kit_id : undefined);
-const localKitFor = (kit: HomeConnectorCatalogItem, localKits: LocalKit[]) => localKits.find(item => item.name === kit.kit_id || item.name === kit.name);
+const isLocalKit = (kit: HomeConnectorCatalogItem) => kit.local_install?.kind === 'town';
+const localSourceId = (kit: HomeConnectorCatalogItem) => kit.local_install?.source_id;
+const localKitFor = (kit: HomeConnectorCatalogItem, localKits: LocalKit[]) => isLocalKit(kit) && localSourceId(kit) ? localKits.find(item => item.sourceId === localSourceId(kit)) : undefined;
 const localKitDetail = (kit: HomeConnectorCatalogItem): HomeConnectorDetail => ({ name: kit.name, icon_url: kit.icon_url, skills: [], accounts: [], methods: [] });
 const toolKey = (tool: Pick<HomeConnectorTool, 'component_id' | 'connection_id' | 'export'>) => `${tool.component_id}:${tool.connection_id}:${tool.export}`;
 type ToggleTool = (installationId: string, tool: HomeConnectorTool, enabled: boolean) => void;
@@ -252,13 +248,15 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
     return syncing.current;
   };
 
-  const load = async (search = query) => {
+  const load = async (search = query, syncHistory = true) => {
     if (!api) return;
     const request = ++catalogRequest.current;
     setCatalogLoading(true); setCatalogError('');
+    if (syncHistory) await town.syncLocalKitHistory().catch(() => {});
+    if (request !== catalogRequest.current) return;
     const localRequest = ++localKitsRequest.current;
     void model.api.localKits().then(result => {
-      if (localRequest === localKitsRequest.current) { setLocalKits(result.kits); setLocalKitsReady(true); }
+      if (localRequest === localKitsRequest.current) { setLocalKits(result.kits.map(kit => ({ ...kit, sourceId: town.localKitSources.get(kit.name) || kit.sourceId }))); setLocalKitsReady(true); }
     }).catch(() => {
       if (localRequest === localKitsRequest.current) { setLocalKits([]); setLocalKitsReady(false); }
     });
@@ -307,7 +305,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   const previousInstallBusy = useRef(false);
   const previousLocalKitsRevision = useRef(town.localKitsRevision);
   useEffect(() => {
-    if ((previousInstallBusy.current && !town.installBusy && !town.plan) || previousLocalKitsRevision.current !== town.localKitsRevision) void load();
+    if ((previousInstallBusy.current && !town.installBusy && !town.plan) || previousLocalKitsRevision.current !== town.localKitsRevision) void load(query, false);
     previousInstallBusy.current = town.installBusy;
     previousLocalKitsRevision.current = town.localKitsRevision;
   }, [town.installBusy, town.plan, town.localKitsRevision]);
@@ -685,6 +683,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
     {!selected && <div className="connector-toolbar"><label className="connector-search"><Icon className="connector-line-icon" name="search-20" aria-hidden="true" /><input aria-label="搜索应用" value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void load(); }} placeholder="搜索应用" /></label><div className="connector-runtime-filter" role="tablist" aria-label="Kit 运行环境">{([['all', '全部'], ['local', '本地'], ['cloud', '云端']] as const).map(([value, label]) => <button key={value} role="tab" type="button" aria-selected={runtimeFilter === value} className={runtimeFilter === value ? 'selected' : ''} onClick={() => setRuntimeFilter(value)}>{label}</button>)}</div><button className="connector-refresh" type="button" aria-label="刷新" title="刷新应用" onClick={() => { details.current.clear(); void load(); }} disabled={catalogLoading} aria-busy={catalogLoading}><Icon className="connector-line-icon" name="refresh-20" aria-hidden="true" /></button></div>}
     {error && <p className="form-error" role="alert">{error}</p>}
     {catalogError && <p className="form-error" role="alert">{catalogError}</p>}
+    {town.localKitHistoryError && <p className="field-help" role="status">{town.localKitHistoryError}</p>}
     {!selected && catalogLoading && <ConnectorLoading label="正在加载应用…" />}
     {selected && busy && <ConnectorLoading label={detail ? '处理中…' : '正在加载…'} />}
     {selected ? <>
