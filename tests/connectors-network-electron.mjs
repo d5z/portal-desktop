@@ -35,9 +35,9 @@ try {
       const requests = [];
       const client = new HomeClient(directory, {isEncryptionAvailable:()=>true,encryptString:value=>Buffer.from(value),decryptString:value=>value.toString()}, async()=>{}, async (url, init) => {
         const pathname = new URL(String(url)).pathname;
-        requests.push({pathname, method:init.method || 'GET', authorization:new Headers(init.headers).get('Authorization')});
+        requests.push({pathname, search: new URL(String(url)).search, method:init.method || 'GET', body: init.body, authorization:new Headers(init.headers).get('Authorization')});
         if (pathname.endsWith('/remove')) return new Response(null, {status:204});
-        if (pathname.endsWith('/actions')) return Response.json({error:'kit_operation_changed'}, {status:409});
+        if (pathname.endsWith('/actions')) return init.body && JSON.parse(init.body).expected_revision === 2 ? Response.json({error:'kit_operation_changed'}, {status:409}) : Response.json({installation_id:'install',operation_id:'operation',revision:4,status:'preparing'}, {status:202});
         if (pathname.includes('/offline/')) throw new Error('Fixture transport offline');
         if (pathname.includes('/app-catalog') || pathname.includes('/kit-catalog')) return Response.json({enabled:true,items:[{release_id:'gmail',name:'Gmail'}]});
         if (pathname.includes('/empty/')) return new Response(null, {status:502});
@@ -51,7 +51,7 @@ try {
       registerHomeIpc((channel, callback) => ipcMain.handle(channel, (event, ...args) => {
         if (event.sender !== window.webContents || event.senderFrame !== window.webContents.mainFrame || event.senderFrame.url !== shellURL) throw Error('Untrusted sender');
         return callback(...args);
-      }), {}, {}, {}, new HomeConnectors(client, async()=>{}), network);
+      }), {contextChanged(){},state:{authenticated:true,sessionVersion:0}}, {}, {}, new HomeConnectors(client, async()=>{}), network);
       globalThis.fixture = {requests, navigate: async url => {shellURL = url; await window.loadURL(url);}};
       await window.loadURL(shellURL);
     });
@@ -92,6 +92,10 @@ try {
   const upstream = await app.evaluate(() => globalThis.fixture.requests);
   assert.equal(upstream.length, 12, 'Unauthenticated local requests never reach Home; writes are not duplicated');
   assert(upstream.every(request => request.authorization === 'Bearer private-access'));
+  assert(upstream.filter(request => request.pathname.endsWith('/app-catalog')).every(request => request.search.includes('q=gmail') && !request.search.includes('args=')));
+  assert(upstream.filter(request => request.pathname.endsWith('/actions')).every(request => JSON.parse(request.body).action === 'uninstall' && !Array.isArray(JSON.parse(request.body))));
+  await page.evaluate(() => window.beings.home.connectors.lifecycle('install', 'uninstall', 3, 'accepted-operation'));
+  assert(responses.some(event => event.response.status === 202), 'Accepted lifecycle status remains visible in Network');
   assert(!JSON.stringify({requests,responses}).includes('private-access'));
   assert(!JSON.stringify({requests,responses}).includes('private-refresh'));
   console.log('Connector Network passed: real preload and protocol, packaged/dev origins, visible request payloads, response bodies and 204/409/502 statuses, no Home tokens in renderer, no duplicate writes.');
