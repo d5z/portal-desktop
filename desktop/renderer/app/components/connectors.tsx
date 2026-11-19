@@ -220,6 +220,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
     syncing.current = (async () => {
       let changed = false;
       for (const [id, entry] of pending.current) {
+        if (entry.state.release_id !== page.current?.release_id) continue;
         if (!force && entry.polls >= 45) continue;
         entry.polls++;
         let next: HomeConnectorEnableState;
@@ -311,7 +312,8 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   }, [town.installBusy, town.plan, town.localKitsRevision]);
 
   poll.current = (force = false) => {
-    if (mutating.current) return;
+    if (mutating.current || document.visibilityState === 'hidden') return;
+    if (!page.current) { if (force) void load(query, false); return; }
     void synchronize().then(async changed => {
       const preparing = installationsRef.current.some(item => item.root_release_id === page.current?.release_id && item.desired_state === 'enabled' && ['preparing', 'waiting_device', 'unknown'].includes(item.status));
       if (!changed && !force && !preparing) return;
