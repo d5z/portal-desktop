@@ -65,7 +65,9 @@ export const IntelligentUI = memo(function IntelligentUI({ source, streaming = f
   }, [menuOpen]);
   return <dialog ref={dialog} onPointerDownCapture={actions.onActivate} onFocusCapture={actions.onActivate}
     role={expanded ? 'dialog' : 'region'} className={`intelligent-ui${expanded ? ' iui-expanded' : ''}`}
-    aria-label={expanded ? doc?.title || '交互界面' : 'Intelligent UI'} onClose={() => setExpanded(false)} onKeyDown={event => {
+    aria-label={expanded ? doc?.title || '交互界面' : 'Intelligent UI'} onClose={event => {
+      if (event.target === event.currentTarget) setExpanded(false);
+    }} onKeyDown={event => {
     if (event.key !== 'Escape') return;
     if (menu.current?.matches(':popover-open')) {
       event.preventDefault();

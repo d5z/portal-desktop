@@ -254,14 +254,14 @@
   grid-template-rows: var(--library-art-row) minmax(32px, auto);
   min-width: 0;
   align-content: start;
-  align-items: center;
-  justify-items: center;
+  place-items: center;
   gap: var(--library-label-gap);
   padding: clamp(8px, 5cqi, 16px) 0 6px;
   border-radius: var(--utility-radius);
 }
 
 .folderTile {
+  // stylelint-disable-next-line selector-class-pattern -- React Bits exposes this global class.
   > :global(.folder-root) {
     grid-area: 1 / 1;
     zoom: calc(var(--library-art-width) / 104px);
