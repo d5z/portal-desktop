@@ -657,7 +657,13 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   if (!authenticated) return <section className="connector-empty"><h3>连接 Home 后管理应用</h3><p>请先完成 Home 登录，再回来添加应用。</p><div className="connector-action-row"><button className="primary" type="button" onClick={() => void loginHome()} disabled={authenticating} aria-busy={authenticating}>{authenticating ? '登录中…' : '登录 Home'}</button>{authenticating && <button type="button" onClick={() => void model.api.home!.action('cancel-login').catch(e => setCatalogError(publicErrorMessage(e, '取消登录失败，请重试。')))}>取消登录</button>}</div>{catalogError && <p className="form-error" role="alert">{catalogError}</p>}</section>;
 
   return <section className="connector-settings" aria-label="应用">
-    {!selected && <div className="connector-toolbar"><label className="connector-search"><Icon className="connector-line-icon" name="search-20" aria-hidden="true" /><input aria-label="搜索应用" value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void load(); }} placeholder="搜索应用" /></label><div className="connector-runtime-filter" role="tablist" aria-label="Kit 运行环境">{([['all', '全部'], ['local', '本地'], ['cloud', '云端']] as const).map(([value, label]) => <button key={value} role="tab" type="button" aria-selected={runtimeFilter === value} className={runtimeFilter === value ? 'selected' : ''} onClick={() => setRuntimeFilter(value)}>{label}</button>)}</div><button className="connector-refresh" type="button" aria-label="刷新" title="刷新应用" onClick={() => { details.current.clear(); void load(); }} disabled={catalogLoading} aria-busy={catalogLoading}><Icon className="connector-line-icon" name="refresh-20" aria-hidden="true" /></button></div>}
+    {!selected && <div className="connector-toolbar">
+      <div className="connector-runtime-filter" role="tablist" aria-label="Kit 运行环境">
+        {([['all', '全部'], ['local', '本地'], ['cloud', '云端']] as const).map(([value, label]) => <button key={value} role="tab" type="button" aria-selected={runtimeFilter === value} className={runtimeFilter === value ? 'selected' : ''} onClick={() => setRuntimeFilter(value)}>{label}</button>)}
+      </div>
+      <label className="connector-search"><Icon className="connector-line-icon" name="search-20" aria-hidden="true" /><input aria-label="搜索应用" value={query} onChange={e => setQuery(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') void load(); }} placeholder="搜索应用" /></label>
+      <button className="connector-refresh" type="button" aria-label="刷新" title="刷新应用" onClick={() => { details.current.clear(); void load(); }} disabled={catalogLoading} aria-busy={catalogLoading}><Icon className="connector-line-icon" name="refresh-20" aria-hidden="true" /></button>
+    </div>}
     {error && <p className="form-error" role="alert">{error}</p>}
     {catalogError && <p className="form-error" role="alert">{catalogError}</p>}
     {!selected && catalogLoading && <ConnectorLoading label="正在加载应用…" />}
@@ -677,6 +683,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
 }
 
 function ConnectorGroup({ title, kits, connected = false, pendingConnection, localKits, localKitsReady, prepareBusy, preparingSourceId, onOpen, onConnect, onInstallLocal, onPrefetch, disabled = false }: { title: string; kits: HomeConnectorCatalogItem[]; connected?: boolean; pendingConnection?: string; localKits: LocalKit[]; localKitsReady: boolean; prepareBusy: boolean; preparingSourceId?: string; onOpen: (kit: HomeConnectorCatalogItem) => void; onConnect: (kit: HomeConnectorCatalogItem) => void; onInstallLocal: (kit: HomeConnectorCatalogItem) => void; onPrefetch: (kit: HomeConnectorCatalogItem) => void; disabled?: boolean }) {
+  if (!kits.length) return null;
   return <section className={`connector-group${title === '推荐' ? ' connector-recommended' : ''}`}><h3>{title}</h3><div className="connector-grid">{kits.map(kit => {
     const isConnecting = pendingConnection === kit.release_id;
     const local = localKitFor(kit, localKits);
@@ -747,6 +754,28 @@ function ConnectorDetailView({ kit, detail, localKit, localKitsReady, localPrepa
   useEffect(() => {
     setSkillsExpanded(false);
   }, [kit.release_id, accountId, installationId]);
+  if (isLocalKit(kit)) return <div className="connector-detail connector-local-detail">
+    <div className="connector-detail-heading">
+      <ConnectorIcon name={kit.name} iconURL={kit.icon_url} />
+      <div className="connector-detail-name"><h3>{kit.name}</h3><div className="connector-runtime-tabs" aria-label="运行环境"><span className="connector-runtime-tab">本地</span></div></div>
+      <div className="connector-detail-actions">
+        {localKit ? <><button type="button" onClick={() => onOpenLocal(localKit)} disabled={busy || !localKitsReady}>查看本机 Kit</button><button className="danger" type="button" onClick={() => onDeleteLocal(localKit)} disabled={busy}>卸载本机 Kit</button></> : <button type="button" onClick={onInstallLocal} disabled={busy || localPreparing || !localKitsReady}>{localPreparing ? '正在准备…' : '安装'}</button>}
+      </div>
+    </div>
+    {kit.description && <p className="connector-detail-description">{kit.description}</p>}
+    <section className="connector-tools-section" aria-label="工具">
+      <h4>工具</h4>
+      {localKit && localKit.tools.length > 0 ? <div className="connector-tools">
+        <button className="connector-tools-toggle" type="button" aria-expanded={toolsExpanded} onClick={() => setToolsExpanded(value => !value)}><span>{localKit.tools.length} 个工具</span><Icon className="connector-line-icon" name="chevron-down" aria-hidden="true" style={{ transform: toolsExpanded ? 'rotate(180deg)' : undefined }} /></button>
+        {toolsExpanded && <div className="connector-tool-list" role="list">{localKit.tools.map(tool => <div className="connector-tool" role="listitem" key={tool.name}><span><strong>{tool.name}</strong>{tool.description && <small>{tool.description}</small>}</span></div>)}</div>}
+      </div> : <p className="field-help">{!localKitsReady ? '正在读取本机状态…' : localKit ? '此 Kit 未声明工具。' : '安装后可查看此 Kit 提供的本地工具。'}</p>}
+    </section>
+    <section className="connector-info-section"><h4>信息</h4><dl className="connector-info">
+      <div><dt>安装状态</dt><dd>{!localKitsReady ? '正在读取…' : localKit ? localKit.problem ? '本机文件异常' : '已安装到本机' : '尚未安装'}</dd></div>
+      {(localKit?.version || kit.version) && <div><dt>版本</dt><dd>{localKit?.version || kit.version}</dd></div>}
+      {kit.category && <div><dt>分类</dt><dd>{kit.category === 'other' ? '其他' : kit.category}</dd></div>}
+    </dl></section>
+  </div>;
   return <div className="connector-detail">
     <div className="connector-detail-heading">
       <ConnectorIcon name={detail.name} iconURL={detail.icon_url} /><div className="connector-detail-name"><h3>{detail.name}</h3>{!!kit.runtimes?.length && <div className="connector-runtime-tabs" aria-label="运行环境">{[...new Set(kit.runtimes.map(runtimeTabLabel))].map(label => <span className="connector-runtime-tab" key={label}>{label}</span>)}</div>}</div>

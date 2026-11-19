@@ -1359,18 +1359,54 @@ html[data-theme='dark'] .town-logo-light {
   padding: 7px 6px;
 }
 
-/* Applications list and detail view share a denser, row-based layout. */
+/* Application browsing stays compact; local Kits have their own detail layout. */
 #client-settings-dialog .connector-settings {
   padding: 0 0 28px;
 }
 
 #client-settings-dialog .connector-toolbar {
-  margin-bottom: 18px;
+  gap: 16px;
+  margin-bottom: 28px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+#client-settings-dialog .connector-runtime-filter {
+  gap: 4px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+
+  button {
+    min-width: 56px;
+    min-height: 36px;
+    padding: 8px 12px;
+    border: 0;
+    border-radius: 8px;
+    font-size: 13px;
+
+    &:hover:not(.selected) {
+      background: var(--settings-hover);
+    }
+
+    &.selected {
+      background: var(--utility-surface);
+      color: var(--text);
+      font-weight: 600;
+    }
+  }
+}
+
+#client-settings-dialog .connector-search {
+  flex: 1 1 160px;
+  max-width: 300px;
+  margin-left: auto;
 }
 
 #client-settings-dialog .connector-search input {
-  height: 38px;
-  min-height: 38px;
+  height: 36px;
+  min-height: 36px;
+  border-radius: 8px;
 }
 
 #client-settings-dialog .connector-group {
@@ -1379,12 +1415,14 @@ html[data-theme='dark'] .town-logo-light {
 
 #client-settings-dialog .connector-group h3 {
   margin-bottom: 8px;
-  font-size: 12px;
-  font-weight: 550;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
 }
 
 #client-settings-dialog .connector-recommended > h3 {
-  padding-bottom: 6px;
+  padding-bottom: 0;
+  border-bottom: 0;
 }
 
 #client-settings-dialog .connector-grid {
@@ -1397,9 +1435,9 @@ html[data-theme='dark'] .town-logo-light {
   gap: 10px;
   min-height: 64px;
   padding: 11px 12px;
-  border: 1px solid color-mix(in srgb, var(--line) 70%, transparent);
-  border-radius: 14px;
-  background: var(--control);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--settings-page);
   transition: background-color 140ms ease, border-color 140ms ease;
 
   &.is-clickable {
