@@ -1,3 +1,4 @@
+import { CHAT_SCENE_ACTIVITY_LABELS, type ChatSceneActivity } from '../../../shared/types';
 import { ChatEventDecoder } from './sse';
 import { withComposerCommandContext, usesIntelligentUICommand } from './composer-command-context';
 import { newToolActivity, completeToolActivity } from '../models/tool-activity';
@@ -307,14 +308,16 @@ function createStreamRuntime(state: any, options: any): any {
     state.items = state.items.filter((item: any) => item !== message);
     changed();
   }
-  function moveRun() {
-    // The aggregate callback summary stays at its original position. Moving it
-    // on each continuation can jump past newer room messages and history anchors.
-    if (currentRun?.autonomousOrigin) return;
-    if (currentRun && !currentRun.end && state.items.at(-1) !== currentRun) {
-      state.items = state.items.filter((item: any) => item !== currentRun);
-      state.items.push(currentRun);
-    }
+  // Read-only projection shared by the transcript and scene list. Transport,
+  // history and queue ownership remain with their existing event handlers.
+  function activeActivity(): ChatSceneActivity | null {
+    if (replayTransportOnly && !pendingReply) return null;
+    if (pendingRecovery) return "reconnecting";
+    if (pendingReply && (pendingReply.phase !== "processing" || !isStreaming))
+      return pendingReply.phase === "queued" ? "queued" : "waiting";
+    if (!isStreaming || replyRunSettled) return null;
+    if (livePhase === "tool" && actionLog.some(entry => entry.type === "tool" && !entry.done && !entry.error)) return "working";
+    return livePhase === "text" ? "replying" : "thinking";
   }
   function updateRun(finished = false) {
     if (replayingSettledReply) return;
@@ -342,13 +345,13 @@ function createStreamRuntime(state: any, options: any): any {
       replayRunStartedAt = undefined;
     }
     const run = currentRun;
-    moveRun();
     if (actionLog.length || !run.entries.length || isStreaming)
       run.entries = actionLog.map((entry) => ({ ...entry }));
-    const waiting = (pendingReply && pendingReply.phase !== "processing") || (!isStreaming && Boolean(pendingRecovery || pendingReply));
+    const activity = activeActivity();
+    const waiting = activity === "queued" || activity === "waiting" || activity === "reconnecting";
     const lastTool = [...run.entries]
       .reverse()
-      .find((entry) => entry.type === "tool" && !entry.done);
+      .find((entry) => entry.type === "tool" && !entry.done && !entry.error);
     run.waitingForReply = !!pendingReply && waiting;
     run.arg = tuiCurrentArg;
     run.hint = tuiHintText;
@@ -369,20 +372,12 @@ function createStreamRuntime(state: any, options: any): any {
       run.hint = "";
       run.status = run.outcome;
     } else {
-      run.status = waiting
-        ? pendingReply ? pendingReply.phase === "queued" ? "queued" : "waiting" : "reconnecting"
-        : livePhase === "tool" && lastTool ? "working" : livePhase === "text" ? "replying" : "thinking";
-      run.label = waiting
-        ? pendingReply ? pendingReply.phase === "queued"
-          ? pendingReply.interrupted && !pendingReply.autonomousOrigin ? '消息已接收，正在调整回复方向…' : `${pendingReply.autonomousOrigin === 'callback' ? 'SBS 自主回调进行中；' : pendingReply.autonomousOrigin ? 'SBS 自主处理进行中；' : ''}消息已接收，正在切换到当前对话…`
-          : "等待最终回复" : "正在恢复连接"
-        : livePhase === "tool" && lastTool
-          ? `正在运行 ${lastTool.name || "工具"}`
-          : livePhase === "text"
-            ? "正在回复"
-            : tuiCurrentState && tuiCurrentState !== "在思考"
-              ? tuiCurrentState
-              : "思考中";
+      const status = activity || "thinking";
+      run.status = status;
+      run.label = status === "queued" ? "消息已接收"
+        : status === "waiting" && pendingReply?.interrupted ? "等待接续回复"
+        : status === "working" && lastTool ? `正在运行 ${lastTool.name || "工具"}`
+        : CHAT_SCENE_ACTIVITY_LABELS[status];
     }
   }
   // Config（_pathBase / API_URL / LOOM_TOKEN / RELAY_SECRET / apiUrl 见文件顶部预取 script）
@@ -881,7 +876,6 @@ function createStreamRuntime(state: any, options: any): any {
       statusMessageId,
     };
     state.items.push(message);
-    moveRun();
     changed();
     return message;
   }
@@ -945,7 +939,7 @@ function createStreamRuntime(state: any, options: any): any {
       kind: "separator",
       id: `marker-${options.nextId()}`,
       marker: true,
-      handoffMarker: /^\[breath yielded/i.test(text || ''),
+      handoffMarker: /^\[breath (?:yielded|superseded)/i.test(text || ''),
       stopMarker: /^\[breath interrupted/i.test(text || ''),
       text: `· ${breathMarkerLabel(text)} · ${timestamp || formatTime()} ·`,
     };
@@ -1346,6 +1340,7 @@ function createStreamRuntime(state: any, options: any): any {
           currentRun.outcome = undefined;
           currentRun.status = undefined;
           currentRun.waitingForReply = false;
+          currentRun.replyConfirmed = false;
         } else {
           actionLog = [];
           currentRun = null;
@@ -2079,6 +2074,7 @@ function createStreamRuntime(state: any, options: any): any {
     currentStreamId = lastStreamId = null;
     lastServerError = undefined;
     replyRunSettled = false;
+    resetLiveProgress();
     pendingReply = { baseline: replyBaseline, submittedAt, phase: "processing" };
     timedOutReply = null;
     autonomousStream = false;
@@ -2667,10 +2663,10 @@ function createStreamRuntime(state: any, options: any): any {
       (!message.historySeq || message.historySeq === p.seq) && state.items.includes(message));
     const current = streamMessage && (!streamMessage.historySeq || streamMessage.historySeq === p.seq) ? streamMessage : null;
     const fragments = [...progress, ...(current ? [{ message: current, text: streamText }] : [])];
-    // A yielded partial can contain every speech fragment since the preceding
-    // stop, even when the last tool/reasoning event already released the bubble.
+    // Process speech and yielded partials can persist several tool-separated
+    // fragments together, even when the last event already released the bubble.
     // Keep the exact raw fragments until history verifies this seq's coverage.
-    if ((p.from === "partial" || (p.from === "final" && !current)) && fragments.length > 1) {
+    if ((p.from !== "final" || !current) && fragments.length > 1) {
       registerPersistedGroup(fragments, p);
       rememberPersisted(p.seq);
       return;
@@ -2959,7 +2955,7 @@ function createStreamRuntime(state: any, options: any): any {
         : cleanContent(role === "user" ? stripSceneTransition(stripClientMessageContext(message.content)) : message.content);
       if (!text) continue;
       const item = isHistoryMarker(message)
-        ? { ...identity, kind: "separator", id: `marker-${options.nextId()}`, marker: true, handoffMarker: /^\[breath yielded/i.test(message.content || ''), stopMarker: /^\[breath interrupted/i.test(message.content || ''), text }
+        ? { ...identity, kind: "separator", id: `marker-${options.nextId()}`, marker: true, handoffMarker: /^\[breath (?:yielded|superseded)/i.test(message.content || ''), stopMarker: /^\[breath interrupted/i.test(message.content || ''), text }
         : { ...identity, kind: "message", id: `message-${options.nextId()}`, role, text,
             streaming: false, label: role === "user" ? "you" : beingName, consecutive: false };
       // Insert old records in sequence order without rebuilding live bubbles,
@@ -3222,6 +3218,7 @@ function createStreamRuntime(state: any, options: any): any {
       currentRun.entries = actionLog.map(entry => ({ ...entry }));
       currentRun.end = Date.now();
       currentRun.waitingForReply = false;
+      currentRun.replyConfirmed = !failed;
       currentRun.outcome = failed ? "timeout" : "done";
       currentRun.status = currentRun.outcome;
       currentRun.label = failed ? "等待超时，结果待确认" : "已回复";
@@ -3822,6 +3819,7 @@ function createStreamRuntime(state: any, options: any): any {
         // this reference, so its answer cannot retroactively finish this run.
         currentRun.end = Date.now();
         currentRun.outcome = currentRun.status = 'done';
+        currentRun.replyConfirmed = true;
         currentRun.label = '已回复';
         currentRun.hint = '';
         logReplyWait('late-reply');
@@ -3889,19 +3887,16 @@ function createStreamRuntime(state: any, options: any): any {
     restoreSceneHistory,
     reconcileHistory,
     syncHistoryCursor,
-    replyCompletedAt: () => currentRun?.label === "已回复" ? currentRun.end || 0 : 0,
+    replyCompletedAt: () => currentRun?.replyConfirmed ? currentRun.end || 0 : 0,
     sceneActivity: () => {
       if (replayTransportOnly && !pendingReply) return null;
-      if (pendingRecovery) return "reconnecting";
-      if (pendingReply && (pendingReply.phase !== "processing" || !isStreaming))
-        return pendingReply.phase === "queued" ? "queued" : "waiting";
-      if (isStreaming && !replyRunSettled)
-        return livePhase === "tool" ? "working" : livePhase === "text" ? "replying" : "thinking";
+      const activity = activeActivity();
+      if (activity) return activity;
       if (currentRun?.end) {
         if (currentRun.outcome === "error" || currentRun.outcome === "timeout") return currentRun.outcome;
         if (currentRun.outcome === "stopped") return "stopped";
         // A bare reasoning/stop boundary does not establish that a reply arrived.
-        return currentRun.label === "已回复" ? "done" : null;
+        return currentRun.replyConfirmed ? "done" : null;
       }
       return null;
     },

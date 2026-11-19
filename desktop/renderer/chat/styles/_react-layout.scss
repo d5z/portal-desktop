@@ -229,18 +229,44 @@ button.step2-back {
   line-height: 1.65;
 }
 
+.scene-task-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
 .scene-scheduling h4 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
   margin: 0;
+  color: var(--text, #30352f);
   font: inherit;
-  font-weight: 500;
+  font-weight: 600;
+}
+
+.scene-task-summary {
+  flex: none;
+  color: var(--muted, #838b83);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.scene-task-summary.has-failures {
+  color: var(--red, #b96859);
 }
 
 .run-activity .scene-scheduling {
   margin: 12px 0 16px 24px;
 }
 
-.scene-scheduling > p {
-  margin: 10px 0;
+.scene-scheduling > p.scene-task-note {
+  margin: 8px 0 10px;
+  color: var(--muted, #838b83);
+  font-size: 12px;
 }
 
 .scene-scheduling pre {
@@ -258,7 +284,21 @@ button.step2-back {
 }
 
 .scene-task-list li {
-  padding: 9px 0;
+  padding: 10px 0;
+}
+
+.scene-task-row {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 10px;
+}
+
+.scene-task-row time {
+  grid-column: 2;
+  overflow-wrap: anywhere;
+  color: var(--muted, #838b83);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
 }
 
 .scene-task-status,
@@ -271,10 +311,19 @@ button.step2-back {
   font-weight: 500;
 }
 
-.scene-task-list small {
-  display: block;
-  overflow-wrap: anywhere;
-  opacity: 0.8;
+.scene-task-status {
+  color: var(--muted, #838b83);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.scene-task-list li[data-status='running'] .scene-task-status,
+.scene-task-list li[data-status='queued'] .scene-task-status {
+  color: var(--accent, #286197);
+}
+
+.scene-task-list li:is([data-status='failed'], [data-status='cancelled'], [data-status='interrupted'], [data-status='budget_exhausted'], [data-status='timeout']) .scene-task-status {
+  color: var(--red, #b96859);
 }
 
 .scene-task-error {

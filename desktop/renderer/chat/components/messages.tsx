@@ -10,7 +10,7 @@ import { ChatStatusRow } from './status-row';
 const duration = (seconds: number) =>
   seconds < 60
     ? `${seconds} 秒`
-    : `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
+    : `${Math.floor(seconds / 60)} 分钟 ${seconds % 60} 秒`;
 
 function ActivityStep({ entry, finished }: { entry: ActivityEntry; finished: boolean }) {
   const [open, setOpen] = useState(false);
@@ -20,7 +20,7 @@ function ActivityStep({ entry, finished }: { entry: ActivityEntry; finished: boo
   const summary = thought ? (entry.preview || entry.text || '') : (entry.arg || entry.result || '');
   const preview = summary.trim().split(/\r?\n/, 1)[0].slice(0, 240);
   const toolStatus = entry.type === 'tool' ? (entry.error ? 'failed' : entry.done ? 'done' : finished ? undefined : 'running') : undefined;
-  const state = entry.error ? '失败' : entry.done ? '' : finished ? '结果未确认' : '进行中';
+  const state = thought ? '' : entry.error ? '失败' : entry.done ? '' : finished ? '结果未确认' : '进行中';
   return <details className="run-entry" data-tool={!thought || undefined} onToggle={event => setOpen(event.currentTarget.open)}>
     <summary className="run-entry-heading">
       <span className={`run-entry-icon${entry.error ? ' error' : ''}`} aria-hidden="true">
@@ -51,33 +51,59 @@ function ActivityStep({ entry, finished }: { entry: ActivityEntry; finished: boo
 }
 function SubagentActivity({ tasks, onOpen }: { tasks?: SceneTask[]; onOpen?: (taskIds: string[], selectedId?: string) => void }) {
   if (!tasks?.length || !onOpen) return null;
-  const active = tasks.filter(task => task.status === 'running' || task.status === 'queued').length;
-  const failed = tasks.filter(task => ['failed', 'interrupted', 'budget_exhausted', 'timeout'].includes(task.status)).length;
-  const completed = tasks.filter(task => task.status === 'done').length;
-  const status = active ? 'running' : failed ? 'failed' : 'done';
+  const running = tasks.filter(task => task.status === 'running').length;
+  const queued = tasks.filter(task => task.status === 'queued').length;
+  const failed = tasks.filter(task => ['failed', 'budget_exhausted', 'timeout'].includes(task.status));
+  const stopped = tasks.filter(task => task.status === 'cancelled' || task.status === 'interrupted').length;
+  const status = running ? 'running' : queued ? 'queued'
+    : failed.length ? (failed.every(task => task.status === failed[0].status) ? failed[0].status : 'failed')
+    : stopped ? 'stopped' : 'done';
+  const label = running ? `${running} 项运行中${queued ? ` · ${queued} 项排队` : ''}`
+    : queued ? `${queued} 项排队中`
+    : failed.length ? `${failed.length} 项${status === 'timeout' ? '超时' : status === 'budget_exhausted' ? '预算用尽' : '失败'}`
+    : stopped ? `${stopped} 项已停止` : '全部完成';
   return <button type="button" className="run-subagent-activity" data-status={status}
     aria-label="查看子智能体执行详情" onClick={() => onOpen(tasks.map(task => task.id))}>
-    <span className="run-subagent-icons" aria-hidden="true"><Icon name="chat-wrench" /></span>
-    <span className="run-subagent-copy"><strong>子智能体 · {tasks.length}</strong><span>{active ? `${active} 运行中` : failed ? `${failed} 异常` : completed === tasks.length ? '已完成' : '已结束'}</span></span>
+    <span className="run-subagent-mark" aria-hidden="true">
+      {status === 'running' ? <StatusMark status="running" size={14} color="currentColor" fillOpacity={0} />
+        : <Icon name={status === 'queued' ? 'chat-clock' : status === 'stopped' ? 'chat-stop' : status === 'done' ? 'chat-check' : 'chat-error'} />}
+    </span>
+    <span>子智能体 · {tasks.length} 项</span>
+    <span className="run-subagent-status">{label}</span>
     <Icon name="chat-chevron-right" />
   </button>;
 }
-export function ChatActivity({ run, sceneLabel, showDetails = true, showProgress = true, onOpenSubagents, errorAlreadyShown = false }: {
-  run: Run; sceneLabel?: string; showDetails?: boolean; showProgress?: boolean; errorAlreadyShown?: boolean; onOpenSubagents?: (taskIds: string[], selectedId?: string) => void;
+export function ChatActivity({ run, sceneLabel, showDetails = true, showProgress = true, onOpenSubagents, errorAlreadyShown = false, superseded = false }: {
+  run: Run; sceneLabel?: string; showDetails?: boolean; showProgress?: boolean; errorAlreadyShown?: boolean; superseded?: boolean; onOpenSubagents?: (taskIds: string[], selectedId?: string) => void;
 }) {
   const status = run.status || run.outcome || "thinking";
   const repeatError = status === 'error' && errorAlreadyShown;
-  if (showDetails || (onOpenSubagents && run.scheduling?.tasks.length) || (run.end && run.entries.some(entry => entry.type === 'tool' && entry.error))) {
-    return <DetailedChatActivity run={run} sceneLabel={sceneLabel} repeatError={repeatError} onOpenSubagents={onOpenSubagents} showTrace={showDetails || !onOpenSubagents} />;
+  if (run.end && status === 'stopped' && !run.entries.length && !run.scheduling?.tasks.length) {
+    if (superseded) return null;
+    return <div className="chat-run"><ChatStatusRow
+      title={`${run.label || '已停止'} · 用时 ${duration(Math.max(0, Math.floor((run.end - run.start) / 1000)))}`}
+      tone="stopped" detail={sceneLabel} /></div>;
   }
-  const attention = !repeatError && ["error", "timeout", "stopped"].includes(status) && (status !== "stopped" || !run.stopHistorySeq);
+  if (run.end && status === 'done' && !run.entries.length && !run.scheduling?.tasks.length) {
+    if (!showDetails) return null;
+    return <div className="chat-run"><div className="run-activity"><div className="run-summary" role="status">
+      <span className="run-icon" aria-hidden="true" />
+      <span className="run-label">用时 {duration(Math.max(0, Math.floor((run.end - run.start) / 1000)))}</span>
+    </div></div></div>;
+  }
+  if (showDetails || (onOpenSubagents && run.scheduling?.tasks.length) || (!superseded && run.end && run.entries.some(entry => entry.type === 'tool' && entry.error))) {
+    return <DetailedChatActivity run={run} sceneLabel={sceneLabel} repeatError={repeatError} superseded={superseded} onOpenSubagents={onOpenSubagents} showTrace={showDetails || !onOpenSubagents} />;
+  }
+  const attention = !superseded && !repeatError && ["error", "timeout", "stopped"].includes(status);
   const artifacts = [...new Set(run.entries.flatMap(entry => entry.artifactPath ? [entry.artifactPath] : []))];
   const progress = !run.end && showProgress;
   if (!attention && !progress && !artifacts.length) return null;
   return <div className="chat-run">
     {attention ? <ChatStatusRow title={CHAT_SCENE_ACTIVITY_LABELS[status]}
-      detail={[sceneLabel, run.hint || run.label].filter(Boolean).join(' · ')}
+      detail={[sceneLabel, run.hint || (run.label !== CHAT_SCENE_ACTIVITY_LABELS[status] ? run.label : '')].filter(Boolean).join(' · ')}
       tone={status === 'stopped' ? 'stopped' : 'error'} />
+    : progress && (status === 'queued' || status === 'waiting' || status === 'reconnecting')
+      ? <ChatStatusRow title={run.label || CHAT_SCENE_ACTIVITY_LABELS[status]} detail={sceneLabel} />
     : progress && <div className="quiet-activity" data-status={status}>
       {sceneLabel && <span className="quiet-activity-scene">{sceneLabel}</span>}
       <div className="thinking-bubble" role="status" aria-label={CHAT_SCENE_ACTIVITY_LABELS[status]}>
@@ -94,12 +120,14 @@ function DetailedChatActivity({
   run,
   sceneLabel,
   repeatError,
+  superseded,
   onOpenSubagents,
   showTrace = true,
 }: {
   run: Run;
   sceneLabel?: string;
   repeatError: boolean;
+  superseded: boolean;
   showTrace?: boolean;
   onOpenSubagents?: (taskIds: string[], selectedId?: string) => void;
 }) {
@@ -107,25 +135,24 @@ function DetailedChatActivity({
     [now, setNow] = useState(Date.now);
   const passive = run.waitingForReply && !run.scheduling?.tasks.some(task => task.status === 'running' || task.status === 'queued');
   const status = run.status || run.outcome || (passive ? "waiting" : "thinking");
+  const settledSummary = !!run.end && (status === 'done' || superseded);
   const showElapsed = !passive && status !== 'reconnecting';
   const showHint = run.hint && !(status === 'working' && run.hint.trim() === CHAT_SCENE_ACTIVITY_LABELS.working);
   useEffect(() => {
-    if (run.end || !showElapsed || !open) return;
+    if (run.end || !showElapsed) return;
     setNow(Date.now());
     const timer = setInterval(() => setNow(Date.now()), 1000);
     return () => clearInterval(timer);
-  }, [run.end, showElapsed, open]);
+  }, [run.end, showElapsed]);
   const tools = run.entries.filter((entry) => entry.type === "tool");
   const failed = tools.filter(entry => entry.error).length;
   const unconfirmed = tools.filter(entry => !entry.done && !entry.error).length;
   const artifacts = [...new Set(tools.flatMap(entry => entry.artifactPath ? [entry.artifactPath] : []))];
   const activeTool = tools.filter(entry => !entry.done && !entry.error).at(-1);
   const activeLabel = activeTool?.label?.trim();
-  const reads = tools.filter(entry => entry.done && !entry.error && entry.name === 'read_file').length;
-  const summary = repeatError ? '执行过程'
+  const summary = settledSummary ? `用时 ${duration(Math.max(0, Math.floor((run.end! - run.start) / 1000)))}`
+    : repeatError ? '执行过程'
     : status === 'working' && activeLabel ? activeLabel
-    : status === 'done' && reads > 0 && reads === tools.length && !artifacts.length ? `读取了 ${reads} 次文件`
-    : status === 'done' && tools.length > 0 ? tools.at(-1)?.label || run.label
     : run.label;
   return (
     <div className="chat-run">
@@ -138,7 +165,7 @@ function DetailedChatActivity({
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
       <summary>
-        <span className="run-icon" role="img" aria-label={repeatError ? "执行过程" : status === "queued" && run.waitingForReply ? "消息已接收" : CHAT_SCENE_ACTIVITY_LABELS[status]}>
+        {settledSummary ? <span className="run-icon" aria-hidden="true" /> : <span className="run-icon" role="img" aria-label={repeatError ? "执行过程" : run.label || CHAT_SCENE_ACTIVITY_LABELS[status]}>
           <Icon
             name={
               repeatError ? "chat-wrench" : run.outcome === "stopped"
@@ -149,28 +176,26 @@ function DetailedChatActivity({
                     : run.end ? "chat-check" : status === "working" ? "chat-wrench" : "chat-clock"
             }
           />
-        </span>
+        </span>}
         <span className="run-caption">
-          <span className="run-label" title={run.hint || run.arg || summary}>
-            {showTrace ? summary : run.end ? '思考过程' : '思考中'}
+          <span className="run-label" title={settledSummary ? summary : run.hint || run.arg || summary}>
+            {settledSummary || showTrace ? summary : run.end ? '思考过程' : run.label}
+            {!settledSummary && showElapsed && ` · ${duration(Math.max(0, Math.floor(((run.end || now) - run.start) / 1000)))}`}
           </span>
-          {!!run.scheduling?.tasks.length && onOpenSubagents && <span className="run-delegation-label">子智能体协作</span>}
           {run.autonomousOrigin
             ? <span className="message-scene" title="后台自主活动，与当前场景对话分别显示">{run.autonomousOrigin === 'callback' ? 'SBS 自主回调' : 'SBS 自主活动'}</span>
             : sceneLabel && <span className="message-scene" title={run.sceneId}>{sceneLabel}</span>}
         </span>
-        {failed > 0 && <span className="run-failures">{failed} 次失败</span>}
-        {run.end && unconfirmed > 0 && <span>{unconfirmed} 次结果未确认</span>}
+        {!superseded && failed > 0 && <span className="run-failures">{failed} 次失败</span>}
+        {!superseded && run.end && unconfirmed > 0 && <span>{unconfirmed} 次结果未确认</span>}
         <span className="run-chevron" aria-hidden="true">
           <Icon name="chat-chevron-right" />
         </span>
       </summary>
-      <SubagentActivity tasks={run.scheduling?.tasks} onOpen={onOpenSubagents} />
-      {open && showTrace && <div className="run-body">
-        {(showElapsed || tools.length > 0) && <div className="run-metrics">
-          {showElapsed && <span title="总耗时" aria-label="总耗时">
-            {duration(Math.max(0, Math.floor(((run.end || now) - run.start) / 1000)))}
-          </span>}
+      <div className="run-body">
+        <SubagentActivity tasks={run.scheduling?.tasks} onOpen={onOpenSubagents} />
+        {open && showTrace && <>
+        {tools.length > 0 && !run.scheduling?.tasks.length && <div className="run-metrics">
           {tools.length > 0 && <span>{tools.length} 次工具调用</span>}
           {failed > 0 && <span className="run-failures">{failed} 次失败</span>}
           {unconfirmed > 0 && <span>{unconfirmed} 次{run.end ? '结果未确认' : '进行中'}</span>}
@@ -187,7 +212,8 @@ function DetailedChatActivity({
             </p>
           )}
         </div>
-      </div>}
+        </>}
+      </div>
     </details>
     {artifacts.length > 0 && <div className="run-artifacts" aria-label="生成的文件">
       {artifacts.map(path => <LocalFileLink key={path} path={path} card>{path.split(/[\\/]/).pop() || path}</LocalFileLink>)}

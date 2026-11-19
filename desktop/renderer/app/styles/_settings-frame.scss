@@ -586,7 +586,7 @@ html[data-theme='dark'] .town-logo-light {
 #client-settings-dialog .client-settings-content > .dialog-heading,
 #client-settings-dialog .settings-tabs {
   background: var(--settings-sidebar);
-  border-right: 1px solid var(--text);
+  border-right: 1px solid var(--line);
 }
 
 #client-settings-dialog .client-settings-content > .dialog-heading {
@@ -1767,7 +1767,7 @@ html[data-theme='dark'] .town-logo-light {
   height: 44px;
   margin-top: 0;
   padding: 0 12px;
-  border: 1px solid #010000;
+  border: 1px solid var(--line);
   border-radius: 20px;
   background: var(--control);
   color: var(--secondary);

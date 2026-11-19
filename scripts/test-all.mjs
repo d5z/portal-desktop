@@ -88,6 +88,7 @@ try {
   await npm('settings-navigation', ['run', 'test:settings-navigation']);
   await step('connectors-network', process.execPath, ['tests/connectors-network-electron.mjs']);
   await step('connectors-navigation', process.execPath, ['tests/connectors-navigation.mjs']);
+  await step('connectors-local-kit', process.execPath, ['tests/connectors-local-kit.mjs']);
   await step('connectors-credentials', process.execPath, ['tests/connectors-credentials.mjs']);
   await step('workspace-motion', process.execPath, ['tests/workspace-motion.mjs']);
   await step('panel-layout-performance', process.execPath, ['tests/panel-layout-performance.mjs']);

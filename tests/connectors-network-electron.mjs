@@ -34,12 +34,17 @@ try {
       await writeFile(path.join(directory, 'home-session.json'), JSON.stringify({credential:Buffer.from(JSON.stringify({version:1,tokens:{access:'private-access',refresh:'private-refresh',expires:Date.now()+3600000,subject:'one'}})).toString('base64')}));
       const requests = [];
       const client = new HomeClient(directory, {isEncryptionAvailable:()=>true,encryptString:value=>Buffer.from(value),decryptString:value=>value.toString()}, async()=>{}, async (url, init) => {
-        const pathname = new URL(String(url)).pathname;
+        const target = new URL(String(url));
+        const pathname = target.pathname;
         requests.push({pathname, method:init.method || 'GET', authorization:new Headers(init.headers).get('Authorization')});
         if (pathname.endsWith('/remove')) return new Response(null, {status:204});
         if (pathname.endsWith('/actions')) return Response.json({error:'kit_operation_changed'}, {status:409});
         if (pathname.includes('/offline/')) throw new Error('Fixture transport offline');
-        if (pathname.includes('/app-catalog') || pathname.includes('/kit-catalog')) return Response.json({enabled:true,items:[{release_id:'gmail',name:'Gmail'}]});
+        if (pathname.includes('/app-catalog') && target.searchParams.get('q')?.startsWith('legacy-')) {
+          const status = Number(target.searchParams.get('q').slice(7));
+          return new Response('<html>Catalog route unavailable</html>', {status, headers:{'Content-Type':'text/html; charset=utf-8'}});
+        }
+        if (pathname.includes('/app-catalog') || pathname.includes('/kit-catalog')) return new Response('{ "enabled": true, "items": [{"release_id":"gmail","name":"Gmail","icon_url":"/assets/icon.svg"}] }', {headers:{'Content-Type':'application/json; charset=utf-8'}});
         if (pathname.includes('/empty/')) return new Response(null, {status:502});
         return Response.json({name:'Gmail',accounts:[],methods:[]});
       });
@@ -62,19 +67,25 @@ try {
   const cdp = await page.context().newCDPSession(page);
   await cdp.send('Network.enable');
   const requests = [], responses = [];
-  const catalogBodies = [];
+  const catalogBodies = [], bodyReads = [];
   cdp.on('Network.requestWillBeSent', event => { if (event.request.url.includes('/api/v1/me/')) requests.push(event); });
   cdp.on('Network.responseReceived', event => { if (event.response.url.includes('/api/v1/me/')) responses.push(event); });
-  cdp.on('Network.loadingFinished', async event => {
-    const response = responses.find(item => item.requestId === event.requestId && item.response.url.includes('/app-catalog?'));
+  cdp.on('Network.loadingFinished', event => {
+    const response = responses.find(item => item.requestId === event.requestId && /\/(app|kit)-catalog/.test(item.response.url));
     if (!response) return;
-    try { catalogBodies.push(JSON.parse((await cdp.send('Network.getResponseBody', { requestId: event.requestId })).body)); }
-    catch { /* DevTools may discard a custom-protocol body after navigation. */ }
+    bodyReads.push(cdp.send('Network.getResponseBody', { requestId: event.requestId }).then(result => {
+      catalogBodies.push({ ...response.response, body: result.base64Encoded ? Buffer.from(result.body, 'base64').toString() : result.body });
+    }));
   });
   for (const url of ['beings://desktop/', devURL]) {
     if (url !== page.url()) await app.evaluate(async (_electron, url) => globalThis.fixture.navigate(url), url);
     assert.equal(await page.evaluate(() => typeof require), 'undefined');
     assert.equal((await page.evaluate(() => window.beings.home.connectors.catalog({q:'gmail'}))).items[0].name, 'Gmail');
+    for (const status of [404, 405]) {
+      const catalog = await page.evaluate(status => window.beings.home.connectors.catalog({q:'legacy-' + status}), status);
+      assert.equal(catalog.items[0].icon_url, 'https://home.beings.town/assets/icon.svg');
+    }
+    await Promise.all(bodyReads);
     assert.equal((await page.evaluate(() => window.beings.home.connectors.detail('gmail'))).name, 'Gmail');
     await page.evaluate(() => window.beings.home.connectors.removeAccount('gmail', 'account'));
     assert.equal((await page.evaluate(() => window.beings.home.connectors.lifecycle('install', 'uninstall', 2, 'request-id'))).accepted, false);
@@ -87,14 +98,22 @@ try {
   assert(responses.some(event => event.response.status === 204));
   assert(responses.some(event => event.response.status === 409));
   assert(responses.some(event => event.response.status === 502));
-  await new Promise(resolve => setTimeout(resolve, 50));
-  assert.equal(catalogBodies[0]?.items?.[0]?.name, 'Gmail');
+  await Promise.all(bodyReads);
+  for (const status of [404, 405]) {
+    const failed = catalogBodies.filter(item => item.status === status);
+    assert.equal(failed.length, 2);
+    assert(failed.every(item => item.url.includes('/app-catalog?') && item.body === '<html>Catalog route unavailable</html>' && new Headers(item.headers).get('Content-Type') === 'text/html; charset=utf-8'));
+  }
+  const legacy = catalogBodies.filter(item => item.url.includes('/kit-catalog?'));
+  assert.equal(legacy.length, 4);
+  assert(legacy.every(item => item.status === 200 && new Headers(item.headers).get('Content-Type') === 'application/json; charset=utf-8' && item.body === '{ "enabled": true, "items": [{"release_id":"gmail","name":"Gmail","icon_url":"/assets/icon.svg"}] }'));
+  assert.equal(JSON.parse(catalogBodies[0].body).items[0].name, 'Gmail');
   const upstream = await app.evaluate(() => globalThis.fixture.requests);
-  assert.equal(upstream.length, 12, 'Unauthenticated local requests never reach Home; writes are not duplicated');
+  assert.equal(upstream.length, 20, 'Unauthenticated local requests never reach Home; writes are not duplicated');
   assert(upstream.every(request => request.authorization === 'Bearer private-access'));
   assert(!JSON.stringify({requests,responses}).includes('private-access'));
   assert(!JSON.stringify({requests,responses}).includes('private-refresh'));
-  console.log('Connector Network passed: real preload and protocol, packaged/dev origins, visible request payloads, response bodies and 204/409/502 statuses, no Home tokens in renderer, no duplicate writes.');
+  console.log('Connector Network passed: real preload and protocol, packaged/dev origins, visible request payloads, original catalog bodies/Content-Type, separate 404/405 fallback requests, and 204/409/502 statuses, no Home tokens in renderer, no duplicate writes.');
 } finally {
   if (app) await app.close();
   await new Promise(resolve => server.close(resolve));

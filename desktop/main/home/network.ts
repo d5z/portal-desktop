@@ -12,7 +12,7 @@ export class ConnectorNetwork {
   async handle(request: Request): Promise<Response> {
     const shell = new URL(this.shellURL());
     const origin = `${shell.protocol}//${shell.host}`;
-    const headers = { 'Access-Control-Allow-Origin': origin, 'Cache-Control': 'no-store', Vary: 'Origin' };
+    const headers = { 'Access-Control-Allow-Origin': origin, 'Cache-Control': 'no-store', Vary: 'Origin', 'Access-Control-Expose-Headers': 'X-Connector-Error' };
     const url = new URL(request.url);
     const routeMatch = (template: string) => {
       const actual = url.pathname.split('/');
@@ -40,10 +40,15 @@ export class ConnectorNetwork {
     if (!Array.isArray(args)) return Response.json({ error: '无效的 Connector 请求。' }, { status: 400, headers });
     try {
       const value = await callback(...(matched?.args || []), ...args);
+      if (value instanceof Response) return new Response(value.body, { status: value.status, headers: { ...headers, 'Content-Type': value.headers.get('Content-Type') || 'application/json' } });
       if (value === undefined) return new Response(null, { status: 204, headers });
       const rejected = operation === 'lifecycle' && (value as { accepted: boolean }).accepted === false;
       return Response.json(value, { status: rejected ? 409 : 200, headers });
     } catch (error) {
+      if (error instanceof HomeError && error.response) return new Response(error.response.body, {
+        status: error.status, headers: { ...headers, 'Content-Type': error.response.headers.get('Content-Type') || 'application/octet-stream',
+          'X-Connector-Error': encodeURIComponent(error.message) },
+      });
       return Response.json({ error: publicErrorMessage(error, 'Connector 请求失败，请重试。') }, {
         status: error instanceof HomeError && error.status >= 400 ? error.status : 502, headers,
       });

@@ -1,3 +1,4 @@
+export const HOME_ORIGIN = 'https://home.beings.town';
 /** Credential-free native Home contract. Remote viewer URLs never cross IPC. */
 export interface HomeComputer { id: string; being_profile_id: string; status: string; desired_state: string; generation: number }
 export interface HomeOperation { id: string; computer_id: string; kind: string; status: string; target_generation: number; error_code: string | null }

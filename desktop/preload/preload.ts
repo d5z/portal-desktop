@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { DesktopAPI, PortalState, TownLiveState } from '../shared/types';
-import { CONNECTOR_NETWORK_METHODS, connectorNetworkPath } from '../shared/home';
+import { HOME_ORIGIN, CONNECTOR_NETWORK_METHODS, connectorNetworkPath } from '../shared/home';
 
 async function connectorRequest(operation: keyof typeof CONNECTOR_NETWORK_METHODS, ...args: unknown[]): Promise<any> {
   const key = await ipcRenderer.invoke('beings:home-connector-network-key');
@@ -16,12 +16,19 @@ async function connectorRequest(operation: keyof typeof CONNECTOR_NETWORK_METHOD
   });
   if (response.status === 204) return;
   const body = await response.text();
+  if (operation === 'catalog' && [404, 405].includes(response.status)) return connectorRequest('legacy-catalog', ...args);
+  if (!response.ok && response.headers.has('X-Connector-Error')) throw new Error(decodeURIComponent(response.headers.get('X-Connector-Error')!));
   if (!body.trim()) throw new Error(response.ok ? 'Connector 返回空响应。' : `Connector 请求失败（HTTP ${response.status}）。`);
   let value: { error?: unknown; accepted?: boolean };
   try { value = JSON.parse(body) as { error?: unknown; accepted?: boolean }; }
   catch { throw new Error('Connector 返回无效响应。'); }
   if (!response.ok && !(operation === 'lifecycle' && response.status === 409 && value?.accepted === false)) {
     throw new Error(typeof value?.error === 'string' ? value.error : `Connector 请求失败（HTTP ${response.status}）。`);
+  }
+  if (operation === 'catalog' || operation === 'legacy-catalog') {
+    const page = value as import('../shared/home').HomeConnectorCatalogPage;
+    if (!page || !Array.isArray(page.items)) throw new Error('统一应用目录响应无效。');
+    return { ...page, items: page.items.map(item => ({ ...item, icon_url: item.icon_url ? URL.parse(item.icon_url, HOME_ORIGIN)?.href ?? null : item.icon_url ?? null })) };
   }
   return value;
 }

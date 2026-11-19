@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ChatState, type Run } from '../desktop/renderer/chat/models/chat';
+import { ChatState, type Run, type Message } from '../desktop/renderer/chat/models/chat';
 import { ChatActivity } from '../desktop/renderer/chat/components/messages';
 import { createChatRuntime } from '../desktop/renderer/chat/services/runtime';
 
@@ -46,6 +46,7 @@ async function fixture(initial: 'live' | 'queued' | 'empty' = 'live') {
     emit(event: string, data: object = {}, scene_id = 'desktop-test') {
       stream.enqueue(new TextEncoder().encode(`event: ${event}\ndata: ${JSON.stringify({scene_id, ...data})}\n\n`));
     },
+    finishStream() { stream.close(); },
     setHistory(read: () => Promise<Response>) { historyRead = read; },
     setActive(read: () => Response) { activeRead = read; },
     close() { runtime.dispose(); try { stream?.close(); } catch {} },
@@ -73,7 +74,7 @@ it('resumes a server-queued input and keeps a long task active, then waits afres
     expect(f.runs()[0].end).toBeUndefined();
     f.emit('message_stop');
     await vi.advanceTimersByTimeAsync(20);
-    expect(f.runs()[0]).toMatchObject({status: 'waiting', label: '等待最终回复'});
+    expect(f.runs()[0]).toMatchObject({status: 'waiting', label: '等待接续回复'});
     await vi.advanceTimersByTimeAsync(240000);
     expect(f.runs()[0].end).toBeUndefined();
     f.emit('content_block_delta', {delta: {text: 'final answer'}});
@@ -237,4 +238,103 @@ it('does not count the shared replay reader as another busy scene when sending t
     expect(posts).toHaveBeenCalledTimes(1);
     expect(state.items.some(i => i.kind === 'message' && i.queued)).toBe(false);
   } finally { runtime.dispose(); }
+});
+
+// Live capture: the old final/stop arrived 9ms before the interrupt POST's 200.
+it('keeps the completed run with its reply when an interrupt races a new stream', async () => {
+  const f = await fixture();
+  try {
+    f.emit('content_block_delta', {delta:{text:'上一轮答复'}});
+    await vi.advanceTimersByTimeAsync(20);
+    const oldRun = f.runs()[0];
+    const original = f.fetcher.getMockImplementation()!;
+    let accept!: (response: Response) => void;
+    f.fetcher.mockImplementation(input => new URL(input).pathname === '/api/chat/stream'
+      ? new Promise<Response>(resolve => { accept = resolve; }) : original(input));
+    const sending = f.runtime.send('新的问题', [], {mode:'interrupt'});
+    await vi.advanceTimersByTimeAsync(0);
+    f.emit('message_stop');
+    await vi.advanceTimersByTimeAsync(20);
+    const user = f.state.items.find(item => item.kind === 'message' && item.text === '新的问题')!;
+    expect(oldRun).toMatchObject({status:'done'});
+    expect(f.state.items.indexOf(oldRun)).toBeLessThan(f.state.items.indexOf(user));
+    accept(new Response('event: reasoning\ndata: {"text":"正在处理新问题"}\n\nevent: message_stop\ndata: {}\n\n'));
+    await sending;
+    await vi.advanceTimersByTimeAsync(20);
+    expect(f.runs()).toHaveLength(2);
+    expect(f.state.items.indexOf(f.runs()[1])).toBeGreaterThan(f.state.items.indexOf(user));
+    expect(f.runs()[1].label).toBe('等待接续回复');
+  } finally { f.close(); }
+});
+
+it('projects one status into the transcript and scene list without changing reply content', async () => {
+  const f = await fixture();
+  const check = (status: string) => {
+    expect(f.runs().at(-1)?.status).toBe(status);
+    expect(f.activity.mock.lastCall?.[0]['desktop-test']).toBe(status);
+  };
+  try {
+    f.emit('reasoning', {text:'检查中'});
+    await vi.advanceTimersByTimeAsync(20);
+    check('thinking');
+    f.emit('tool_use', {name:'read_file', id:'read-1', input:{}});
+    await vi.advanceTimersByTimeAsync(20);
+    check('working');
+    f.emit('tool_result', {name:'read_file', tool_use_id:'read-1', is_error:true, content:'missing file'});
+    await vi.advanceTimersByTimeAsync(20);
+    check('thinking'); // A failed tool is not a failed turn.
+    await f.runtime.send('补充问题', [], {mode:'interrupt'});
+    await vi.advanceTimersByTimeAsync(20);
+    check('queued');
+    f.emit('message_stop');
+    await vi.advanceTimersByTimeAsync(20);
+    check('waiting');
+    f.emit('meta', {continuation:true});
+    f.emit('content_block_delta', {delta:{text:''}});
+    await vi.advanceTimersByTimeAsync(20);
+    check('waiting'); // Transport markers alone are not model progress.
+    f.emit('content_block_delta', {delta:{text:'完整答复'}});
+    await vi.advanceTimersByTimeAsync(20);
+    check('replying');
+    f.emit('message_stop');
+    await vi.advanceTimersByTimeAsync(20);
+    check('done');
+    const order = f.state.items.map(item => item.id);
+    const replies = f.state.items.filter((item): item is Message => item.kind === 'message' && item.role === 'being');
+    expect(replies.map(item => item.text)).toEqual(['完整答复']);
+    expect(f.runs().at(-1)?.replyConfirmed).toBe(true);
+    f.runs().at(-1)!.label = 'Translated completion label';
+    await f.runtime.refreshHistory();
+    await vi.advanceTimersByTimeAsync(20);
+    check('done');
+    expect(f.state.items.map(item => item.id)).toEqual(order);
+    expect(f.state.items.filter(item => item.kind === 'message' && item.role === 'being')).toEqual(replies);
+  } finally { f.close(); }
+});
+
+
+it('keeps activity above the reply and starts the next turn without the previous text phase', async () => {
+  const f = await fixture();
+  try {
+    const firstRun = f.runs()[0];
+    const runIndex = f.state.items.indexOf(firstRun);
+    f.emit('content_block_delta', {delta:{text:'first reply'}});
+    await vi.advanceTimersByTimeAsync(20);
+    expect(f.state.items.indexOf(firstRun)).toBe(runIndex);
+    const reply = f.state.items.find(item => item.kind === 'message' && item.role === 'being');
+    expect(runIndex).toBeLessThan(f.state.items.indexOf(reply!));
+    f.emit('message_stop');
+    f.finishStream();
+    await vi.advanceTimersByTimeAsync(20);
+    const original = f.fetcher.getMockImplementation()!;
+    let accept!: (response: Response) => void;
+    f.fetcher.mockImplementation(input => new URL(input).pathname === '/api/chat/stream'
+      ? new Promise<Response>(resolve => { accept = resolve; }) : original(input));
+    const sending = f.runtime.send('next turn');
+    await vi.advanceTimersByTimeAsync(20);
+    expect(f.runs().at(-1)?.status).toBe('thinking');
+    expect(f.activity.mock.lastCall?.[0]['desktop-test']).toBe('thinking');
+    accept(Response.json({queued:true}, {status:202}));
+    await sending;
+  } finally { f.close(); }
 });

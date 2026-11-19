@@ -52,7 +52,7 @@ export interface ChatScene { scene_id: string; scene_meta: { client: string; sce
 export interface RecentChatMessage { seq: number; role: 'user' | 'being' | 'assistant'; content: string; at: string; scene_id: string; scene_label: string }
 export type ChatSceneActivity = 'queued' | 'thinking' | 'replying' | 'working' | 'waiting' | 'reconnecting' | 'timeout' | 'done' | 'error' | 'send-failed' | 'task-failed' | 'stopped';
 export const CHAT_SCENE_ACTIVITY_LABELS: Record<ChatSceneActivity, string> = {
-  queued: '排队中', thinking: '思考中', replying: '回复中', working: '执行中', waiting: '等待最终回复',
+  queued: '排队中', thinking: '思考中', replying: '回复中', working: '执行中', waiting: '等待回复',
   reconnecting: '恢复连接中', timeout: '等待超时', done: '已回复', error: '执行异常', stopped: '已停止',
   'send-failed': '消息未发送', 'task-failed': '后台任务失败',
 };

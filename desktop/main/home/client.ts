@@ -61,8 +61,8 @@ export class HomeClient {
       try { response = await this.fetcher(homeURL(pathname), { ...init, redirect: 'error', signal }); }
       catch { throw new HomeError(0, 'network'); }
       if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new HomeError(response.status, typeof error.error === 'string' ? error.error : '');
+        const error = await response.clone().json().catch(() => ({}));
+        throw new HomeError(response.status, typeof error?.error === 'string' ? error.error : '', response);
       }
       if (response.status === 204) return undefined as T;
       if (read) {

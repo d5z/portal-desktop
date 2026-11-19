@@ -4,7 +4,7 @@ import { AttachmentMessages, attachmentMessageReader, releaseAttachmentMessageRe
 import { SceneQueueStore } from "./scene-queue";
 import type { SavedSceneSend } from "./scene-queue";
 import { inCurrentScene, messageScene, stripSceneTransition, withSceneTransition } from "../models/scenes";
-import type { ChatRuntime, ChatState, RuntimeOptions } from "../models/chat";
+import type { ChatRuntime, ChatState, RuntimeOptions, Message } from "../models/chat";
 
 /** One Being coordinator; scene-local state is not a separate agent or breath. */
 export function createSceneRuntime(state: ChatState, options: RuntimeOptions, createRuntime: any): ChatRuntime {
@@ -139,7 +139,7 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
     sendQueue.push(queued);
     entry.message.canInterruptQueued = persisted && saved.phase === "queued" && !saved.attachment;
     target.local.queued++;
-    entry.message.queueNotice = saved.phase === 'sending' ? '发送状态待确认，请先查看场景历史' : undefined;
+    entry.message.queueNotice = saved.phase === 'sending' ? '发送状态待确认，请核对历史后移除待发记录' : undefined;
     entry.message.setQueuedEditing = (editing: boolean) => {
       if (editing && (queued.claimed || queued.cancelled || saved.phase !== 'queued' || !sendQueue.includes(queued))) return false;
       queued.editing = editing;
@@ -198,11 +198,12 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
       } catch { entry.message.queueNotice = '无法保存排序，请重试'; entry.message.queueNoticeTone = 'error'; publish(); }
     };
     entry.message.cancelQueued = async () => {
-      if (saved.phase === 'sending' || (queued.claimed && !saved.attachment)) return;
+      if (queued.claimed && (!saved.attachment || saved.phase === 'sending')) return;
       queued.cancelled = true;
       queued.controller.abort();
       queued.claimed = true;
-      if (saved.attachment?.messageId) {
+      // An uncertain send can only be removed locally; it may already be accepted.
+      if (saved.attachment?.messageId && saved.phase !== 'sending') {
         try { await new AttachmentMessages(attachmentRequest(saved.scene.sceneId)).update(saved.attachment.messageId, {delivery_status:'cancelled'}); }
         catch { entry.message.queueNotice = '本地已取消；服务端状态尚未同步'; }
       }
@@ -390,20 +391,26 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
     const status = session.runtime?.sceneActivity();
     const queued = sendQueue.some(next => next.session === session && next.saved.phase !== 'failed');
     const failed = sendQueue.some(next => next.session === session && next.saved.phase === 'failed');
+    if (status && ["queued", "thinking", "replying", "working", "waiting", "reconnecting"].includes(status)) return status;
     const tasks = (state.sceneTasks || []).filter((t: any) => t.sceneId === session.local.currentScene.sceneId);
     if (tasks.some((t: any) => t.status === 'running' || t.status === 'queued')) return 'working';
     if (status === 'error' || status === 'timeout' || status === 'stopped') return queued ? 'queued' : status;
     // Creation order is not completion order: an earlier slow task can finish
     // after a stage reply for a later fast task. Inspect every pending result.
-    const currentTasks = tasks.filter((t: any) => !session.submittedAt || t.createdAt >= session.submittedAt);
-    const repliedAt = session.runtime?.replyCompletedAt?.() || 0;
-    if (!['thinking','replying'].includes(status)) {
-      if (currentTasks.some((t: any) => ['failed','interrupted','budget_exhausted','timeout'].includes(t.status) &&
-          (!t.endedAt || t.endedAt > repliedAt))) return 'task-failed';
-      if (session.submittedAt && currentTasks.some((t: any) => t.status === 'done' && t.endedAt > repliedAt)) return 'waiting';
-    }
-    return status && ["queued", "thinking", "replying", "working", "waiting", "reconnecting"].includes(status) ? status :
-      queued ? "queued" : failed ? "send-failed" : status;
+    // Refresh loses the live submission/confirmation timestamps. Recover the
+    // latest turn from this scene's messages instead of reviving all old failures.
+    const messages = tasks.length ? (state.items || []).filter((item): item is Message => item.kind === 'message' &&
+      item.sceneId === session.local.currentScene.sceneId && !item.queued).reverse() : [];
+    const latestUser = messages.find(item => item.role === 'user');
+    const submittedAt = Math.max(session.submittedAt || 0, latestUser?.createdAt || 0);
+    const currentTasks = tasks.filter((t: any) => submittedAt && t.createdAt >= submittedAt);
+    const finalReply = messages.find(item => item.role === 'being' &&
+      !item.streaming && !item.interim && (item.createdAt || 0) >= submittedAt);
+    const repliedAt = Math.max(session.runtime?.replyCompletedAt?.() || 0, finalReply?.createdAt || 0);
+    if (currentTasks.some((t: any) => ['failed','interrupted','budget_exhausted','timeout'].includes(t.status) &&
+        (!t.endedAt || t.endedAt > repliedAt))) return 'task-failed';
+    if (submittedAt && currentTasks.some((t: any) => t.status === 'done' && t.endedAt > repliedAt)) return 'waiting';
+    return queued ? "queued" : failed ? "send-failed" : status;
   };
   function publish() {
     if (disposed || !selected) return;

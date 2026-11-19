@@ -156,7 +156,10 @@ function QueueRow({ item, index, reorderable, allowInterrupt, onEdit }: {
         aria-label={`编辑消息：${label}`} disabled={item.queueBusy} onClick={() => onEdit(item)}>
         <Icon name="chat-edit" width="14" height="14" />
       </button>}
-      {item.queuePhase !== 'sending' && item.cancelQueued && <button type="button" data-warm-tooltip="取消排队" aria-label={`取消排队：${label}`} disabled={item.queueBusy && item.queuePhase !== 'preparing'} onClick={() => item.cancelQueued?.()}>
+      {item.cancelQueued && (item.queuePhase !== 'sending' || !item.queueBusy) && <button type="button"
+        data-warm-tooltip={item.queuePhase === 'sending' ? '移除待发记录' : '取消排队'}
+        aria-label={`${item.queuePhase === 'sending' ? '移除待发记录' : '取消排队'}：${label}`}
+        disabled={item.queueBusy && item.queuePhase !== 'preparing'} onClick={() => item.cancelQueued?.()}>
         <Icon name="chat-close" width="14" height="14" />
       </button>}
     </div>
@@ -218,6 +221,10 @@ export function ChatView({
   const historyWindow=useHistoryWindow(state.historyLoading ? [] : timelineItems,JSON.stringify([state.historyScope,state.currentScene.sceneId,state.showSbsMessages]),before=>runtime.loadOlderHistory(before));
   const visibleItems=historyWindow.items;
   const progressRuns = quietProgressRuns(timelineItems);
+  const latestRunByScene = new Map<string | undefined, string>();
+  for (const item of timelineItems) {
+    if (item.kind === 'run' && !item.autonomousOrigin) latestRunByScene.set(item.sceneId, item.id);
+  }
   const visibleBubbleIds = new Set(visibleItems.flatMap(item => item.kind === 'message' && item.role !== 'system' ? item.sourceMessageIds || [item.id] : []));
   const bubbleNotices = new Map<string, Message[]>();
   const attachedNoticeIds = new Set<string>();
@@ -582,6 +589,7 @@ export function ChatView({
           const viewportProps: ComponentProps<'div'> = {
             id: 'messages', ref: messages, tabIndex: 0, 'aria-label': '对话消息',
             'aria-busy': state.historyLoading || state.historyRefreshing,
+            onClickCapture: reader.onClickCapture,
             onWheel: reader.onWheel, onTouchStart: reader.onTouchStart, onTouchMove: reader.onTouchMove,
             onScroll: () => { reader.onScroll(); setSelection(null); if(!state.historyLoading && messages.current && messages.current.scrollTop<Math.max(800,messages.current.clientHeight*1.5) && !scrollLock.current && historyWindow.hasMore)void historyWindow.more(); },
           };
@@ -606,6 +614,9 @@ export function ChatView({
           </>;
           const renderItem = (item: ChatItem, index: number) => {
             const previous = visibleItems[index - 1];
+            if (item.kind === 'separator' && item.stopMarker) return (
+              <ChatStatusRow key={item.id} title="已停止" tone="stopped" />
+            );
             if (item.kind === "separator") return (
               <div
                 key={item.id}
@@ -620,6 +631,7 @@ export function ChatView({
                 run={item}
                 showDetails={showReasoning}
                 showProgress={progressRuns.has(item.id)}
+                superseded={!item.autonomousOrigin && latestRunByScene.get(item.sceneId) !== item.id}
                 errorAlreadyShown={previous?.kind === "message" && previous.role === "system" &&
                   previous.sceneId === item.sceneId && previous.text.startsWith("⚠")}
                 onOpenSubagents={parent !== window && location.protocol === 'beings:' ? (taskIds, selectedId) => bridge.send({ type: 'beings:subagent-tasks-open', taskIds, selectedId }) : undefined}

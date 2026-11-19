@@ -58,8 +58,9 @@ try {
   }
   assert.equal(await frame.locator('.chat-root').evaluate(n=>getComputedStyle(n).webkitTapHighlightColor),'rgba(0, 0, 0, 0)');
   const send=frame.locator('#send-btn');
-  const bounds=await send.boundingBox();assert.equal(bounds.width,34);assert.equal(bounds.height,34);
-  assert.equal(await send.locator('svg').evaluate(n=>getComputedStyle(n).width),'20px');
+  // This fixture emulates touch input, so controls use the 44px touch target.
+  const bounds=await send.boundingBox();assert.equal(bounds.width,44);assert.equal(bounds.height,44);
+  assert.equal(await send.locator('svg').evaluate(n=>getComputedStyle(n).width),'18px');
   assert.equal(await send.isDisabled(),true);
   await frame.locator('#input').fill('保留草稿，按钮样式检查');
   assert.equal(await send.isEnabled(),true);

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { sceneItems } from "../desktop/renderer/chat/models/scenes";
 import { replyBubbles } from "../desktop/renderer/chat/models/reply-bubbles";
 import { ChatState, type Message } from "../desktop/renderer/chat/models/chat";
 import { createChatRuntime } from "../desktop/renderer/chat/services/runtime";
@@ -250,6 +251,41 @@ describe("stream progress and persisted replies", () => {
     } finally { f.runtime.dispose(); }
   });
 
+  it.each(['before-meta', 'after-meta', 'after-final'])('reconciles combined act_talk history arriving %s', async order => {
+    const f = fixture();
+    const parts = ['两件事分开答：第一条已经记录。', '第二条也已记录，现在继续检查。'];
+    const row = {seq:10, role:'assistant', scene_id:'desktop-test', content:parts.join('\n\n')};
+    try {
+      await f.runtime.start();
+      await f.runtime.send('检查记录');
+      await vi.advanceTimersByTimeAsync(0);
+      for (const text of parts) {
+        f.event('content_block_delta', {delta:{text}});
+        f.event('tool_use', {name:'read', input:{}});
+      }
+      await vi.advanceTimersByTimeAsync(20);
+      const first = f.replies()[0];
+      if (order === 'before-meta') { f.history.push(row); await f.runtime.refreshHistory(); }
+      f.event('meta', {persisted:{from:'act_talk', kind:'self', seq:10, stream_id:'talk-stream'}});
+      await vi.advanceTimersByTimeAsync(20);
+      if (order === 'after-meta') { f.history.push(row); await f.runtime.refreshHistory(); }
+      f.event('content_block_delta', {delta:{text:'检查完成。'}});
+      f.event('meta', {persisted:{from:'final', kind:'self', seq:11, stream_id:'talk-stream'}});
+      f.event('message_stop', {});
+      f.close();
+      await vi.advanceTimersByTimeAsync(20);
+      if (order === 'after-final') f.history.push(row);
+      f.history.push({seq:11, role:'assistant', scene_id:'desktop-test', content:'检查完成。'});
+      await f.runtime.refreshHistory();
+      await f.runtime.refreshHistory();
+      expect(f.replies().map(message => message.text)).toEqual([row.content, '检查完成。']);
+      expect(f.replies()[0]).toBe(first);
+      expect(first).toMatchObject({historySeq:10, persistedFrom:'act_talk', streaming:false});
+      const bubbles = replyBubbles(f.state.items).filter((item): item is Message => item.kind === 'message' && item.role === 'being');
+      expect(bubbles.map(message => message.text).join('\n\n')).toBe(row.content + '\n\n检查完成。');
+    } finally { f.runtime.dispose(); }
+  });
+
   it.each(["act_talk", "partial"])("binds %s and final independently in one stream", async from => {
     const f = fixture();
     try {
@@ -271,6 +307,22 @@ describe("stream progress and persisted replies", () => {
         { historySeq: 10, text: "过程落库", persistedFrom: from, interim: true },
         { historySeq: 11, text: "终稿落库", persistedFrom: "final" },
       ]);
+    } finally { f.runtime.dispose(); }
+  });
+
+  it.each(['initial', 'refresh'])('keeps superseded markers out of the transcript after %s history', async phase => {
+    const f = fixture();
+    const marker = {seq:1, from:'system', type:'marker', content:'[breath superseded]', scene_id:'desktop-test'};
+    try {
+      if (phase === 'initial') f.history.push(marker);
+      await f.runtime.start();
+      if (phase === 'refresh') {
+        f.history.push(marker);
+        await f.runtime.refreshHistory();
+      }
+      const stored = f.state.items.find(item => item.kind === 'separator' && item.handoffMarker);
+      expect(stored).toBeDefined();
+      expect(sceneItems(f.state.items, 'all', f.state.currentScene)).not.toContain(stored);
     } finally { f.runtime.dispose(); }
   });
 

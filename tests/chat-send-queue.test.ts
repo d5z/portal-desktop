@@ -1,6 +1,42 @@
 import { expect, it, vi } from 'vitest';
 import { createSceneRuntime } from '../desktop/renderer/chat/services/scene-runtime';
 import { SceneQueueStore } from '../desktop/renderer/chat/services/scene-queue';
+import { AttachmentMessages } from '../desktop/renderer/chat/services/attachment-messages';
+
+it.each([false, true])('removes a restored uncertain send locally and resumes the queue (attachment=%s)', async attachment => {
+  vi.useFakeTimers();
+  const row:any={id:'uncertain',endpoint:'fixture',scene:{sceneId:'a'},text:'上次发送',files:[],createdAt:Date.now(),phase:'sending',
+    ...(attachment ? {attachment:{messageId:'msg_'+'a'.repeat(64),delivery:'unknown'}} : {})};
+  const read=vi.spyOn(SceneQueueStore.prototype,'read').mockResolvedValue([row]);
+  const write=vi.spyOn(SceneQueueStore.prototype,'write').mockResolvedValue();
+  const get=vi.spyOn(AttachmentMessages.prototype,'get').mockRejectedValue(new Error('offline'));
+  const update=vi.spyOn(AttachmentMessages.prototype,'update');
+  const sent=vi.fn(async()=>{});
+  const state:any={items:[],currentScene:{sceneId:'a'},draft:'',files:[],sceneTasks:[],changed:vi.fn()};
+  const runtime=createSceneRuntime(state,{},(local:any)=>({
+    isBusy:()=>false,sceneActivity:()=>null,syncConnection:()=>{},dispose:()=>{},start:async()=>{},
+    waitForPendingFiles:async()=>{},request:async()=>new Response(null,{status:204}),send:sent,
+    stageQueuedSend(text:string,files:any[]=[],sendOptions:any={}) {
+      const message:any={kind:'message',id:text,role:'user',text,queued:true,...local.currentScene};
+      local.items.push(message);return {text,files,sendOptions,message};
+    },
+  }));
+  try {
+    await runtime.start();
+    const uncertain=state.items[0];
+    await runtime.send('下一条',[]);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(sent).not.toHaveBeenCalled();
+    expect(state.queued).toBe(2);
+    await uncertain.cancelQueued();
+    await vi.advanceTimersByTimeAsync(0);
+    expect(write).toHaveBeenCalledWith('uncertain');
+    expect(update).not.toHaveBeenCalled();
+    expect(sent).toHaveBeenCalledExactlyOnceWith('下一条',[],expect.any(Object));
+    expect(state.queued).toBe(0);
+    expect(state.items).not.toContain(uncertain);
+  } finally {runtime.dispose();read.mockRestore();write.mockRestore();get.mockRestore();update.mockRestore();vi.useRealTimers();}
+});
 
 it('explains a restored failed send and clears its status when the row is removed', async () => {
   const row:any={id:'failed',endpoint:'fixture',scene:{sceneId:'a'},text:'附件任务',files:[],createdAt:1,phase:'failed',error:'附件解析失败：report.pdf'};

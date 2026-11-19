@@ -50,6 +50,9 @@ export function SubagentTaskPanel({ tasks, details, error, onRetry, onClose, ini
   const [selectedId, setSelectedId] = useState<string | undefined>(initialSelectedId);
   const [now, setNow] = useState(Date.now);
   const active = tasks.filter(task => activeStatuses.has(task.status)).length;
+  const failed = tasks.filter(task => ['failed', 'cancelled', 'interrupted', 'budget_exhausted', 'timeout'].includes(task.status)).length;
+  const completed = tasks.filter(task => task.status === 'done').length;
+  const overviewStatus = active ? `${active} 个执行中` : failed ? `${failed} 个未完成` : tasks.length ? `${completed} 个已完成` : '等待状态同步';
   useEffect(() => {
     if (!active) return;
     const timer = setInterval(() => setNow(Date.now()), 1000);
@@ -90,7 +93,10 @@ export function SubagentTaskPanel({ tasks, details, error, onRetry, onClose, ini
     <div className={styles.body} key={selectedId || 'list'}>
       {error && <p role="alert">{error} <button onClick={onRetry}>重试</button></p>}
       {!selected ? <>
-        <p className={styles.count} role="status">{tasks.length} 个子任务{active ? ` · ${active} 个执行中` : ''}</p>
+        <div className={styles.overview} role="status">
+          <strong>{tasks.length} 个子任务</strong>
+          <span className={failed ? styles.overviewError : undefined}>{overviewStatus}</span>
+        </div>
         {!tasks.length && <p>暂无本轮任务记录</p>}
         <ul className={styles.list}>{ordered.map(task => <li key={task.id}>
           <button type="button" className={styles.task} data-status={task.status} onClick={() => setSelectedId(task.id)} aria-label={`查看子任务：${task.brief || task.id}`}>

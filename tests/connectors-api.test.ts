@@ -16,7 +16,7 @@ describe('Home Connector transport', () => {
 
   it('resolves service-relative Connector icons against the Home origin', async () => {
     const client = transport();
-    client.request.mockResolvedValueOnce({ enabled: true, items: [{ icon_url: 'assets/connector-icons/github.svg', runtimes: ['local'], local_install_url: 'portal-kit://install?market=grove&release=release' }], next_after: null });
+    client.request.mockResolvedValueOnce(Response.json({ enabled: true, items: [{ icon_url: 'assets/connector-icons/github.svg', runtimes: ['local'], local_install_url: 'portal-kit://install?market=grove&release=release' }], next_after: null }));
     client.request.mockResolvedValueOnce({ name: 'GitHub', icon_url: 'assets/connector-icons/github.svg', accounts: [], methods: [] });
     const api = new HomeConnectors(client as never, vi.fn());
     await expect(api.catalog()).resolves.toMatchObject({ items: [{ icon_url: 'https://home.beings.town/assets/connector-icons/github.svg', runtimes: ['local'], local_install_url: 'portal-kit://install?market=grove&release=release' }] });

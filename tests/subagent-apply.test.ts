@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, expect, it, vi } from 'vitest';
@@ -26,10 +26,11 @@ afterEach(async () => {
   for (const cleanup of cleanups.splice(0)) await cleanup();
 });
 
-async function fixture(contents?: string) {
+async function fixture(contents?: string, installed = false) {
   probe.mockReset().mockResolvedValue(undefined);
   const directory = await mkdtemp(path.join(os.tmpdir(), 'subagent-apply-'));
-  const file = path.join(directory, 'desktop-portal.toml');
+  const file = installed ? path.join(directory, 'portal-service', 'previous', 'portal.toml') : path.join(directory, 'desktop-portal.toml');
+  await mkdir(path.dirname(file), { recursive: true });
   if (contents !== undefined) await writeFile(file, contents);
   const errorLog = new ClientErrorLog(directory);
   cleanups.push(async () => { await errorLog.flush(); await rm(directory, { recursive: true, force: true }); });
@@ -151,22 +152,30 @@ it('enables the manually selected model at startup without loading the default',
   expect(probe).not.toHaveBeenCalled();
 });
 
-it('initializes the default in an installed runtime config during packaged startup', async () => {
-  const { controller, store, file, start, background } = await fixture('[subagent]\nenabled=false\n');
+it.each([true, false])('initializes and synchronizes the installed runtime config after upgrade (generated=%s)', async generatedConfig => {
+  const { controller, store, file, start, background } = await fixture('[subagent]\nenabled=false\n', true);
   vi.spyOn(app, 'isPackaged', 'get').mockReturnValue(true);
   vi.spyOn(runtime, 'loadRuntimeBundle').mockResolvedValue({ binary: '/unused/portal', bundle: {
     schema: 1, id: 'fixture', clientVersion: '1.0.0', portalVersion: '1.0.0', sha256: '', platform: process.platform, arch: process.arch,
   } });
   vi.spyOn(runtime.RuntimeUpdater.prototype, 'sync').mockResolvedValue({ phase: 'current', message: '' });
-  vi.spyOn(background, 'installedService', 'get').mockReturnValue({ root: path.dirname(file), label: 'fixture', file: '', existing: false, configPath: file, generatedConfig: true });
+  vi.spyOn(background, 'installedService', 'get').mockReturnValue({ root: path.join(background.runtimeDirectory, 'current'), label: background.label, file: '', existing: false, configPath: file, generatedConfig });
   await controller.restoreStartup();
   expect(parse(await readFile(file, 'utf8')).subagent).toMatchObject({ enabled: true, model_source: 'loom', model: { model: 'glm5.3flash' } });
   expect(store.settings.portalConfigPath).toBe(file);
   expect(start).toHaveBeenCalledWith(expect.objectContaining({ portalConfigPath: file }), store.connection);
+  await controller.save({ ...store.settings, connectionLink: 'https://example.org/bob/?token=bob-token' });
+  expect(parse(await readFile(file, 'utf8')).subagent).toMatchObject({
+    model_source: 'loom', model: { base_url: 'https://101.132.86.87/llm/bob/v1', api_key: 'bob-token' },
+  });
+  probe.mockRejectedValueOnce(new Error('HTTP 500'));
+  await controller.save({ ...store.settings, connectionLink: 'https://example.org/carol/?token=carol-token' });
+  expect(parse(await readFile(file, 'utf8')).subagent).toMatchObject({ enabled: false });
+  expect(store.settings.portalConfigPath).toBe(file);
 });
 
 it.each(['[subagent]\nenabled=false\n', original.replace('enabled=true', 'enabled=false')])('restarts an existing background runtime only when startup changes its subagent configuration (%s)', async contents => {
-  const { controller, store, file, background } = await fixture(contents);
+  const { controller, store, file, background } = await fixture(contents, true);
   await store.save({ ...store.settings, backgroundEnabled: true });
   vi.spyOn(app, 'isPackaged', 'get').mockReturnValue(true);
   vi.spyOn(runtime, 'loadRuntimeBundle').mockResolvedValue({ binary: '/unused/portal', bundle: {
@@ -174,7 +183,7 @@ it.each(['[subagent]\nenabled=false\n', original.replace('enabled=true', 'enable
   } });
   vi.spyOn(runtime.RuntimeUpdater.prototype, 'sync').mockResolvedValue({ phase: 'current', message: '' });
   vi.spyOn(runtime.RuntimeUpdater.prototype, 'waitReady').mockResolvedValue(undefined);
-  vi.spyOn(background, 'installedService', 'get').mockReturnValue({ root: path.dirname(file), label: 'fixture', file: '', existing: false, configPath: file, generatedConfig: true });
+  vi.spyOn(background, 'installedService', 'get').mockReturnValue({ root: path.dirname(file), label: background.label, file: '', existing: false, configPath: file, generatedConfig: true });
   background.state = { ...background.state, enabled: true, running: true };
   let runtimeEnabled = false;
   const disable = vi.spyOn(background, 'disable').mockImplementation(async () => {
@@ -201,5 +210,20 @@ it('persists the default config path even when startup finds an unchanged model'
   probe.mockClear();
   await controller.start();
   expect(store.settings.portalConfigPath).toBe(file);
+  expect(probe).not.toHaveBeenCalled();
+});
+
+it('does not initialize an imported custom config merely because the service uses it', async () => {
+  const { controller, store, file, background } = await fixture();
+  const imported = path.join(path.dirname(file), 'imported-portal.toml');
+  const contents = '[subagent]\nenabled=false\n';
+  await writeFile(imported, contents);
+  await store.save({ ...store.settings, portalConfigPath: imported });
+  vi.spyOn(background, 'installedService', 'get').mockReturnValue({
+    root: path.join(background.runtimeDirectory, 'current'), label: background.label,
+    file: '', existing: false, configPath: imported, generatedConfig: false,
+  });
+  await controller.start();
+  expect(await readFile(imported, 'utf8')).toBe(contents);
   expect(probe).not.toHaveBeenCalled();
 });

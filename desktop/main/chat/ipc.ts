@@ -33,8 +33,14 @@ export function registerChatIpc(options: {
       } : {}),
     };
   };
+  let taskPublishRevision = 0;
   const publishTasks = () => {
+    const revision = ++taskPublishRevision;
     void taskSnapshot().then(snapshot => {
+      // Ledger and Portal state notifications can overlap. Only the newest
+      // snapshot may reach the renderer, otherwise an older read can restore
+      // a stale running/error badge after a newer done state was published.
+      if (revision !== taskPublishRevision) return;
       const window = getWindow();
       if (snapshot.endpoint === store.connection?.endpoint && window && !window.isDestroyed()) window.webContents.send('beings:scene-tasks', snapshot);
     });

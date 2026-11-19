@@ -1,10 +1,11 @@
 import { createPublicKey, verify } from 'node:crypto';
-export const HOME_ORIGIN = 'https://home.beings.town';
+import { HOME_ORIGIN } from '../../shared/home';
+export { HOME_ORIGIN } from '../../shared/home';
 export const HOME_CLIENT = 'being-desktop';
 export const HOME_CALLBACK = 'http://127.0.0.1:47831/oauth/callback';
 export const HOME_REQUIRED_SCOPE = 'openid offline_access being:read being:write account:write files:read computer:read computer:write computer:connect';
 export class HomeError extends Error {
-  constructor(public status: number, public code: string) { super(homeErrorMessage(status, code)); }
+  constructor(public status: number, public code: string, public response?: Response) { super(homeErrorMessage(status, code)); }
 }
 export function homeErrorMessage(status: number, code = '') {
   if (code === 'kit_connector_management_disabled') return '当前环境未开放 Connector Kit 快捷管理。';

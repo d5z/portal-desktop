@@ -50,7 +50,7 @@
   --chat-composer-primary-surface: var(--chat-ink);
   --chat-composer-primary-foreground: var(--chat-reply-surface);
 
-  --chat-turn-gap: 40px;
+  --chat-turn-gap: var(--space-xl);
   --chat-message-group-gap: var(--space-lg);
   --chat-message-sequence-gap: var(--space-sm);
   --chat-run-copy-gap: var(--space-sm);
