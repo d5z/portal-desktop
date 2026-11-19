@@ -26,7 +26,7 @@ describe("Kit installation status", () => {
     const installKit = vi.fn().mockRejectedValueOnce(new Error('安装失败')).mockResolvedValue({ name: 'alpha', message: '已安装', tools: 0 });
     const { model } = fixture({
       prepareKit: vi.fn().mockResolvedValue(plan), installKit,
-      home: { connectors: { reportLocalKitHistory } } as unknown as DesktopAPI['home'],
+      home: { state: vi.fn(async () => ({ authenticated: true, sessionVersion: 1 })), connectors: { reportLocalKitHistory } } as unknown as DesktopAPI['home'],
     });
     await model.load();
     await model.refreshInstalledKits();
@@ -35,7 +35,8 @@ describe("Kit installation status", () => {
     await model.install();
     expect(reportLocalKitHistory).not.toHaveBeenCalled();
     await model.install();
-    expect(reportLocalKitHistory).toHaveBeenCalledExactlyOnceWith({ source_id: 'town-source-id', version: plan.version });
+    expect(reportLocalKitHistory).toHaveBeenCalledExactlyOnceWith({ source_id: 'town-source-id', version: plan.version }, 1);
+    expect(model.localKitHistoryError).toContain('同步失败');
     expect(model.installError).toBe('');
     expect(model.plan).toBeUndefined();
     await model.load();
