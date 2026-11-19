@@ -109,12 +109,14 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
 
   const restorePending = async () => {
     if (!api) return;
+    const request = navigation.current;
     const ids = Object.keys(localStorage).filter(key => key.startsWith('portal.home.connector.intent.'));
     await Promise.all(ids.map(async key => {
       const id = localStorage.getItem(key);
       if (!id || pending.current.has(id)) return;
       try {
         const state = await api.state(id);
+        if (request !== navigation.current) return;
         if (pendingStatuses.includes(state.status)) {
           pending.current.set(id, { state, polls: 0 });
           localStorage.setItem(pendingKey(id), id);
