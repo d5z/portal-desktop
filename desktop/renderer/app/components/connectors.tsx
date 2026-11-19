@@ -255,8 +255,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
     if (!api) return;
     const request = ++catalogRequest.current;
     setCatalogLoading(true); setCatalogError('');
-    if (syncHistory) await town.syncLocalKitHistory().catch(() => {});
-    if (request !== catalogRequest.current) return;
+    const history = syncHistory ? town.syncLocalKitHistory().catch(() => {}) : undefined;
     const localRequest = ++localKitsRequest.current;
     void model.api.localKits().then(result => {
       if (localRequest === localKitsRequest.current) { setLocalKits(result.kits.map(kit => ({ ...kit, sourceId: town.localKitSources.get(kit.name) || kit.sourceId }))); setLocalKitsReady(true); }
@@ -300,6 +299,8 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
       if (refreshedSelected) page.current = refreshedSelected;
       setCatalogEnabled(kits.enabled); setCatalog(kits.items); setInstallations(installed);
       setSelected(current => current && kits.items.find(item => item.release_id === current.release_id) || current);
+      // History synchronization must not hold the catalogue or cloud flows hostage.
+      if (history) void history.then(() => { if (request === catalogRequest.current) void load(search, false); });
       return true;
     } catch (e) { if (request === catalogRequest.current) setCatalogError(publicErrorMessage(e, '无法读取应用目录。')); return false; }
     finally { if (request === catalogRequest.current) setCatalogLoading(false); }
