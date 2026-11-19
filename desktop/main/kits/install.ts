@@ -170,7 +170,7 @@ export class KitInstaller {
         if (!entries.length || offset === 99984) throw new Error('Town 目录分页未完成，历史暂未同步。');
       }
     }
-    const candidates: { name: string; source_id: string; version: string }[] = [];
+    const candidates: { name: string; source_id: string; version: string; sha256: string }[] = [];
     for (const kit of installed) {
       const ids = kit.sourceId ? [kit.sourceId] : catalog.filter(entry => entry.name === kit.name).map(entry => entry.id);
       const matches: string[] = [];
@@ -180,7 +180,7 @@ export class KitInstaller {
         if (detail.data.ambiguous || detail.data.name !== kit.name || groveEntryKind(detail.data) !== 'kit') continue;
         if (kit.sourceId || typeof detail.data.bundle_hash === 'string' && detail.data.bundle_hash.toLowerCase() === kit.installationHash) matches.push(id);
       }
-      if (matches.length === 1) candidates.push({ name: kit.name, source_id: matches[0], version: kit.version });
+      if (matches.length === 1) candidates.push({ name: kit.name, source_id: matches[0], version: kit.version, sha256: kit.installationHash! });
     }
     return candidates;
   }

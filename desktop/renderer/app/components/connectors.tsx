@@ -258,7 +258,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
     const history = syncHistory ? town.syncLocalKitHistory().catch(() => {}) : undefined;
     const localRequest = ++localKitsRequest.current;
     void model.api.localKits().then(result => {
-      if (localRequest === localKitsRequest.current) { setLocalKits(result.kits.map(kit => ({ ...kit, sourceId: town.localKitSources.get(kit.name) || kit.sourceId }))); setLocalKitsReady(true); }
+      if (localRequest === localKitsRequest.current) { setLocalKits(result.kits.map(kit => ({ ...kit, sourceId: town.localKitSources.get(`${kit.name}:${kit.installationHash}`) || kit.sourceId }))); setLocalKitsReady(true); }
     }).catch(() => {
       if (localRequest === localKitsRequest.current) { setLocalKits([]); setLocalKitsReady(false); }
     });

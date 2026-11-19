@@ -294,7 +294,7 @@ export class TownModel extends Store {
         let failed = false;
         for (const candidate of candidates) {
           if (this.historySession !== session) return;
-          this.localKitSources.set(candidate.name, candidate.source_id);
+          this.localKitSources.set(`${candidate.name}:${candidate.sha256}`, candidate.source_id);
           const key = `${candidate.source_id}:${candidate.version}`;
           if (this.historySynced.has(key)) continue;
           const current = await this.api.home!.state();
@@ -1670,7 +1670,7 @@ export class TownModel extends Store {
       }
       if (revision !== this.lifecycleRevision) return;
       this.localKitHistoryError = historyFailed ? '本机已安装，使用历史同步失败，请刷新重试。' : '';
-      this.localKitSources.set(result.name, plan.sourceId);
+      this.localKitSources.set(`${result.name}:${plan.sha256}`, plan.sourceId);
       this.plan = undefined;
       this.environment = {};
       this.localKitsRevision++;
