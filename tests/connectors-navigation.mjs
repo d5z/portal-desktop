@@ -116,7 +116,7 @@ try {
         let account = accounts.find(item => item.id === state.connection_id);
         // Model Home's identity consolidation after a fresh OAuth callback.
         const existing = accounts.find(item => item.id === f.identityAccount && !item.removed);
-        if (existing) { account.removed = true; account = existing; state.connection_id = existing.id; }
+        if (existing && existing !== account) { account.removed = true; account = existing; state.connection_id = existing.id; }
         Object.assign(account, { status: 'active', usable: true, grant_revoked: false, enable_id: null });
         if (account.display_name === 'default') account.display_name = 'Second account';
         if (!account.installation_ids.length) {
@@ -145,13 +145,13 @@ try {
         if (installation.revision !== revision) return { accepted: false, message: '应用状态已变化，本次操作未提交。' };
         f.receipts[requestId] = input;
         if (action === 'enable') { installation.desired_state = 'enabled'; installation.status = 'ready'; installation.revision++; }
-        if (action === 'uninstall') { installation.desired_state = 'removed'; installation.revision++; }
+        if (action === 'uninstall') { installation.desired_state = 'removed'; installation.status = 'removed'; installation.revision++; }
         if (f.loseResponse === id) { f.loseResponse = null; throw new Error('模拟响应丢失，请重试。'); }
         return { accepted: true };
       },
       openAuthorization: async url => { if (f.failOpen) throw new Error('无法打开账号授权，请重试。'); f.opened.push(url); },
     };
-    const homeState = () => ({ authenticated: f.authenticated, authenticating: f.authenticating, error: f.loginError });
+    const homeState = () => ({ sessionVersion: 0, authenticated: f.authenticated, authenticating: f.authenticating, error: f.loginError });
     f.publishHome = () => f.listeners.forEach(listener => listener(homeState()));
     window.fixtureApp.api.home = { state: async () => homeState(), action: async action => {
       if (action === 'cancel-login') { f.authenticating = false; f.loginError = '登录已取消。'; f.publishHome(); f.releaseLogin(homeState()); return homeState(); }
@@ -216,8 +216,8 @@ try {
   const firstIntent = await page.evaluate(() => Object.keys(connectorFixture.enables).at(-1));
   await button('重新连接').click();
   await page.waitForFunction(() => connectorFixture.opened.length === 2);
-  assert.equal(await page.evaluate(id => connectorFixture.enables[id].status, firstIntent), 'cancelled', 'Reconnect retires the old attempt before fresh authorization');
-  assert.equal(await settings.locator('.connector-account-row').count(), 1, 'Old default is removed');
+  assert.equal(await page.evaluate(id => connectorFixture.enables[id].status, firstIntent), 'awaiting_account', 'Reconnect resumes the original incomplete authorization');
+  assert.equal(await settings.locator('.connector-account-row').count(), 1, 'Resuming does not create another default');
   await settings.screenshot({ path: 'output/playwright/connectors-reconnect.png' });
   await page.setViewportSize({ width: 720, height: 720 });
   await settings.screenshot({ path: 'output/playwright/connectors-reconnect-narrow.png' });
@@ -244,7 +244,7 @@ try {
   assert(await settings.getByRole('switch', { name: 'read_repo', exact: true }).isDisabled(), 'Expired accounts preserve preferences but cannot enable tools');
   await button('重新连接').click();
   await button('baiye0 已连接').waitFor();
-  assert.deepEqual(await page.evaluate(() => connectorFixture.previews.at(-1).input), { method: 'oauth2' });
+  assert.deepEqual(await page.evaluate(() => connectorFixture.previews.at(-1).input), { connection_id: 'github-account', reauthorize: true });
   assert.equal(await page.evaluate(() => connectorFixture.lifecycleCalls.length), 0, 'Reauthorization does not uninstall an installed account');
   assert.equal(await settings.locator('.connector-account-row').count(), 1, 'Home identity consolidation does not duplicate an account');
   await page.evaluate(() => { connectorFixture.identityAccount = null; });
@@ -297,8 +297,8 @@ try {
   await remove('断开');
   await button('连接').waitFor();
   const calls = await page.evaluate(() => connectorFixture.lifecycleCalls);
-  assert.deepEqual(calls.map(call => call.id), ['github-account-install', 'third-account-install', 'third-account-install', 'third-account-install']);
-  assert.deepEqual(calls[2], calls[3], 'Uncertain response retains the original revision and request id');
+  assert.deepEqual(calls.map(call => call.id), ['github-account-install', 'third-account-install', 'third-account-install']);
+  assert.equal(calls.length, 3, 'A lost response is reconciled from observed removal without replaying the write');
   assert.notEqual(calls[1].requestId, calls[2].requestId, 'Rejected operation can use a new request');
   assert.equal(await settings.locator('.connector-account-row').count(), 0, 'Removed history is not shown');
   // Removing only a default works with no installation and cancels its intent.
