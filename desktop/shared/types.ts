@@ -156,6 +156,7 @@ export interface DesktopAPI {
   pairTown(input: { beingId: string; code: string }): Promise<void>;
   saveTownToken(token: string): Promise<void>;
   localKits(): Promise<KitLibrary>;
+  localKitHistoryCandidates?(): Promise<{ name: string; source_id: string; version: string }[]>;
   deleteKit(name: string): Promise<{ deleted: boolean; name: string }>;
   importKit(): Promise<{ installed: boolean; name?: string }>;
   prepareKit(id: string): Promise<KitInstallPlan>;
@@ -206,7 +207,7 @@ export interface TownLiveState {
 }
 export type TownPost = { kind: 'bonfire'; content: string; replyTo?: number } | { kind: 'dm'; recipient: string; content: string; replyTo?: string } | { kind: 'fireside'; firesideId: string; content: string; replyTo?: number };
 export interface KitTool { name: string; description: string; params?: unknown }
-export interface LocalKit { name: string; version: string; description: string; directory: string; command: string[]; tools: KitTool[]; compatible: boolean; eager: boolean; problem?: string }
+export interface LocalKit { sourceId?: string; installationHash?: string; name: string; version: string; description: string; directory: string; command: string[]; tools: KitTool[]; compatible: boolean; eager: boolean; problem?: string }
 export interface KitLibrary { directory: string; enabled: boolean; kits: LocalKit[]; configPath?: string }
 export interface LocalApp { id: string; name: string; path: string; exists: boolean }
 export interface KitInstallPlan { ticket: string; name: string; version: string; description: string; tools: number; command: string[]; environment: { name: string; description: string; required: boolean }[]; dependency: 'none' | 'npm' | 'python'; sha256: string; notes: string }

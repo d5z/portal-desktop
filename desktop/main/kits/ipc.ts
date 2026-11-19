@@ -17,6 +17,7 @@ export interface KitsIpcOptions {
 
 export function registerKitsIpc(options: KitsIpcOptions) {
   const { handle, exclusive, window, store, kitInstaller } = options;
+  handle('beings:kit-history-candidates', () => kitInstaller.historyCandidates(store.settings));
   handle('beings:kits', () => localKits(store.settings));
   handle('beings:kit-delete', (name: string) => exclusive(async () => {
     const library = await localKits(store.settings);

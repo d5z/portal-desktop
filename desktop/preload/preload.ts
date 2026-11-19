@@ -200,6 +200,7 @@ const api: DesktopAPI = {
   autoPairTown: input => ipcRenderer.invoke('beings:town-auto-pair', input),
   cancelTownPair: requestId => ipcRenderer.invoke('beings:town-pair-cancel', requestId),
   saveTownToken: token => ipcRenderer.invoke('beings:town-token', token),
+  localKitHistoryCandidates: () => ipcRenderer.invoke('beings:kit-history-candidates'),
   localKits: () => ipcRenderer.invoke('beings:kits'),
   deleteKit: name => ipcRenderer.invoke('beings:kit-delete', name),
   importKit: () => ipcRenderer.invoke('beings:kit-import'),

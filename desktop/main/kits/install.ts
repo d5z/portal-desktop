@@ -9,7 +9,7 @@ import { pipeline } from 'node:stream/promises';
 import { Readable, Transform } from 'node:stream';
 import { createGunzip } from 'node:zlib';
 import { TOWN_ORIGIN, TownClient } from '../town/client';
-import { readKit, kitLocation } from './catalog';
+import { readKit, kitLocation, localKits } from './catalog';
 import { redact } from '../chat/connection';
 import { groveEntryKind } from '../../shared/plugins';
 import type { Settings, KitInstallPlan, KitInstallInput } from '../../shared/types';
@@ -101,7 +101,7 @@ export async function runInstallCommand(program: string, args: string[], cwd: st
     child.once('exit', code => { clearTimeout(timer); child.stdout?.destroy(); child.stderr?.destroy(); const secrets = Object.entries(env).filter(([key]) => /KEY|TOKEN|SECRET|PASSWORD/i.test(key)).map(([, value]) => value || ''); code === 0 ? resolve() : reject(new Error(timedOut ? '安装依赖超时，请重试。' : `安装依赖失败：${redact(output, secrets)}`)); });
   });
 }
-interface Prepared { plan: KitInstallPlan; root: string; directory: string; manifest: any; settings: Settings; created: number }
+interface Prepared { sourceId: string; plan: KitInstallPlan; root: string; directory: string; manifest: any; settings: Settings; created: number }
 export class KitInstaller {
   private pending = new Map<string, Prepared>();
   constructor(private fetcher: typeof fetch = fetch) {}
@@ -147,9 +147,42 @@ export class KitInstaller {
       const plan: KitInstallPlan = { ticket: randomUUID(), name: kit.name, version: kit.version, description: kit.description, tools: kit.tools.length,
         command: kit.command, environment, dependency, sha256: createHash('sha256').update(data).digest('hex'),
         notes: manifest.provision?.install || manifest.provision?.post_install ? '作者还声明了自定义安装步骤；本客户端只自动处理 package.json / requirements.txt，未执行自定义命令。' : '' };
-      this.pending.set(plan.ticket, { plan, root, directory: source, manifest, settings: { ...settings }, created: Date.now() });
+      this.pending.set(plan.ticket, { sourceId: id, plan, root, directory: source, manifest, settings: { ...settings }, created: Date.now() });
       return plan;
     } catch (error) { await rm(root, { recursive: true, force: true }); throw error; }
+  }
+  /** Resolve receipts against the fixed Town catalogue without downloading or executing Kits. */
+  async historyCandidates(settings: Settings) {
+    const library = await localKits(settings);
+    const installed = library.kits.filter(kit => !kit.problem && kit.installationHash);
+    const town = new TownClient(() => '', this.fetcher);
+    const catalog: { id: string; name: string }[] = [];
+    if (installed.some(kit => !kit.sourceId)) {
+      for (let offset = 0; offset <= 100000; offset += 24) {
+        const result = await town.query({ kind: 'grove', offset });
+        if (!result.ok) throw new Error(result.message);
+        const entries = result.data.kits;
+        if (!Array.isArray(entries)) throw new Error('Town 目录响应无效，历史暂未同步。');
+        for (const entry of entries) if (entry && typeof entry.id === 'string' && typeof entry.name === 'string') catalog.push({ id: entry.id, name: entry.name });
+        const total = Number(result.data.total ?? result.data.count);
+        const more = typeof result.data.has_more === 'boolean' ? result.data.has_more : entries.length >= 24 && (!Number.isSafeInteger(total) || offset + entries.length < total);
+        if (!more) break;
+        if (!entries.length || offset === 99984) throw new Error('Town 目录分页未完成，历史暂未同步。');
+      }
+    }
+    const candidates: { name: string; source_id: string; version: string }[] = [];
+    for (const kit of installed) {
+      const ids = kit.sourceId ? [kit.sourceId] : catalog.filter(entry => entry.name === kit.name).map(entry => entry.id);
+      const matches: string[] = [];
+      for (const id of new Set(ids)) {
+        const detail = await town.query({ kind: 'kit', id });
+        if (!detail.ok) continue;
+        if (detail.data.ambiguous || detail.data.name !== kit.name || groveEntryKind(detail.data) !== 'kit') continue;
+        if (kit.sourceId || typeof detail.data.bundle_hash === 'string' && detail.data.bundle_hash.toLowerCase() === kit.installationHash) matches.push(id);
+      }
+      if (matches.length === 1) candidates.push({ name: kit.name, source_id: matches[0], version: kit.version });
+    }
+    return candidates;
   }
   async discard(ticket: string) { const item = this.pending.get(ticket); if (item) { this.pending.delete(ticket); await rm(item.root, { recursive: true, force: true }); } }
   async dispose() { for (const ticket of this.pending.keys()) await this.discard(ticket); }
@@ -200,7 +233,7 @@ export class KitInstaller {
     await rm(path.join(item.directory, '.env'), { force: true });
     if (Object.values(supplied).some(Boolean)) await writeFile(path.join(item.directory, '.env'), dotenv(supplied), { mode: 0o600 });
     await writeFile(path.join(item.directory, 'manifest.json'), JSON.stringify(finalManifest, null, 2) + '\n');
-    await writeFile(path.join(item.directory, '.beings-install.json'), JSON.stringify({ sha256: item.plan.sha256, installedAt: new Date().toISOString() }), { mode: 0o600 });
+    await writeFile(path.join(item.directory, '.beings-install.json'), JSON.stringify({ sourceId: item.sourceId, sha256: item.plan.sha256, installedAt: new Date().toISOString() }), { mode: 0o600 });
     await mkdir(location.directory, { recursive: true });
     await rename(item.directory, target); await this.discard(input.ticket);
     return { name: item.plan.name, tools: item.plan.tools, message: '已安装。Portal 将自动刷新清单，并在首次调用时启动 Kit。' };

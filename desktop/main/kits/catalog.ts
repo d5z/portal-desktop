@@ -31,7 +31,16 @@ export async function readKit(directory: string, platform: string = process.plat
   const normalizePlatform = (value: string) => value.toLowerCase().replace(/^macos$/, 'darwin').replace(/^win32$/, 'windows');
   const current = normalizePlatform(platform);
   const platforms = manifest.platform?.map(normalizePlatform);
-  return { name: manifest.name, version: manifest.version, description: String(manifest.description || ''),
+  let receipt: { sourceId?: string; sha256?: string } = {};
+  try {
+    const value = JSON.parse(await readFile(path.join(directory, '.beings-install.json'), 'utf8'));
+    if (typeof value.sha256 === 'string' && /^[a-f0-9]{64}$/i.test(value.sha256)) {
+      receipt = { sha256: value.sha256.toLowerCase(),
+        ...(typeof value.sourceId === 'string' && /^[a-zA-Z0-9_-]{1,160}$/.test(value.sourceId) ? { sourceId: value.sourceId } : {}),
+      };
+    }
+  } catch { /* Imported or older Kits may have no usable installation receipt. */ }
+  return { sourceId: receipt.sourceId, installationHash: receipt.sha256, name: manifest.name, version: manifest.version, description: String(manifest.description || ''),
     directory, command, tools: manifest.tools.map((v: any) => ({ name: v.name, description: v.description, params: v.params })),
     compatible: !platforms || platforms.includes(current), eager: manifest.eager === true };
 }
