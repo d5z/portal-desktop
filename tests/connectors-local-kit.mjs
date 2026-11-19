@@ -1,4 +1,4 @@
-// A legacy catalog can offer the same Kit for both local and cloud runtimes.
+// Local installation requires an explicit Town source, rather than a Home release ID.
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { chromium } from 'playwright';
@@ -23,7 +23,7 @@ try {
   await page.evaluate(() => {
     window.localKitFixture = { detailReads: 0, prepared: [] };
     fixtureApp.api.home = { state: async () => ({ authenticated: true }), subscribe: () => () => {}, bounds: async () => {}, connectors: {
-      catalog: async () => ({ enabled: true, items: [{ release_id: 'mixed', kit_id: 'mixed-kit', name: 'Mixed Runtime', version: '1.0', runtimes: ['local', 'cloud'], availability: 'listed', installation_ids: [] }], next_after: null }),
+      catalog: async () => ({ enabled: true, items: [{ release_id: 'mixed', kit_id: 'mixed-kit', name: 'Mixed Runtime', version: '1.0', runtimes: ['local'], local_install: { kind: 'town', source_id: 'town-source' }, availability: 'listed', installation_ids: [] }], next_after: null }),
       installations: async () => ({ items: [], next_after: null }),
       detail: async () => { localKitFixture.detailReads++; return { name: 'Mixed Runtime', accounts: [], skills: [], methods: [{ method: 'oauth2', fields: [] }] }; },
     } };
@@ -38,16 +38,15 @@ try {
   await settings.getByRole('tab', { name: '应用', exact: true }).click();
   await settings.getByRole('tab', { name: '本地', exact: true }).click();
   await settings.getByRole('button', { name: '查看 Mixed Runtime 详情', exact: true }).click();
-  assert(await settings.getByRole('button', { name: '连接', exact: true }).isVisible(), 'Dual-runtime kits keep their cloud connector details');
-  assert((await page.evaluate(() => localKitFixture.detailReads)) > 0);
-  await settings.getByRole('button', { name: '安装', exact: true }).click();
+  assert.equal(await page.evaluate(() => localKitFixture.detailReads), 0, 'Town details do not request cloud connector APIs');
+  await settings.getByRole('button', { name: '安装到本机', exact: true }).click();
   await page.getByRole('dialog', { name: '安装 Mixed Runtime', exact: true }).waitFor();
-  assert.deepEqual(await page.evaluate(() => localKitFixture.prepared), ['mixed-kit']);
+  assert.deepEqual(await page.evaluate(() => localKitFixture.prepared), ['town-source']);
   await page.getByRole('button', { name: '取消 Kit 安装', exact: true }).click();
   await settings.getByRole('button', { name: '返回应用', exact: true }).click();
   await settings.getByRole('tab', { name: '云端', exact: true }).click();
-  assert.equal(await settings.getByRole('button', { name: '查看 Mixed Runtime 详情', exact: true }).count(), 1);
-  console.log('PASS: legacy dual-runtime Kit appears in both filters, preserves cloud connector details and prepares local installation.');
+  assert.equal(await settings.getByRole('button', { name: '查看 Mixed Runtime 详情', exact: true }).count(), 0);
+  console.log('PASS: explicit Town source installs locally without cloud connector detail requests.');
 } finally {
   await browser?.close();
   server.kill();
