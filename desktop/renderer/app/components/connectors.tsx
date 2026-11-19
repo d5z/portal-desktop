@@ -302,7 +302,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
       const preparing = installationsRef.current.some(item => item.root_release_id === page.current?.release_id && item.desired_state === 'enabled' && ['preparing', 'waiting_device', 'unknown'].includes(item.status));
       if (!changed && !force && !preparing) return;
       await load();
-      if (page.current) await refreshDetail(page.current.release_id, preferredAccounts.current.get(page.current.release_id));
+      if (page.current && !isLocalKit(page.current)) await refreshDetail(page.current.release_id, preferredAccounts.current.get(page.current.release_id));
     }).catch(e => setError(publicErrorMessage(e, '无法更新连接状态，请重试。')));
   };
   useEffect(() => {
@@ -688,7 +688,7 @@ function ConnectorGroup({ title, kits, connected = false, pendingConnection, loc
     const localOnly = isLocalKit(kit);
     const preparing = preparingSourceId !== undefined && preparingSourceId === localSourceId(kit);
     const action = localOnly && !local
-      ? { label: '安装', onClick: onInstallLocal, icon: false }
+      ? { label: '安装到本机', onClick: onInstallLocal, icon: false }
       : connected || local
         ? { label: '管理应用', onClick: onOpen, icon: true }
         : { label: '连接', onClick: onConnect, icon: false };
@@ -757,7 +757,7 @@ function ConnectorDetailView({ kit, detail, localKit, localKitsReady, localPrepa
       <ConnectorIcon name={detail.name} iconURL={detail.icon_url} /><div className="connector-detail-name"><h3>{detail.name}</h3>{!!kit.runtimes?.length && <div className="connector-runtime-tabs" aria-label="运行环境">{[...new Set(kit.runtimes.map(runtimeTabLabel))].map(label => <span className="connector-runtime-tab" key={label}>{label}</span>)}</div>}</div>
       <div className="connector-detail-actions">
         {!isLocalKit(kit) && <button className="connector-refresh" type="button" aria-label="刷新连接状态" onClick={onAdvance} disabled={busy}><Icon className="connector-line-icon" name="refresh-20" aria-hidden="true" /></button>}
-        {isLocalKit(kit) && <>{localKit ? <><button type="button" onClick={() => onOpenLocal(localKit)} disabled={busy || !localKitsReady}>查看本机 Kit</button><button className="danger" type="button" onClick={() => onDeleteLocal(localKit)} disabled={busy}>卸载本机 Kit</button></> : <button type="button" onClick={onInstallLocal} disabled={busy || localPreparing || !localKitsReady}>{localPreparing ? '正在准备…' : '安装'}</button>}</>}
+        {isLocalKit(kit) && <>{localKit ? <><button type="button" onClick={() => onOpenLocal(localKit)} disabled={busy || !localKitsReady}>查看本机 Kit</button><button className="danger" type="button" onClick={() => onDeleteLocal(localKit)} disabled={busy}>卸载本机 Kit</button></> : <button type="button" onClick={onInstallLocal} disabled={busy || localPreparing || !localKitsReady}>{localPreparing ? '正在准备…' : '安装到本机'}</button>}</>}
         {(detail.accounts.length > 0 || removalPending) && <button className="danger" type="button" onClick={onDisconnect} disabled={busy}>断开</button>}
         {!detail.accounts.length && !removalPending && !preview && (!flow || !pendingStatuses.includes(flow.status)) && detail.methods.length > 0 && <button type="button" onClick={() => onConnect()} disabled={busy}>连接</button>}
       </div>
