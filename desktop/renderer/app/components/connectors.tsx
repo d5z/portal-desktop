@@ -359,9 +359,15 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   };
 
   const completeConnection = async (kit: HomeConnectorCatalogItem, intent: HomeConnectorPreview, confirmValues: Record<string, string>, confirmAdopt: boolean, request: number) => {
-    // Keep the same preview available for an explicit retry if confirm loses its response.
     enter(kit); setPreview(intent);
-    const next = await api!.confirm(intent.id, { adopt: confirmAdopt, values: confirmValues });
+    // A lost write response must be reconciled before another submission.
+    let next: HomeConnectorEnableState;
+    try { next = await api!.confirm(intent.id, { adopt: confirmAdopt, values: confirmValues }); }
+    catch (error) {
+      const current = await api!.state(intent.id);
+      if (!current.installation_id && !current.authorization_url && !['ready', 'preparing'].includes(current.status)) throw error;
+      next = current;
+    }
     details.current.delete(kit.release_id);
     if (pendingStatuses.includes(next.status)) { pending.current.set(next.id, { state: next, polls: 0 }); localStorage.setItem(pendingKey(next.id), next.id); }
     if (next.connection_id) preferredAccounts.current.set(next.release_id, next.connection_id);
@@ -386,7 +392,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
     setPendingConnection(page.current ? undefined : kit.release_id); setFlow(undefined); setBusy(true); setError(''); setPreview(undefined); setValues({}); setAdopt(false);
     try {
       await syncing.current;
-      const waiting = !account && [...pending.current.values()].find(entry => entry.state.release_id === kit.release_id);
+      const waiting = account?.enable_id ? pending.current.get(account.enable_id) : !account ? [...pending.current.values()].find(entry => entry.state.release_id === kit.release_id) : undefined;
       if (waiting) {
         const current = await api.state(waiting.state.id);
         if (request !== navigation.current) return;
@@ -418,15 +424,9 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
       const reuseAccount = account?.usable && !account.installation_ids.length;
       const nextMethod = reuseAccount ? undefined : chosenMethod || nextDetail.methods.find(item => item.method === 'oauth2')?.method || nextDetail.methods.find(item => item.method === account?.auth_type)?.method || (nextDetail.methods.length === 1 ? nextDetail.methods[0].method : undefined);
       if (!reuseAccount && !nextMethod) { enter(kit); setDetail(nextDetail); setMethod(''); return; }
-      // Reconnect starts fresh authorization; Home consolidates verified identities.
-      // Retire uninstalled/default attempts first so stale callbacks cannot revive them.
-      if (account && !reuseAccount && !account.installation_ids.length) {
-        await removeAccounts(kit, [account]);
-        if (request !== navigation.current) return;
-        await refreshDetail(kit.release_id);
-        if (request !== navigation.current) return;
-      }
-      const input = reuseAccount ? { connection_id: account!.id } : { method: nextMethod };
+      const input = account
+        ? { connection_id: account.id, ...(!reuseAccount ? { reauthorize: true } : {}) }
+        : { method: nextMethod };
       const nextPreview = await api.preview(kit.release_id, input);
       if (request !== navigation.current) return;
       const fields = nextDetail.methods.find(item => item.method === nextMethod)?.fields || [];
@@ -438,9 +438,9 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   };
 
   const confirmConnection = async () => {
-    if (!selected || !preview) return;
+    if (!selected || !preview || mutating.current) return;
     const request = navigation.current;
-    setError('');
+    setError(''); setBusy(true);
     mutating.current = true;
     try { await completeConnection(selected, preview, values, adopt, request); }
     catch (e) { if (request === navigation.current) setError(publicErrorMessage(e, '无法完成连接。')); }
