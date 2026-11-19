@@ -439,9 +439,9 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
         chooseAccount(account);
       }
       const reuseAccount = account?.usable && !account.installation_ids.length;
-      const nextMethod = reuseAccount ? undefined : chosenMethod || nextDetail.methods.find(item => item.method === 'oauth2')?.method || nextDetail.methods.find(item => item.method === account?.auth_type)?.method || (nextDetail.methods.length === 1 ? nextDetail.methods[0].method : undefined);
+      const nextMethod = reuseAccount ? undefined : chosenMethod || nextDetail.methods.find(item => item.method === account?.auth_type)?.method || nextDetail.methods.find(item => item.method === 'oauth2')?.method || (nextDetail.methods.length === 1 ? nextDetail.methods[0].method : undefined);
       if (!reuseAccount && !nextMethod) { enter(kit); setDetail(nextDetail); setMethod(''); return; }
-      const input = account
+      const input = account && account.status !== 'unknown'
         ? { connection_id: account.id, ...(!reuseAccount ? { reauthorize: true } : {}) }
         : { method: nextMethod };
       const nextPreview = await api.preview(kit.release_id, input);
