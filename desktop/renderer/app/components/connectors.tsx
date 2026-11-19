@@ -551,6 +551,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
       if (request === toolRequest.current) {
         setError(publicErrorMessage(e, '无法更新工具设置。'));
         setTools(current => current?.map(item => toolKey(item) === key ? { ...item, enabled: tool.enabled } : item));
+        await loadTools(installationId, true);
       }
     } finally { setToolBusy(current => { const next = new Set(current); next.delete(key); return next; }); }
   };
