@@ -5,7 +5,7 @@ import { SceneStore } from '../desktop/renderer/shared/models/scene';
 function fixture() {
   let home = { authenticated: true, authenticating: false, sessionVersion: 1 };
   const report = vi.fn().mockResolvedValue({});
-  const candidates = vi.fn().mockResolvedValue([{ name: 'Cursor', source_id: 'cursor-town', version: '1.0' }]);
+  const candidates = vi.fn().mockResolvedValue([{ name: 'Cursor', source_id: 'cursor-town', version: '1.0', sha256: 'a'.repeat(64) }]);
   const api = { home: { state: async () => home, connectors: { reportLocalKitHistory: report } }, localKitHistoryCandidates: candidates } as unknown as TownAPI;
   const model = new TownModel(api, vi.fn(), vi.fn(), new SceneStore(), vi.fn(), vi.fn());
   return { model, report, candidates, setHome: (state: typeof home) => { home = state; } };
@@ -19,6 +19,8 @@ describe('Home local Kit history session boundaries', () => {
     expect(report).toHaveBeenCalledExactlyOnceWith({ source_id: 'cursor-town', version: '1.0' }, 1);
     await model.syncLocalKitHistory();
     expect(report).toHaveBeenCalledTimes(1);
+    expect(model.localKitSources.get(`Cursor:${'a'.repeat(64)}`)).toBe('cursor-town');
+    expect(model.localKitSources.has(`Cursor:${'b'.repeat(64)}`)).toBe(false);
   });
 
   it('retries a failed history entry on refresh and clears its failure message', async () => {
@@ -33,13 +35,13 @@ describe('Home local Kit history session boundaries', () => {
 
   it('discards metadata arriving after logout and scopes later reports to the new account', async () => {
     const { model, report, candidates, setHome } = fixture();
-    let resolve!: (items: { name: string; source_id: string; version: string }[]) => void;
+    let resolve!: (items: { name: string; source_id: string; version: string; sha256: string }[]) => void;
     candidates.mockImplementationOnce(() => new Promise(done => { resolve = done; }));
     const pending = model.syncLocalKitHistory();
     await Promise.resolve();
     setHome({ authenticated: false, authenticating: false, sessionVersion: 2 });
     await model.syncLocalKitHistory();
-    resolve([{ name: 'Cursor', source_id: 'cursor-town', version: '1.0' }]);
+    resolve([{ name: 'Cursor', source_id: 'cursor-town', version: '1.0', sha256: 'a'.repeat(64) }]);
     await pending;
     expect(report).not.toHaveBeenCalled();
     setHome({ authenticated: true, authenticating: false, sessionVersion: 3 });
