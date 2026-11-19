@@ -264,6 +264,19 @@ export class TownModel extends Store {
   private historySession?: number;
   private historySynced = new Set<string>();
   private historyFlight?: { session: number; promise: Promise<void> };
+  private historyReports = new Map<string, Promise<void>>();
+  private reportKitHistory(source_id: string, version: string, session: number) {
+    const key = `${source_id}:${version}`;
+    const operation = `${session}:${key}`;
+    const pending = this.historyReports.get(operation);
+    if (pending) return pending;
+    if (this.historySession === session && this.historySynced.has(key)) return Promise.resolve();
+    const request = this.api.home!.connectors!.reportLocalKitHistory({ source_id, version }, session).then(() => {
+      if (this.historySession === session) this.historySynced.add(key);
+    }).finally(() => { if (this.historyReports.get(operation) === request) this.historyReports.delete(operation); });
+    this.historyReports.set(operation, request);
+    return request;
+  }
   async syncLocalKitHistory(state?: HomeState): Promise<void> {
     const home = state || await this.api.home?.state();
     const session = home?.authenticated && !home.authenticating ? home.sessionVersion : undefined;
@@ -287,9 +300,8 @@ export class TownModel extends Store {
           const current = await this.api.home!.state();
           if (!current.authenticated || current.authenticating || current.sessionVersion !== session) return;
           try {
-            await this.api.home!.connectors!.reportLocalKitHistory({ source_id: candidate.source_id, version: candidate.version }, session);
+            await this.reportKitHistory(candidate.source_id, candidate.version, session);
             if (this.historySession !== session) return;
-            this.historySynced.add(key);
           } catch { failed = true; }
         }
         if (this.historySession === session) this.localKitHistoryError = failed ? '本机已安装，部分使用历史同步失败，请刷新重试。' : '';
@@ -1653,8 +1665,7 @@ export class TownModel extends Store {
       const current = await this.api.home?.state().catch(() => undefined);
       if (home?.authenticated && !home.authenticating && home.sessionVersion !== undefined && current?.authenticated && !current.authenticating && current.sessionVersion === home.sessionVersion) {
         try {
-          await this.api.home!.connectors!.reportLocalKitHistory({ source_id: plan.sourceId, version: plan.version }, home.sessionVersion);
-          if (this.historySession === home.sessionVersion) this.historySynced.add(`${plan.sourceId}:${plan.version}`);
+          await this.reportKitHistory(plan.sourceId, plan.version, home.sessionVersion);
         } catch { historyFailed = true; }
       }
       if (revision !== this.lifecycleRevision) return;
