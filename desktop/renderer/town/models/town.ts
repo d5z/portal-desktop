@@ -588,7 +588,7 @@ export class TownModel extends Store {
     const samePage = this.view === view && this.directId === id;
     this.view = view;
     this.directId = id;
-    this.tab = view === 'kits' ? 'grove' : this.tabs[view] || definitions[view].tabs[0]?.[0] || view;
+    this.tab = view === 'kits' ? (this.localOnly ? 'local' : 'grove') : this.tabs[view] || definitions[view].tabs[0]?.[0] || view;
     this.offset = 0;
     if (!samePage) this.search = "";
     void this.load();
@@ -598,12 +598,20 @@ export class TownModel extends Store {
     if (this.view === 'kits') {
       this.localOnly = tab === 'local';
       if (this.localOnly) this.groveKind = 'kit';
-      tab = 'grove';
+      tab = this.localOnly ? 'local' : 'grove';
     }
     this.tab = tab;
     this.tabs[this.view] = tab;
     this.offset = 0;
     this.search = "";
+    void this.load();
+  }
+  setLocalOnly(localOnly: boolean) {
+    this.localOnly = localOnly;
+    this.offset = 0;
+    this.toolSelection = '';
+    this.localKit = undefined;
+    this.tab = localOnly ? 'local' : 'grove';
     void this.load();
   }
   pagination() { return this.view === 'kits' ? toolPage(this) : catalogPage(this); }
@@ -1529,6 +1537,7 @@ export class TownModel extends Store {
     try {
       const library = await this.api.localKits();
       if (generation === this.installedRequest) this.installedLibrary = library;
+      return library;
     } catch (error) {
       if (generation === this.installedRequest) this.installedError = errorText(error);
     } finally {
@@ -1540,7 +1549,7 @@ export class TownModel extends Store {
   }
   async showInstalledKit(name: string) {
     this.directId = undefined;
-    this.tab = "grove";
+    this.tab = "local";
     this.localOnly = true;
     this.groveKind = 'kit';
     this.search = "";
@@ -1646,7 +1655,8 @@ export class TownModel extends Store {
       if (this.localKit?.name === kit.name) this.localKit = undefined;
       if (this.selectedId === kit.name) this.selectedId = "";
       this.toast(`${kit.name} 已删除。`);
-      await this.load();
+      const library = await this.refreshInstalledKits();
+      if (library && this.tab === 'local') this.library = library;
       this.localKitsRevision++;
       this.changed();
     });

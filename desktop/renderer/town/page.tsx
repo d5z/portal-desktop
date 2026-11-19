@@ -113,11 +113,11 @@ export function Town({ model, visible = model.visible }: { model: TownModel; vis
               </option>
             ))}
           </select>
-          {town.view === "kits" && town.tab === "grove" && <div className="segmented grove-kind-filter" role="tablist" aria-label="Grove 类型" onKeyDown={navigateTabs}>
+          {town.view === "kits" && (town.tab === "grove" || town.tab === "local") && <div className="segmented grove-kind-filter" role="tablist" aria-label="Grove 类型" onKeyDown={navigateTabs}>
             {([["", "全部"], ["app", "App"], ["kit", "Kit"], ["plugin", "Plugin"]] as const).map(([value, label]) => <button key={value} role="tab" id={`grove-kind-${value || 'all'}`} aria-controls="town-body" tabIndex={town.groveKind === value ? 0 : -1} aria-selected={town.groveKind === value} className={town.groveKind === value ? "selected" : ""} onClick={() => { town.groveKind = value; town.offset = 0; town.toolSelection = ""; town.selectedId = ""; town.localKit = undefined; town.changed(); }}>{label}</button>)}
           </div>}
           {town.view === 'kits' && !town.directId && !pluginLibrary && <>
-            <label className="tools-local-filter"><input type="checkbox" checked={town.localOnly} onChange={e => { town.localOnly = e.target.checked; town.offset = 0; town.toolSelection = ""; town.localKit = undefined; town.changed(); }} />仅本机存在</label>
+            <label className="tools-local-filter"><input type="checkbox" checked={town.localOnly} onChange={e => town.setLocalOnly(e.target.checked)} />仅本机存在</label>
             {town.groveKind === 'kit' && town.supportsLocalKits && <button className="primary" onClick={() => void town.importKit()}>导入 Kit</button>}
           </>}
           <select

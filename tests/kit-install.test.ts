@@ -61,6 +61,13 @@ it('persists scoped environment in Portal dotenv without wrapping the command', 
   await expect(stat(path.join(target, '.beings-launch.ps1'))).rejects.toThrow();
   await expect(stat(path.join(target, '.beings-launch.sh'))).rejects.toThrow();
 });
+it('allows an untouched optional environment field during installation', async () => {
+  const f = await fixture({ provision: { env: [{ name: 'OPTIONAL_KEY', required: false }] } });
+  const plan = await f.installer.prepare('fixture-id', f.settings);
+  const result = await f.installer.install({ ticket: plan.ticket, environment: {} }, f.settings);
+  expect(result.name).toBe(plan.name);
+  await expect(stat(path.join(f.kits, plan.name, '.env'))).rejects.toThrow();
+});
 it('rejects changed settings and cancels staging without exposing an installed manifest', async () => {
   const f = await fixture();
   const plan = await f.installer.prepare('fixture-id', f.settings);

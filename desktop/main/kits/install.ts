@@ -159,8 +159,10 @@ export class KitInstaller {
     const supplied = input.environment || {};
     if (Object.keys(supplied).some(key => !item.plan.environment.some(e => e.name === key))) throw new Error('无效的 Kit 配置字段。');
     for (const field of item.plan.environment) {
-      if (typeof supplied[field.name] !== 'string' || supplied[field.name].length > 8192 || supplied[field.name].includes('\0')) throw new Error(`无效的 ${field.name} 配置。`);
-      if (field.required && !supplied[field.name].trim()) throw new Error(`请填写 ${field.name}。`);
+      const value = supplied[field.name];
+      if (value === undefined && !field.required) continue;
+      if (typeof value !== 'string' || value.length > 8192 || value.includes('\0')) throw new Error(`无效的 ${field.name} 配置。`);
+      if (field.required && !value.trim()) throw new Error(`请填写 ${field.name}。`);
     }
     const location = await kitLocation(settings); const target = path.join(location.directory, item.plan.name);
     if (await exists(target)) throw new Error('同名 Kit 已安装。');
