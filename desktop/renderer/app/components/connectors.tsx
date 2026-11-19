@@ -843,7 +843,7 @@ function ConnectorSkillPreview({ api, releaseId, skill }: { api: HomeConnectorAP
     return () => { active = false; };
   }, [api, releaseId, skill.export, open, attempt, body]);
   return <details className="connector-skill-row" onToggle={event => setOpen(event.currentTarget.open)}>
-    <summary><div className="connector-skill-copy"><Icon name="skill" width="28" height="28" aria-hidden="true" /><div><h5>{skill.name}</h5><p>{skill.description}</p></div></div></summary>
+    <summary><Icon className="connector-skill-chevron" name="chevron-right-20" aria-hidden="true" /><div className="connector-skill-copy"><Icon name="skill" width="28" height="28" aria-hidden="true" /><div><h5>{skill.name}</h5><p>{skill.description}</p></div></div></summary>
     {loading && <p className="field-help" role="status">正在读取技能…</p>}
     {error && <p className="form-error" role="alert">{error} <button type="button" onClick={() => setAttempt(value => value + 1)}>重试</button></p>}
     {body && <><p className="field-help">仅预览技能内容，工具调用权限由账号和工具设置决定。</p><pre className="connector-skill-body">{body.body}</pre></>}

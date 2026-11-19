@@ -958,7 +958,31 @@
 }
 
 .connector-skill-row > summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  list-style: none;
   cursor: pointer;
+}
+
+.connector-skill-row > summary::-webkit-details-marker {
+  display: none;
+}
+
+.connector-skill-chevron {
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  margin-top: 4px;
+}
+
+.connector-skill-row[open] > summary > .connector-skill-chevron {
+  transform: rotate(90deg);
+}
+
+.connector-skill-row > summary > .connector-skill-copy {
+  flex: 1;
+  min-width: 0;
 }
 
 .connector-skill-body {
