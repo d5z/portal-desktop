@@ -390,7 +390,6 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
     details.current.delete(kit.release_id);
     if (pendingStatuses.includes(next.status)) { pending.current.set(next.id, { state: next, polls: 0 }); localStorage.setItem(pendingKey(next.id), next.id); }
     if (next.connection_id) preferredAccounts.current.set(next.release_id, next.connection_id);
-    if (request !== navigation.current) return;
     setValues({}); setPreview(undefined); setFlow(next);
     try {
       // A catalog/detail read must not prevent the browser from opening OAuth.
@@ -405,7 +404,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   };
 
   const connect = async (kit: HomeConnectorCatalogItem, account?: HomeConnectorAccount, chosenMethod?: string) => {
-    if (!api) return;
+    if (!api || mutating.current) return;
     const request = ++navigation.current;
     mutating.current = true;
     setPendingConnection(page.current ? undefined : kit.release_id); setFlow(undefined); setBusy(true); setError(''); setPreview(undefined); setValues({}); setAdopt(false);
@@ -482,7 +481,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   };
 
   const cancelAuthorization = async () => {
-    if (!api || !selected) return;
+    if (!api || !selected || mutating.current) return;
     const id = preview?.id || flow?.id;
     if (!id) return;
     const request = navigation.current;
@@ -515,7 +514,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   };
 
   const restoreConnection = async (installationId: string) => {
-    if (!api) return;
+    if (!api || mutating.current) return;
     const request = navigation.current;
     mutating.current = true; setBusy(true); setError('');
     try {
@@ -605,6 +604,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
           lifecycleRequests.current.delete(id);
         }
       }
+      for (const id of account.installation_ids) lifecycleRequests.current.delete(id);
       await api!.removeAccount(kit.release_id, account.id);
       remaining.delete(account.id);
       for (const [id, entry] of pending.current) if (entry.state.release_id === kit.release_id &&
@@ -617,7 +617,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   };
 
   const disconnect = async (kit: HomeConnectorCatalogItem, account?: HomeConnectorAccount) => {
-    if (!api || !detail) return;
+    if (!api || !detail || mutating.current) return;
     const remaining = removals.current.get(kit.release_id);
     const accounts = account ? [remaining?.get(account.id) || account] : [...new Map([...detail.accounts.map(item => [item.id, item] as const), ...remaining || []]).values()];
     if (!accounts.length || !window.confirm(account
