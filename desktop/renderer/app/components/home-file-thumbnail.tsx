@@ -77,8 +77,9 @@ export function HomeFileThumbnail({ file, api, onOpen }: { file: HomeFileEntry; 
   const previewLabel = `预览缩略图：${file.name}`;
   return <div className={styles.thumbnail} ref={host}>
     {thumbnail ? <TiltedCard imageSrc={thumbnail.url} altText={file.name}
-      captionText={previewLabel} containerWidth={104} containerHeight={76}
-      imageWidth={thumbnail.width} imageHeight={thumbnail.height} radius={6} shadow={0.2} showTooltip={false} onClick={onOpen} />
+      captionText={previewLabel} containerWidth="100%" containerHeight="100%"
+      imageWidth={`${thumbnail.width / 104 * 100}%`} imageHeight={`${thumbnail.height / 76 * 100}%`}
+      radius={6} shadow={0.2} showTooltip={false} onClick={onOpen} />
       : onOpen ? <button type="button" className={styles.thumbnailPreview} aria-label={previewLabel} onClick={onOpen}>{fallback}</button> : fallback}
   </div>;
 }

@@ -16,7 +16,7 @@ const labels: Record<GenerationSnapshot['status'],string> = {queued:'排队中',
 function PictureIcon() {
   return <Icon name="image-rounded" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />;
 }
-function GenerationDither({ animated }: { animated: boolean }) {
+function GenerationDither() {
   const canvas = useRef<HTMLCanvasElement>(null);
   useEffect(() => {
     const element = canvas.current!;
@@ -28,7 +28,7 @@ function GenerationDither({ animated }: { animated: boolean }) {
     let pointer: { x: number; y: number } | null = null;
     let x = 0, y = 0;
     function draw(time: number) {
-      const moving = animated && !motion.matches && visible;
+      const moving = !motion.matches && visible;
       const targetX = moving ? pointer?.x ?? width * (0.5 + Math.sin(time / 1700) * 0.12) : width / 2;
       const targetY = moving ? pointer?.y ?? height * (0.5 + Math.cos(time / 2100) * 0.10) : height / 2;
       x += (targetX - x) * (moving ? 0.12 : 1);
@@ -84,7 +84,7 @@ function GenerationDither({ animated }: { animated: boolean }) {
       element.removeEventListener('pointermove', move);
       element.removeEventListener('pointerleave', leave);
     };
-  }, [animated]);
+  }, []);
   return <canvas ref={canvas} className="image-generation-dither" aria-hidden="true" />;
 }
 
@@ -93,7 +93,7 @@ function GeneratedPhoto({ src, name, loaded, onLoad, onError, children }: {
 }) {
   return <div className="image-generation-photo" data-loaded={loaded} aria-busy={!loaded}>
     <RemoteImage src={src} name={name} onLoad={onLoad} onError={onError} />
-    {!loaded && <div className="image-generation-loading"><GenerationDither animated /></div>}
+    {!loaded && <div className="image-generation-loading"><GenerationDither /></div>}
     {children}
   </div>;
 }
@@ -151,13 +151,13 @@ function ImageGenerationCard({job, endpoint, being, report, statusInActions, mul
   return <section ref={ref} className="image-generation-card" aria-label={job.title} data-generation-id={snapshot?.id || job.generation_id || undefined}>
     {photos.length > 0 && !imageFailed ? <>
       <div className="image-generation-images">{grouped
-        ? <MessageImageGroup className="generated-image-group" count={photos.length} initiallyExpanded>{photos.map(({photo}) => photo)}</MessageImageGroup>
+        ? <MessageImageGroup className="generated-image-group" initiallyExpanded>{photos.map(({photo}) => photo)}</MessageImageGroup>
         : photos.map(({photo}) => photo)}</div>
       {/* Keep downloads mounted while the same photos switch between the grid and deck. */}
       {grouped && photos.map(({download}) => download)}
     </> : active && <div className="image-generation-placeholder" data-active={active} data-status={snapshot?.status}
       data-phase={snapshot?.stage === 'validate_convert' ? 'refining' : snapshot?.status === 'running' ? 'running' : 'queued'} aria-busy="true">
-      <GenerationDither animated={snapshot?.status === 'running'} />
+      <GenerationDither />
       <span className="image-generation-progress" role="progressbar" aria-label={label} />
     </div>}
     {status && <>

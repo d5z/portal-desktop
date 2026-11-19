@@ -13,6 +13,7 @@ import { ChatStatusRow } from './status-row';
 import { MessageImageGroup } from '../../shared/components/message-image-group';
 import { FileName } from '../../shared/components/file-name';
 import { Icon } from '../../shared/icons/icon';
+import { MessageCaptionAnchor } from '../../shared/components/message-action-slot';
 const delivery = {unknown:'发送结果待确认，请核对历史', failed:'发送失败', cancelled:'已取消'} as const;
 export const isPreviewImage = (mime = '') => /^image\/(png|jpeg|gif|webp)$/.test(mime);
 
@@ -25,7 +26,7 @@ function renderAttachmentRuns<T>(items: T[], isImage: (item: T) => boolean, rend
     }
     const count = index - start;
     result.push(count === 1 ? render(items[start], start) : (
-      <MessageImageGroup key={`images-${start}`} className="attachment-image-group" count={count}>
+      <MessageImageGroup key={`images-${start}`} className="attachment-image-group">
         {items.slice(start, index).map((item, offset) => render(item, start + offset))}
       </MessageImageGroup>
     ));
@@ -87,7 +88,10 @@ function LoadedAttachmentMessage({message, processing}: AttachmentMessageProps) 
   const cached=ids ? ids.split(',').map(id=>service.cache.get(id)).filter((view):view is AttachmentMessage=>!!view) : [];
   const views = hasViews ? message.attachmentViews! : cached.length===ids.split(',').length ? cached : fetched.key===JSON.stringify([endpoint,ids]) ? fetched.views : [];
   if (!views.length && message.attachmentUploads?.length) return <div className="content attachment-message"><div>
-    {!message.text.startsWith('[发送了') && <div className="attachment-message-copy"><p className="attachment-original-text"><CommandMessageText text={message.text}/></p></div>}
+    {!message.text.startsWith('[发送了') && <div className="attachment-caption">
+      <div className="attachment-message-copy"><p className="attachment-original-text"><CommandMessageText text={message.text}/></p></div>
+      <MessageCaptionAnchor />
+    </div>}
     {renderAttachmentRuns(message.attachmentUploads, file => !!file.blob && isPreviewImage(file.mime), (file, index) => {
       const p = file.progress, complete = p?.phase === 'complete', failed = p?.phase === 'failed';
       const total = p?.total || file.size;
@@ -117,9 +121,12 @@ function LoadedAttachmentMessage({message, processing}: AttachmentMessageProps) 
       while (parts[end]?.type === type) end++;
       const run = parts.slice(start, end);
       if (type === 'text') {
-        content.push(<div key={start} className="attachment-message-copy">
-          {run.map((part, index) => part.type === 'text' &&
-            <p className="attachment-original-text" key={index}><CommandMessageText text={part.text}/></p>)}
+        content.push(<div key={start} className="attachment-caption">
+          <div className="attachment-message-copy">
+            {run.map((part, index) => part.type === 'text' &&
+              <p className="attachment-original-text" key={index}><CommandMessageText text={part.text}/></p>)}
+          </div>
+          <MessageCaptionAnchor />
         </div>);
       } else {
         const attachments = run.filter(part => part.type === 'attachment');

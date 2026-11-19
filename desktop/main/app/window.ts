@@ -20,7 +20,10 @@ export interface MainWindowOptions {
 }
 
 export function createMainWindow(options: MainWindowOptions) {
-  const window = new BrowserWindow(clientWindowOptions());
+  const window = new BrowserWindow({
+    ...clientWindowOptions(),
+    ...(process.platform === 'darwin' ? { backgroundColor: '#00000000', vibrancy: 'hud' as const } : {}),
+  });
   const presentation = windowPresentation(window);
   if (process.platform === 'win32') {
     window.setMenuBarVisibility(false);

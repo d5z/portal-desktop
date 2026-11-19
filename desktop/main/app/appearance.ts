@@ -18,7 +18,10 @@ export async function loadAppearance(directory: string, getWindow: () => Browser
         const file = path.join(directory, 'appearance.json');
         await writeFile(file + '.tmp', JSON.stringify({ theme })); await rename(file + '.tmp', file);
         nativeTheme.themeSource = theme; appearance = theme; changed(theme);
-        if (!(process.platform === 'win32' && Number(os.release().split('.')[2]) >= 22621)) getWindow()?.setBackgroundColor(theme === 'dark' ? '#212121' : '#ffffff');
+        // macOS gets its material color from nativeTheme and the renderer's tint.
+        if (process.platform !== 'darwin' && !(process.platform === 'win32' && Number(os.release().split('.')[2]) >= 22621)) {
+          getWindow()?.setBackgroundColor(theme === 'dark' ? '#212121' : '#ffffff');
+        }
         return appearance;
       }));
     },

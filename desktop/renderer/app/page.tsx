@@ -9,6 +9,7 @@ import {AttachmentImageViewer} from './components/attachment-image-viewer';
 import { useEffect, useLayoutEffect, useRef } from "react";
 import type { AppModel } from "./models/app";
 import { useModel } from "../shared/hooks/use-model";
+import { usePointerFocus } from '../shared/hooks/use-pointer-focus';
 import { presentColorScheme, renderedColorScheme } from '../shared/color-scheme';
 import { useChatBridge } from "./hooks/use-chat-bridge";
 import { WorkspaceNavigation, BeingInfo } from "./components/workspace-navigation";
@@ -39,6 +40,7 @@ export function App({ model }: { model: AppModel }) {
     frame = useRef<HTMLIFrameElement>(null);
   const chatPanel = useRef<HTMLElement>(null);
   const [chatWidth, setChatWidth] = usePanelWidth("chat", 640);
+  usePointerFocus();
   useChatBridge(app, frame);
   useEffect(() => app.start(), [app]);
   const previousStartupNotice = useRef('');

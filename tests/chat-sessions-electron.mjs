@@ -318,7 +318,9 @@ try {
   const queuedScene = await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id);
   const localQueueStatus = chat.locator('.composer-queue-item').filter({hasText:'排队 C'});
   await localQueueStatus.waitFor();
-  assert.equal(await localQueueStatus.getByRole('button',{name:'引导',exact:true}).isDisabled(),true,'Cannot steer another scene');
+  assert.equal(await localQueueStatus.getByRole('button',{name:'引导',exact:true}).count(),0,'Cannot steer another scene');
+  assert.ok(await localQueueStatus.getByRole('button',{name:'编辑消息：排队 C',exact:true}).isEnabled());
+  assert.ok(await localQueueStatus.getByRole('button',{name:'取消排队：排队 C',exact:true}).isEnabled());
   assert.equal(await chat.locator('#messages .message.user').filter({hasText:'排队 C'}).count(),0,'Unsent queue stays beside the composer');
   await page.locator(`[data-scene-id="${queuedScene}"] [data-status="queued"]`).waitFor();
   await page.screenshot({animations:'disabled',path:'test-results/chat-sessions-activity.png'});

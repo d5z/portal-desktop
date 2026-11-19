@@ -3,7 +3,7 @@ import { DropdownMenuMotion, dropdownMenuPopover } from '../../shared/components
 import { NavigationMenuMotion } from '../../shared/components/animate-ui/navigation-menu-motion';
 import { clearMenuGlide, menuGlide } from '../../shared/components/react-bits/GlideSelectMotion';
 import { Icon } from '../../shared/icons/icon';
-import { useDismissAttachmentMenu } from './use-dismiss-attachment-menu';
+import { useDismissAttachmentMenu } from '../../shared/hooks/use-dismiss-attachment-menu';
 import { useCallback, useEffect, useLayoutEffect, useId, useRef, useState, type ReactNode, type CSSProperties, type KeyboardEvent } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { audioMenuPosition } from '../services/audio-menu-position';

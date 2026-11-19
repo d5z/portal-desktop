@@ -52,7 +52,8 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
   const library = useRef<HTMLDivElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const [menu, setMenu] = useState<FileMenu>();
-  const [query, setQuery] = useState('');
+  const [workspaceQuery, setWorkspaceQuery] = useState('');
+  const [recentQuery, setRecentQuery] = useState('');
   // Portaled surfaces must close when their retained tab is no longer visible.
   useEffect(() => { if (!active) { setMenu(undefined); store.closePreview(); } }, [active, store]);
   useMenuDismiss(!!menu, menuRef, () => setMenu(undefined), event => {
@@ -92,15 +93,17 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
       const next = JSON.stringify([state.authenticated, state.authenticating, state.username, state.binding]);
       if (identity === next) return;
       identity = next;
-      setMenu(undefined); store.reset(); setQuery(''); void store.load();
+      setMenu(undefined); store.reset(); setWorkspaceQuery(''); setRecentQuery(''); void store.load();
     };
     const stop = api.subscribe(state => { received = true; receive(state); });
     void api.state().then(state => { if (!received) receive(state); }).catch(() => { if (active && !received) void store.load(); });
     return () => { active = false; stop(); store.reset(); };
   }, [api, store]);
-  const navigate = (path: string) => { setQuery(''); void model.load(path); };
-  const search = query.trim().toLocaleLowerCase();
-  const entries = search ? model.entries.filter(entry => entry.name.toLocaleLowerCase().includes(search)) : model.entries;
+  const navigate = (path: string) => { setWorkspaceQuery(''); void model.load(path); };
+  const workspaceSearch = workspaceQuery.trim().toLocaleLowerCase();
+  const recentSearch = recentQuery.trim().toLocaleLowerCase();
+  const entries = workspaceSearch ? model.entries.filter(entry => entry.name.toLocaleLowerCase().includes(workspaceSearch)) : model.entries;
+  const recentEntries = recentSearch ? recent.entries.filter(entry => entry.name.toLocaleLowerCase().includes(recentSearch)) : recent.entries;
   const parts = model.path ? model.path.split('/') : [];
   const viewControls = <div className={styles.viewModes} role="group" aria-label="文件显示布局">
     {viewModes.map(([mode, label, icon]) => <IconButton key={mode} className={styles.iconButton} label={label}
@@ -128,14 +131,23 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
           {label}
         </button>)}
     </div>
-    {tab === 'workspace' ? <>
+    {tab === 'workspace' && <>
       {model.loaded && entries.length > 0 && <span className={styles.count}>{entries.length} 项</span>}
       <IconButton className={styles.iconButton} label="刷新资料库" disabled={model.loading || model.busy} onClick={() => void model.load()}><Icon name="lucide-refresh-cw" /></IconButton>
-    </> : viewControls}
+    </>}
+    </div>
+    <div className={styles.searchRow}>
+      <label className={styles.searchField}>
+        <Icon name="lucide-search" />
+        <input className={styles.search} type="search" aria-label={tab === 'recent' ? '搜索最近文件' : '搜索当前文件夹'} placeholder="搜索文件"
+          value={tab === 'recent' ? recentQuery : workspaceQuery}
+          onChange={event => (tab === 'recent' ? setRecentQuery : setWorkspaceQuery)(event.target.value)} />
+      </label>
+      {viewControls}
     </div>
     <section role="tabpanel" id={`${tabId}-recent`} aria-labelledby={`${tabId}-recent-tab`} hidden={tab !== 'recent'}>
-      {!recent.entries.length && <p className={styles.recentEmpty}>打开本机或云电脑中的文件后，会显示在这里。</p>}
-      <ul className={styles.fileGrid} data-layout={view} aria-label="最近的文件">{recent.entries.map(entry => <motion.li {...tileMotion} className={styles.tile} key={`${entry.source}:${entry.path}`}
+      {!recentEntries.length && <p className={styles.recentEmpty}>{recentSearch ? '没有匹配的文件。' : '打开本机或云电脑中的文件后，会显示在这里。'}</p>}
+      <ul className={styles.fileGrid} data-layout={view} aria-label="最近的文件">{recentEntries.map(entry => <motion.li {...tileMotion} className={styles.tile} key={`${entry.source}:${entry.path}`}
         {...menuTrigger(entry.name, [
           entry.source === 'local' ? !!openLocal && { label: '打开', icon: 'chat-file', run: () => openLocal(entry.path) }
             : !model.busy && { label: '预览', icon: 'chat-file', run: () => void model.open(entry) },
@@ -164,21 +176,14 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
         {parts.map((part, index) => <span key={index}><span aria-hidden="true">/</span><button type="button" title={part} aria-current={index === parts.length - 1 ? 'location' : undefined} onClick={() => navigate(parts.slice(0, index + 1).join('/'))}>{part}</button></span>)}
       </nav>
     </div>}
-    <div className={styles.searchRow}>
-      <label className={styles.searchField}>
-        <Icon name="lucide-search" />
-        <input className={styles.search} type="search" aria-label="搜索当前文件夹" placeholder="搜索文件" value={query} onChange={event => setQuery(event.target.value)} />
-      </label>
-      {tab === 'workspace' && viewControls}
-    </div>
     {model.error && <div className={styles.feedback} role="alert"><p>{model.error}</p><div><button type="button" disabled={model.loading || model.busy} onClick={() => void model.load()}>重试</button><button type="button" onClick={onConnect}>前往电脑栏</button></div></div>}
-    <p className={styles.status} role="status" hidden={!model.busy && !model.loading && !model.notice}>{model.busy ? '正在保存文件…' : model.loading ? '正在读取工作区…' : model.notice || (model.loaded ? `${entries.length} 项${query ? '匹配结果' : ''}` : '')}</p>
+    <p className={styles.status} role="status" hidden={!model.busy && !model.loading && !model.notice}>{model.busy ? '正在保存文件…' : model.loading ? '正在读取工作区…' : model.notice || (model.loaded ? `${entries.length} 项${workspaceSearch ? '匹配结果' : ''}` : '')}</p>
     {model.loaded && !entries.length && <motion.div className={styles.empty}
-      initial={query || reduce ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.12 }}>
+      initial={workspaceSearch || reduce ? false : { opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.12 }}>
       <Icon name="lucide-folder" />
-      <strong>{query ? '没有匹配的文件' : '这个文件夹还是空的'}</strong>
-      <p>{query ? '试试其他名称，或清除搜索。' : 'Being 生成的文件会出现在这里。'}</p>
-      {query && <button type="button" onClick={() => setQuery('')}>清除搜索</button>}
+      <strong>{workspaceSearch ? '没有匹配的文件' : '这个文件夹还是空的'}</strong>
+      <p>{workspaceSearch ? '试试其他名称，或清除搜索。' : 'Being 生成的文件会出现在这里。'}</p>
+      {workspaceSearch && <button type="button" onClick={() => setWorkspaceQuery('')}>清除搜索</button>}
     </motion.div>}
     <ul className={styles.fileGrid} data-layout={view} aria-label="工作区文件" aria-busy={model.loading}>{entries.map(entry => (
       <motion.li {...tileMotion} className={`${styles.tile} ${entry.type === 'directory' ? styles.folderTile : ''}`} key={entry.path}
