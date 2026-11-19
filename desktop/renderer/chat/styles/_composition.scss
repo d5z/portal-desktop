@@ -554,12 +554,14 @@
 
 .iui-toast {
   position: fixed;
-  z-index: 2147483647;
+  inset: auto;
   left: 50%;
   bottom: max(28px, env(safe-area-inset-bottom));
   transform: translateX(-50%);
   max-width: calc(100vw - 32px);
   box-sizing: border-box;
+  margin: 0;
+  border: 0;
   padding: 10px 18px;
   border-radius: 12px;
   background: var(--text, #242424);

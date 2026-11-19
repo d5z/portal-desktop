@@ -52,7 +52,7 @@ try{
   await page.goto(url);
   await page.getByRole('slider',{name:'温度'}).fill('28');
   assert.equal(await page.getByRole('button',{name:'用当前选择继续',exact:true}).count(),1);
-  await page.getByRole('textbox',{name:'message input'}).fill('按当前选择调整');
+  await page.getByRole('textbox',{name:'消息输入框'}).fill('按当前选择调整');
   await page.getByRole('button',{name:'用当前选择继续',exact:true}).click();
   assert.equal(sends.length,0,'Edit must not send automatically');
   assert.equal(await page.locator('.iui-action-status, .iui-continue p').count(),0);
@@ -61,9 +61,9 @@ try{
   const colors = await bringSelection.evaluate(el => ({fg:getComputedStyle(el).color,bg:getComputedStyle(el).backgroundColor}));
   assert.notEqual(colors.fg, colors.bg);
   assert.equal(colors.bg, await bringSelection.evaluate(el => {const probe=document.createElement('span');probe.style.color='var(--text)';el.append(probe);const color=getComputedStyle(probe).color;probe.remove();return color;}));
-  assert.equal(await page.getByRole('textbox',{name:'message input'}).evaluate(el=>el.value??el.editor.getMarkdown()),'按当前选择调整');
+  assert.equal(await page.getByRole('textbox',{name:'消息输入框'}).evaluate(el=>el.value??el.editor.getMarkdown()),'按当前选择调整');
   await page.waitForFunction(()=>document.activeElement?.matches('#input, #input [contenteditable], [role=textbox][contenteditable]'));
-  await page.locator('.iui-context-target').getByText('将携带原界面和当前选择').waitFor();
+  await page.locator('.iui-context-target').getByText('修改「一周衣橱」').waitFor();
   assert.equal(await page.getByRole('button',{name:'添加附件和工具',exact:true}).getAttribute('data-active'),'true');
   await page.getByRole('button',{name:'取消本条界面修改',exact:true}).click();
   assert.equal(await page.getByRole('button',{name:'添加附件和工具',exact:true}).getAttribute('data-active'),'false');
@@ -72,7 +72,7 @@ try{
   await page.getByText('按当前选择调整后的建议',{exact:true}).waitFor();
   assert.equal(await page.locator('.intelligent-ui').count(),1,'Update must reuse the original UI');
   assert.equal(await page.getByRole('slider',{name:'温度'}).inputValue(),'28');
-  assert.equal(await page.getByRole('textbox',{name:'message input'}).evaluate(el=>el.value??el.editor.getMarkdown()),'');
+  assert.equal(await page.getByRole('textbox',{name:'消息输入框'}).evaluate(el=>el.value??el.editor.getMarkdown()),'');
   assert.equal(sends.length,1);
   assert.ok(sends[0].message.includes('"surfaceId":"wardrobe"'));
   assert.ok(sends[0].message.includes('"temp":28'));
@@ -115,7 +115,7 @@ try{
   await appSurface.getByRole('spinbutton',{name:'模拟人数',exact:true}).fill('4');
   await page.waitForFunction(()=>document.querySelector('.iui-app input[type=number]')?.value==='4');
   assert.equal(await appSurface.getByRole('button',{name:'用当前选择继续',exact:true}).count(),1);
-  await page.getByRole('textbox',{name:'message input'}).fill('调整模拟计划');
+  await page.getByRole('textbox',{name:'消息输入框'}).fill('调整模拟计划');
   await page.getByRole('button',{name:'添加附件和工具'}).click();
   await page.getByRole('menuitem',{name:/智能 UI/}).click();
   await page.locator('#send-btn').click();
@@ -128,7 +128,7 @@ try{
   await appSurface.scrollIntoViewIfNeeded();
   const ticks = Number(await appSurface.locator('.iui-metric output').textContent());
   await page.waitForFunction(ticks=>Number(document.querySelector('.iui-app .iui-metric output')?.textContent)>ticks,ticks);
-  await page.getByRole('textbox',{name:'message input'}).fill('调整衣橱而不是模拟');
+  await page.getByRole('textbox',{name:'消息输入框'}).fill('调整衣橱而不是模拟');
   await page.locator('.iui-surface').filter({has:page.getByRole('slider',{name:'温度'})}).getByRole('button',{name:'修改',exact:true}).click();
   assert.equal(await page.getByRole('button',{name:'添加附件和工具',exact:true}).getAttribute('data-active'),'true','Edit must arm next message for existing artifact');
   await page.waitForFunction(()=>document.activeElement?.matches('#input, #input [contenteditable], [role=textbox][contenteditable]'));
@@ -148,7 +148,7 @@ try{
   ])});
   await page.reload();
   const continueSurface=page.locator('.iui-surface').filter({has:page.getByRole('heading',{name:'继续操作计划',exact:true})});
-  const composer=page.getByRole('textbox',{name:'message input'});
+  const composer=page.getByRole('textbox',{name:'消息输入框'});
   await continueSurface.getByRole('spinbutton',{name:'继续预算',exact:true}).fill('23');
   await continueSurface.getByRole('spinbutton',{name:'继续模拟人数',exact:true}).fill('6');
   await page.waitForFunction(()=>[...document.querySelectorAll('.iui-app input[type=number]')].some(el=>el.value==='6'));

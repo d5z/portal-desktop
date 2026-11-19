@@ -1,8 +1,9 @@
-import { SmallMenuDetails } from '../components/small-menu-details';
+import { dropdownMenuPopover } from '../components/animate-ui/dropdown-menu-motion';
+import { Icon } from '../icons/icon';
 import { useUIToast } from './feedback';
 import { CodeClipboard } from '../components/clipboard';
 import type { AppSelections } from './surfaces';
-import { memo, useContext, useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import { memo, useContext, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { applyUIChanges, evaluate, reconcileState, reconcileUpdatedState, type UIDocument, type UINode, type Value } from './runtime';
 import { UIStream } from './stream';
 import { loadUIState, rememberUIState, saveUIState } from './storage';
@@ -24,7 +25,11 @@ export const IntelligentUI = memo(function IntelligentUI({ source, streaming = f
   const parser = useRef(new UIStream());
   const [accepted, setAccepted] = useState<UIDocument | null>(null), [error, setError] = useState('');
   const [showSource, setShowSource] = useState(false), [expanded, setExpanded] = useState(false);
-  const section = useRef<HTMLElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const dialog = useRef<HTMLDialogElement>(null);
+  const menu = useRef<HTMLDivElement>(null);
+  const more = useRef<HTMLButtonElement>(null);
+  const menuId = useId();
   // Coalesce token bursts without remounting the currently interactive tree.
   useEffect(() => {
     const update = () => { const result = parser.current.update(source, streaming); if (result.doc) setAccepted(result.doc); setError(result.error); };
@@ -38,29 +43,85 @@ export const IntelligentUI = memo(function IntelligentUI({ source, streaming = f
   const doc = accepted || initial.current.result.doc;
   const notice = error || (!accepted ? initial.current.result.error : '');
   const repair = actions.onRepair || actions.onContinue;
-  useEffect(() => {
-    if (!expanded) return;
-    const previous = document.activeElement as HTMLElement | null;
-    section.current?.focus();
-    return () => previous?.focus();
+  useLayoutEffect(() => {
+    const panel = dialog.current!;
+    if (menu.current?.matches(':popover-open')) menu.current.hidePopover();
+    if (expanded) {
+      panel.showModal();
+      panel.focus({ preventScroll: true });
+    } else if (panel.open) panel.close();
   }, [expanded]);
-  return <section onPointerDownCapture={actions.onActivate} onFocusCapture={actions.onActivate} ref={section} tabIndex={expanded ? -1 : undefined} role={expanded ? 'dialog' : undefined} aria-modal={expanded || undefined} className={`intelligent-ui${expanded ? ' iui-expanded' : ''}`} aria-label={expanded ? doc?.title || '交互界面' : 'Intelligent UI'} onKeyDown={e => {
-    if (!expanded) return;
-    if (e.key === 'Escape') { e.stopPropagation(); setExpanded(false); }
-    if (e.key === 'Tab') {
-      const elements = [...section.current!.querySelectorAll<HTMLElement>('button:not(:disabled),input,select,summary,[tabindex="0"]')].filter(el => el.getClientRects().length);
-      const first = elements[0], last = elements.at(-1);
-      if (e.shiftKey && (document.activeElement === first || document.activeElement === section.current)) { e.preventDefault(); last?.focus(); }
-      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first?.focus(); }
+  useEffect(() => {
+    if (!menuOpen) return;
+    const dismiss = () => {
+      if (menu.current?.matches(':popover-open')) menu.current.hidePopover();
+    };
+    window.addEventListener('resize', dismiss);
+    document.addEventListener('scroll', dismiss, true);
+    return () => {
+      window.removeEventListener('resize', dismiss);
+      document.removeEventListener('scroll', dismiss, true);
+    };
+  }, [menuOpen]);
+  return <dialog ref={dialog} onPointerDownCapture={actions.onActivate} onFocusCapture={actions.onActivate}
+    role={expanded ? 'dialog' : 'region'} className={`intelligent-ui${expanded ? ' iui-expanded' : ''}`}
+    aria-label={expanded ? doc?.title || '交互界面' : 'Intelligent UI'} onClose={event => {
+      if (event.target === event.currentTarget) setExpanded(false);
+    }} onKeyDown={event => {
+    if (event.key !== 'Escape') return;
+    if (menu.current?.matches(':popover-open')) {
+      event.preventDefault();
+      event.stopPropagation();
+      menu.current.hidePopover();
+      more.current?.focus({ preventScroll: true });
+    } else if (expanded) {
+      event.stopPropagation();
     }
   }}>
-    <header className="iui-toolbar"><span className="iui-status">{streaming && <><span className="iui-status-dot" />正在生成</>}</span><div className="iui-toolbar-actions">{actions.onEdit && <button type="button" disabled={streaming || actions.submitDisabled} title="将此界面及当前选择带入下一条消息" onClick={() => { setExpanded(false); actions.onEdit?.(); }}>修改</button>}<button type="button" onClick={() => setExpanded(v => !v)} aria-label={expanded ? '收起界面' : '展开界面'}>{expanded ? '收起' : '展开'}</button><SmallMenuDetails className="iui-menu" summary="···" summaryProps={{ "aria-label": "界面更多选项" }} surfaceClassName="iui-menu-surface"><button type="button" aria-pressed={showSource} onClick={() => setShowSource(v => !v)}>{showSource ? '预览' : '源码'}</button></SmallMenuDetails></div></header>
-    {!doc && streaming && <p className="iui-notice" role="status">正在接收界面描述…</p>}
-    <div className="iui-preview" hidden={showSource}>{doc && <UIRuntime doc={doc} {...actions} onEdit={actions.onEdit ? () => { setExpanded(false); actions.onEdit?.(); } : undefined} onContinue={actions.onContinue ? text => { setExpanded(false); actions.onContinue?.(text); } : undefined} submitDisabled={streaming || actions.submitDisabled} />}</div>
+    <header className="iui-toolbar">
+      <span className="iui-status" role="status">{streaming && <><span className="iui-status-dot" />正在生成</>}</span>
+      <div className="iui-toolbar-actions">
+        {!showSource && actions.onEdit && <button type="button" disabled={streaming || actions.submitDisabled}
+          title="将此界面及当前选择带入下一条消息" onClick={() => { setExpanded(false); actions.onEdit?.(); }}>修改</button>}
+        <button type="button" onClick={() => setExpanded(v => !v)}
+          aria-label={expanded ? '收起界面' : '展开界面'}>{expanded ? '收起' : '展开'}</button>
+        <button ref={more} className="iui-menu-trigger" type="button" aria-label="界面更多选项" popoverTarget={menuId} aria-expanded={menuOpen}
+          onClick={event => {
+            const popup = menu.current!;
+            if (popup.matches(':popover-open')) return;
+            event.preventDefault();
+            popup.showPopover();
+            const anchor = event.currentTarget.getBoundingClientRect();
+            const gap = 4, edge = 8;
+            const { offsetWidth: width, offsetHeight: height } = popup;
+            const below = anchor.bottom + gap;
+            const opensBelow = below + height <= innerHeight - edge;
+            popup.style.left = `${Math.max(edge, Math.min(anchor.right - width, innerWidth - width - edge))}px`;
+            popup.style.top = `${Math.max(edge, opensBelow ? below : anchor.top - gap - height)}px`;
+            popup.style.transformOrigin = opensBelow ? 'top right' : 'bottom right';
+            popup.querySelector('button')?.focus({ preventScroll: true });
+          }}><Icon name="chat-more" width="16" height="16" /></button>
+        <div id={menuId} ref={menu} className="iui-menu-surface" popover="auto" {...dropdownMenuPopover}
+          onToggle={event => { if (event.target === event.currentTarget) setMenuOpen(event.newState === 'open'); }}>
+          <button type="button" onClick={() => {
+            menu.current?.hidePopover();
+            setShowSource(value => !value);
+            more.current?.focus({ preventScroll: true });
+          }}>{showSource ? '返回预览' : '源码'}</button>
+        </div>
+      </div>
+    </header>
+    <div className="iui-preview" hidden={showSource}>
+      {!doc && streaming && <p className="iui-notice" role="status">正在接收界面描述…</p>}
+      {doc && <UIRuntime doc={doc} {...actions}
+        onEdit={actions.onEdit ? () => { setExpanded(false); actions.onEdit?.(); } : undefined}
+        onContinue={actions.onContinue ? text => { setExpanded(false); actions.onContinue?.(text); } : undefined}
+        submitDisabled={streaming || actions.submitDisabled} />}
+    </div>
     {showSource && <pre className="iui-source"><code>{source}</code></pre>}
     {notice && !streaming && <div className="iui-feedback"><ErrorIndicator description={`界面未更新：${notice}${doc ? ' · 已保留可用内容' : ''}`}
       retry={repair && { label: '让 Being 修正', run: () => { setExpanded(false); repair(`请修正刚才生成的智能界面「${doc?.title || '交互界面'}」。客户端报告：${notice}。请优先按上述错误中的节点、字段和层级修正，不要猜测删除其他合法属性。node 事件的 parent 必须与 op、node 同级，不能写入 node 对象；section.value、slider.value 和 list/checklist 项目的 description 都是合法字段。保留原需求和有效内容，重新输出完整的 intelligent-ui 界面；联动结果必须实际引用绑定状态。JSON 能解析不等于客户端校验通过，未经实际验证不要声称通过。`); } }} /></div>}
-  </section>;
+  </dialog>;
 });
 export function UIRuntime({ doc, storageKey, onContinue, onEdit, onSnapshot, submitDisabled, onEvent, embedded = false }: UIActions & { embedded?: boolean; doc: UIDocument; onEvent?: (key: string, value: Value) => void }) {
   const prefix = useId();

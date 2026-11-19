@@ -45,7 +45,8 @@ export function AttachmentFilePreview({part,endpoint}:{part:AttachmentPart;endpo
     file={{ size: part.size, mime: part.mime, parseFailed: part.parse_status === 'failed' }}
     onPreview={supported ? () => void preview() : undefined} previewing={busy}
     previewFailure={error ? { detail: error, run: () => void preview() } : undefined}
-    details={part.parse_result_id ? <AttachmentDetails key={JSON.stringify([endpoint,part.attachment_id,part.parse_result_id])} part={part} endpoint={endpoint} /> : undefined}>
+    details={part.parse_result_id ? dismissMenu => <AttachmentDetails key={JSON.stringify([endpoint,part.attachment_id,part.parse_result_id])}
+      part={part} endpoint={endpoint} dismissMenu={dismissMenu} /> : undefined}>
     下载原件
   </AttachmentDownload>;
 }

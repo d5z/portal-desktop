@@ -645,10 +645,7 @@ html[data-platform='darwin'] .workspace-stage .topbar {
   flex: none;
   width: 48px;
   height: 48px;
-  background: var(--control);
-  border: 1px solid var(--line);
-  font: 400 22px/1 var(--font-sans);
-  color: var(--secondary);
+  font: 22px/1 var(--font-sans);
   margin-bottom: 10px;
   border-radius: 50%;
   box-shadow: none;
@@ -807,6 +804,27 @@ body:has(.rail-links[data-sorting]) .rail-tooltip {
   overflow: clip;
 }
 
+@media (prefers-reduced-transparency: no-preference) {
+  html[data-platform='darwin']:has(#client-main:not([hidden])) {
+    &,
+    body,
+    #client-main {
+      background: transparent;
+    }
+
+    .workspace-body {
+      background: light-dark(rgb(246 246 246 / 78%), rgb(26 26 26 / 62%));
+    }
+  }
+
+  @container stage (width > 700px) {
+    html[data-platform='darwin'] .chat-session-panel[data-pinned='true'] {
+      background: transparent;
+      outline-color: transparent;
+    }
+  }
+}
+
 @container stage (max-width: 700px) {
   .chat-session-panel[data-pinned='true'] {
     position: absolute;
@@ -818,10 +836,7 @@ body:has(.rail-links[data-sorting]) .rail-tooltip {
 
   @media (prefers-reduced-transparency: no-preference) {
     html[data-platform='darwin'] .chat-session-panel[data-pinned='true'] {
-      background: light-dark(
-        color-mix(in srgb, var(--neutral-50) 78%, transparent),
-        color-mix(in srgb, var(--neutral-900) 80%, transparent)
-      );
+      background: light-dark(rgb(246 246 246 / 78%), rgb(26 26 26 / 80%));
       backdrop-filter: blur(50px);
     }
   }

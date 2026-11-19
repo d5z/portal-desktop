@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type {
   HomeConnectorAPI, HomeConnectorBeingAccess, HomeConnectorCatalogPage, HomeConnectorDetail, HomeConnectorEnableState,
-  HomeConnectorInstallation, HomeConnectorInstallationPage, HomeConnectorPreview, HomeConnectorTool,
+  HomeConnectorInstallation, HomeConnectorInstallationPage, HomeConnectorPreview, HomeConnectorTool, HomeLocalKitHistory, HomeLocalKitHistoryPage,
 } from '../../shared/home';
 import type { HomeClient } from './client';
 import { HomeError, homeURL } from './protocol';
@@ -38,12 +38,35 @@ export class HomeConnectors implements HomeConnectorAPI {
   }
 
   catalog(query: { q?: string; after?: string } = {}) {
-    const params = new URLSearchParams({ limit: '20' });
+    const params = new URLSearchParams({ limit: '12' });
     if (query.q?.trim()) params.set('q', utf8Prefix(query.q.trim(), 100));
     if (query.after) params.set('after', requiredId(query.after, '分页游标'));
-    return this.client.request<HomeConnectorCatalogPage>('/v1/me/kit-catalog?' + params.toString()).then(page => ({
-      ...page, items: page.items.map(item => ({ ...item, icon_url: this.iconURL(item.icon_url) })),
-    }));
+    const normalize = (page: HomeConnectorCatalogPage) => {
+      if (!page || typeof page !== 'object' || !Array.isArray(page.items)) throw new Error('统一应用目录响应无效。');
+      return { ...page, items: page.items.map(item => ({ ...item, icon_url: this.iconURL(item.icon_url) })) };
+    };
+    return this.client.request<HomeConnectorCatalogPage>('/v1/me/app-catalog?' + params.toString()).then(normalize).catch(error => {
+      // Keep older Home deployments usable when they have not exposed app-catalog yet.
+      const legacyEndpoint = error instanceof HomeError && [404, 405].includes(error.status);
+      const invalidResponse = error instanceof Error && error.message === '统一应用目录响应无效。';
+      if (!legacyEndpoint && !invalidResponse) throw error;
+      return this.client.request<HomeConnectorCatalogPage>('/v1/me/kit-catalog?' + params.toString()).then(normalize);
+    });
+  }
+
+  localKitHistory(after?: string) {
+    const params = new URLSearchParams({ limit: '12' });
+    if (after) params.set('after', requiredId(after, '分页游标'));
+    return this.client.request<HomeLocalKitHistoryPage>('/v1/me/local-kit-history?' + params.toString());
+  }
+
+  reportLocalKitHistory(input: { source_id: string; version: string }) {
+    const sourceId = requiredId(input.source_id, 'source_id');
+    const version = requiredId(input.version, 'version');
+    if (Buffer.byteLength(sourceId, 'utf8') > 256 || Buffer.byteLength(version, 'utf8') > 256) throw new Error('本机 Kit 历史字段过长。');
+    return this.client.request<HomeLocalKitHistory>('/v1/me/local-kit-history', {
+      ...json({ source_id: sourceId, version }),
+    });
   }
 
   installations(after?: string) {

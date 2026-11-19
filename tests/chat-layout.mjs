@@ -74,18 +74,43 @@ try{
   await deck.hover();
   for (let sample = 0; sample < 5; sample++) await page.mouse.wheel(24, 2);
   await photos.locator('.stack-card[data-top]').getByRole('button',{name:'预览 第三张示例图'}).waitFor();
+  const swipeStart = await deck.evaluate(() => performance.now() + 300);
+  const swipe = (at, samples) => deck.evaluate((node, { at, samples }) => {
+    samples.forEach((deltaX, index) => {
+      const event = new WheelEvent('wheel', { deltaX, bubbles: true, cancelable: true });
+      Object.defineProperty(event, 'timeStamp', { value: at + index * 8 });
+      node.dispatchEvent(event);
+    });
+  }, { at, samples });
+  // A swipe accelerates and then tapers off. A new swipe can start before
+  // the old stream has been quiet for 220 ms.
+  const samples = [12, 22, 30, 42, 24, 12, 8, 4, 2];
+  for (const [index, name] of ['第一张示例图', '第二张示例图', '第三张示例图'].entries()) {
+    await swipe(swipeStart + 100 * index, samples);
+    await photos.locator('.stack-card[data-top]').getByRole('button',{name:'预览 ' + name}).waitFor({timeout:2000});
+  }
+  const reverse = samples.map(delta => -delta);
+  for (const [index, name] of ['第二张示例图', '第一张示例图', '第三张示例图'].entries()) {
+    await swipe(swipeStart + 300 + 100 * index, reverse);
+    await photos.locator('.stack-card[data-top]').getByRole('button',{name:'预览 ' + name}).waitFor({timeout:2000});
+  }
+  await deck.press('ArrowLeft');
+  await photos.locator('.stack-card[data-top]').getByRole('button',{name:'预览 第二张示例图'}).waitFor();
+  await deck.press('ArrowRight');
+  await photos.locator('.stack-card[data-top]').getByRole('button',{name:'预览 第三张示例图'}).waitFor();
   const verticalScroll = await deck.evaluate(node => node.dispatchEvent(new WheelEvent('wheel', { deltaY: 100, bubbles: true, cancelable: true })));
   assert.ok(verticalScroll, 'Mac vertical scrolling stays available over the deck');
-  const imageActions = photos.locator('xpath=ancestor::div[@data-message-hover]').locator('.message-hover-actions');
   await photos.locator('.stack-card[data-top] button').hover();
-  await imageActions.getByRole('button',{name:'展开 3 张图片'}).click();
+  await photos.getByRole('button',{name:'展开 3 张图片'}).click();
   assert.equal(await photos.locator('.message-image-stack img').count(),3);
   await photos.evaluate(() => Object.defineProperty(navigator, 'platform', { value: 'Win32', configurable: true }));
-  await imageActions.getByRole('button',{name:'收起图片'}).click();
+  await photos.getByRole('button',{name:'收起图片'}).click();
   await photos.locator('.stack-card[data-top]').getByRole('button',{name:'预览 第三张示例图'}).waitFor();
   await deck.hover();
   await page.mouse.wheel(0, 100);
   await photos.locator('.stack-card[data-top]').getByRole('button',{name:'预览 第一张示例图'}).waitFor();
+  await page.mouse.wheel(0, -100);
+  await photos.locator('.stack-card[data-top]').getByRole('button',{name:'预览 第三张示例图'}).waitFor();
   await page.context().setOffline(true);
   await frame.locator('#toast:popover-open').waitFor();
   assert.equal(await frame.locator('#toast').textContent(),'已离线，恢复网络后会自动继续');
@@ -129,19 +154,32 @@ try{
         return !node.matches('.table-wrap') || getComputedStyle(node).overflowX === 'visible';
       }).map(node => ({ element: node.id || node.className, width: node.clientWidth, contentWidth: node.scrollWidth })));
     assert.deepEqual(overflow,[],`Horizontal overflow at ${width}px`);
-    assert.ok(await frame.locator('#pending-files .pending-file:not([inert]) .remove').evaluateAll(buttons => {
-      const prompt = document.querySelector('#input-area').getBoundingClientRect();
-      return buttons.length > 0 && buttons.every(button => {
-        const rect = button.getBoundingClientRect();
-        return rect.left >= prompt.left && rect.right <= prompt.right;
-      });
-    }), `Attachment remove buttons stay within the Prompt at ${width}px`);
+    const attachmentList = frame.locator('#pending-files .pending-files-list');
+    assert.ok(await attachmentList.evaluate(list => {
+      const cards = Array.from(list.querySelectorAll('.pending-file'));
+      return getComputedStyle(list).overflowX === 'auto' && list.scrollHeight === list.clientHeight &&
+        cards.length === 2 && cards.every(card => card.offsetTop === cards[0].offsetTop);
+    }), `Attachments stay in one horizontally scrollable row at ${width}px`);
+    assert.equal(await frame.getByRole('button',{name:/收起附件|另有.*份附件/}).count(),0);
     assert.equal(await frame.locator('#chat-index').count(),1);
     await frame.locator('#input').fill(long);
     assert.ok(await frame.locator('#input').evaluate(n=>n.scrollWidth<=n.clientWidth+1));
     assert.ok(await frame.locator('#messages').evaluate(n=>n.scrollHeight>n.clientHeight),'Vertical reading must remain available');
     await page.screenshot({path:`test-results/chat-layout-${width}.png`});
   }
+  const attachmentList = frame.locator('#pending-files .pending-files-list');
+  await attachmentList.hover();
+  await page.mouse.wheel(400,0);
+  await page.waitForFunction(() => document.querySelector('iframe').contentDocument.querySelector('.pending-files-list').scrollLeft > 0);
+  const secondRemove = frame.getByRole('button',{name:'移除 第二份附件.txt'});
+  await secondRemove.focus();
+  assert.ok(await secondRemove.evaluate(button => {
+    const list = button.closest('.pending-files-list').getBoundingClientRect();
+    const rect = button.getBoundingClientRect();
+    return rect.left >= list.left && rect.right <= list.right + 1;
+  }), 'The scrolled shelf keeps the last attachment remove button usable');
+  await page.mouse.wheel(-400,0);
+  await page.waitForFunction(() => document.querySelector('iframe').contentDocument.querySelector('.pending-files-list').scrollLeft === 0);
   await frame.locator('html').evaluate(n=>n.dataset.theme='dark');
   await page.screenshot({path:'test-results/chat-layout-dark.png'});
   // Wrapping must never rewrite the copyable source.
@@ -167,14 +205,14 @@ try{
   await results.locator('.image-generation-photo[data-loaded="true"]').nth(3).waitFor();
   const actions = results.locator('xpath=ancestor::*[@data-message-hover]').locator('[data-message-actions]');
   await results.getByRole('button',{name:'预览 多张生成结果'}).last().hover();
-  const collapse = actions.getByRole('button',{name:'收起图片',exact:true});
+  const collapse = results.getByRole('button',{name:'收起图片',exact:true});
   await collapse.click({timeout:3000});
   const photoGroup = results.getByRole('group',{name:'4 张图片',exact:true});
   await photoGroup.locator('.stack-card[data-top] button').waitFor();
   await photoGroup.getByLabel('图片堆叠，方向键翻看').press('ArrowRight');
   const second = photoGroup.locator('.stack-card[data-top] img');
   assert.match(await second.getAttribute('src'),/generated=1$/);
-  await actions.getByRole('button',{name:'展开 4 张图片',exact:true}).click();
+  await photoGroup.getByRole('button',{name:'展开 4 张图片',exact:true}).click();
   const expandedPhotos = photoGroup.locator('.message-image-stack img');
   assert.equal(await expandedPhotos.count(),4);
   await generated.waitForFunction(() => Array.from(document.querySelectorAll('.generated-image-group .message-image-stack img'))
@@ -190,7 +228,7 @@ try{
     const card = generated.getByRole('region',{name:title,exact:true});
     await card.scrollIntoViewIfNeeded();
     const row = card.locator('xpath=ancestor::*[@data-message-hover]');
-    await row.getByRole('status').getByText(status,{exact:true}).waitFor();
+    await row.getByRole('alert').getByText(status,{exact:false}).waitFor({state:'attached'});
     const placeholder = card.locator('.image-generation-status-frame > svg');
     await placeholder.waitFor({timeout:3000});
     assert.ok(await placeholder.evaluate(icon => {

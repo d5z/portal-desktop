@@ -39,7 +39,7 @@ try {
         if (pathname.endsWith('/remove')) return new Response(null, {status:204});
         if (pathname.endsWith('/actions')) return Response.json({error:'kit_operation_changed'}, {status:409});
         if (pathname.includes('/offline/')) throw new Error('Fixture transport offline');
-        if (pathname.includes('/kit-catalog')) return Response.json({enabled:true,items:[{release_id:'gmail',name:'Gmail'}]});
+        if (pathname.includes('/app-catalog') || pathname.includes('/kit-catalog')) return Response.json({enabled:true,items:[{release_id:'gmail',name:'Gmail'}]});
         if (pathname.includes('/empty/')) return new Response(null, {status:502});
         return Response.json({name:'Gmail',accounts:[],methods:[]});
       });
@@ -66,7 +66,7 @@ try {
   cdp.on('Network.requestWillBeSent', event => { if (event.request.url.includes('/api/v1/me/')) requests.push(event); });
   cdp.on('Network.responseReceived', event => { if (event.response.url.includes('/api/v1/me/')) responses.push(event); });
   cdp.on('Network.loadingFinished', async event => {
-    const response = responses.find(item => item.requestId === event.requestId && item.response.url.includes('/kit-catalog?'));
+    const response = responses.find(item => item.requestId === event.requestId && item.response.url.includes('/app-catalog?'));
     if (!response) return;
     try { catalogBodies.push(JSON.parse((await cdp.send('Network.getResponseBody', { requestId: event.requestId })).body)); }
     catch { /* DevTools may discard a custom-protocol body after navigation. */ }

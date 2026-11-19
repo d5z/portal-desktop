@@ -1,3 +1,5 @@
+@use '../../shared/styles/chat-menu';
+
 /* Local declarative interfaces use the chat theme and never inject model CSS. */
 .intelligent-ui {
   margin: 12px 0;
@@ -329,39 +331,31 @@
   gap: 6px;
 }
 
-.iui-toolbar-actions > button,
-.iui-menu > summary {
+.iui-toolbar-actions > button {
   border: 0;
   background: transparent;
   color: var(--text-muted);
 }
 
-.iui-menu {
-  position: relative;
+.iui-toolbar-actions > .iui-menu-trigger {
+  display: grid;
+  place-items: center;
+  min-width: 28px;
 }
 
-.iui-menu summary {
-  cursor: pointer;
-  list-style: none;
-  padding: 4px 8px;
-  font-weight: 700;
-  letter-spacing: 2px;
-}
-
-.iui-menu summary::-webkit-details-marker {
-  display: none;
-}
-
-.iui-menu-surface {
-  position: absolute;
-  z-index: 2;
-  right: 0;
-  top: 30px;
-  transform-origin: top right;
+.iui-menu-surface[popover] {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  padding: 4px;
+  color: var(--text);
+  @include chat-menu.surface(var(--chat-menu-surface, var(--bg)), var(--chat-menu-border, 1px solid var(--border)), var(--chat-menu-shadow, 0 4px 12px #0001));
+  @include chat-menu.popover-presence;
 
   > button {
-    min-width: 80px;
-    box-shadow: 0 4px 12px #0001;
+    @include chat-menu.action-row;
+
+    white-space: nowrap;
   }
 }
 
@@ -618,14 +612,29 @@
   border-radius: 0 0 18px 18px;
 }
 
-.iui-expanded {
+/* The inline card and dialog share one mounted UI runtime. */
+dialog.intelligent-ui {
+  display: block;
+  padding: 0;
+  max-width: none;
+  max-height: none;
+}
+
+.intelligent-ui.iui-expanded {
+  --iui-expanded-inset: 20px;
+
   position: fixed;
-  inset: 20px;
+  inset: calc(var(--chat-top-inset, 0px) + var(--iui-expanded-inset)) var(--iui-expanded-inset) var(--iui-expanded-inset);
   width: auto;
+  height: auto;
   margin: 0;
-  z-index: 10000;
-  overflow-y: auto;
-  box-shadow: 0 0 0 100vmax #0006;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scroll-padding-block-start: 48px;
+}
+
+.iui-expanded::backdrop {
+  background: #0006;
 }
 
 .iui-expanded .iui-toolbar {
@@ -640,6 +649,8 @@
   max-width: 1040px;
   margin: auto;
 }
+
+.iui-expanded .iui-source { max-height: none; }
 
 @media (max-width: 600px) {
   .iui-body {
@@ -659,8 +670,8 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  .iui-expanded {
-    inset: 8px;
+  .intelligent-ui.iui-expanded {
+    --iui-expanded-inset: 8px;
   }
 
   .intelligent-ui button {

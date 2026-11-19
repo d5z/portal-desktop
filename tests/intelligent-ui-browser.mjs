@@ -26,11 +26,23 @@ try {
   assert.equal(await total.textContent(), '472');
   await page.getByLabel('界面更多选项').click();
   await page.getByRole('button', { name: '源码', exact: true }).click();
-  await page.getByRole('button', { name: '预览', exact: true }).click();
+  await page.locator('.iui-source').waitFor();
+  await page.locator('.iui-menu-surface:popover-open').waitFor({ state: 'detached' });
+  await page.getByLabel('界面更多选项').click();
+  await page.getByRole('button', { name: '返回预览', exact: true }).click();
   assert.equal(await total.textContent(), '472');
   await page.getByRole('button', { name: '展开界面' }).click();
   assert.equal(await total.textContent(), '472');
+  const dialog = page.locator('dialog.iui-expanded:modal');
+  await dialog.waitFor();
+  await dialog.getByLabel('界面更多选项').click();
+  await dialog.locator('.iui-menu-surface:popover-open').waitFor();
   await page.keyboard.press('Escape');
+  await dialog.locator('.iui-menu-surface:popover-open').waitFor({ state: 'detached' });
+  assert.ok(await dialog.isVisible());
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'detached' });
+  assert.equal(await page.getByRole('button',{name:'展开界面'}).evaluate(node => node === document.activeElement), true);
   await page.evaluate(() => window.update('{"version":', true));
   assert.equal(await total.textContent(), '472');
   await page.evaluate(() => { const doc = JSON.parse(window.source); doc.title = '流式更新完成'; window.update(JSON.stringify(doc)); });
@@ -114,16 +126,26 @@ try {
   assert.match(await page.evaluate(()=>window.copied), /\[✓\] 鸡肉 · 1250 克/);
   assert.match(await page.evaluate(()=>window.copied), /配菜与水果/);
   assert.equal((await page.locator('.intelligent-ui').boundingBox()).height,beforeCopy.height);
-  assert.equal(await page.locator('.intelligent-ui .iui-toast').count(),0);
   await page.locator('.iui-toast').waitFor({state:'visible'});
   assert.equal(await page.getByRole('button',{name:'用当前选择继续',exact:true}).count(),0);
-  await page.evaluate(()=>{window.failCopy=true;});
-  await page.getByRole('button',{name:'复制清单',exact:true}).click();
-  await page.getByText('复制失败，请重试',{exact:true}).waitFor();
-  await page.evaluate(()=>{window.failCopy=false;});
-  await page.getByRole('button',{name:'复制清单',exact:true}).click();
-  await page.getByText('已复制',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'展开界面',exact:true}).click();
+  for (const failed of [true,false]) {
+    await page.evaluate(failed=>{window.failCopy=failed;},failed);
+    await page.getByRole('button',{name:'复制清单',exact:true}).click();
+    const toast = page.getByRole('status').filter({hasText:failed?'复制失败，请重试':'已复制'});
+    await toast.waitFor();
+    assert.ok(await toast.evaluate(el=>{
+      const rect=el.getBoundingClientRect(), previous=el.style.pointerEvents;
+      el.style.pointerEvents='auto';
+      const above=el.contains(document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2));
+      el.style.pointerEvents=previous;
+      return above;
+    }), 'Copy success and failure feedback must paint above the expanded modal');
+    assert.equal(await page.getByRole('button',{name:'复制清单',exact:true}).evaluate(el=>el===document.activeElement),true);
+  }
+  await page.screenshot({path:path.resolve('test-results/intelligent-ui-expanded-copy.png')});
   await page.locator('.iui-toast').waitFor({state:'detached',timeout:5000});
+  await page.getByRole('button',{name:'收起界面',exact:true}).click();
   assert.equal(await page.locator('.iui-numbered-timeline .iui-timeline-number').count(),4);
   assert.equal(await page.getByRole('heading',{name:'把周末，留给一桌好菜',exact:true}).count(),1);
 
@@ -155,6 +177,20 @@ try {
   await page.keyboard.press('Enter');
   assert.equal(await page.getByRole('button',{name:'增加同行人数'}).isDisabled(),true);
   assert.equal(await page.locator('.iui-facts dd').innerText(),'4');
+  await page.getByRole('button',{name:'展开界面',exact:true}).click();
+  for (const close of ['Escape','button']) {
+    await page.getByRole('button',{name:'预览 装备 1',exact:true}).click();
+    const preview=page.getByRole('dialog',{name:'图片预览：装备 1',exact:true});
+    await preview.waitFor();
+    if (close==='Escape') await page.keyboard.press('Escape');
+    else await preview.getByRole('button',{name:'关闭图片预览',exact:true}).click();
+    await preview.waitFor({state:'detached'});
+    assert.equal(await page.locator('dialog.iui-expanded:modal').count(),1,'Closing an image preview must leave its parent UI expanded');
+    assert.equal(await page.locator('.iui-facts dd').innerText(),'4');
+    assert.equal(await page.getByRole('button',{name:'预览 装备 1',exact:true}).evaluate(el=>el===document.activeElement),true);
+  }
+  await page.keyboard.press('Escape');
+  await page.getByRole('button',{name:'展开界面',exact:true}).waitFor();
   for(const width of [320,800]) {
     await page.setViewportSize({width,height:800});
     const gallery = await page.locator('.iui-gallery').boundingBox();
@@ -258,9 +294,9 @@ try {
   await page.getByRole('button', { name: '重新开始', exact: true }).click();
   await page.getByRole('button', { name: '第 1 格', exact: true }).waitFor();
   await page.evaluate(() => window.update(JSON.stringify({ version: 1, title: '异常计算', state: {}, body: [{ id: 'bad', type: 'app', code: 'while(true){}' }] }), false, 'bad-app'));
-  await page.getByText(/应用计算超时/).waitFor();
+  await page.getByRole('alert').filter({hasText:/应用计算超时/}).waitFor();
   await page.evaluate(() => window.update(JSON.stringify({version:1,title:'错误图片',state:{},body:[{id:'image-app',type:'app',code:`ui.render({version:1,title:'图片',state:{},body:[{id:'photo',type:'image',src:'data:image/svg+xml,<svg/>'}]});`}]}),false,'invalid-image'));
-  await page.getByText(/生成内容格式不符合要求/).waitFor();
+  await page.getByRole('alert').filter({hasText:/生成内容格式不符合要求/}).waitFor();
   assert.equal(await page.getByRole('button',{name:'重新启动',exact:true}).count(),0);
   assert.equal(await page.getByText('正在准备交互体验…',{exact:true}).count(),0);
   await page.getByRole('button',{name:'让 Being 修正',exact:true}).click();

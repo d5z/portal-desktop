@@ -8,10 +8,9 @@
   &:empty { display: none; }
 }
 
-.message-media-actions .message-image-toggle[aria-expanded='true'] svg { rotate: 180deg; }
-
 :root[data-chat-host='desktop'] {
   $feedback: '.chat-error-indicator, .chat-status-actions, .message-action-status, .attachment-download-progress';
+  $media: '.attachment-message-host, .message-image-group, .markdown-image-only, .image-generation-answer, [data-slot="delivered-files"]';
 
   .message-bubble-row {
     position: relative;
@@ -25,10 +24,20 @@
     flex: 0 0 auto;
     min-width: 0;
     margin-block-end: 4px;
+
+    &:not(:has(button, time, .message-media-actions > *)) { display: none; }
   }
 
   .message.user .message-bubble-body:has(> .attachment-message-host) {
-    max-inline-size: min(var(--chat-attachment-width), 100%);
+    max-inline-size: min(var(--chat-attachment-message-width, var(--chat-attachment-width)), 100%);
+  }
+
+  .message-bubble-row:has(#{$media}) {
+    flex-wrap: nowrap;
+  }
+
+  @media (max-width: 380px) {
+    .message.being .message-bubble-body:has(.message-caption-actions:not(:empty)) { max-inline-size: 100%; }
   }
 
   .message.being .message-bubble-body:has(> .intelligent-answer .intelligent-ui) {
@@ -56,8 +65,28 @@
     margin-inline-start: auto;
   }
 
+  .message-caption-actions:empty { display: none; }
+
+  :is(.attachment-caption, .markdown-caption) {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+    max-inline-size: 100%;
+
+    > :first-child { min-inline-size: 0; }
+    > .message-caption-actions { flex: none; }
+  }
+
+  .message.user :is(.attachment-caption, .markdown-caption) {
+    flex-direction: row-reverse;
+  }
+
+  .attachment-caption > .message-caption-actions { margin-block-end: 4px; }
+
+  .markdown-caption > :first-child { margin: 0; }
+
   .message-media-actions { display: contents; }
-  .message.user .message-media-actions > :not(.message-image-toggle) { order: -1; }
+  .message.user .message-media-actions > * { order: -1; }
   .message.user .message-media-actions > :is(#{$feedback}) { order: 1; }
   .message.being .message-media-actions > :is(#{$feedback}) { order: -1; }
 
@@ -95,7 +124,8 @@
   .message-hover-buttons { gap: 4px; }
 
   .message-hover-buttons button,
-  .message-hover-buttons .chat-error-indicator > button {
+  .message-hover-buttons .chat-error-indicator > button,
+  :is(.markdown-table-actions, .markdown-table-preview > header) button {
     position: relative;
     display: grid;
     place-items: center;
@@ -112,8 +142,23 @@
     transition: background-color var(--ui-motion-fast) ease;
   }
 
+  :is(.markdown-table-actions, .markdown-table-preview > header) button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--chat-secondary);
+    cursor: pointer;
+
+    svg {
+      width: var(--chat-icon-compact);
+      height: var(--chat-icon-compact);
+      stroke-width: 1.95;
+    }
+  }
+
   @media (forced-colors: active) {
-    .message-hover-buttons button:focus-visible {
+    .message-hover-buttons button:focus-visible,
+    :is(.markdown-table-actions, .markdown-table-preview > header) button:focus-visible {
       outline-color: Highlight;
     }
   }
@@ -143,12 +188,27 @@
   }
 
   .message-hover-buttons button[data-copy-failed],
-  .message-hover-buttons button[data-copy-failed]:hover:not(:disabled) {
+  .message-hover-buttons button[data-copy-failed]:hover:not(:disabled),
+  .markdown-table-actions button[data-copy-failed],
+  .markdown-table-actions button[data-copy-failed]:hover:not(:disabled) {
     color: var(--chat-error-icon);
   }
 
+  @media (hover: none), (pointer: coarse) {
+    :is(.markdown-table-actions, .markdown-table-preview > header) button {
+      flex-basis: var(--touch-target);
+      width: var(--touch-target);
+      height: var(--touch-target);
+      border-radius: 6px;
+      touch-action: manipulation;
+    }
+  }
+
   @media (hover: none) {
-    .message-action-space { flex: 0 0 100%; margin-block-end: 0; }
+    .message-bubble-row:not(:has(#{$media})) .message-action-space {
+      flex-basis: 100%;
+      margin-block-end: 0;
+    }
 
     .message .message-hover-actions {
       justify-content: flex-start;

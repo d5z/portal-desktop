@@ -30,6 +30,8 @@ const api: DesktopAPI = {
   home: {
     connectors: {
       catalog: query => connectorRequest('catalog', query),
+      localKitHistory: after => connectorRequest('local-kit-history', after),
+      reportLocalKitHistory: input => connectorRequest('report-local-kit-history', input),
       installations: after => connectorRequest('installations', after),
       installation: installationId => connectorRequest('installation', installationId),
       removeAccount: (releaseId, connectionId) => connectorRequest('remove-account', releaseId, connectionId),

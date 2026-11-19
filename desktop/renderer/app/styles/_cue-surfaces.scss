@@ -158,31 +158,36 @@
 
 #being-info .being-profile {
   min-height: 128px;
-  padding: 6px 0 12px;
+  padding: 10px 0 24px;
 }
 
+.workspace-rail .rail-being,
 #being-info .being-avatar {
-  --avatar-colors: #17445d, #206876 42%, #318d94 78%, #68bdba;
+  --avatar-ink: light-dark(#3c6467, #a2c4c2);
 
-  width: 62px;
-  height: 62px;
-  margin-bottom: 10px;
-  border: 0;
-  background: radial-gradient(circle 35px at 47% 50%, var(--avatar-colors));
-  color: white;
-  font: 500 27px/33px var(--font-sans);
+  border: 1px solid var(--line);
+  background: light-dark(var(--neutral-0), var(--neutral-card));
+  color: var(--avatar-ink);
+  font-weight: 500;
 
   &[data-palette='indigo'] {
-    --avatar-colors: #3f346f, #5b4e9a 42%, #786cbe 78%, #a99bdd;
+    --avatar-ink: light-dark(#595372, #bab2ce);
   }
 
   &[data-palette='clay'] {
-    --avatar-colors: #753a35, #a14e41 42%, #c7745d 78%, #e6ac90;
+    --avatar-ink: light-dark(#79574d, #cdb0a4);
   }
 
   &[data-palette='blue'] {
-    --avatar-colors: #173e80, #285aab 42%, #5185d0 78%, #87b7ef;
+    --avatar-ink: light-dark(#465d76, #aabed3);
   }
+}
+
+#being-info .being-avatar {
+  width: 62px;
+  height: 62px;
+  margin-bottom: 12px;
+  font: 500 27px/33px var(--font-sans);
 }
 
 #being-info .being-profile h2 {
@@ -193,7 +198,7 @@
 
 #being-info .being-status {
   gap: 5px;
-  margin: 2px 0 0;
+  margin: 4px 0 0;
   font-size: 11px;
   line-height: 18px;
 
@@ -260,7 +265,7 @@
 }
 
 #being-info .being-info-content {
-  padding: 10px 8px 24px;
+  padding: 22px 8px 24px;
   margin-inline: -8px;
   scrollbar-gutter: auto;
 }
@@ -270,7 +275,7 @@
 }
 
 #being-info .being-info-content > #being-profile-panel {
-  padding-block-start: 6px;
+  padding-block-start: 8px;
 }
 
 #being-info #being-profile-panel h3 {
@@ -292,8 +297,8 @@
 }
 
 #being-info :is(.being-details > div, .being-action-row) {
-  min-height: 52px;
-  padding: 10px 16px;
+  min-height: 56px;
+  padding: 12px 16px;
   border: 0;
 }
 
@@ -583,6 +588,7 @@
 #client-settings-dialog .connector-search {
   position: relative;
   display: block;
+  flex-basis: 160px;
   min-width: 0;
 }
 
@@ -600,7 +606,7 @@
 #client-settings-dialog .connector-search input {
   height: 40px;
   min-height: 40px;
-  padding: 8px 48px 8px 40px;
+  padding: 8px 14px 8px 40px;
   border-radius: 24px;
   background: var(--control);
   transition:
@@ -612,7 +618,7 @@
   border-color: color-mix(in srgb, var(--secondary) 32%, var(--line));
 }
 
-#client-settings-dialog .connector-search input:focus-visible {
+:root:not([data-pointer-focus]) #client-settings-dialog .connector-search input:focus-visible {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent);
   outline: none;
@@ -700,9 +706,9 @@
 }
 
 #client-settings-dialog .connector-toolbar > button.connector-refresh {
-  position: absolute;
-  right: 4px;
+  position: static;
   display: grid;
+  flex: 0 0 32px;
   place-items: center;
   width: 32px;
   min-height: 32px;

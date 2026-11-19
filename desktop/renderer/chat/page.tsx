@@ -39,7 +39,6 @@ import {
   Fragment,
   useCallback,
   useEffect,
-  useId,
   useLayoutEffect,
   useMemo,
   useRef,
@@ -59,6 +58,7 @@ import {
 } from "./models/chat";
 import { inCurrentScene, isGlobalBeingMessage, sceneItems, sceneName, type HistoryScope } from "./models/scenes";
 import { useModel } from "../shared/hooks/use-model";
+import { usePointerFocus } from '../shared/hooks/use-pointer-focus';
 import { CodeClipboard, isImageOnlyMarkdown } from "../shared/components/markdown";
 import { type ComposerHandle } from "../shared/components/rich-composer";
 import { ChatComposer } from "./components/composer";
@@ -100,6 +100,7 @@ class ChatErrorBoundary extends Component<
   }
 }
 export function ChatApp({ connection, keywordNavigation = true, mobileWeb = false }: { connection?: RuntimeOptions['connection']; keywordNavigation?: boolean; mobileWeb?: boolean } = {}) {
+  usePointerFocus(typeof document !== 'undefined' && document.documentElement.dataset.chatHost === 'desktop');
   const session = useChatSession(connection);
   return (
     <ChatErrorBoundary>
@@ -147,16 +148,16 @@ function QueueRow({ item, index, reorderable, allowInterrupt, onEdit }: {
     <div className="composer-queue-row-actions">
       {item.retry ? <button type="button" className="composer-queue-steer" disabled={item.queueBusy} aria-label={item.retryLabel || '重试'}
         onClick={() => void item.retry?.()}><Icon name="chat-retry" width="14" height="14" />重试</button>
-        : !working && !unconfirmed && item.canInterruptQueued && <ChatActionTooltip content="发给正在运行的任务" disabled={!allowInterrupt}>
-          <button type="button" className="composer-queue-steer" disabled={!allowInterrupt} aria-label="引导"
+        : allowInterrupt && !working && !unconfirmed && item.canInterruptQueued && <ChatActionTooltip content="发给正在运行的任务">
+          <button type="button" className="composer-queue-steer" aria-label="引导"
             onClick={() => void item.interruptQueued?.()}><Icon name="turn-right" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />引导</button>
         </ChatActionTooltip>}
-      {item.queuePhase !== 'sending' && item.cancelQueued && <button type="button" data-warm-tooltip="取消排队" aria-label={`取消排队：${label}`} disabled={item.queueBusy && item.queuePhase !== 'preparing'} onClick={() => item.cancelQueued?.()}>
-        <Icon name="trash" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-      </button>}
       {!working && !unconfirmed && onEdit && canEditQueuedMessage(item) && <button type="button" data-queue-edit data-warm-tooltip="编辑消息"
         aria-label={`编辑消息：${label}`} disabled={item.queueBusy} onClick={() => onEdit(item)}>
         <Icon name="chat-edit" width="14" height="14" />
+      </button>}
+      {item.queuePhase !== 'sending' && item.cancelQueued && <button type="button" data-warm-tooltip="取消排队" aria-label={`取消排队：${label}`} disabled={item.queueBusy && item.queuePhase !== 'preparing'} onClick={() => item.cancelQueued?.()}>
+        <Icon name="chat-close" width="14" height="14" />
       </button>}
     </div>
   </div>;
@@ -253,14 +254,8 @@ export function ChatView({
   const surfaceContext = useMemo(() => ({ blocks: surfaceBlocks }), [surfaceBlocks]);
   const currentSceneName = sceneName(state.currentScene, state.currentScene);
   const [pendingPreview, setPendingPreview] = useState<Attachment | null>(null);
-  const [pendingExpanded, setPendingExpanded] = useState(false);
-  const [fittingPendingCount, setFittingPendingCount] = useState<number>();
-  const pendingOverflow = fittingPendingCount === undefined ? 0 : Math.max(0, state.files.length - fittingPendingCount);
   const pendingList = useRef<HTMLDivElement>(null);
   const queueTooltipRoot = useRef<HTMLDivElement>(null);
-  const pendingToggle = useRef<HTMLButtonElement>(null);
-  const pendingListId = useId();
-  const isEditingQueue = Boolean(editingQueued);
   const pendingImages = state.files.flatMap(file => {
     if (!/^image\/(png|jpeg|gif|webp)$/.test(file.type)) return [];
     const src = file.previewUrl || (file.base64 && `data:${file.type};base64,${file.base64}`);
@@ -271,36 +266,6 @@ export function ChatView({
   useEffect(() => {
     if (pendingPreview && pendingImageIndex < 0) setPendingPreview(null);
   }, [pendingPreview, pendingImageIndex]);
-  useLayoutEffect(() => {
-    const list = pendingList.current;
-    const toggle = pendingToggle.current;
-    if (!list || !toggle || isEditingQueue || document.documentElement.dataset.chatHost !== 'desktop') return;
-    const shelf = list.parentElement!;
-    const cards = Array.from(list.children);
-    const measure = () => {
-      const width = shelf.clientWidth;
-      const gap = parseFloat(getComputedStyle(list).columnGap) || 0;
-      const widths = cards.map(card => card.getBoundingClientRect().width);
-      const all = widths.reduce((total, size) => total + size + gap, -gap);
-      if (all <= width) {
-        if (toggle === document.activeElement) {
-          list.querySelector<HTMLButtonElement>('.remove')?.focus({ preventScroll: true });
-        }
-        setFittingPendingCount(widths.length);
-        setPendingExpanded(false);
-        return;
-      }
-      // Reserve the disclosure button only when the complete row cannot fit.
-      let remaining = width - toggle.getBoundingClientRect().width;
-      const firstOverflow = widths.findIndex(size => (remaining -= size + gap) < -0.5);
-      setFittingPendingCount(firstOverflow < 0 ? widths.length : firstOverflow);
-    };
-    const resize = new ResizeObserver(measure);
-    resize.observe(shelf);
-    cards.forEach(card => resize.observe(card));
-    measure();
-    return () => resize.disconnect();
-  }, [state.files.length, isEditingQueue]);
   const chatApp = useRef<HTMLDivElement>(null),
     messages = useRef<HTMLDivElement>(null),
     composer = useRef<ComposerHandle>(null),
@@ -370,7 +335,7 @@ export function ChatView({
   const canChooseFollowUp = canSteer && hasDraft && !state.stopping &&
     (state.files.length === 0 || location.protocol !== 'beings:');
   const action = state.stopping || (!hasDraft && (state.streaming || state.attachmentPending)) ? 'stop'
-    : state.sendWillQueue ? canChooseFollowUp ? 'steer' : 'queue' : 'send';
+    : canChooseFollowUp ? 'steer' : hasDraft && state.sendWillQueue ? 'queue' : 'send';
   const sendLabel = state.stopping ? '正在停止' : action === 'stop' ? '停止处理' : readingFiles ? '正在读取附件'
     : action === 'steer' ? '引导' : action === 'queue' ? '排队' : '发送消息';
   function sendDraft(mode?: "interrupt") {
@@ -666,12 +631,18 @@ export function ChatView({
             const processing = attachment ? attachmentProcessing(item) : null;
             const notices = (item.sourceMessageIds || [item.id]).flatMap(id => bubbleNotices.get(id) || []);
             let text = splitSchedulingHint(attachment ? originalMessageText(item) : item.text).text;
+            let mixedMedia = false;
             if (item.role === 'being') {
               if (text.includes('being.image-generation')) {
-                text = imageGenerationBlocks(text).filter(block => block.kind === 'text').map(block => block.text).join('\n');
+                const blocks = imageGenerationBlocks(text);
+                mixedMedia = blocks.some(block => block.kind === 'receipt');
+                text = blocks.filter(block => block.kind === 'text').map(block => block.text).join('\n');
               }
               const files = beingFileBlocks(text);
-              if (files.length) text = files.filter(block => block.kind === 'text').map(block => block.text).join('\n');
+              if (files.length) {
+                mixedMedia = true;
+                text = files.filter(block => block.kind === 'text').map(block => block.text).join('\n');
+              }
             }
             const info = {
               text: text.trim() && (attachment || !isImageOnlyMarkdown(text)) ? text : '',
@@ -710,6 +681,9 @@ export function ChatView({
                     onContextMenu: event => messageMenu.openMenu(event, { ...info, hasExtraActions }),
                     onKeyDown: event => messageMenu.openMenu(event, { ...info, hasExtraActions }),
                   })}
+                  mixedMedia={mixedMedia}
+                  time={shortTime && <time className="message-hover-time" title={exactTime} dateTime={dateTime}>{shortTime}</time>}
+                  copy={info.text && <CopyMessage appearance="chat" text={info.text} copy={bridge.copyText} />}
                   menu={attachmentMenuMessageId === item.id ? messageMenu.attachmentTarget : null}
                   feedback={<div className="message-feedback">
                     {notices.map(notice => <SystemStatusRow key={notice.id} item={notice} inActions />)}
@@ -717,10 +691,7 @@ export function ChatView({
                       <ChatStatusRow title={item.queueNotice || '消息需要处理'} tone="error" inActions
                         retry={{ label: item.retryLabel || '重试', run: () => void item.retry?.() }} />}
                   </div>}
-                  actions={(mediaActions, hasExtraActions) => <div className="message-hover-actions" data-message-actions>
-                    {shortTime && <time className="message-hover-time" title={exactTime} dateTime={dateTime}>{shortTime}</time>}
-                    <div className="message-hover-buttons">
-                      {info.text && <CopyMessage appearance="chat" text={info.text} copy={bridge.copyText} />}
+                  actions={(mediaActions, hasExtraActions) => <>
                       {hasExtraActions && <ChatActionTooltip content="更多消息操作" disabled={activeMenuMessageId === item.id}>
                         <button type="button" className="message-more" aria-label="更多消息操作"
                           aria-haspopup="menu" aria-expanded={activeMenuMessageId === item.id}
@@ -729,8 +700,7 @@ export function ChatView({
                         </button>
                       </ChatActionTooltip>}
                       {mediaActions}
-                    </div>
-                  </div>}>
+                  </>}>
                     {attachment ? <AttachmentMessageContent message={item} processing={processing} /> : <ImageGenerationAnswer
                       text={item.role === 'being' ? item.text : ''}
                       streaming={item.streaming}
@@ -813,22 +783,13 @@ export function ChatView({
               hidden={!!editingQueued}
               role="group"
               aria-label="待发送附件"
-              data-expanded={pendingExpanded}
             >
-              <button type="button" ref={pendingToggle} hidden={!pendingOverflow} className="composer-overflow-toggle pending-files-toggle"
-                aria-expanded={pendingExpanded} aria-controls={pendingListId} onClick={() => {
-                  if (pendingExpanded && pendingList.current) pendingList.current.scrollTop = 0;
-                  setPendingExpanded(!pendingExpanded);
-                }}>
-                {pendingExpanded ? '收起附件' : `另有 ${pendingOverflow} 份附件`}<Icon name="chat-chevron-down" width="14" height="14" />
-              </button>
-              <ChatTooltipGroup anchorRoot={pendingList}><div className="pending-files-list" id={pendingListId} ref={pendingList} data-warm-tooltip-scope>
+              <ChatTooltipGroup anchorRoot={pendingList}><div className="pending-files-list" ref={pendingList} data-warm-tooltip-scope>
                 {state.files.map((file, i) => {
                   const preview = pendingImages.find(image => image.file === file)?.src;
                   const mediaType = file.type.split('/', 1)[0];
                   const icon = mediaType === 'audio' ? 'chat-audio' : mediaType === 'image' ? 'chat-image' : 'chat-file';
-                  return <div className={`pending-file${preview ? " pending-file-image" : ""}`} key={`${file.name}-${i}`}
-                    inert={!pendingExpanded && fittingPendingCount !== undefined && i >= fittingPendingCount}>
+                  return <div className={`pending-file${preview ? " pending-file-image" : ""}`} key={`${file.name}-${i}`}>
                     <div className="pending-file-content" title={!preview && !file.loading ? `${file.name} · ${formatBytes(file.size)}` : undefined}>
                       {preview ? <button className="pending-file-open" type="button" aria-label={`预览 ${file.name}`}
                         data-warm-tooltip="预览图片" onClick={() => setPendingPreview(file)}>
@@ -845,8 +806,8 @@ export function ChatView({
                         const list = event.currentTarget.closest('#pending-files');
                         runtime.removePending(i);
                         requestAnimationFrame(() => {
-                          const controls = list?.querySelectorAll<HTMLButtonElement>('.pending-file:not([inert]) .remove');
-                          (controls?.[i] ?? controls?.[i - 1] ?? (pendingToggle.current?.hidden ? null : pendingToggle.current) ?? composer.current)?.focus();
+                          const controls = list?.querySelectorAll<HTMLButtonElement>('.pending-file .remove');
+                          (controls?.[i] ?? controls?.[i - 1] ?? composer.current)?.focus();
                         });
                       }}>
                         <Icon name="chat-close" width="14" height="14" />

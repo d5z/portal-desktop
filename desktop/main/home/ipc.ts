@@ -26,6 +26,8 @@ export function registerHomeIpc(handle: (channel: string, callback: (...args: an
       };
     }
     handle('beings:home-connector-catalog', (query: { q?: string; after?: string } = {}) => connectors.catalog(query));
+    handle('beings:home-connector-local-kit-history', (after?: string) => connectors.localKitHistory(after));
+    handle('beings:home-connector-report-local-kit-history', (input: { source_id: string; version: string }) => connectors.reportLocalKitHistory(input));
     handle('beings:home-connector-installations', (after?: string) => connectors.installations(after));
     handle('beings:home-connector-installation', (installationId: string) => connectors.installation(installationId));
     handle('beings:home-connector-remove-account', (releaseId: string, connectionId: string) => connectors.removeAccount(releaseId, connectionId));

@@ -1,34 +1,42 @@
+@use '../../shared/styles/chat-icon-control';
+
 /* A04: shared unframed images; geometry follows the Figma masters. */
 :root[data-chat-host='desktop'] {
   --chat-deck-start-inset: 0.05;
   --chat-deck-end-inset: 0.13;
+  --chat-image-toggle-size: var(--chat-icon-target);
+  --chat-image-action-rail: calc(var(--chat-image-toggle-size) + 8px);
+  --chat-image-group-width: calc(var(--chat-attachment-width) + var(--chat-image-action-rail));
 
   #messages .message .message-image-group {
-    display: flex;
-    flex-direction: column;
-    gap: var(--chat-image-grid-gap);
+    position: relative;
     box-sizing: border-box;
-    width: var(--chat-attachment-width);
+    width: var(--chat-image-group-width);
     max-width: 100%;
-    padding: 0;
+    padding-inline-end: var(--chat-image-action-rail);
     border: 0;
     background: transparent;
     color: var(--chat-secondary);
   }
 
-  .message .message-bubble-body:has(> .attachment-message-host, > .content:has(> .markdown-image-group:only-child)) {
+  #messages .message.user .message-image-group { padding-inline: var(--chat-image-action-rail) 0; }
+
+  .message .message-bubble-body:has(> .attachment-message-host) {
     flex: 0 1 auto;
-    width: var(--chat-attachment-width);
+    width: var(--chat-attachment-message-width, var(--chat-attachment-width));
     min-width: 0;
   }
 
-  // Side actions follow the front photo. The deck still reserves room for the fan.
-  .message.being .message-bubble-body:has(> .intelligent-answer > .content > .markdown-image-group:only-child > .message-image-deck) {
-    margin-inline-end: calc(-1 * var(--chat-deck-end-inset) * min(var(--chat-attachment-width), var(--chat-text-bubble-max-width)));
+  .message.user .message-bubble-body:has(> .attachment-message-host .attachment-image-group) {
+    --chat-attachment-message-width: var(--chat-image-group-width);
   }
 
-  .message.user .message-bubble-body:has(> .attachment-message-host .attachment-image-group:last-child > .message-image-deck) {
-    margin-inline-start: calc(-1 * var(--chat-deck-start-inset) * min(var(--chat-attachment-width), 100%));
+  .message.being .message-bubble-body:has(.generated-image-group) {
+    --chat-generation-bubble-width: var(--chat-image-group-width);
+  }
+
+  .image-generation-images:has(> .generated-image-group:only-child) {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   #messages .message-bubble-body .content:is(:has(> .markdown-image-group):not(:has(> :not(.markdown-image-group))), :has(> p.markdown-image-only:only-child)) {
@@ -37,6 +45,10 @@
     padding: 0;
     background: transparent;
     box-shadow: none;
+  }
+
+  #messages .message-bubble-body .content:has(> .markdown-image-group):not(:has(> :not(.markdown-image-group))) {
+    width: var(--chat-image-group-width);
   }
 
   #messages .message-bubble-body .content {
@@ -49,6 +61,52 @@
     > :is(.markdown-image-only, .markdown-image-group) + * {
       margin-block-start: var(--chat-attachment-gap);
     }
+  }
+
+  .message-image-toggle {
+    position: absolute;
+    z-index: 1;
+    inset-inline-end: 0;
+    inset-block-end: 4px;
+    display: grid;
+    place-items: center;
+    inline-size: var(--chat-image-toggle-size);
+    block-size: var(--chat-image-toggle-size);
+    padding: 0;
+    border: 0;
+    border-radius: 4px;
+    background: transparent;
+    color: var(--chat-secondary);
+    cursor: pointer;
+
+    @include chat-icon-control.feedback;
+
+    > svg { transition: rotate var(--ui-motion-fast) ease; }
+    &[aria-expanded='true'] > svg { rotate: 180deg; }
+    &:focus-visible {
+      outline: 1px solid currentcolor;
+      outline-offset: -1px;
+    }
+  }
+
+  .message-image-deck + .message-image-toggle {
+    inset-inline-end: calc((100% - var(--chat-image-action-rail)) * var(--chat-deck-end-inset));
+  }
+
+  .message.user .message-image-toggle { inset-inline: 0 auto; }
+
+  .message.user .message-image-deck + .message-image-toggle {
+    inset-inline-start: calc((100% - var(--chat-image-action-rail)) * var(--chat-deck-start-inset));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .message-image-toggle > svg { transition: none; }
+  }
+
+  @media (pointer: coarse) {
+    --chat-image-toggle-size: var(--touch-target);
+
+    .message-image-toggle { touch-action: manipulation; }
   }
 
   #messages .message .message-bubble-body .content:has(> .markdown-image-only):has(> :not(.markdown-image-only, .markdown-image-group)) {
@@ -115,7 +173,7 @@
   #messages .message-image-deck :is(.attachment-card-host, .attachment-image-card) { width: 100%; height: 100%; }
   #messages .message .message-image-deck :is([data-slot='image-thumbnail'], .attachment-image-thumbnail) { max-width: none; }
 
-  #messages .message :is([data-slot='image-thumbnail'], .attachment-image-thumbnail):focus-visible {
+  &:not([data-pointer-focus]) #messages .message :is([data-slot='image-thumbnail'], .attachment-image-thumbnail):focus-visible {
     // Inset rings stay visible in cropped tiles and across light or dark images.
     outline: 2px solid white;
     outline-offset: -4px;
@@ -123,7 +181,7 @@
   }
 
   @media (forced-colors: active) {
-    #messages .message :is([data-slot='image-thumbnail'], .attachment-image-thumbnail):focus-visible {
+    &:not([data-pointer-focus]) #messages .message :is([data-slot='image-thumbnail'], .attachment-image-thumbnail):focus-visible {
       outline-color: Highlight;
     }
   }

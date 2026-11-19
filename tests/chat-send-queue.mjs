@@ -42,6 +42,8 @@ try{
   assert.equal(await page.getByRole('button',{name:'停止处理',exact:true}).count(),0);
   await input.press('Control+Enter');
   await page.locator('.composer-queue-item').filter({hasText:'稍后发送'}).waitFor();
+  await sendControl.locator('svg rect').waitFor();
+  assert.equal(await sendControl.getAttribute('aria-label'),'停止处理','An empty composer keeps the active turn stop action while messages are queued');
   await input.fill('优先处理');
   const send = page.locator('#send-btn[aria-label="引导"]');
   const tip = page.getByRole('group',{name:'发送选项'});
@@ -78,6 +80,9 @@ try{
   assert.equal(sends.length,1);
   assert.equal(await page.locator('.message.user').count(),1);
   const later = page.locator('.composer-queue-item').filter({hasText:'稍后发送'});
+  assert.deepEqual(await later.locator('.composer-queue-row-actions button').evaluateAll(
+    buttons => buttons.map(button => button.getAttribute('aria-label'))
+  ), ['引导','编辑消息：稍后发送','取消排队：稍后发送']);
   assert.equal(await later.locator(':is(.composer-queue-leading, .composer-queue-drag-handle) > svg').count(), 1);
   const summary = later.getByRole('button', { name: /^预览第/ });
   const preview = page.getByRole('dialog', { name: '待发消息预览' });

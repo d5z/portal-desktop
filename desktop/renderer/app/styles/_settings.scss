@@ -403,12 +403,14 @@
 
 .connector-toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 20px;
 }
 
 .connector-search {
   flex: 1;
+  min-width: 160px;
 }
 
 .connector-search input {
@@ -418,6 +420,33 @@
   border: 1px solid var(--line);
   border-radius: 10px;
   background: var(--surface);
+}
+
+.connector-runtime-filter {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: stretch;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.connector-runtime-filter button {
+  border: 0;
+  border-right: 1px solid var(--line);
+  padding: 8px 12px;
+  background: transparent;
+  color: var(--secondary);
+}
+
+.connector-runtime-filter button:last-child {
+  border-right: 0;
+}
+
+.connector-runtime-filter button.selected {
+  background: var(--selected);
+  color: var(--text);
 }
 
 .connector-toolbar > button {

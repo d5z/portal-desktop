@@ -480,11 +480,11 @@ export function KitDetail({ town, data }: { town: TownModel; data: Data }) {
             {installed ? installed.problem ? "本机文件异常" : "已安装"
               : town.prepareBusy ? "正在下载并检查…"
               : town.installedLoading ? "正在检查安装状态…"
-              : !town.installedLibrary ? "安装状态未确认" : "安装到本机"}
+              : !town.installedLibrary ? "安装状态未确认" : "安装"}
           </button>
         )}
         {installed && <button className="secondary" onClick={() => void town.showInstalledKit(installed.name)}>查看本机 Kit</button>}
-        {installed && <button className="secondary danger-action" onClick={() => void town.deleteKit(installed)}>删除本机 Kit</button>}
+        {installed && <button className="secondary danger-action" onClick={() => town.requestDeleteKit(installed)}>删除本机 Kit</button>}
         <button
           className="secondary scene-select"
           onClick={() =>
@@ -673,7 +673,7 @@ export function LocalKitDetail({town, kit}: {town: TownModel; kit: LocalKit}) { 
                   >
                     一起看
                   </button>
-                  <button className="secondary danger-action" onClick={() => void town.deleteKit(kit)}>
+                  <button className="secondary danger-action" onClick={() => town.requestDeleteKit(kit)}>
                     删除本机 Kit
                   </button>
                 </div>

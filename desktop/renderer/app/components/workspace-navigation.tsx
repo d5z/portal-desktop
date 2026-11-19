@@ -18,11 +18,9 @@ import { useModel } from "../../shared/hooks/use-model";
 import { BeingComputer } from "./being-computer";
 import { BeingLibrary } from "./home-library";
 import { beingModelRequest } from '../services/being-model-network';
+import { beingMonogram } from '../lib/being-monogram';
 
 const beingTabs = [["profile", "详情"], ["library", "资料库"], ["computer", "电脑"]] as const;
-
-const beingAvatarPalettes = ["teal", "indigo", "clay", "blue"] as const;
-const avatarInitials = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 
 const destinations = [
   ["bonfire", "篝火", "rail-bonfire"],
@@ -86,7 +84,8 @@ function readPinnedNavigation(): string[] {
 
 export function WorkspaceNavigation({ app }: { app: AppModel }) {
   const town = useModel(app.town), plugins = useModel(app.plugins);
-  const name = town.displayName || app.snapshot?.settings.being || "Being";
+  const beingId = (app.snapshot?.settings.being || "").trim();
+  const name = town.displayName?.trim() || beingId || "Being";
   const [pins, setPins] = useState(readPinnedNavigation);
   const [order, setOrder] = useState<string[]>(() => {
     try { const saved = JSON.parse(localStorage.getItem("beings:navigation-order") || "null");
@@ -145,7 +144,7 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
   const sceneOrderKey = `beings:scene-order:${JSON.stringify([app.snapshot?.settings.endpoint, app.snapshot?.settings.being])}`;
   return <nav className="workspace-rail" aria-label="主导航">
     {app.startup === 'ready' && <ChatSceneIndicator orderKey={sceneOrderKey}
-      beingName={name} onHome={() => void app.returnToMainChat()}
+      beingName={name} beingId={beingId} onHome={() => void app.returnToMainChat()}
       createRequest={app.chatSessionCreateRequest}
       scene={app.snapshot?.chatScene} sessions={app.snapshot?.chatSessions} activity={app.chatSceneActivity}
       onSession={(operation, value, sceneId) => app.changeChatSession(operation, value, sceneId)}
@@ -208,10 +207,7 @@ export function BeingInfo({ app }: { app: AppModel }) {
   useEffect(() => { if (privacyOpen) privacyBack.current?.focus(); }, [privacyOpen]);
   const beingId = (app.snapshot?.settings.being || "").trim();
   const name = town.displayName?.trim() || beingId || "Being";
-  let avatarHash = 2166136261;
-  for (const character of beingId) avatarHash = Math.imul(avatarHash ^ character.codePointAt(0)!, 16777619);
-  const avatarPalette = beingAvatarPalettes[(avatarHash >>> 0) % beingAvatarPalettes.length];
-  const initial = avatarInitials.segment(name)[Symbol.iterator]().next().value?.segment;
+  const { initial, palette } = beingMonogram(name, beingId);
   const status = !app.snapshot?.settings.hasToken ? "未连接" : ({online:"已连接",connecting:"连接中",reconnecting:"重连中",offline:"已离线",degraded:"连接不稳定"}[app.connection] || "正在确认连接");
   const hidden = !app.beingInfoOpen || app.view !== "chat" || (app.subagentSettingsOpen && !app.settingsRoute);
   const browserAvailable = app.view === "chat" && !(app.subagentSettingsOpen && !app.settingsRoute);
@@ -254,7 +250,7 @@ export function BeingInfo({ app }: { app: AppModel }) {
     <div className="being-overview" hidden={privacyOpen}>
     <div className="being-home-title">Being Home</div>
     <div className="being-profile">
-      <div className="being-avatar" data-palette={avatarPalette} aria-hidden="true">{initial}</div>
+      <div className="being-avatar" data-palette={palette} aria-hidden="true">{initial}</div>
       <h2>{name}</h2>
       <p className="being-status" data-online={app.connection === "online"}><span aria-hidden="true" />{status}</p>
     </div>

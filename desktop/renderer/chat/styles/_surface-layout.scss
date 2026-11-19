@@ -262,7 +262,7 @@
   font-size: 11px;
   line-height: 18px;
 
-  &[data-tool] { font-family: var(--mono); }
+  .run-entry[data-tool] & { font-family: var(--mono); }
 }
 
 .run-entry-heading small {
