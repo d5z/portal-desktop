@@ -94,6 +94,21 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   const poll = useRef<(force?: boolean) => void>(() => {});
   const mutating = useRef(false);
   const localKitsRequest = useRef(0);
+  const homeSession = useRef<number>();
+  const resetHomeSession = (session: number | undefined) => {
+    if (homeSession.current === session) return;
+    homeSession.current = session;
+    navigation.current++; toolRequest.current++;
+    page.current = undefined;
+    pending.current.clear(); finished.current.clear(); details.current.clear(); toolsCache.current.clear();
+    removals.current.clear(); lifecycleRequests.current.clear(); preferredAccounts.current.clear();
+    toolsInstallation.current = undefined; toolsLoadingInstallation.current = undefined; toolsAccount.current = undefined;
+    for (const key of Object.keys(localStorage)) if (key.startsWith('portal.home.connector.intent.')) localStorage.removeItem(key);
+    setSelected(undefined); setDetail(undefined); setPreview(undefined); setFlow(undefined); setAccountId(undefined);
+    setTools(undefined); setBeingAccess(undefined); setValues({}); setMethod(undefined); setAdopt(false);
+    setBusy(false); setError(''); setToolsError(''); setToolsLoading(false); setPendingConnection(undefined);
+    onDetailChange?.(null);
+  };
   const pendingKey = (id: string) => `portal.home.connector.intent.${id}`;
 
   const restorePending = async () => {
@@ -250,6 +265,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
     try {
       const home = await model.api.home?.state();
       if (request !== catalogRequest.current) return;
+      resetHomeSession(home?.authenticated && !home.authenticating ? home.sessionVersion : undefined);
       setAuthenticated(Boolean(home?.authenticated));
       setAuthenticating(Boolean(home?.authenticating));
       if (!home?.authenticated) {
@@ -308,11 +324,13 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   useEffect(() => {
     void load('');
     void restorePending().then(() => poll.current());
-    let lastAuthenticated: boolean | undefined;
+    let lastSession = '';
     const unsubscribe = model.api.home?.subscribe(state => {
       setAuthenticating(state.authenticating);
       if (!state.authenticated && state.error) setCatalogError(publicErrorMessage(state.error));
-      if (lastAuthenticated !== state.authenticated) { lastAuthenticated = state.authenticated; void load(''); }
+      const session = `${state.authenticated}:${state.authenticating}:${state.sessionVersion}`;
+      resetHomeSession(state.authenticated && !state.authenticating ? state.sessionVersion : undefined);
+      if (lastSession !== session) { lastSession = session; void load(''); }
     });
     const timer = window.setInterval(() => poll.current(), 2500);
     const focus = () => { for (const entry of pending.current.values()) entry.polls = 0; void restorePending().then(() => poll.current(true)); };
@@ -368,6 +386,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
       if (!current.installation_id && !current.authorization_url && !['ready', 'preparing'].includes(current.status)) throw error;
       next = current;
     }
+    if (request !== navigation.current) return;
     details.current.delete(kit.release_id);
     if (pendingStatuses.includes(next.status)) { pending.current.set(next.id, { state: next, polls: 0 }); localStorage.setItem(pendingKey(next.id), next.id); }
     if (next.connection_id) preferredAccounts.current.set(next.release_id, next.connection_id);
