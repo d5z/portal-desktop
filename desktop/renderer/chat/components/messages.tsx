@@ -21,7 +21,7 @@ function ActivityStep({ entry, finished }: { entry: ActivityEntry; finished: boo
   const preview = summary.trim().split(/\r?\n/, 1)[0].slice(0, 240);
   const toolStatus = entry.type === 'tool' ? (entry.error ? 'failed' : entry.done ? 'done' : finished ? undefined : 'running') : undefined;
   const state = entry.error ? '失败' : entry.done ? '' : finished ? '结果未确认' : '进行中';
-  return <details className="run-entry" onToggle={event => setOpen(event.currentTarget.open)}>
+  return <details className="run-entry" data-tool={!thought || undefined} onToggle={event => setOpen(event.currentTarget.open)}>
     <summary className="run-entry-heading">
       <span className={`run-entry-icon${entry.error ? ' error' : ''}`} aria-hidden="true">
         {toolStatus
@@ -30,7 +30,7 @@ function ActivityStep({ entry, finished }: { entry: ActivityEntry; finished: boo
         <span className="run-entry-disclosure"><Icon name="chat-chevron-right" /></span>
       </span>
       <span className="run-entry-title" title={title}>{title}</span>
-      {preview && <span className="run-entry-chip" data-tool={!thought || undefined}>{preview}</span>}
+      {preview && <span className="run-entry-chip">{preview}</span>}
       {state && <small className={entry.error ? 'run-failures' : undefined}>{state}</small>}
     </summary>
     {open && <div className="run-entry-detail">
@@ -108,6 +108,7 @@ function DetailedChatActivity({
   const passive = run.waitingForReply && !run.scheduling?.tasks.some(task => task.status === 'running' || task.status === 'queued');
   const status = run.status || run.outcome || (passive ? "waiting" : "thinking");
   const showElapsed = !passive && status !== 'reconnecting';
+  const showHint = run.hint && !(status === 'working' && run.hint.trim() === CHAT_SCENE_ACTIVITY_LABELS.working);
   useEffect(() => {
     if (run.end || !showElapsed || !open) return;
     setNow(Date.now());
@@ -174,7 +175,7 @@ function DetailedChatActivity({
           {failed > 0 && <span className="run-failures">{failed} 次失败</span>}
           {unconfirmed > 0 && <span>{unconfirmed} 次{run.end ? '结果未确认' : '进行中'}</span>}
         </div>}
-        {run.hint && <p className="run-hint">{run.hint}</p>}
+        {showHint && <p className="run-hint">{run.hint}</p>}
         {!run.end && run.context && <p className="run-hint">{run.context}</p>}
         {run.scheduling && !onOpenSubagents && <SceneScheduling {...run.scheduling} />}
         <div className="run-list">

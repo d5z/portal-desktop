@@ -60,6 +60,10 @@ const glyphs = {
     <path d="M3 6h18" />
     <path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
   </>) },
+  'lucide-maximize-2': { viewBox: '0 0 24 24', content: (<>
+    <path d="M15 3h6v6" /><path d="m21 3-7 7" />
+    <path d="m3 21 7-7" /><path d="M9 21H3v-6" />
+  </>) },
   // Chat glyph geometry from Lucide (ISC), https://lucide.dev/license.
   'chat-more': { viewBox: '0 0 24 24', content: (
     <>
@@ -82,7 +86,7 @@ const glyphs = {
       <path vectorEffect="non-scaling-stroke" d="m21.854 2.147-10.94 10.939" />
     </g>
   ) },
-  'chat-stop': { viewBox: '0 0 24 24', content: (<><rect width="18" height="18" x="3" y="3" rx="2" fill="currentColor" stroke="none" /></>) },
+  'chat-stop': { viewBox: '0 0 24 24', content: <rect width="12" height="12" x="6" y="6" rx="1.5" fill="currentColor" stroke="none" /> },
   // Composer controls use the 20 px geometry from the Codex desktop reference.
   'chat-arrow-up': { viewBox: '0 0 20 20', content: <path d="M10 16.667V3.333m-5.833 5.834L10 3.333l5.833 5.834" strokeWidth="1.33" /> },
   'chat-composer-stop': { viewBox: '0 0 20 20', content: <rect width="11" height="11" x="4.5" y="4.5" rx="1.25" fill="currentColor" stroke="none" /> },

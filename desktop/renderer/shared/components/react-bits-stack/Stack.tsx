@@ -112,7 +112,7 @@ interface DragState {
 
 interface Actions {
   placeAll: (options?: PlaceAllOptions) => void;
-  sendToBack: (direction: Vector | null, velocity?: Vector | null) => void;
+  cycleCards: (direction: Vector | null, velocity?: Vector | null, reverse?: boolean) => void;
   onMove: (event: PointerEvent) => void;
   onUp: (event: PointerEvent) => void;
 }
@@ -219,7 +219,7 @@ export default function Stack({
   const orderRef = useRef(order);
   const valuesRef = useRef(new Map<number, CardValues>());
   const elementsRef = useRef(new Map<number, HTMLDivElement>());
-  const flyingRef = useRef(new Map<number, { turned: boolean }>());
+  const flyingRef = useRef(new Map<number, { turned: boolean; finish: () => void }>());
   const dragRef = useRef<DragState | null>(null);
   const aliveRef = useRef(true);
   const mountedRef = useRef(false);
@@ -366,13 +366,13 @@ export default function Stack({
     setOrder(next);
   };
 
-  const sendToBack = (direction: Vector | null, velocity: Vector | null = null) => {
+  const cycleCards = (direction: Vector | null, velocity: Vector | null = null, reverse = false) => {
     const s = settingsRef.current!;
     const current = orderRef.current;
     if (current.length < 2) return;
     const top = current[0];
     if (flyingRef.current.has(top)) return;
-    const next = [...current.slice(1), top];
+    const next = reverse ? [current[current.length - 1], ...current.slice(0, -1)] : [...current.slice(1), top];
     if (s.reduceMotion) {
       commit(next);
       return;
@@ -390,13 +390,21 @@ export default function Stack({
     const out = [home.x + dx * travel, home.y + dy * travel];
     const values = valuesFor(top);
     const launch = springFor(s, 'fling');
-    const flight = { turned: false };
+    const flight = {
+      turned: false,
+      finish() {
+        if (!flight.turned) turn();
+        if (!landed) land();
+      }
+    };
     flyingRef.current.set(top, flight);
     values.z.set(s.count + 1);
     animate(values.x, out[0], velocity ? { ...launch, velocity: velocity[0] } : launch);
     animate(values.y, out[1], velocity ? { ...launch, velocity: velocity[1] } : launch);
     settleFace(values, s);
     commit(next);
+    // A quick reversal can bring an outgoing card straight back to the front.
+    flyingRef.current.get(next[0])?.finish();
     const span = Math.max(Math.hypot(out[0] - values.x.get(), out[1] - values.y.get()), 1);
     let landed = false;
     const turn = () => {
@@ -410,10 +418,7 @@ export default function Stack({
       const position = orderRef.current.indexOf(top);
       if (position >= 0) values.z.set(settingsRef.current!.count - position);
     };
-    const fallback = setTimeout(() => {
-      if (!flight.turned) turn();
-      if (!landed) land();
-    }, 1500 / s.speed);
+    const fallback = setTimeout(flight.finish, 1500 / s.speed);
     const clearOfPile = () => {
       const element = elementsRef.current.get(top);
       if (!element) return true;
@@ -512,7 +517,7 @@ export default function Stack({
     }
     const s = settingsRef.current!;
     if (!drag.moved) {
-      if (event.type === 'pointerup' && s.sendToBackOnClick) sendToBack(null);
+      if (event.type === 'pointerup' && s.sendToBackOnClick) cycleCards(null);
       else settleFace(valuesFor(drag.card), s);
       return;
     }
@@ -524,7 +529,8 @@ export default function Stack({
     const pace = Math.hypot(vx, vy);
     const flick = pace > FLICK_SPEED && distance > 16 && vx * dx + vy * dy > 0;
     if (event.type === 'pointerup' && s.count > 1 && (distance > s.threshold || flick)) {
-      sendToBack(pace > 300 ? [vx, vy] : [dx, dy], [vx, vy]);
+      const direction: Vector = pace > 300 ? [vx, vy] : [dx, dy];
+      cycleCards(direction, [vx, vy], direction[0] > Math.abs(direction[1]));
     } else {
       placeAll({ released: drag.card, velocity: [clamp(vx, -3000, 3000), clamp(vy, -3000, 3000)] });
     }
@@ -565,13 +571,17 @@ export default function Stack({
 
   const onKeyDown = (event: ReactKeyboardEvent<HTMLDivElement>) => {
     if (event.target !== event.currentTarget) return;
-    if (['ArrowRight', 'ArrowDown', 'Enter', ' '].includes(event.key)) {
+    if (event.key === 'ArrowRight' || event.key === 'ArrowLeft') {
       event.preventDefault();
-      sendToBack(null);
+      const reverse = event.key === 'ArrowLeft';
+      cycleCards([reverse ? 1 : -1, 0], null, reverse);
+    } else if (['ArrowDown', 'Enter', ' '].includes(event.key)) {
+      event.preventDefault();
+      cycleCards(null);
     }
   };
 
-  actionsRef.current = { placeAll, sendToBack, onMove, onUp };
+  actionsRef.current = { placeAll, cycleCards, onMove, onUp };
   if (!listenersRef.current) {
     listenersRef.current = {
       move: (event: PointerEvent) => actionsRef.current!.onMove(event),
@@ -597,7 +607,7 @@ export default function Stack({
 
   useEffect(() => {
     if (!autoplay || count < 2 || dragging || (pauseOnHover && hovered)) return undefined;
-    const timer = setTimeout(() => actionsRef.current!.sendToBack(null), Math.max(300, autoplayDelay));
+    const timer = setTimeout(() => actionsRef.current!.cycleCards(null), Math.max(300, autoplayDelay));
     return () => clearTimeout(timer);
   }, [autoplay, autoplayDelay, pauseOnHover, hovered, dragging, order, count]);
 

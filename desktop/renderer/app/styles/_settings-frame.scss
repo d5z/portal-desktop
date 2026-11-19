@@ -1886,7 +1886,7 @@ html[data-theme='dark'] .town-logo-light {
   outline: none;
 }
 
-#client-settings-dialog .settings-nav-search:focus-within {
+:root:not([data-pointer-focus]) #client-settings-dialog .settings-nav-search:has(> input:focus-visible) {
   border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
 }

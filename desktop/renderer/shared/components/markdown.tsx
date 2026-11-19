@@ -8,6 +8,7 @@ import { StreamingMarkdown } from '../lib/streaming-markdown';
 import { LocalFileAction, LocalFileLink } from './local-file-link';
 import { RemoteImage, RemoteImageGroup } from './remote-image';
 import { MessageImageGroup } from './message-image-group';
+import { MessageCaptionAnchor, MessageCaptionSlot } from './message-action-slot';
 import { Icon } from '../icons/icon';
 import codeStyles from './markdown-code-copy.module.scss';
 import { remoteImageURL } from '../../../shared/remote-image';
@@ -152,7 +153,7 @@ export const Markdown = memo(function Markdown(props: MarkdownProps) {
   return <MarkdownReferenceScope text={props.content}><div className={props.className ?? 'reading-text'} data-delivered-files-only={filesOnly || undefined}>
     {blocks.map((block, index) => block.kind === 'files'
       ? <BeingFilesMessage key={block.start} receipt={block.receipt} streaming={props.streaming ?? false} source={block.text} />
-      : <MarkdownText {...props} key={block.start} content={block.text} className="" leadingContent={index === 0 ? props.leadingContent : undefined} />)}
+      : <MarkdownText {...props} key={block.start} content={block.text} className="" withinFileReceipt leadingContent={index === 0 ? props.leadingContent : undefined} />)}
   </div></MarkdownReferenceScope>;
 });
 
@@ -168,7 +169,9 @@ const MarkdownText = memo(function MarkdownText({
   previewMarkdownCode = true,
   intelligentUI = false,
   streaming: receiving = false,
-}: MarkdownProps) {
+  withinFileReceipt = false,
+}: MarkdownProps & { withinFileReceipt?: boolean }) {
+  const captionSlot = useContext(MessageCaptionSlot);
   const [content, setContent] = useState(source);
   const reveal = useRef({ source: '', text: '', position: 0, receiving: false });
   useLayoutEffect(() => {
@@ -234,7 +237,10 @@ const MarkdownText = memo(function MarkdownText({
     [onPlace, renderText, leadingContent, chat, richCode, previewMarkdownCode, intelligentUI, streaming, previewLocalFile]);
   const linked = new Set<PlaceView>();
   const firstContentToken = tokens.find(token => token.type !== 'space');
-  const groupImages = chat && className?.split(/\s+/).includes('content');
+  const groupImages = chat && (withinFileReceipt || className?.split(/\s+/).includes('content'));
+  const captionToken = captionSlot && groupImages && (captionSlot.mixedMedia || tokens.some(imageParagraph))
+    ? tokens.filter(token => token.type !== 'space' && token.type !== 'def' && token.type !== 'hr' && !imageParagraph(token)).at(-1)
+    : undefined;
   // Explicit links take precedence over automatic word links throughout the message.
   function collect(list: Token[]) {
     for (const token of list) {
@@ -322,7 +328,7 @@ const MarkdownText = memo(function MarkdownText({
             else if (list[end].type !== 'space') break;
           }
           if (group.length > 1) {
-            const grid = <MessageImageGroup className="markdown-image-group" count={group.length}>
+            const grid = <MessageImageGroup className="markdown-image-group">
               {group.map(({src,name,title}, imageIndex) => <RemoteImage key={imageIndex} src={src} name={name} title={title} showUnavailable />)}
             </MessageImageGroup>;
             return <Fragment key={index}>
@@ -336,7 +342,9 @@ const MarkdownText = memo(function MarkdownText({
       const cached = topLevel ? blockCache.get(token) : undefined;
       if (cached && cached.before === before) {
         cached.after.forEach(view => linked.add(view));
-        return <Fragment key={index}>{cached.node}</Fragment>;
+        return token === captionToken
+          ? <div key={index} className="markdown-caption">{cached.node}<MessageCaptionAnchor /></div>
+          : <Fragment key={index}>{cached.node}</Fragment>;
       }
       const inner = ["link", "code", "codespan", "html", "image"].includes(
         token.type,
@@ -526,7 +534,9 @@ const MarkdownText = memo(function MarkdownText({
           node = token.raw;
       }
       if (topLevel) blockCache.set(token, { before, after: [...linked], node });
-      return <Fragment key={index}>{node}</Fragment>;
+      return token === captionToken
+        ? <div key={index} className="markdown-caption">{node}<MessageCaptionAnchor /></div>
+        : <Fragment key={index}>{node}</Fragment>;
     });
   }
   return <div className={className}>{leadingContent && firstContentToken?.type !== 'paragraph' && <p>{leadingContent}</p>}{render(tokens, true, true)}</div>;
@@ -575,22 +585,21 @@ function MarkdownTableScroll({ children, text }: { children: ReactNode; text: st
   const scroller = <div ref={ref} className="table-wrap" tabIndex={overflow ? 0 : undefined} role="region"
     aria-label={overflow ? '表格，可横向滚动' : '表格'}>
     {children}
-    {overflow && <small className="table-scroll-hint" aria-hidden="true">可横向滚动 <Icon name="chat-chevron-right" width="12" height="12" /></small>}
   </div>;
   if (typeof document === 'undefined' || document.documentElement.dataset.chatHost !== 'desktop') return scroller;
   return <div className="markdown-table" data-copy-group>
-    {scroller}
     <div className="markdown-table-actions" data-markdown-copy="exclude">
       <CopyMessage appearance="chat" text={text} copy={copy} label="复制表格" />
       {overflow && <ChatActionTooltip content="展开表格">
         <button ref={expand} type="button" aria-label="展开表格" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
-          <Icon name="expand" width="16" height="16" fill="none" stroke="currentColor" />
+          <Icon name="lucide-maximize-2" />
         </button>
       </ChatActionTooltip>}
     </div>
+    {scroller}
     {open && <Dialog className="markdown-table-preview" open onClose={closePreview} aria-label="表格预览" dismissOnBackdrop>
       <header><strong>表格预览</strong>
-        <button type="button" aria-label="关闭表格预览" onClick={closePreview}><Icon name="chat-close" width="16" height="16" /></button>
+        <button type="button" aria-label="关闭表格预览" onClick={closePreview}><Icon name="chat-close" /></button>
       </header>
       <div className="table-wrap" role="region" aria-label="表格，可横向滚动" tabIndex={0}>{children}</div>
     </Dialog>}

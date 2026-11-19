@@ -16,6 +16,7 @@ import { CHAT_SCENE_ACTIVITY_ACTIONS, CHAT_SCENE_ACTIVITY_LABELS, type ChatScene
 import type { HistoryScope } from "../../chat/models/scenes";
 import { PanelResizeHandle, usePanelWidth } from "../../shared/components/panel-resize";
 import { Dialog } from "../../shared/components/dialog";
+import { beingMonogram } from '../lib/being-monogram';
 
 const sceneTooltipAppearance = { ...shellTooltipAppearance, side: 'bottom' as const, gap: 6 };
 class SceneKeyboardSensor {
@@ -221,9 +222,10 @@ function SceneList({ sessions, selected, activity, query, disabled, orderKey, on
   </nav>;
 }
 
-export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connected, scope, scopeReady, onScope, onCopy, onSession, visible = true, onReveal, createRequest = 0, beingName = "Being", onHome, orderKey }: {
+export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connected, scope, scopeReady, onScope, onCopy, onSession, visible = true, onReveal, createRequest = 0, beingName = "Being", beingId = "", onHome, orderKey }: {
   orderKey: string;
   beingName?: string;
+  beingId?: string;
   onHome?: () => void;
   createRequest?: number;
   activity?: Record<string, ChatSceneActivity>;
@@ -324,17 +326,18 @@ export function ChatSceneIndicator({ scene, sessions = [], activity = {}, connec
   useLayoutEffect(() => { if (expanded) lastPinned.current = pinned; }, [expanded, pinned]);
   const drawerPinned = expanded ? pinned : lastPinned.current;
   const label = scene?.scene_meta.scene_label || "场景标记不可用";
+  const { initial, palette } = beingMonogram(beingName, beingId);
   const collapse = () => { setMenu(undefined); setRenaming(undefined); pin(false); trigger.current?.focus(); };
   const reveal = () => { pin(true); onReveal?.(); };
   useEffect(() => { if (pinned && visible) search.current?.focus(); }, [pinned, visible]);
   return (
     <>
       <div className="chat-scene-control">
-        <button ref={trigger} id="chat-scene-indicator" className={`rail-button rail-being${pinned ? '' : ' rail-scene-toggle'}`} type="button"
+        <button ref={trigger} id="chat-scene-indicator" className={`rail-button rail-being${pinned ? '' : ' rail-scene-toggle'}`} type="button" data-palette={palette}
           aria-label={pinned ? `${beingName} · 返回主对话` : "展开场景列表"}
           aria-controls={pinned ? undefined : "chat-session-panel"} aria-expanded={pinned ? undefined : false}
           title={`${pinned ? '返回主对话' : '展开场景列表'} · ${label}`} onClick={pinned ? onHome : reveal}>
-          <span className="rail-scene-avatar" aria-hidden="true">{beingName.slice(0, 1).toUpperCase()}</span>
+          <span className="rail-scene-avatar" aria-hidden="true">{initial}</span>
           {!pinned && <Icon name="split-panel" />}
         </button>
       </div>

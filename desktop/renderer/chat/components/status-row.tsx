@@ -22,7 +22,7 @@ export function ChatStatusRow({ title, detail, tone = 'neutral', retry, children
     </>;
     return inActions ? <MessageAction>{feedback}</MessageAction>
       : <div className={className} data-tone="error">
-        <span className="chat-status-copy" role="status"><strong>{title}</strong></span>
+        {!mediaStatus && <span className="chat-status-copy" role="status"><strong>{title}</strong></span>}
         {feedback}
       </div>;
   }

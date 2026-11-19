@@ -1,32 +1,19 @@
 import { Icon } from '../../shared/icons/icon';
-import { ChatActionMenu } from './chat-action-menu';
+import { ChatActionMenu } from '../../shared/components/chat-action-menu';
 import { AttachmentAudioMenu, type AudioMenuControls } from './attachment-audio-menu';
-import { useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { createPortal } from 'react-dom';
-import { MessageAction, MessageActionSlot } from '../../shared/components/message-action-slot';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { MessageAction } from '../../shared/components/message-action-slot';
 import { ErrorIndicator } from '../../shared/components/error-indicator';
 import { FileName } from '../../shared/components/file-name';
 import {formatBytes} from '../../shared/lib/format-bytes';
 import { ChatStatusRow } from './status-row';
 export function AttachmentDownload({endpoint, id, artifact, name, children, file, details, audioControls, iconOnly=false, apiBase='', request=fetch, onPreview, previewing, previewFailure, onDownloaded}: {
-  onDownloaded?:()=>void; onPreview?:()=>void; request?:typeof fetch; apiBase?:string; endpoint: string; id: string; artifact?: string; name: string; children: string; file?:{size:number;mime:string;parseFailed?:boolean}; details?:ReactNode; audioControls?:AudioMenuControls; iconOnly?:boolean;
+  onDownloaded?:()=>void; onPreview?:()=>void; request?:typeof fetch; apiBase?:string; endpoint: string; id: string; artifact?: string; name: string; children: string; file?:{size:number;mime:string;parseFailed?:boolean}; details?:(dismissMenu:()=>void)=>ReactNode; audioControls?:AudioMenuControls; iconOnly?:boolean;
   previewing?: boolean; previewFailure?: { detail: string; run(): void };
 }) {
   const compact = Boolean(audioControls);
-  const slot = useContext(MessageActionSlot);
-  const [menuGroup] = useState(() => file && slot ? document.createElement('div') : null);
-  const menuTarget = slot?.menu;
-  const registerExtraActions = slot?.registerExtraActions;
   const [downloaded,setDownloaded]=useState(false);
   const hasFileActions = !!file && (downloaded || !!details);
-  useLayoutEffect(() => hasFileActions ? registerExtraActions?.() : undefined, [hasFileActions, registerExtraActions]);
-  useLayoutEffect(() => {
-    if (!hasFileActions || !menuGroup || !menuTarget) return;
-    menuGroup.setAttribute('role', 'group');
-    menuGroup.setAttribute('aria-label', name);
-    menuTarget.appendChild(menuGroup);
-    return () => menuGroup.remove();
-  }, [hasFileActions, menuGroup, menuTarget, name]);
   const [activeAction,setActiveAction]=useState(''),[error,setError]=useState('');
   const [checking,setChecking]=useState(true);
   const [status,setStatus]=useState(''),[progress,setProgress]=useState({loaded:0,total:0});
@@ -90,15 +77,6 @@ export function AttachmentDownload({endpoint, id, artifact, name, children, file
       disabled: busy || checking, run: () => void action(failedAction.current) }} />
     : previewFailure ? <ChatStatusRow title="暂时无法预览" detail={`${name} · ${previewFailure.detail}`} tone="error" inActions
       retry={{ label: '重新预览', run: previewFailure.run }} /> : null;
-  const fileActions = hasFileActions && <>
-    {canPreview && <button type="button" role="menuitem" disabled={busy || checking} onClick={()=>void action('open')}>
-      <Icon name="chat-external-link" />用系统应用打开
-    </button>}
-    {downloaded && <button type="button" role="menuitem" disabled={busy} onClick={()=>void action('reveal')}>
-      <Icon name="folder" />打开所在位置
-    </button>}
-    {details}
-  </>;
   const progressBar = <div className="attachment-download-progress">
     <button type="button" aria-label="取消下载" title="取消下载" onClick={()=>controller.current?.abort()}>
       <Icon name="chat-close" width="16" height="16" />
@@ -118,8 +96,15 @@ export function AttachmentDownload({endpoint, id, artifact, name, children, file
         <span className="attachment-file-icon" aria-hidden="true"><Icon name="chat-file" width="20" height="20" /></span>
         <span className="attachment-file-label"><FileName name={name} /><small className="attachment-file-metadata">{fileType} · {formatBytes(file.size)}</small></span>
       </button>
-      {hasFileActions && (menuGroup ? createPortal(<><strong title={name}>{name}</strong>{fileActions}</>, menuGroup)
-        : <ChatActionMenu label={`${name} 文件操作`}>{fileActions}</ChatActionMenu>)}
+      {hasFileActions && <ChatActionMenu label={`${name} 文件操作`}>{dismissMenu => <>
+        {canPreview && <button type="button" role="menuitem" disabled={busy || checking} onClick={()=>void action('open')}>
+          <Icon name="chat-external-link" />用系统应用打开
+        </button>}
+        {downloaded && <button type="button" role="menuitem" disabled={busy} onClick={()=>void action('reveal')}>
+          <Icon name="folder" />打开所在位置
+        </button>}
+        {details?.(dismissMenu)}
+      </>}</ChatActionMenu>}
       {!feedback && file.parseFailed && <span className="attachment-file-feedback">
         <ErrorIndicator description={`解析失败 · ${name} · 可以下载原件查看。`} />
       </span>}

@@ -24,7 +24,9 @@
   position: fixed;
   inset: auto;
   margin: 0;
-  width: min(248px, calc(100vw - 16px));
+  width: max-content;
+  min-width: min(155px, calc(100vw - 16px));
+  max-width: calc(100vw - 16px);
   max-height: calc(100dvh - 16px);
   overflow: auto;
   color: var(--text);
@@ -32,6 +34,73 @@
 }
 
 .attachment-file-popover:popover-open { display: grid; }
+
+.attachment-details-dialog {
+  position: fixed;
+  inset: 0;
+  box-sizing: border-box;
+  width: min(560px, calc(100% - 24px));
+  max-height: min(560px, calc(100dvh - 32px));
+  margin: auto;
+  padding: 16px;
+  border: 1px solid var(--chat-edge);
+  border-radius: var(--radius-lg, 16px);
+  background: var(--chat-menu-surface);
+  color: var(--chat-ink);
+  overflow: hidden;
+
+  &[open] {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 12px;
+  }
+
+  &::backdrop { background: rgb(0 0 0 / 28%); }
+
+  > header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  > header > div {
+    display: grid;
+    min-width: 0;
+  }
+
+  > header small {
+    overflow: hidden;
+    color: var(--chat-secondary);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  > header > button {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--chat-secondary);
+
+    @include chat-icon-control.feedback;
+  }
+
+  .attachment-details-content {
+    overflow: auto;
+    overscroll-behavior: contain;
+  }
+
+  .attachment-segment pre {
+    max-height: none;
+    overflow: visible;
+  }
+}
 
 :is(.attachment-file-popover[popover], .audio-floating-menu[popover], .audio-floating-menu .audio-settings .audio-speed-options) {
   @include chat-menu.surface(
@@ -45,6 +114,10 @@
 
 :is(.attachment-file-popover, .audio-floating-menu)[popover] {
   @include chat-menu.popover-presence;
+}
+
+.attachment-file-popover[popover][data-dialog-handoff][data-menu-popover-motion] {
+  transition: none;
 }
 
 .audio-floating-menu .audio-settings .audio-speed-options {
@@ -94,8 +167,7 @@
   background-color: transparent;
 }
 
-.attachment-file-popover > button,
-.attachment-file-popover .attachment-details > button {
+.attachment-file-popover > button {
   display: block;
   width: 100%;
   min-height: 32px;

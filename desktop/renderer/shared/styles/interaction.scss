@@ -86,3 +86,11 @@
 :focus:not(:focus-visible) {
   outline: none;
 }
+
+@media (forced-colors: none) {
+  // Chromium keeps :focus-visible when clicking an already focused control and
+  // also matches it on text fields. Override component outlines for pointer input.
+  :root[data-pointer-focus] :focus-visible {
+    outline: none !important;
+  }
+}
