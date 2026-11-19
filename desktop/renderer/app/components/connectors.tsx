@@ -567,16 +567,21 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
       for (const id of account.installation_ids) {
         const saved = lifecycleRequests.current.get(id);
         const installation = await api!.installation(id);
-        if (installation.desired_state !== 'removed' || saved) {
+        if (installation.status !== 'removed') {
           const operation = saved || { id: crypto.randomUUID(), revision: installation.revision };
           lifecycleRequests.current.set(id, operation);
-          const result = await api!.lifecycle(id, 'uninstall', operation.revision, operation.id);
+          const result = installation.desired_state === 'removed' ? { accepted: true as const } : await api!.lifecycle(id, 'uninstall', operation.revision, operation.id);
           if (!result.accepted) {
             lifecycleRequests.current.delete(id);
             throw new Error(result.message);
           }
-          const latest = await api!.installation(id);
-          if (latest.desired_state !== 'removed') throw new Error('断开尚未确认，请刷新状态后重试。');
+          let latest = await api!.installation(id);
+          for (let attempt = 0; latest.status !== 'removed' && attempt < 20; attempt++) {
+            await new Promise(resolve => window.setTimeout(resolve, 1000));
+            if (!page.current || page.current.release_id !== kit.release_id) throw new Error('卸载已提交，请返回应用详情确认结果。');
+            latest = await api!.installation(id);
+          }
+          if (latest.status !== 'removed') throw new Error('卸载仍在处理中，请稍后刷新并重试移除账号。');
           lifecycleRequests.current.delete(id);
         }
       }
