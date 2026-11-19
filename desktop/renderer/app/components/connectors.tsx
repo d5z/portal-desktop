@@ -1,6 +1,6 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import type {
-  HomeConnectorAccount, HomeConnectorBeingAccess, HomeConnectorCatalogItem, HomeConnectorDetail, HomeConnectorEnableState,
+  HomeConnectorAPI, HomeConnectorSkill, HomeConnectorSkillBody, HomeConnectorAccount, HomeConnectorBeingAccess, HomeConnectorCatalogItem, HomeConnectorDetail, HomeConnectorEnableState,
   HomeConnectorInstallation, HomeConnectorPreview, HomeConnectorTool,
 } from '../../../shared/home';
 import type { AppModel } from '../models/app';
@@ -689,7 +689,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
     {selected ? <>
       {!detail && <div className="connector-detail-heading"><h3>{selected.name}</h3></div>}
       {!detail && !busy && <button type="button" onClick={() => void openKit(selected)}>重试</button>}
-      {detail && <ConnectorDetailView kit={selected} detail={detail} localKit={localInstalled(selected)} localKitsReady={localKitsReady} localPreparing={town.prepareBusy} onInstallLocal={() => installLocal(selected)} onOpenLocal={localKit => { model.closeClientSettings(); model.navigate("kits"); void model.town.showInstalledKit(localKit.name); }} onDeleteLocal={localKit => model.town.requestDeleteKit(localKit)} installations={installations} accountId={accountId} onAccount={chooseAccount} preview={preview} flow={flow} method={method} values={values} adopt={adopt} busy={busy} toolBusy={toolBusy} toolToggleRef={toolToggleRef} onConnect={(account, method) => void connect(selected, account, method)} onValue={(name, value) => setValues(current => ({ ...current, [name]: value }))} onAdopt={setAdopt} onConfirm={() => void confirmConnection()} onAdvance={() => void advance()} onCancel={() => void cancelAuthorization()} onOpenAuthorization={() => void openAuthorization()} beingAccess={beingAccess} onRestoreConnection={restoreConnection} tools={tools} toolsLoading={toolsLoading} toolsError={toolsError} onLoadTools={loadTools} removalPending={Boolean(removals.current.get(selected.release_id)?.size)} onRemove={account => void disconnect(selected, account)} onDisconnect={() => void disconnect(selected)} />}
+      {detail && <ConnectorDetailView api={api} kit={selected} detail={detail} localKit={localInstalled(selected)} localKitsReady={localKitsReady} localPreparing={town.prepareBusy} onInstallLocal={() => installLocal(selected)} onOpenLocal={localKit => { model.closeClientSettings(); model.navigate("kits"); void model.town.showInstalledKit(localKit.name); }} onDeleteLocal={localKit => model.town.requestDeleteKit(localKit)} installations={installations} accountId={accountId} onAccount={chooseAccount} preview={preview} flow={flow} method={method} values={values} adopt={adopt} busy={busy} toolBusy={toolBusy} toolToggleRef={toolToggleRef} onConnect={(account, method) => void connect(selected, account, method)} onValue={(name, value) => setValues(current => ({ ...current, [name]: value }))} onAdopt={setAdopt} onConfirm={() => void confirmConnection()} onAdvance={() => void advance()} onCancel={() => void cancelAuthorization()} onOpenAuthorization={() => void openAuthorization()} beingAccess={beingAccess} onRestoreConnection={restoreConnection} tools={tools} toolsLoading={toolsLoading} toolsError={toolsError} onLoadTools={loadTools} removalPending={Boolean(removals.current.get(selected.release_id)?.size)} onRemove={account => void disconnect(selected, account)} onDisconnect={() => void disconnect(selected)} />}
     </> : catalogLoading && !catalog.length ? null : <>
       {installedKits.length > 0 && <ConnectorGroup title={`已添加（${installedKits.length}）`} kits={installedKits} connected pendingConnection={pendingConnection} localKits={localKits} localKitsReady={localKitsReady} prepareBusy={town.prepareBusy || Boolean(town.plan)} preparingSourceId={preparingSourceId} onOpen={openKit} onConnect={connect} onInstallLocal={installLocal} onPrefetch={kit => { if (!isLocalKit(kit)) void readDetail(kit.release_id).catch(() => {}); }} />}
       {usedKits.length > 0 && <ConnectorGroup title={`使用过（${usedKits.length}）`} kits={usedKits} pendingConnection={pendingConnection} localKits={localKits} localKitsReady={localKitsReady} prepareBusy={town.prepareBusy || Boolean(town.plan)} preparingSourceId={preparingSourceId} onOpen={openKit} onConnect={connect} onInstallLocal={installLocal} onPrefetch={() => {}} />}
@@ -747,8 +747,8 @@ const ConnectorToolRow = memo(function ConnectorToolRow({ installationId, tool, 
 });
 
 
-function ConnectorDetailView({ kit, detail, localKit, localKitsReady, localPreparing, onInstallLocal, onOpenLocal, onDeleteLocal, installations, accountId, onAccount, preview, flow, method, values, adopt, busy, toolBusy, toolToggleRef, onConnect, onValue, onAdopt, onConfirm, onAdvance, onCancel, onOpenAuthorization, beingAccess, onRestoreConnection, tools, toolsLoading, toolsError, onLoadTools, removalPending, onRemove, onDisconnect }: {
-  kit: HomeConnectorCatalogItem; detail: HomeConnectorDetail; localKit?: LocalKit; localKitsReady: boolean; localPreparing: boolean; onInstallLocal: () => void; onOpenLocal: (kit: LocalKit) => void; onDeleteLocal: (kit: LocalKit) => void; installations: HomeConnectorInstallation[]; accountId?: string; onAccount: (account: HomeConnectorAccount) => void;
+function ConnectorDetailView({ api, kit, detail, localKit, localKitsReady, localPreparing, onInstallLocal, onOpenLocal, onDeleteLocal, installations, accountId, onAccount, preview, flow, method, values, adopt, busy, toolBusy, toolToggleRef, onConnect, onValue, onAdopt, onConfirm, onAdvance, onCancel, onOpenAuthorization, beingAccess, onRestoreConnection, tools, toolsLoading, toolsError, onLoadTools, removalPending, onRemove, onDisconnect }: {
+  api: HomeConnectorAPI; kit: HomeConnectorCatalogItem; detail: HomeConnectorDetail; localKit?: LocalKit; localKitsReady: boolean; localPreparing: boolean; onInstallLocal: () => void; onOpenLocal: (kit: LocalKit) => void; onDeleteLocal: (kit: LocalKit) => void; installations: HomeConnectorInstallation[]; accountId?: string; onAccount: (account: HomeConnectorAccount) => void;
   preview?: HomeConnectorPreview; flow?: HomeConnectorEnableState; method?: string; values: Record<string, string>; adopt: boolean; busy: boolean; toolBusy: Set<string>; toolToggleRef: { current: ToggleTool };
   onConnect: (account?: HomeConnectorAccount, method?: string) => void; onValue: (name: string, value: string) => void; onAdopt: (value: boolean) => void;
   onConfirm: () => void; onAdvance: () => void; onCancel: () => void; onOpenAuthorization: () => void;
@@ -812,13 +812,34 @@ function ConnectorDetailView({ kit, detail, localKit, localKitsReady, localPrepa
     <section className="connector-info-section"><h4 className="connector-apps-heading">应用 <span>1</span></h4><div className="connector-app-summary"><span>{kit.name}</span><small>连接器</small></div></section>
     {skills.length > 0 && <section className="connector-skills-section" aria-label="技能">
       <h4>技能 <span>{skills.length}</span></h4>
-      <div className="connector-skill-list">{visibleSkills.map(skill => <article className="connector-skill-row" key={skill.export}>
-        <div className="connector-skill-copy"><Icon name="skill" width="28" height="28" aria-hidden="true" /><div><h5>{skill.name}</h5><p>{skill.description}</p></div></div>
-      </article>)}
+      <div className="connector-skill-list">{visibleSkills.map(skill => <ConnectorSkillPreview key={`${kit.release_id}:${skill.export}`} api={api} releaseId={kit.release_id} skill={skill} />)}
       {!skillsExpanded && skills.length > visibleSkills.length && <button className="connector-skills-more" type="button" aria-expanded={false} onClick={() => setSkillsExpanded(true)}>另有 {skills.length - visibleSkills.length} 个</button>}
       {skillsExpanded && skills.length > 5 && <button className="connector-skills-more" type="button" aria-expanded={true} onClick={() => setSkillsExpanded(false)}>收起</button>}
       </div>
     </section>}
     <section className="connector-info-section"><h4>信息</h4><dl className="connector-info"><div><dt>功能</dt><dd>1 个应用</dd></div>{kit.version && <div><dt>版本</dt><dd>{kit.version}</dd></div>}{kit.category && <div><dt>分类</dt><dd>{kit.category}</dd></div>}</dl></section>
   </div>;
+}
+
+function ConnectorSkillPreview({ api, releaseId, skill }: { api: HomeConnectorAPI; releaseId: string; skill: HomeConnectorSkill }) {
+  const [open, setOpen] = useState(false);
+  const [body, setBody] = useState<HomeConnectorSkillBody>();
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [attempt, setAttempt] = useState(0);
+  useEffect(() => {
+    if (!open || body) return;
+    let active = true;
+    setLoading(true); setError('');
+    void api.skill(releaseId, skill.export).then(result => {
+      if (active) { setBody(result); setLoading(false); }
+    }).catch(error => { if (active) { setError(publicErrorMessage(error, '无法读取技能正文，请重试。')); setLoading(false); } });
+    return () => { active = false; };
+  }, [api, releaseId, skill.export, open, attempt, body]);
+  return <details className="connector-skill-row" onToggle={event => setOpen(event.currentTarget.open)}>
+    <summary><div className="connector-skill-copy"><Icon name="skill" width="28" height="28" aria-hidden="true" /><div><h5>{skill.name}</h5><p>{skill.description}</p></div></div></summary>
+    {loading && <p className="field-help" role="status">正在读取技能…</p>}
+    {error && <p className="form-error" role="alert">{error} <button type="button" onClick={() => setAttempt(value => value + 1)}>重试</button></p>}
+    {body && <><p className="field-help">仅预览技能内容，工具调用权限由账号和工具设置决定。</p><pre className="connector-skill-body">{body.body}</pre></>}
+  </details>;
 }

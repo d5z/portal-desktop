@@ -87,6 +87,7 @@ export interface HomeConnectorAccount {
 }
 export interface HomeConnectorField { name: string; label?: string; type?: string; required?: boolean; secret?: boolean; description?: string | null; placeholder?: string | null }
 export interface HomeConnectorSkill { export: string; name: string; description: string }
+export interface HomeConnectorSkillBody extends HomeConnectorSkill { body: string }
 export interface HomeConnectorDetail {
   name: string;
   /** Absolute URL resolved by the main process from Home's service-relative icon URL. */
@@ -104,7 +105,7 @@ export interface HomeConnectorTool {
 }
 export interface HomeConnectorBeingAccess { enabled: boolean; revision: number; being_profile_id: string }
 export const CONNECTOR_NETWORK_METHODS = {
-  catalog: 'GET', 'legacy-catalog': 'GET', 'local-kit-history': 'GET', 'report-local-kit-history': 'POST', installations: 'GET', installation: 'GET', detail: 'GET',
+  catalog: 'GET', 'legacy-catalog': 'GET', 'local-kit-history': 'GET', 'report-local-kit-history': 'POST', installations: 'GET', installation: 'GET', detail: 'GET', skill: 'GET',
   'remove-account': 'POST', preview: 'POST', confirm: 'POST', state: 'GET', advance: 'POST', cancel: 'POST',
   tools: 'GET', 'set-tool': 'PUT', 'being-access': 'PUT', 'get-being-access': 'GET', lifecycle: 'POST',
 } as const;
@@ -113,6 +114,7 @@ export const CONNECTOR_NETWORK_ROUTES = {
   catalog: '/api/v1/me/app-catalog', 'legacy-catalog': '/api/v1/me/kit-catalog', 'local-kit-history': '/api/v1/me/local-kit-history', 'report-local-kit-history': '/api/v1/me/local-kit-history', installations: '/api/v1/me/kit-installations',
   installation: '/api/v1/me/kit-installations/:installation_id',
   detail: '/api/v1/me/kit-releases/:release_id/connector',
+  skill: '/api/v1/me/kit-releases/:release_id/connector-skills/:skill',
   'remove-account': '/api/v1/me/kit-releases/:release_id/connector-accounts/:connection_id/remove',
   preview: '/api/v1/me/kit-releases/:release_id/connector-preview',
   confirm: '/api/v1/me/kit-connector-enables/:intent_id/confirm',
@@ -132,7 +134,7 @@ export function connectorNetworkPath(operation: keyof typeof CONNECTOR_NETWORK_R
     return encodeURIComponent(value);
   };
   let path: string = CONNECTOR_NETWORK_ROUTES[operation];
-  for (const name of ['installation_id', 'release_id', 'connection_id', 'intent_id']) {
+  for (const name of ['installation_id', 'release_id', 'connection_id', 'intent_id', 'skill']) {
     const token = ':' + name;
     if (path.includes(token)) path = path.replace(token, value(name));
   }
@@ -146,6 +148,7 @@ export interface HomeConnectorAPI {
   installation(installationId: string): Promise<HomeConnectorInstallation>;
   removeAccount(releaseId: string, connectionId: string): Promise<void>;
   detail(releaseId: string): Promise<HomeConnectorDetail>;
+  skill(releaseId: string, skill: string): Promise<HomeConnectorSkillBody>;
   preview(releaseId: string, input: { connection_id?: string; method?: string; reauthorize?: boolean }): Promise<HomeConnectorPreview>;
   confirm(intentId: string, input: { adopt: boolean; values?: Record<string, string> }): Promise<HomeConnectorEnableState>;
   state(intentId: string): Promise<HomeConnectorEnableState>;

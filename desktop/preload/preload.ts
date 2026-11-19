@@ -67,6 +67,7 @@ const api: DesktopAPI = {
       installations: after => connectorRequest('installations', after),
       installation: installationId => connectorRequest('installation', installationId),
       removeAccount: (releaseId, connectionId) => connectorRequest('remove-account', releaseId, connectionId),
+      skill: (releaseId, skill) => connectorRequest('skill', releaseId, skill),
       detail: releaseId => connectorRequest('detail', releaseId),
       preview: (releaseId, input) => connectorRequest('preview', releaseId, input),
       confirm: (intentId, input) => connectorRequest('confirm', intentId, input),

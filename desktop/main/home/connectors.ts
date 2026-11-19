@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type {
   HomeConnectorAPI, HomeConnectorBeingAccess, HomeConnectorCatalogPage, HomeConnectorDetail, HomeConnectorEnableState,
-  HomeConnectorInstallation, HomeConnectorInstallationPage, HomeConnectorPreview, HomeConnectorTool, HomeLocalKitHistory, HomeLocalKitHistoryPage,
+  HomeConnectorInstallation, HomeConnectorInstallationPage, HomeConnectorPreview, HomeConnectorTool, HomeConnectorSkillBody, HomeLocalKitHistory, HomeLocalKitHistoryPage,
 } from '../../shared/home';
 import type { HomeClient } from './client';
 import { HomeError, homeURL } from './protocol';
@@ -88,6 +88,10 @@ export class HomeConnectors implements HomeConnectorAPI {
     return this.client.request<HomeConnectorDetail>('/v1/me/kit-releases/' + encodeURIComponent(requiredId(releaseId, 'release_id')) + '/connector').then(detail => ({
       ...detail, icon_url: this.iconURL(detail.icon_url),
     }));
+  }
+
+  skill(releaseId: string, skill: string) {
+    return this.client.request<HomeConnectorSkillBody>('/v1/me/kit-releases/' + encodeURIComponent(requiredId(releaseId, 'release_id')) + '/connector-skills/' + encodeURIComponent(requiredId(skill, 'skill')));
   }
 
   installation(installationId: string) {

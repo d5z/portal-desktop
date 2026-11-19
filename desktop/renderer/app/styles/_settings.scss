@@ -956,3 +956,15 @@
     animation-duration: 1.8s;
   }
 }
+
+.connector-skill-row > summary {
+  cursor: pointer;
+}
+
+.connector-skill-body {
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+}

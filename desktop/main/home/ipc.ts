@@ -27,6 +27,7 @@ export function registerHomeIpc(handle: (channel: string, callback: (...args: an
     handle('beings:home-connector-installations', (after?: string) => connectors.installations(after));
     handle('beings:home-connector-installation', (installationId: string) => connectors.installation(installationId));
     handle('beings:home-connector-remove-account', (releaseId: string, connectionId: string) => connectors.removeAccount(releaseId, connectionId));
+    handle('beings:home-connector-skill', (releaseId: string, skill: string) => connectors.skill(releaseId, skill));
     handle('beings:home-connector-detail', (releaseId: string) => connectors.detail(releaseId));
     handle('beings:home-connector-preview', (releaseId: string, input: { connection_id?: string; method?: string; reauthorize?: boolean }) => connectors.preview(releaseId, input));
     handle('beings:home-connector-confirm', (intentId: string, input: { adopt: boolean; values?: Record<string, string> }) => connectors.confirm(intentId, input));
