@@ -52,3 +52,42 @@ describe('Connector desktop Network contract', () => {
     await expect(desktop.home!.connectors!.lifecycle('installation', 'uninstall', 8, 'new-request')).resolves.toEqual({ accepted: true });
   });
 });
+
+
+it.each([404, 405])('makes catalog fallback a second visible request after HTTP %s', async status => {
+  vi.stubGlobal('process', { ...process, isMainFrame: true });
+  await import('../desktop/preload/preload');
+  const desktop = electron.contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === 'beings')![1] as DesktopAPI;
+  const handlers = new Map<string, (...args: any[]) => unknown>();
+  const originalBody = '<html>Legacy deployment: app catalog unavailable</html>';
+  const request = vi.fn().mockRejectedValueOnce(new HomeError(status, '', new Response(originalBody, {
+    status, headers: { 'Content-Type': 'text/html; charset=utf-8' },
+  }))).mockResolvedValueOnce(Response.json({ enabled: true, items: [{ name: 'Fixture', icon_url: '/assets/icon.svg' }, { name: 'Invalid icon', icon_url: 'https://[' }], next_after: null }));
+  const network = new ConnectorNetwork(() => 'beings://desktop/');
+  registerHomeIpc((channel, callback) => handlers.set(channel, callback), {} as never, {} as never, {} as never,
+    new HomeConnectors({ request } as never, vi.fn()), network);
+  electron.ipcRenderer.invoke.mockImplementation((channel, ...args) => handlers.get(channel)!(...args));
+  const visible: { url: string; status: number; body: string; type: string | null }[] = [];
+  vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {
+    const response = await network.handle(new Request(url, init));
+    visible.push({ url, status: response.status, body: await response.clone().text(), type: response.headers.get('Content-Type') });
+    return response;
+  });
+  const catalog = await desktop.home!.connectors!.catalog({ q: 'fixture' });
+  expect(catalog.items.map(item => item.icon_url)).toEqual(['https://home.beings.town/assets/icon.svg', null]);
+  expect(visible.map(item => new URL(item.url).pathname)).toEqual(['/api/v1/me/app-catalog', '/api/v1/me/kit-catalog']);
+  expect(visible[0]).toMatchObject({ status, body: originalBody, type: 'text/html; charset=utf-8' });
+  expect(visible[1].status).toBe(200);
+  expect(request.mock.calls.map(([url]) => url)).toEqual(['/v1/me/app-catalog?limit=12&q=fixture', '/v1/me/kit-catalog?limit=12&q=fixture']);
+});
+
+it('does not hide catalog failures other than unsupported endpoints', async () => {
+  vi.stubGlobal('process', { ...process, isMainFrame: true });
+  await import('../desktop/preload/preload');
+  const desktop = electron.contextBridge.exposeInMainWorld.mock.calls.find(([name]) => name === 'beings')![1] as DesktopAPI;
+  electron.ipcRenderer.invoke.mockResolvedValue('fixture');
+  const request = vi.fn().mockResolvedValue(new Response('Upstream unavailable', { status: 503, headers: { 'Content-Type': 'text/plain' } }));
+  vi.stubGlobal('fetch', request);
+  await expect(desktop.home!.connectors!.catalog()).rejects.toThrow();
+  expect(request).toHaveBeenCalledTimes(1);
+});

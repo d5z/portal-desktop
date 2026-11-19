@@ -1,7 +1,8 @@
 import { homeErrorMessage } from '../../shared/home';
 export { homeErrorMessage } from '../../shared/home';
 import { createPublicKey, verify } from 'node:crypto';
-export const HOME_ORIGIN = 'https://home.beings.town';
+import { HOME_ORIGIN } from '../../shared/home';
+export { HOME_ORIGIN } from '../../shared/home';
 export const HOME_CLIENT = 'being-desktop';
 export const HOME_CALLBACK = 'http://127.0.0.1:47831/oauth/callback';
 export const HOME_REQUIRED_SCOPE = 'openid offline_access being:read being:write account:write files:read computer:read computer:write computer:connect';

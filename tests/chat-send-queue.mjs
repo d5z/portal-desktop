@@ -167,5 +167,37 @@ try{
   await mkdir('test-results',{recursive:true});await page.screenshot({path:'test-results/chat-send-queue.png',fullPage:true});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   assert.deepEqual(errors,[]);
+  // A reload can leave a durable sending record without matching history.
+  // Removing it must release later messages without resending the uncertain one.
+  const recovered=await browser.newPage();
+  await recovered.goto(page.url());
+  await recovered.getByRole('textbox',{name:'消息输入框'}).waitFor();
+  await recovered.evaluate(async()=>{
+    const request=indexedDB.open('portal-scene-outbox',1);
+    const db=await new Promise((resolve,reject)=>{request.onsuccess=()=>resolve(request.result);request.onerror=()=>reject(request.error);});
+    await new Promise((resolve,reject)=>{
+      const transaction=db.transaction('sends','readwrite');
+      const store=transaction.objectStore('sends');
+      for(const [index,text] of ['未确认的旧消息','恢复后继续发送'].entries())store.put({
+        id:`recovery-${index}`,endpoint:location.origin,scene:{sceneId:'queue-test',strict:true},text,files:[],
+        createdAt:Date.now(),order:index,phase:index===0?'sending':'queued',
+      });
+      transaction.oncomplete=resolve;transaction.onerror=()=>reject(transaction.error);
+    });
+    db.close();
+  });
+  const sendsBeforeRecovery=sends.length;
+  await recovered.reload();
+  const removeUncertain=recovered.getByRole('button',{name:'移除待发记录：未确认的旧消息',exact:true});
+  await removeUncertain.waitFor();
+  assert.equal(sends.length,sendsBeforeRecovery,'An uncertain send must not be automatically retried');
+  await Promise.all([
+    recovered.waitForResponse(response=>response.url().endsWith('/api/chat/stream') && response.status()===202),
+    removeUncertain.click(),
+  ]);
+  await recovered.locator('.message.user').filter({hasText:'恢复后继续发送'}).waitFor();
+  assert.equal(sends.length,sendsBeforeRecovery+1);
+  assert.equal(sends.at(-1).message,'恢复后继续发送');
+  await recovered.close();
   console.log('PASS: same-scene queue, cancel, interrupt, single echo, preserved draft and mobile layout');
 }finally{stream?.end();await browser?.close();server.closeAllConnections();await new Promise(r=>server.close(r));}

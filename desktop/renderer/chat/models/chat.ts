@@ -106,16 +106,17 @@ export interface Run extends MessageScene {
   context?: string;
   arg: string;
   waitingForReply?: boolean;
+  /** A final reply was observed, independently of the display label. */
+  replyConfirmed?: boolean;
   status?: import("../../../shared/types").ChatSceneActivity;
   scheduling?: { hint: string; tasks: import("../../../shared/types").SceneTask[] };
-  synthetic?: boolean;
   stopHistorySeq?: number;
   outcome?: "stopped" | "error" | "timeout" | "done";
 }
 export type ChatItem =
   | Message
   | Run
-  | ({ kind: "separator"; id: string; text: string; marker?: boolean; handoffMarker?: boolean; stopMarker?: boolean } & MessageScene);
+  | ({ kind: "separator"; id: string; text: string; historySeq?: number; marker?: boolean; handoffMarker?: boolean; stopMarker?: boolean } & MessageScene);
 export interface Preset {
   base_url?: string;
   api?: string;

@@ -157,11 +157,11 @@
     .run-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .message-scene { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
     .run-caption > .message-scene { opacity: 1; }
+
   }
 
   .run-entry-heading small { font-size: 12px; font-variant-numeric: tabular-nums; }
   .run-entry-title { color: var(--neutral-tertiary); }
-  .run-entry[data-tool] .run-entry-chip { background: color-mix(in srgb, var(--chat-ink) 4%, transparent); }
 
   .run-entry:not([data-tool]) .run-entry-icon > svg > circle {
     // Match the tool status ring within the same 24-unit viewBox.

@@ -5,7 +5,7 @@ import { mkdtemp, mkdir, copyFile, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { _electron as electron } from 'playwright';
-import { waitForChatReady, clickWhenPointerReady } from './support/desktop.mjs';
+import { waitForChatReady } from './support/desktop.mjs';
 
 const directory = await mkdtemp(path.join(os.tmpdir(), 'portal-chat-sessions-'));
 let application;
@@ -107,40 +107,9 @@ try {
     frame.contentWindow.postMessage({type:'beings:scene-tasks',revision:new URL(frame.src).searchParams.get('revision'),endpoint:snapshot.settings.endpoint,
       tasks:[],subagentReady:false,subagentConfigured:false,subagentEnabled:false},'beings://chat');
   });
+  // Subagent uses the Being model; stale setup flags must not block either picker.
   const subagentSetup = chat.getByRole('menuitem',{name:/Subagent/});
-  await chat.getByRole('button',{name:'添加附件和工具'}).click();
-  await subagentSetup.waitFor();
-  await clickWhenPointerReady(page, subagentSetup);
-  await page.waitForFunction(() => window.fixtureApp.subagentSettingsOpen === true);
-  await page.evaluate(() => window.fixtureApp.closeSubagentSettings());
-  // Both pickers and direct submissions must open setup without touching the draft or posting.
   const commandInput = chat.getByRole('textbox',{name:'消息输入框'});
-  for (const trigger of ['plus', 'slash', 'enter', 'send', 'queue']) {
-    const draft = trigger === 'plus' ? '保留已有要求' : trigger === 'slash' ? '/sub' : '/子代理 保留已有要求';
-    // Let the rich editor handle paste through its transaction pipeline.
-    await commandInput.press('ControlOrMeta+a');
-    await commandInput.press('Backspace');
-    await commandInput.evaluate((el, text) => {
-      const clipboardData = new DataTransfer(); clipboardData.setData('text/plain', text);
-      el.dispatchEvent(new ClipboardEvent('paste', {bubbles:true,cancelable:true,clipboardData}));
-    }, draft);
-    if (trigger === 'plus') {
-      await chat.getByRole('button',{name:'添加附件和工具'}).click();
-      await subagentSetup.click();
-    } else if (trigger === 'slash') await commandInput.press('Enter');
-    else if (trigger === 'send') await chat.locator('#send-btn').click();
-    else await commandInput.press(trigger === 'queue' ? 'Control+Enter' : 'Enter');
-    await page.waitForFunction(() => window.fixtureApp.subagentSettingsOpen === true);
-    assert.equal(await commandInput.evaluate(el => el.value ?? el.editor.getMarkdown()),draft,'Setup preserves the existing draft');
-    assert.equal(await application.evaluate(() => globalThis.fixture.requests.length),0,'Unconfigured subagent must not send');
-    assert.equal(await chat.locator('.message.user').count(),0,'Setup must not create a user bubble');
-    await page.evaluate(() => window.fixtureApp.closeSubagentSettings());
-  }
-  await page.evaluate(async () => {
-    const frame = document.querySelector('iframe'), snapshot = await window.beings.snapshot();
-    frame.contentWindow.postMessage({type:'beings:scene-tasks',revision:new URL(frame.src).searchParams.get('revision'),endpoint:snapshot.settings.endpoint,
-      tasks:[],subagentReady:true,subagentConfigured:true,subagentEnabled:true},'beings://chat');
-  });
   await commandInput.fill('保留已有要求');
   await chat.getByRole('button',{name:'添加附件和工具'}).click();
   await subagentSetup.click();
@@ -318,6 +287,7 @@ try {
   const queuedScene = await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id);
   const localQueueStatus = chat.locator('.composer-queue-item').filter({hasText:'排队 C'});
   await localQueueStatus.waitFor();
+  await localQueueStatus.getByRole('button',{name:'编辑消息：排队 C',exact:true}).and(chat.locator(':enabled')).waitFor();
   assert.equal(await localQueueStatus.getByRole('button',{name:'引导',exact:true}).count(),0,'Cannot steer another scene');
   assert.ok(await localQueueStatus.getByRole('button',{name:'编辑消息：排队 C',exact:true}).isEnabled());
   assert.ok(await localQueueStatus.getByRole('button',{name:'取消排队：排队 C',exact:true}).isEnabled());
@@ -347,14 +317,14 @@ try {
     assert.ok(i < 300, 'C must dispatch after B finishes'); await new Promise(resolve => setTimeout(resolve,20));
   }
   await page.locator(`[data-scene-id="${discussion}"] [data-status="done"]`).waitFor();
-  await chat.getByText('消息已接收，正在切换到当前对话…',{exact:true}).waitFor();
+  await chat.getByText('消息已接收',{exact:true}).waitFor();
   await page.locator(`[data-scene-id="${queuedScene}"] [data-status="queued"]`).waitFor();
   await application.evaluate((_,sceneId) => {
     const history = globalThis.fixture.history;
     history.push({seq:history.length+1,role:'being',content:'C 排队回复完成',scene_id:sceneId,at:new Date().toISOString()});
   },queuedScene);
   await chat.getByText('C 排队回复完成',{exact:true}).waitFor();
-  await chat.getByText('已回复',{exact:true}).waitFor();
+  await chat.locator('.chat-run .run-label').filter({hasText:/^用时 /}).waitFor();
   assert.equal(await page.locator(`[data-scene-id="${queuedScene}"] [data-status="done"]`).count(),0);
   await page.getByRole('button',{name:'切换到场景：技术方案'}).click();
   await page.locator(`[data-scene-id="${discussion}"] [data-status="done"]`).waitFor({state:'hidden'});
@@ -450,13 +420,9 @@ try {
   await visibleQuestion.waitFor();
   assert.equal(await visibleQuestion.locator('.content').innerText(), '独立问题');
   assert.equal(await visibleQuestion.locator('.scene-scheduling').count(), 0);
-  const schedulingRun = visibleQuestion.locator('xpath=following-sibling::div[@class="chat-run"][1]').locator(':scope > details.run-activity');
-  await schedulingRun.waitFor();
-  assert.equal(await schedulingRun.getAttribute('open'), null);
-  assert.equal(await schedulingRun.locator('.scene-scheduling').count(), 0, 'Collapsed activity does not mount process details');
-  await schedulingRun.locator(':scope > summary').click();
-  await schedulingRun.locator('.scene-scheduling').waitFor();
-  assert.match(await schedulingRun.locator('.scene-scheduling pre').textContent(), /background-a/);
+  const schedulingRun = visibleQuestion.locator('xpath=following-sibling::div[@class="chat-run"][1]');
+  await schedulingRun.locator('.run-summary').waitFor();
+  assert.equal(await schedulingRun.locator('.scene-scheduling').count(), 0, 'Transport hints do not create process rows');
   const pushTasks = async status => page.evaluate(async status => {
     const frame = document.querySelector('iframe');
     const snapshot = await window.beings.snapshot();
@@ -468,18 +434,18 @@ try {
   const runningScene = page.getByRole('button',{name:'切换到场景：跨客户端场景'});
   await runningScene.locator('.chat-session-activity[data-status="working"]').waitFor();
   assert.equal(await runningScene.getAttribute('aria-description'),'执行中');
-  if (await schedulingRun.getAttribute('open') === null) await schedulingRun.locator('summary').click();
-  await chat.locator('.scene-task-list').getByText('后台执行中',{exact:true}).waitFor();
+  await schedulingRun.locator(':scope > details > summary').click();
+  await schedulingRun.locator('.run-subagent-status').getByText('1 项运行中',{exact:true}).waitFor();
   await page.screenshot({animations:'disabled',path:'test-results/scene-scheduling-running.png'});
   await pushTasks('done');
-  await schedulingRun.getByText('后台已完成，尚未收到回复',{exact:true}).waitFor();
-  assert.equal((await schedulingRun.getAttribute('class')).includes('running'),false);
-  assert.equal(await schedulingRun.locator('.run-elapsed').isVisible(),false);
+  await schedulingRun.locator('.run-subagent-status').getByText('全部完成',{exact:true}).waitFor();
+  await runningScene.locator('.chat-session-activity[data-status="waiting"]').waitFor();
+  assert.equal(await schedulingRun.locator('details.run-activity.running').count(),0,'Child tasks do not reopen a completed parent run');
   await page.screenshot({animations:'disabled',path:'test-results/scene-scheduling-awaiting-reply.png'});
   await pushTasks('failed');
-  await schedulingRun.locator('.run-label').filter({hasText:'后台任务异常'}).waitFor();
-  if (await schedulingRun.getAttribute('open') === null) await schedulingRun.locator(':scope > summary').click();
-  await chat.locator('.scene-task-list').getByText('模型鉴权失败，请检查 subagent 密钥',{exact:true}).waitFor();
+  await schedulingRun.locator('.run-subagent-status').getByText('1 项失败',{exact:true}).waitFor();
+  await runningScene.locator('.chat-session-activity[data-status="task-failed"]').waitFor();
+  assert.equal(await schedulingRun.getByRole('button',{name:'查看子智能体执行详情'}).count(),1);
   await page.screenshot({animations:'disabled',path:'test-results/scene-scheduling-failed.png'});
   if (!await sbsVisibility.isVisible()) await page.getByLabel('SBS 状态与显示设置',{exact:true}).click();
   await sbsVisibility.check();

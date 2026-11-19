@@ -6,6 +6,16 @@ import { createChatRuntime } from "../desktop/renderer/chat/services/runtime";
 afterEach(() => { vi.useRealTimers(); vi.unstubAllGlobals(); });
 const current = { sceneId: "desktop-test", sceneLabel: "桌面·测试机" };
 
+it.each(['current','all'] as const)('shows a stop only once in %s history without discarding its acknowledgement', scope => {
+  const run:any={...current,kind:'run',id:'stopped',start:1,end:1001,status:'stopped',entries:[],stopHistorySeq:8};
+  const marker:any={...current,kind:'separator',id:'stop-marker',marker:true,stopMarker:true,historySeq:8,text:'· 已停止 · 16:33:05 ·'};
+  const history=[run,marker];
+  expect(sceneItems(history,scope,current)).toEqual([run]);
+  expect(history).toEqual([run,marker]);
+  expect(sceneItems([marker],scope,current)).toEqual([marker]);
+  expect(sceneItems([run,{...marker,id:'other-stop',historySeq:9}],scope,current)).toHaveLength(2);
+});
+
 describe("scene history refresh", () => {
   beforeEach(() => {
     vi.useFakeTimers();
@@ -593,7 +603,7 @@ describe("scene history refresh", () => {
       await runtime.send("C 输入");
       expect(requests.map(r => r.message)).toEqual(["B 输入"]);
       expect(state.items.find(i => i.kind === "run" && i.sceneId === "desktop-b"))
-        .toMatchObject({ label: "消息已接收，正在切换到当前对话…" });
+        .toMatchObject({ label: "消息已接收" });
       expect(state.items.find(i => i.kind === "message" && i.text === "C 输入"))
         .toMatchObject({ queued: true });
       history.push({ seq: 1, role: "user", content: "B 输入", scene_id: "desktop-b" },
@@ -606,7 +616,7 @@ describe("scene history refresh", () => {
       expect(state.items.filter(i => i.kind === "message" && i.text === "B 排队回复")).toHaveLength(1);
       expect(state.items.find(i => i.kind === "run" && i.sceneId === "desktop-b")).toMatchObject({ outcome: "done" });
       expect(state.items.find(i => i.kind === "run" && i.sceneId === "desktop-c"))
-        .toMatchObject({ label: "消息已接收，正在切换到当前对话…" });
+        .toMatchObject({ label: "消息已接收" });
     } finally { runtime.dispose(); }
   });
 
@@ -642,7 +652,7 @@ describe("scene history refresh", () => {
       expect(state.items.some(item => item.kind === "message" && item.text === "A 旧格式回复")).toBe(true);
       if (strict) {
         expect(requests.map(r => r.message)).toEqual(["A 输入"]);
-        expect(state.items.find(item => item.kind === "run" && item.sceneId === "desktop-test")).toMatchObject({ label: "消息已接收，正在切换到当前对话…", waitingForReply: true });
+        expect(state.items.find(item => item.kind === "run" && item.sceneId === "desktop-test")).toMatchObject({ label: "消息已接收", waitingForReply: true });
         history.push({ seq: 2, role: "being", content: "A 场景回复", scene_id: "desktop-test" });
         await vi.advanceTimersByTimeAsync(4100);
       }
@@ -678,7 +688,7 @@ describe("scene history refresh", () => {
       await vi.advanceTimersByTimeAsync(2000);
       const runs = state.items.filter((i): i is Extract<ChatItem, {kind:"run"}> => i.kind==="run" && i.sceneId==="desktop-test");
       expect(runs).toHaveLength(1);
-      expect(runs[0]).toMatchObject({label:"等待最终回复",waitingForReply:true});
+      expect(runs[0]).toMatchObject({label:"等待回复",waitingForReply:true});
       expect(runs[0].end).toBeUndefined();
       emit("content_block_delta","desktop-test",{delta:{text:"A response"}});
       emit("message_stop","desktop-test");
@@ -743,7 +753,7 @@ describe("scene history refresh", () => {
       await vi.advanceTimersByTimeAsync(0);
       const runs = state.items.filter(i => i.kind === "run");
       expect(runs).toHaveLength(1);
-      expect(runs[0]).toMatchObject({ label: "等待最终回复", waitingForReply: true });
+      expect(runs[0]).toMatchObject({ label: "等待回复", waitingForReply: true });
       expect(runs[0].end).toBeUndefined();
       await vi.advanceTimersByTimeAsync(300_100);
       expect(runs[0]).toMatchObject({ label: "等待超时，结果待确认", outcome: "timeout" });
@@ -856,16 +866,25 @@ describe("chat scene scopes", () => {
     expect(items).toHaveLength(6);
   });
 
-  it('does not show an unaddressed handoff as if it were directed to every room', () => {
+  it('hides an old stopped marker after a newer message in the same scene, including restored history', () => {
+    const stopped = {kind:'separator',id:'old-stop',text:'已停止',stopMarker:true,sceneId:'a'} as ChatItem;
+    const user = {kind:'message',id:'new-user',role:'user',text:'继续',sceneId:'a'} as ChatItem;
+    const other = {...stopped,id:'other-stop',sceneId:'b'};
+    const latest = {...stopped,id:'latest-stop'};
+    expect(sceneItems([stopped,other,user,latest],'all',{sceneId:'a'})).toEqual([other,user,latest]);
+  });
+
+  it('hides handoff markers in every scene without deleting runtime data', () => {
     const marker = {kind:'separator',id:'handoff',text:'转向你',marker:true,handoffMarker:true} as ChatItem;
     const local = {...marker,id:'local',sceneId:'room-a'};
     const other = {...marker,id:'other',sceneId:'room-b'};
     const items = [marker,local,other];
     for (const strict of [true,false]) {
-      expect(sceneItems(items,'current',{sceneId:'room-a',strict},true)).toEqual([local]);
-      expect(sceneItems(items,'current',{sceneId:'room-a',strict},false)).toEqual([local]);
+      expect(sceneItems(items,'current',{sceneId:'room-a',strict},true)).toEqual([]);
+      expect(sceneItems(items,'current',{sceneId:'room-a',strict},false)).toEqual([]);
     }
-    expect(sceneItems(items,'all',{sceneId:'room-a'},true)).toBe(items);
+    expect(sceneItems(items,'all',{sceneId:'room-a'},true)).toEqual([]);
+    expect(items).toHaveLength(3);
   });
 
   it('keeps autonomous process records out of every transcript without deleting runtime data', () => {

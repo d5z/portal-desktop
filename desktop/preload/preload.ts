@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { DesktopAPI, PortalState, TownLiveState } from '../shared/types';
-import { CONNECTOR_NETWORK_METHODS, connectorNetworkPath, homeErrorMessage } from '../shared/home';
+import { HOME_ORIGIN, CONNECTOR_NETWORK_METHODS, connectorNetworkPath, homeErrorMessage } from '../shared/home';
 
 async function connectorRequest(operation: keyof typeof CONNECTOR_NETWORK_METHODS, ...args: unknown[]): Promise<any> {
   const key = await ipcRenderer.invoke('beings:home-connector-network-key');
@@ -53,7 +53,7 @@ async function connectorRequest(operation: keyof typeof CONNECTOR_NETWORK_METHOD
   if (operation === 'catalog' || operation === 'legacy-catalog' || operation === 'detail') {
     const items = operation === 'detail' ? [value] : value.items;
     if (!Array.isArray(items)) throw new Error('统一应用目录响应无效。');
-    for (const item of items) if (item.icon_url) item.icon_url = new URL(item.icon_url, 'https://home.beings.town/').href;
+    for (const item of items) item.icon_url = item.icon_url ? URL.parse(item.icon_url, HOME_ORIGIN)?.href ?? null : item.icon_url ?? null;
   }
   return value;
 }

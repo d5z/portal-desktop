@@ -22,7 +22,7 @@ describe('Grove catalog presentation', () => {
     const listing = renderToStaticMarkup(createElement(Catalog, { town: model, data: { kits: [plugin, { id: 'kit-1', name: 'ordinary-kit' }] } }));
     expect(listing).toContain('Pipeline'); expect(listing).toContain('Plugin'); expect(listing).not.toContain('ordinary-kit');
     const detail = renderToStaticMarkup(createElement(CatalogDetail, { town: model }));
-    expect(detail).toContain('Plugin ·'); expect(detail).not.toContain('安装到本机');
+    expect(detail).toContain('Plugin ·'); expect(detail).not.toContain('>安装</button>');
     expect(detail).toContain('桌面客户端');
   });
   it('renders the server growth stage, vitality, progress, adoption and linked experience', () => {
@@ -41,7 +41,7 @@ describe('Grove catalog presentation', () => {
     expect(listing).toContain('最近还在用');
     const detail = renderToStaticMarkup(createElement(CatalogDetail, { town: model }));
     expect(detail).toContain('hand-perception-contract');
-    expect(detail).toContain('安装到本机');
+    expect(detail).toContain('<button class="primary">安装</button>');
   });
 
   it('distinguishes unmaintained kits and never offers App bundle installation', () => {
@@ -55,7 +55,7 @@ describe('Grove catalog presentation', () => {
     const markup = renderToStaticMarkup(createElement(CatalogDetail, { town: town(app) }));
     expect(markup).toContain('App ·');
     expect(markup).toContain('查看 App 仓库');
-    expect(markup).not.toContain('安装到本机');
+    expect(markup).not.toContain('>安装</button>');
     expect(markup).not.toContain('not-a-portal-tool');
     const untrusted = renderToStaticMarkup(createElement(CatalogDetail, { town: town({ ...app, repo_url: 'https://github.com.evil.test/example/app' }) }));
     expect(untrusted).not.toContain('查看 App 仓库');

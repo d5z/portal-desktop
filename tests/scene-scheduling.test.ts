@@ -20,8 +20,8 @@ it('retains unscoped task metadata while presenting it beside the current scene 
     { ...task, task_id: 'invalid', scene_id: 123 }, { ...task, task_id: 'other', scene_id: 'other' }] }, new Set(['a']));
   expect(output.map(task => [task.id, task.sceneId])).toEqual([['unscoped', ''], ['null', '']]);
   const user: any = { kind: 'message', role: 'user', id: 'current', sceneId: 'a', createdAt: 1, text: 'task' };
-  expect(withScheduling([user], output)).toHaveLength(2);
-  expect(withScheduling([user], output)[1]).toMatchObject({ kind: 'run', sceneId: 'a', scheduling: { tasks: output } });
+  const run:any = {kind:'run',id:'run',sceneId:'a',start:2,entries:[],label:'思考中'};
+  expect(withScheduling([user,run], output)[1]).toMatchObject({ kind: 'run', sceneId: 'a', scheduling: { tasks: output } });
 });
 it('keeps a run with its preceding scene message when its timer predates the server timestamp', () => {
   const input:any[] = [
@@ -33,8 +33,7 @@ it('keeps a run with its preceding scene message when its timer predates the ser
   const current:any = {id:'new-task',sceneId:'a',createdAt:60,status:'running'};
   const output:any[] = withScheduling(input,[old,current]);
   expect(output.find(item=>item.id==='current-run').scheduling.tasks).toEqual([current]);
-  expect(output.find(item=>item.id==='scheduling-old').scheduling.tasks).toEqual([old]);
-  expect(output.some(item=>item.id==='scheduling-new')).toBe(false);
+  expect(output.map(item=>item.id)).toEqual(input.map(item=>item.id));
 });
 it('observes atomic ledger replacement without polling and stops on dispose', async () => {
   const directory = await mkdtemp(path.join(os.tmpdir(),'scene-task-watch-'));
@@ -85,35 +84,62 @@ it('attaches interleaved scene tasks and hints to their own turn without mutatin
   const run = (id:string,sceneId:string,start:number):any => ({kind:'run',id,sceneId,start,end:start+1,entries:[],label:'已回复'});
   const hint = 'question\n\n[Desktop 场景调度提示]\n当前输入属于 scene_id="b"。本客户端其他场景尚在处理或等待回复：[]\n[/Desktop 场景调度提示]';
   const input = [user('a1','a',10),user('b1','b',20,hint),run('b-run','b',21),run('a-run','a',11),user('a2','a',50)];
-  const task:any = {id:'task-a',sceneId:'a',createdAt:30,status:'running'};
+  const task:any = {id:'task-a',sceneId:'a',createdAt:30,status:'running',brief:'子任务完整说明只在详情中展示'};
   const output:any[] = withScheduling(input,[task]);
   expect(output).toHaveLength(input.length);
-  expect(output.find(i=>i.id==='a-run')).toMatchObject({label:'后台执行中',end:undefined,scheduling:{tasks:[task]}});
+  expect(output.find(i=>i.id==='a-run')).toMatchObject({label:'已回复',end:12,scheduling:{tasks:[task]}});
   expect(output.find(i=>i.id==='b-run').scheduling.hint).toContain('scene_id="b"');
   expect(output.find(i=>i.id==='a2').scheduling).toBeUndefined();
   expect(input[3].label).toBe('已回复');
+  expect(output.find(i=>i.id==='a-run').context).toBeUndefined();
+  expect(output.find(i=>i.id==='a-run').scheduling.tasks[0].brief).toBe(task.brief);
 });
-it('rebuilds one collapsed process row from history, waits after stage replies, then settles on final reply', () => {
+it.each(['running','done','failed'] as const)('does not rebuild process rows from refreshed history with %s tasks', status => {
   const input:any[] = [ {kind:'message',role:'user',id:'a',sceneId:'a',createdAt:10,text:'task'},
     {kind:'message',role:'being',id:'stage',sceneId:'a',createdAt:20,text:'已委派'} ];
-  const tasks:any[] = [{id:'t1',sceneId:'a',createdAt:15,endedAt:30,status:'done'}, {id:'t2',sceneId:'a',createdAt:16,endedAt:35,status:'done'}];
-  const before:any[] = withScheduling(input,tasks);
-  expect(before.filter(i=>i.kind==='run')).toHaveLength(1);
-  expect(before[1]).toMatchObject({label:'后台已完成，尚未收到回复',waitingForReply:true,scheduling:{tasks}});
-  const after:any[] = withScheduling([...input,{...input[1],id:'final',createdAt:40}],tasks);
-  expect(after[1].end).toBe(35);
-  expect(after[1].label).toBe('思考过程');
-  expect(withScheduling(input,[{...tasks[0],sceneId:'external'}])).toEqual(input);
+  const tasks:any[] = [{id:'t1',sceneId:'a',createdAt:15,endedAt:30,status}];
+  expect(withScheduling(input,tasks)).toEqual(input);
+  const final = [...input,{...input[1],id:'final',createdAt:40}];
+  expect(withScheduling(final,tasks)).toEqual(final);
+});
+
+it.each(['queued','thinking','working','replying','waiting','reconnecting','done','stopped','error','timeout'] as const)(
+  'keeps parent %s authoritative across child lifecycle changes', status => {
+    const terminal=['done','stopped','error','timeout'].includes(status);
+    const parent:any={kind:'run',id:'parent',sceneId:'a',start:11,end:terminal?50:undefined,
+      entries:[{type:'tool',name:'portal_exec',done:terminal}],status,label:'主对话状态',hint:'主对话提示',
+      outcome:terminal?status:undefined,waitingForReply:status==='waiting',replyConfirmed:status==='done'};
+    const input:any[]=[{kind:'message',role:'user',id:'user',sceneId:'a',createdAt:10,text:'task'},parent];
+    for(const childStatus of ['queued','running','done','failed'] as const) {
+      const task:any={id:'child',sceneId:'a',createdAt:20,endedAt:childStatus==='done'||childStatus==='failed'?40:undefined,status:childStatus};
+      const result:any=withScheduling(input,[task])[1];
+      expect(result).toEqual({...parent,scheduling:{hint:'',tasks:[task]}});
+      expect(parent.scheduling).toBeUndefined();
+    }
+  },
+);
+
+it('leaves final-reply reconciliation to the runtime when task history arrives separately', () => {
+  const input:any[] = [
+    {kind:'message',role:'user',id:'user',sceneId:'a',createdAt:10,text:'task'},
+    {kind:'run',id:'run',sceneId:'a',start:11,entries:[],label:'后台执行中',status:'working',waitingForReply:true},
+    {kind:'message',role:'being',id:'reply',sceneId:'a',createdAt:40,text:'已完成',streaming:false},
+  ];
+  const output:any[] = withScheduling(input,[{id:'task-a',sceneId:'a',createdAt:20,endedAt:30,status:'done'}]);
+  expect(output.find(item=>item.id==='run')).toMatchObject(input[1]);
+  expect(output.find(item=>item.id==='run').end).toBeUndefined();
 });
 
 it('does not use a newer turn reply to finish older delegated work', () => {
   const input:any[] = [
     {kind:'message',role:'user',id:'old',sceneId:'a',createdAt:10,text:'old task'},
+    {kind:'run',id:'old-run',sceneId:'a',start:11,entries:[],label:'思考中'},
     {kind:'message',role:'user',id:'new',sceneId:'a',createdAt:40,text:'new question'},
     {kind:'message',role:'being',id:'new-answer',sceneId:'a',createdAt:50,text:'new answer'},
   ];
   const output:any[] = withScheduling(input,[{id:'old-task',sceneId:'a',status:'done',createdAt:20,endedAt:30}]);
-  expect(output[1]).toMatchObject({id:'scheduling-old',label:'后台已完成，尚未收到回复'});
+  expect(output[1]).toMatchObject(input[1]);
+  expect(output[1].waitingForReply).toBeUndefined();
 });
 
 it('waits for every delegated result even when tasks finish out of creation order', async () => {
@@ -275,10 +301,12 @@ it.each(['running', 'done'] as const)('does not block a new scene on a %s ledger
 it.each([{interim:true}, {streaming:true}])('does not finish delegated work on an unfinished reply (%j)', flags => {
   const input:any[] = [
     {kind:'message',role:'user',id:'u',sceneId:'a',createdAt:10,text:'task'},
+    {kind:'run',id:'run',sceneId:'a',start:11,entries:[],label:'思考中'},
     {kind:'message',role:'being',id:'a',sceneId:'a',createdAt:40,text:'stage',...flags},
   ];
   const output:any[] = withScheduling(input,[{id:'t',sceneId:'a',createdAt:20,endedAt:30,status:'done'}]);
-  expect(output[1]).toMatchObject({status:'waiting',waitingForReply:true});
+  expect(output[1]).toMatchObject(input[1]);
+  expect(output[1].end).toBeUndefined();
 });
 
 it('shows failed delegated work even when another task completed', async () => {
@@ -295,7 +323,47 @@ it('shows failed delegated work even when another task completed', async () => {
       {id:'bad',sceneId:'a',createdAt:at,endedAt:at+20,status:'failed'}];
     runtime.updateSceneTasks(tasks);
     expect(activity.mock.lastCall?.[0].a).toBe('task-failed');
-    const input:any[]=[{kind:'message',role:'user',id:'u',sceneId:'a',createdAt:at-1,text:'two tasks'}];
-    expect(withScheduling(input,tasks)[1]).toMatchObject({status:'error',label:'后台任务异常'});
+    const input:any[]=[{kind:'message',role:'user',id:'u',sceneId:'a',createdAt:at-1,text:'two tasks'},
+      {kind:'run',id:'run',sceneId:'a',start:at,end:at+20,entries:[],label:'已回复'}];
+    expect(withScheduling(input,tasks)[1]).toMatchObject({...input[1],scheduling:{tasks}});
+  } finally {runtime.dispose();}
+});
+
+it.each([
+  {name:'old failure before the latest question', taskAt:20, replyAt:0, interim:false, expected:undefined},
+  {name:'current unresolved failure', taskAt:60, replyAt:0, interim:false, expected:'task-failed'},
+  {name:'current failure followed by a final reply', taskAt:60, replyAt:80, interim:false, expected:undefined},
+  {name:'current failure followed only by progress', taskAt:60, replyAt:80, interim:true, expected:'task-failed'},
+])('restores the scene badge from history: $name', ({taskAt, replyAt, interim, expected}) => {
+  const state:any = {items:[
+    {kind:'message',role:'user',id:'old',sceneId:'a',createdAt:10,text:'old task'},
+    {kind:'message',role:'user',id:'current',sceneId:'a',createdAt:50,text:'current question'},
+    ...(replyAt ? [{kind:'message',role:'being',id:'answer',sceneId:'a',createdAt:replyAt,text:'reply',streaming:false,interim}] : []),
+  ],currentScene:{sceneId:'a'},draft:'',sceneTasks:[],changed:vi.fn()};
+  const activity = vi.fn();
+  const runtime = createSceneRuntime(state,{onSceneActivity:activity},()=>({
+    sceneActivity:()=>null, replyCompletedAt:()=>0, isBusy:()=>false, syncConnection:()=>{}, dispose:()=>{},
+  }));
+  try {
+    const task:any = {id:'failed',sceneId:'a',createdAt:taskAt,endedAt:taskAt+5,status:'failed'};
+    runtime.updateSceneTasks([task]);
+    expect(activity.mock.lastCall?.[0].a).toBe(expected);
+    expect(state.sceneTasks).toEqual([task]);
+  } finally {runtime.dispose();}
+});
+
+it.each(['queued','thinking','replying','working','waiting','reconnecting'])('prioritizes the current %s stream over an old task ledger', status => {
+  const state:any={items:[],currentScene:{sceneId:'a'},sceneTasks:[],changed:vi.fn()};
+  const activity=vi.fn();
+  const runtime=createSceneRuntime(state,{onSceneActivity:activity},()=>({
+    sceneActivity:()=>status,isBusy:()=>true,syncConnection:()=>{},dispose:()=>{},
+  }));
+  try {
+    runtime.updateSceneTasks([
+      {id:'old-failure',sceneId:'a',createdAt:10,endedAt:20,status:'failed'},
+      {id:'old-running',sceneId:'a',createdAt:11,status:'running'},
+    ]);
+    expect(activity.mock.lastCall?.[0].a).toBe(status);
+    expect(state.sceneTasks).toHaveLength(2);
   } finally {runtime.dispose();}
 });

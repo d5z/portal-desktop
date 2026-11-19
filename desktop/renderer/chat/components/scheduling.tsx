@@ -19,14 +19,24 @@ const labels: Record<SceneTask['status'], string> = { queued: '等待执行', ru
 export function SceneScheduling({ tasks, hint }: { tasks: SceneTask[]; hint: string }) {
   if (!tasks.length && !hint) return null;
   const active = tasks.filter(t => t.status === 'running' || t.status === 'queued').length;
+  const failed = tasks.filter(t => ['failed', 'cancelled', 'interrupted', 'budget_exhausted', 'timeout'].includes(t.status)).length;
+  const completed = tasks.filter(t => t.status === 'done').length;
+  const summary = active ? `${active} 项进行中` : failed ? `${failed} 项未完成` : tasks.length ? `${completed}/${tasks.length} 项完成` : '等待状态同步';
   return <section className="scene-scheduling scene-task-list" aria-label="场景调度">
-    <h4><span className={active ? 'scene-task-spinner' : ''} aria-hidden="true" />场景调度 · subagent{active ? ` · ${active} 项进行中` : ''}</h4>
+    <header className="scene-task-header">
+      <h4><span className={active ? 'scene-task-spinner' : ''} aria-hidden="true" />后台任务</h4>
+      <span className={`scene-task-summary${failed ? ' has-failures' : ''}`} role="status">
+        {summary}
+      </span>
+    </header>
     {hint && <pre>{hint}</pre>}
-    {tasks.length > 0 && <p>后台任务独立执行，结果由 Being 在对应场景回复。工具执行完成不代表回复已经到达。</p>}
+    {tasks.length > 0 && <p className="scene-task-note">任务在后台独立执行，结果会回到对应场景。</p>}
     <ul>{[...tasks].reverse().slice(0, 30).map(task => <li key={task.id} data-status={task.status}>
-      <span className="scene-task-status">{labels[task.status]}</span>
-      <strong className="scene-task-brief">{task.brief || '后台子任务'}</strong>
-      <small>{new Date(task.createdAt).toLocaleString()} · {task.id}{task.turns ? ` · ${task.turns} 轮` : ''}</small>
+      <div className="scene-task-row">
+        <span className="scene-task-status">{labels[task.status]}</span>
+        <strong className="scene-task-brief">{task.brief || '后台子任务'}</strong>
+        <time dateTime={new Date(task.createdAt).toISOString()}>{new Date(task.createdAt).toLocaleString()} · {task.id}{task.turns ? ` · ${task.turns} 轮` : ''}</time>
+      </div>
       {task.error && <p className="scene-task-error">{task.error}</p>}
     </li>)}</ul>
   </section>;

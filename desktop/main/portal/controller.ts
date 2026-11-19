@@ -106,7 +106,13 @@ export async function createPortalController(options: {
     // Default inference uses the current Loom identity, independently of the Being's main model.
     let subagentChanged = false;
     const generatedConfigPath = path.join(directory, 'desktop-portal.toml');
-    const ownsGeneratedConfig = !store.settings.portalConfigPath || store.settings.portalConfigPath === generatedConfigPath;
+    const configPath = store.settings.portalConfigPath || generatedConfigPath;
+    const service = background.installedService;
+    // Upgrades can retain a generated TOML under an older service directory.
+    // Its model settings still belong to Desktop even after the file is edited.
+    const ownsGeneratedConfig = configPath === generatedConfigPath ||
+      service?.configPath === configPath && !service.existing && service.label === background.label &&
+      (service.generatedConfig || path.dirname(path.dirname(configPath)) === background.runtimeDirectory && path.basename(configPath) === 'portal.toml');
     if (ownsGeneratedConfig) {
       try {
         subagentChanged = await syncSubagentModel(directory, store.settings, store.connection, net.fetch.bind(net) as typeof fetch);
@@ -117,8 +123,8 @@ export async function createPortalController(options: {
         // A changed identity must never run with the previous Being's model token.
         // Keep other Portal tools available, but disable the rejected default.
         subagentChanged = (await readSubagentConfig(directory, store.settings)).enabled !== false;
-        const configPath = await setSubagentEnabled(directory, {
-          ...store.settings, portalConfigPath: generatedConfigPath,
+        await setSubagentEnabled(directory, {
+          ...store.settings, portalConfigPath: configPath,
         }, false);
         await store.save({ ...store.settings, portalConfigPath: configPath });
         errorLog.report('subagent-model-sync', error);

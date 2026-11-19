@@ -1,5 +1,5 @@
 import useEventListener from 'ahooks/es/useEventListener';
-import { useCallback, useEffect, useLayoutEffect, useRef, type RefObject, type TouchEvent, type WheelEvent } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, type MouseEvent, type RefObject, type TouchEvent, type WheelEvent } from 'react';
 import type { ChatItem } from '../models/chat';
 import { firstAfter } from '../models/scroll-position';
 
@@ -118,6 +118,14 @@ export function useMessageScroll(items: ChatItem[], container: RefObject<HTMLDiv
   }, { target: container });
   return {
     scrollLock, releaseAnchor, subscribe, getSnapshot,
+    onClickCapture(event: MouseEvent) {
+      if (!(event.target instanceof Element) || !event.target.closest('.run-activity summary')) return;
+      // Expanding a process is an explicit reading action, not new streamed
+      // content. Preserve the current viewport before details changes height.
+      scrollLock.current = false;
+      observedTop.current = container.current?.scrollTop ?? null;
+      remember();
+    },
     onWheel(event: WheelEvent) {
       if (event.deltaY >= 0) return;
       scrollLock.current = false;

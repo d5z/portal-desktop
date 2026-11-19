@@ -55,13 +55,14 @@ async function stop() {
   if (!child || child.exitCode !== null) return;
   const exited = once(child, 'exit'); child.kill(); await exited; child = undefined;
 }
-async function start(mode, executable = binary) {
+async function start(mode, executable = binary, runtimeDirectory) {
   await stop();
   const previous = generation;
   // The standalone config defaults to full access; Desktop's CLI mode must override it.
   await writeFile(config, `name = "permissions-fixture"\nworkspace = ${JSON.stringify(workspace)}\nkits_enabled = false\n[subagent]\nenabled = false\n[tools]\ncustom_tools_enabled = ${mode !== 'full-access'}\n[security]\npermission_mode = "full-access"\n`);
   child = spawn(executable, ['--config', config, '--connect', `http://127.0.0.1:${port}/fixture/?token=native-test`, '--permission-mode', mode],
-    {windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,PATH:process.platform === 'win32' ? path.join(process.env.SystemRoot,'System32') : '/usr/bin:/bin',USERPROFILE:temporary,HOME:temporary,HEART_PORTAL_CLIENT_MANAGED:'1',HEART_PORTAL_SUPERVISED:'1',HEART_PORTAL_CLIENT_FILE:registration}});
+    {windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,PATH:process.platform === 'win32' ? path.join(process.env.SystemRoot,'System32') : '/usr/bin:/bin',USERPROFILE:temporary,HOME:temporary,HEART_PORTAL_CLIENT_MANAGED:'1',HEART_PORTAL_SUPERVISED:'1',HEART_PORTAL_CLIENT_FILE:registration,
+      ...(runtimeDirectory ? {HEART_PORTAL_RUNTIME_DIR:runtimeDirectory} : {})}});
   child.stdout.on('data', bytes => {diagnostics=(diagnostics+bytes).slice(-12000);});
   child.stderr.on('data', bytes => {diagnostics=(diagnostics+bytes).slice(-12000);});
   const deadline = Date.now()+15000;
@@ -254,6 +255,14 @@ try {
   assert.equal(await readFile(outside,'utf8'),'full shell write');
   assert.equal(approvals.length,beforeFull,'Full access must not ask through any file/shell path');
   assert.doesNotMatch(diagnostics,/Sandbox ACL cleanup failed/);
+  // Desktop's background engine has no sidecar; the runtime lives elsewhere.
+  // In particular, the Windows sandbox launcher must retain this explicit path.
+  const serviceDirectory=path.join(temporary,'portal-service');await mkdir(serviceDirectory);
+  const serviceBinary=path.join(serviceDirectory,path.basename(binary));await copyFile(binary,serviceBinary);
+  await start('supervised',serviceBinary,path.dirname(runtimeFile));allow=true;
+  const serviceRuntime=await call('portal_exec',shellArgs(chain(`${python} --version`,'node --version')));ok(serviceRuntime);
+  assert.match(JSON.stringify(serviceRuntime),new RegExp(JSON.parse(beforeRuntime).python.version.replaceAll('.','\\.')));
+  assert.match(JSON.stringify(serviceRuntime),new RegExp(JSON.parse(beforeRuntime).node.version.replaceAll('.','\\.')));
   // A damaged managed install must explain the repair, never silently use host Python.
   const damagedDirectory=path.join(temporary,'damaged-install');await mkdir(damagedDirectory);
   const damagedBinary=path.join(damagedDirectory,path.basename(binary));await copyFile(binary,damagedBinary);

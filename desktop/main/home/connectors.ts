@@ -46,21 +46,21 @@ export class HomeConnectors implements HomeConnectorAPI {
     catch { return null; }
   }
 
-  catalog(query: { q?: string; after?: string } = {}) {
+  async catalog(query: { q?: string; after?: string } = {}) {
+    const response = await this.catalogResponse(query);
+    const page = await response.json() as HomeConnectorCatalogPage;
+    if (!page || !Array.isArray(page.items)) throw new Error('统一应用目录响应无效。');
+    return { ...page, items: page.items.map(item => ({ ...item, icon_url: this.iconURL(item.icon_url) })) };
+  }
+
+  catalogResponse(query: { q?: string; after?: string } = {}, legacy = false) {
     const params = new URLSearchParams({ limit: '12' });
     if (query.q?.trim()) params.set('q', utf8Prefix(query.q.trim(), 100));
     if (query.after) params.set('after', requiredId(query.after, '分页游标'));
-    const normalize = (page: HomeConnectorCatalogPage) => {
-      if (!page || typeof page !== 'object' || !Array.isArray(page.items)) throw new Error('统一应用目录响应无效。');
-      return { ...page, items: page.items.map(item => ({ ...item, icon_url: this.iconURL(item.icon_url) })) };
-    };
-    return this.client.request<HomeConnectorCatalogPage>('/v1/me/app-catalog?' + params.toString()).then(normalize).catch(error => {
-      // Keep older Home deployments usable when they have not exposed app-catalog yet.
-      const legacyEndpoint = error instanceof HomeError && [404, 405].includes(error.status);
-      const invalidResponse = error instanceof Error && error.message === '统一应用目录响应无效。';
-      if (!legacyEndpoint && !invalidResponse) throw error;
-      return this.client.request<HomeConnectorCatalogPage>('/v1/me/kit-catalog?' + params.toString()).then(normalize);
-    });
+    const resource = legacy ? 'kit-catalog' : 'app-catalog';
+    return this.client.request<Response>(`/v1/me/${resource}?${params}`, {}, async response => new Response(await response.arrayBuffer(), {
+      status: response.status, headers: { 'Content-Type': response.headers.get('Content-Type') || 'application/json' },
+    }));
   }
 
   localKitHistory(after?: string) {

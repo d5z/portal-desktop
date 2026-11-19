@@ -162,7 +162,8 @@ describe("scene history cache fallback", () => {
       expect(visible(state).filter(m => m.kind === "message").map(m => m.text)).toEqual(["几天前的问题", "几天前的回复"]);
       expect(state.items.filter(m => m.kind === "message").slice(0, 3).map(m => m.historySeq)).toEqual([1, 2, 101]);
       await runtime.refreshHistory();
-      expect(visible(state).filter(m => m.kind === "separator" && m.marker)).toHaveLength(1);
+      expect(state.items.filter(m => m.kind === "separator" && m.handoffMarker)).toHaveLength(1);
+      expect(visible(state).filter(m => m.kind === "separator" && m.handoffMarker)).toHaveLength(0);
       expect(visible(state).filter(m => m.kind === "message")).toHaveLength(2);
       expect(queries.filter(url => url.searchParams.has("after")).every(url => url.searchParams.get("after") === "400")).toBe(true);
     } finally { runtime.dispose(); }

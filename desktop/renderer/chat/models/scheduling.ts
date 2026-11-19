@@ -12,9 +12,9 @@ export function splitSchedulingHint(text: string) {
   return { text: text.slice(0, start), hint };
 }
 
-/** Attach process metadata to its originating scene/turn, never the selected scene.
- * History may not contain transient reasoning runs; in that case create one
- * presentation-only process row. Do not change wire messages or runtime state.
+/** Attach process metadata only to an existing run in its originating scene/turn.
+ * Reloaded history without transient reasoning stays free of process rows.
+ * Do not change wire messages or runtime state.
  */
 export function withScheduling(items: ChatItem[], tasks: SceneTask[], currentScene?: MessageScene): ChatItem[] {
   const users = items.filter((item): item is Message => item.kind === 'message' && item.role === 'user');
@@ -41,47 +41,14 @@ export function withScheduling(items: ChatItem[], tasks: SceneTask[], currentSce
     if (group && !group.run) group.run = item;
   }
   const replacements = new Map<string, Run>();
-  const insertions = new Map<string, Run>();
   for (const group of groups.values()) {
-    if (!group.hint && !group.tasks.length) continue;
-    const { user, tasks: assigned } = group;
-    const lastEnd = Math.max(0, ...assigned.map(task => task.endedAt || 0));
-    const replied = lastEnd > 0 && items.some(item => item.kind === 'message' && item.role === 'being'
-      && !item.streaming && !item.interim
-      && item.sceneId === user.sceneId && (item.createdAt || 0) >= lastEnd
-      && owner(item.sceneId, item.createdAt || 0)?.id === user.id);
-    const active = assigned.some(task => task.status === 'running' || task.status === 'queued');
-    const failed = !active && !replied && assigned.some(task => ['failed', 'interrupted', 'budget_exhausted', 'timeout'].includes(task.status));
-    const waiting = !active && !failed && !replied && assigned.some(task => task.status === 'done');
-    const run: Run = group.run ? { ...group.run } : {
-      kind: 'run', id: `scheduling-${user.id}`, sceneId: user.sceneId, sceneLabel: user.sceneLabel,
-      entries: [], start: user.createdAt || 0, end: lastEnd || user.createdAt || 1,
-      label: '思考过程', hint: '', arg: '', synthetic: true,
-    };
-    run.scheduling = { hint: group.hint, tasks: assigned };
-    const briefs = assigned.map(task => task.brief).filter((brief): brief is string => Boolean(brief));
-    if (briefs.length) run.context = briefs.length === 1 ? briefs[0] : `${briefs.length} 个任务：${briefs.slice(0, 2).join('、')}`;
-    // A stage reply ends a breath, but does not finish its delegated work.
-    if (active) {
-      run.end = undefined;
-      run.label = '后台执行中';
-      run.waitingForReply = true;
-      run.outcome = undefined;
-      run.status = 'working';
-    } else if (waiting && run.outcome !== 'error' && run.outcome !== 'timeout' && run.outcome !== 'stopped') {
-      run.end = undefined;
-      run.label = '后台已完成，尚未收到回复';
-      run.waitingForReply = true;
-      run.outcome = undefined;
-      run.status = 'waiting';
-    } else if (failed && (run.end || run.synthetic)) {
-      run.label = '后台任务异常'; run.outcome = 'error'; run.status = 'error';
-    }
-    if (group.run) replacements.set(group.run.id, run);
-    else insertions.set(user.id, run);
+    if (!group.run || (!group.hint && !group.tasks.length)) continue;
+    // The task ledger describes child work, not the parent stream lifecycle.
+    // Keep completion, waiting and timing owned by the chat runtime.
+    replacements.set(group.run.id, {
+      ...group.run,
+      scheduling: { hint: group.hint, tasks: group.tasks },
+    });
   }
-  return items.flatMap(item => {
-    const inserted = insertions.get(item.id);
-    return inserted ? [item, inserted] : [replacements.get(item.id) || item];
-  });
+  return items.map(item => replacements.get(item.id) || item);
 }

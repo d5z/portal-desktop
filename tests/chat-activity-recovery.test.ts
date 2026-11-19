@@ -225,7 +225,7 @@ it.each(['callback', 'beating'])('discovers SBS %s while idle, lets a room inter
     await vi.advanceTimersByTimeAsync(20);
     expect(f.posts).toHaveLength(1);
     expect(f.state.items.find(i=>i.kind==='run' && i.sceneId==='room')).toMatchObject({label:
-      `${origin === 'callback' ? 'SBS 自主回调进行中；' : 'SBS 自主处理进行中；'}消息已接收，正在切换到当前对话…`});
+      '消息已接收'});
     expect(f.state.items.some(i=>i.kind==='message' && i.queued)).toBe(false);
     f.setActive({...active,next_seq:4,events:[
       {seq:3,event:'content_block_delta',data:{scene_id:'room',delta:{text:'human reply'}}},
@@ -539,7 +539,7 @@ it.each([true, false])('shows an ordinary interrupt only on continuation and rec
     f.setPost(()=>Response.json({queued:true},{status:202}));
     await f.runtime.send('change direction', [], {mode:'interrupt'});
     await vi.advanceTimersByTimeAsync(20);
-    expect(f.state.items.find(i=>i.kind==='run')).toMatchObject({label:'消息已接收，正在调整回复方向…'});
+    expect(f.state.items.find(i=>i.kind==='run')).toMatchObject({label:'消息已接收'});
     const markers = () => f.state.items.filter(i=>i.kind==='separator' && i.text.includes('转向你'));
     expect(markers()).toHaveLength(0);
     const at = new Date().toISOString();
@@ -562,7 +562,7 @@ it('keeps unaddressed persisted handoffs out of the current room SBS view', asyn
     await f.runtime.refreshHistory();
     expect(f.state.items.find(i=>i.kind==='separator' && i.marker)).toMatchObject({handoffMarker:true});
     expect(sceneItems(f.state.items,'current',{sceneId:'room',strict:true},true).some(i=>i.kind==='separator' && i.marker)).toBe(false);
-    expect(sceneItems(f.state.items,'all',{sceneId:'room'},true).some(i=>i.kind==='separator' && i.marker)).toBe(true);
+    expect(sceneItems(f.state.items,'all',{sceneId:'room'},true).some(i=>i.kind==='separator' && i.marker)).toBe(false);
   } finally {f.runtime.dispose();}
 });
 

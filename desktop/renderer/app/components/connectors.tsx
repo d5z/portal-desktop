@@ -668,7 +668,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   // Account authorization and installation readiness are separate backend states.
   const connected = (kit: HomeConnectorCatalogItem) => installations.some(item => kit.installation_ids.includes(item.id) && item.desired_state !== 'removed');
   const localInstalled = (kit: HomeConnectorCatalogItem) => localKitFor(kit, localKits);
-  const filteredCatalog = catalog.filter(item => runtimeFilter === 'all' || runtimeFilter === 'local' && isLocalKit(item) || runtimeFilter === 'cloud' && hasRemoteRuntime(item));
+  const filteredCatalog = catalog.filter(item => runtimeFilter === 'all' || runtimeFilter === 'local' && Boolean(localSourceId(item)) || runtimeFilter === 'cloud' && hasRemoteRuntime(item));
   const installedKits = filteredCatalog.filter(item => connected(item) || Boolean(localInstalled(item)));
   const usedKits = filteredCatalog.filter(item => isLocalKit(item) && !localInstalled(item) && item.local_install?.used_before);
   const availableKits = catalogEnabled ? filteredCatalog.filter(item => item.availability === 'listed' && !connected(item) && !localInstalled(item) && !usedKits.includes(item)) : [];
