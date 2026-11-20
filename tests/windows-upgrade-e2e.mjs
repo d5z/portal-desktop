@@ -188,7 +188,8 @@ try {
   finally { clearTimeout(timer); }
   app = undefined;
   console.log('Old client exited; waiting for the independent installer and new client.');
-  upgradedPid = await until('NSIS launches new client', async () => (await clients()).find(p => p.ExecutablePath === installed(pkg.version) && p.ProcessId !== oldClientPid)?.ProcessId);
+  // Give the independent installer the same budget as a direct Setup invocation.
+  upgradedPid = await until('NSIS launches new client', async () => (await clients()).find(p => p.ExecutablePath === installed(pkg.version) && p.ProcessId !== oldClientPid)?.ProcessId, 150_000);
   const state = await until('new bundled Portal connects', async () => {
     const service = await json(path.join(profile, 'portal-service.json')).catch(() => null);
     if (service?.bundleId !== bundle.id) return false;
@@ -287,9 +288,20 @@ try {
   await writeFile(path.join(diagnostics, 'failure.json'), JSON.stringify({
     root, profile, error: { message: error.message, stack: error.stack, code: error.code, signal: error.signal, killed: error.killed },
     clients: await clients().catch(failure => ({ error: String(failure) })),
+    installerProcesses: JSON.parse(await powershell(`
+      ConvertTo-Json -InputObject @(Get-CimInstance Win32_Process | Where-Object {
+        $_.Name -eq 'portal-desktop.exe' -or $_.Name -like '*Setup*' -or $_.Name -eq 'powershell.exe'
+      } | Select-Object ProcessId,ParentProcessId,ExecutablePath,CommandLine) -Compress
+    `)),
     portals: await Promise.all([...ownedProcesses.values()].map(async before => ({ before, after: await processIdentity(before.pid) }))),
     profileCreated: await access(profile).then(() => true, () => false),
   }, null, 2));
+  const updates = path.join(profile, 'client-updates');
+  for (const attempt of await readdir(updates).catch(() => [])) {
+    for (const name of await readdir(path.join(updates, attempt))) {
+      if (/\.(log|json)$/.test(name)) await cp(path.join(updates, attempt, name), path.join(diagnostics, `${attempt}-${name}`));
+    }
+  }
   throw error;
 } finally {
   if (app) await app.close().catch(() => {});

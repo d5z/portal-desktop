@@ -66,7 +66,7 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.pa
             { town_id: 't_Bird', display_name: '山雀', display: '山雀 (t_Bird)', joined_at: '2026-09-03T12:00:00+08:00' },
           ]);
       if (url.pathname === '/api/fireside/hear') {
-        if (url.searchParams.get('fireside_id') === '11') await new Promise(resolve => setTimeout(resolve, 120));
+        if (url.searchParams.get('fireside_id') === '11') await globalThis.firesideResponse;
         const title = url.searchParams.get('fireside_id') === '11' ? '第二围炉消息' : '围炉消息';
         return json({ messages: Array.from({ length: 30 }, (_, index) => ({
           seq: index + 1,
@@ -194,9 +194,13 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.pa
   assert.equal(await page.locator('.fireside-thread-heading button').count(), 1);
   assert.equal(await page.locator('.fireside-thread-heading .fireside-members-trigger').count(), 1);
   const headingHeight = await page.locator('.fireside-thread-heading').evaluate(element => element.getBoundingClientRect().height);
+  await app.evaluate(() => {
+    globalThis.firesideResponse = new Promise(resolve => { globalThis.releaseFiresideResponse = resolve; });
+  });
   await page.locator('.fireside-room[data-id="11"]').click();
   await page.locator('.fireside-thread[aria-busy="true"] .fireside-loading-controls').waitFor();
   assert.equal(await page.locator('.fireside-thread-heading').evaluate(element => element.getBoundingClientRect().height), headingHeight);
+  await app.evaluate(() => globalThis.releaseFiresideResponse());
   await page.getByText('第二围炉消息', { exact: true }).waitFor();
   assert.equal(await page.locator('.fireside-thread-heading').evaluate(element => element.getBoundingClientRect().height), headingHeight);
   const roomGeometry = async () => page.locator('.fireside-room[data-id="10"]').evaluate(element => ({

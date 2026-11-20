@@ -109,7 +109,16 @@ try {
   await writeFile(path.join(current, 'Contents/Resources/runtime-bundle.json'), JSON.stringify({ ...expectedBundle, clientVersion: previousVersion, id: sha('previous-fixture:' + expectedBundle.id) }));
   const entitlement = path.join(root, 'entitlements.plist');
   await writeFile(entitlement, (await execute('/usr/bin/codesign', ['--display', '--entitlements', ':-', candidate])).stdout);
-  await execute('/usr/bin/codesign', ['--force', '--sign', signing.identity, '--timestamp', '--options', 'runtime', '--entitlements', entitlement, current]);
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await execute('/usr/bin/codesign', ['--force', '--sign', signing.identity, '--timestamp', '--options', 'runtime', '--entitlements', entitlement, current]);
+      break;
+    } catch (error) {
+      if (attempt >= 2 || !error.stderr?.includes('A timestamp was expected but was not found.')) throw error;
+      console.log('Apple timestamp missing while signing the upgrade fixture; retrying.');
+      await pause(2000);
+    }
+  }
   await execute('/usr/bin/codesign', ['--verify', '--deep', '--strict', current]);
   const configPath = path.join(root, 'custom portal.toml');
   const config = `# Existing user configuration must remain byte-for-byte intact.\nname = "upgrade-fixture"\nworkspace = ${JSON.stringify(workspace)}\nkits_dir = ${JSON.stringify(kits)}\nkits_enabled = true\nbind = "127.0.0.1:0"\n[tools]\nexec = true\nfile = true\nsearch = true\nweb_fetch = true\ncustom_tools_enabled = true\nscreenshot = false\n[security]\nexec_allowlist = []\nmax_file_size = 4321000\n`;
