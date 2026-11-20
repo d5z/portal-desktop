@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { chmod, mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { BackgroundPortal, type Command } from '../desktop/main/portal/background';
@@ -36,13 +36,15 @@ async function fixture(platform: 'darwin' | 'win32' = 'darwin') {
     }
     return '';
   };
-  const settings: Settings = { endpoint: '', being: '', hasToken: true, portalName: 'test', portalBinary: process.execPath, workspace: root, autoStart: false, backgroundEnabled: true, allowExec: false, kitsEnabled: false };
+  // Commands are mocked; stage fixture bytes instead of copying the host's Node binary.
+  const oldBinary = path.join(root, 'old-engine');
+  await writeFile(oldBinary, 'old executable');
+  await chmod(oldBinary, 0o700);
+  const settings: Settings = { endpoint: '', being: '', hasToken: true, portalName: 'test', portalBinary: oldBinary, workspace: root, autoStart: false, backgroundEnabled: true, allowExec: false, kitsEnabled: false };
   const connection = parseConnection('https://example.org/test/?token=fixture-secret');
   const background = new BackgroundPortal(profile, run, platform, root);
   await background.enable(settings, connection);
   const previous = { ...background.installedService! };
-  // Commands are mocked; do not deep-compare the host's 100 MB Node executable.
-  await writeFile(path.join(previous.root, platform === 'win32' ? 'heart-portal.exe' : 'heart-portal'), 'old executable');
   const original = 'name = "test"\nworkspace = "unchanged"\n# custom tools and settings must survive\n';
   await writeFile(previous.configPath!, original);
   const binary = path.join(root, 'new-engine'); await writeFile(binary, 'new executable');
