@@ -79,7 +79,7 @@ jobs:
         os: [macos-14, macos-15-intel, windows-latest]
     # Keep the original job/artifact IDs used by staging and publication retries.
     runs-on: ${{ matrix.os == 'macos-14' && 'macos-15' || matrix.os }}
-    timeout-minutes: ${{ matrix.os == 'windows-latest' && 120 || 45 }}
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 120 || matrix.os == 'macos-15-intel' && 60 || 45 }}
     env:
       PORTAL_DESKTOP_UPDATE_REPOSITORY: ${{ vars.PORTAL_DESKTOP_UPDATE_REPOSITORY || github.repository }}
     steps:

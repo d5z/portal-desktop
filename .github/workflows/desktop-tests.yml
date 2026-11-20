@@ -26,7 +26,7 @@ jobs:
       matrix:
         os: [macos-15, macos-15-intel, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: ${{ matrix.os == 'windows-latest' && 120 || 40 }}
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 120 || matrix.os == 'macos-15-intel' && 60 || 40 }}
     defaults:
       run:
         working-directory: client

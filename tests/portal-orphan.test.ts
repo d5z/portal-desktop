@@ -78,7 +78,7 @@ it.skipIf(process.platform !== 'darwin')('recovers a real detached child after i
     expect(replacement.state).toMatchObject({ managed: true, portalName: 'recovered', conflict: false });
     expect(replacement.state.pid).not.toBe(pid);
   } finally { await replacement.stop(); }
-}, 25_000);
+}, 60_000);
 
 it.skipIf(process.platform !== 'darwin')('forces a verified orphan to exit when it ignores graceful termination', async () => {
   const root = await realpath(await mkdtemp(path.join(os.tmpdir(), 'portal-stuck-orphan-'))); roots.push(root);

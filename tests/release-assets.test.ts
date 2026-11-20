@@ -1,4 +1,4 @@
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, describe, expect, it } from 'vitest';
 import { execFile } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises';
@@ -35,6 +35,8 @@ async function releaseFixture() {
   return { root, input, stage };
 }
 
+// These cases launch native Python ZIP inspection and the publication process.
+describe('release staging', { timeout: 30_000 }, () => {
 it.skipIf(process.platform === 'win32')('publishes both Mac architectures and Windows with separate installers, ZIPs, manifests and checksums', async () => {
   const { root, stage } = await releaseFixture();
   await stage('release');
@@ -83,4 +85,6 @@ it.skipIf(process.platform === 'win32')('rejects Intel manifests for the wrong a
   await execute('python3', ['-c', 'import sys,zipfile\nwith zipfile.ZipFile(sys.argv[1],"w") as z:\n z.writestr("App/resources/runtime-bundle.json",sys.argv[2])\n z.writestr("App/resources/heart-portal","wrong engine")',
     path.join(intel, 'app.zip'), original.toString()]);
   await expect(stage('wrong-engine')).rejects.toThrow('macos-x64 engine checksum mismatch');
+});
+
 });
