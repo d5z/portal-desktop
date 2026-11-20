@@ -120,8 +120,15 @@ try {
   await frame.getByText('跟随测试段落 29').waitFor();
   const expectBottom = async label => {
     const gap = await messages.evaluate(async el => {
-      await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-      return el.scrollHeight - el.scrollTop - el.clientHeight;
+      // Streaming renders and ResizeObserver can span more than two frames on
+      // hosted runners. Wait for the actual pinned position, without scrolling.
+      const deadline = performance.now() + 2000;
+      let gap;
+      do {
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        gap = el.scrollHeight - el.scrollTop - el.clientHeight;
+      } while (Math.abs(gap) >= 2 && performance.now() < deadline);
+      return gap;
     });
     assert.ok(Math.abs(gap) < 2, `${label}: bottom gap ${gap}`);
   };

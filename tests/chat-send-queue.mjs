@@ -98,6 +98,9 @@ try{
   await page.locator('.composer-queue-item').filter({hasText:'稍后发送'}).waitFor({state:'detached'});
   await input.fill('');
   await sendControl.and(page.getByRole('button', { name: '停止处理', exact: true })).waitFor();
+  // Queue persistence briefly disables editing; wait for the same readiness
+  // the visible edit action exposes before exercising its keyboard shortcut.
+  await page.getByRole('button', { name: '编辑消息：优先处理', exact: true }).and(page.locator(':enabled')).waitFor();
   await input.press('ArrowUp');
   const editing = page.locator('#input').and(page.getByRole('textbox', { name: '编辑待发消息', exact: true }));
   await editing.waitFor();
