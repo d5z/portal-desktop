@@ -7,6 +7,9 @@ on:
       - 'desktop/main/portal/foreground-record.ts'
       - 'desktop/main/portal/supervisor.ts'
       - 'tests/portal-orphan-windows.test.ts'
+      - 'tests/windows-sandbox-cancellation-native.mjs'
+      - 'tests/portal-permissions-native.mjs'
+      - 'heart-portal'
   workflow_dispatch:
 permissions:
   contents: read
@@ -43,3 +46,8 @@ jobs:
             output/node-*/node.sha256
           key: ${{ steps.task-node-cache.outputs.cache-primary-key }}
       - run: npx vitest run tests/portal-orphan-windows.test.ts
+      - name: Check sandbox cancellation and ACL restoration
+        run: node tests/windows-sandbox-cancellation-native.mjs
+      - name: Check native permissions and bundled interpreters
+        if: success() || failure()
+        run: node tests/portal-permissions-native.mjs
