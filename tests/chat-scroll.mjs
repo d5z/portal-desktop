@@ -60,6 +60,8 @@ try {
   await frame.locator('.message.user').nth(11).waitFor();
   await post({type:'beings:chat-top-inset',value:topInset});
   await child().waitForFunction(value => document.querySelector('.chat-root').style.getPropertyValue('--chat-top-inset') === `${value}px`, topInset);
+  await child().waitForFunction(() => performance.getEntriesByName('loom:ready').length > 0);
+  await child().evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   const jump=frame.locator('#chat-jump-latest');
   await jump.waitFor({state:'hidden'});
   // Moving through the bottom whitespace does not hide any message.

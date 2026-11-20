@@ -126,7 +126,7 @@ try {
   const connectionLink = `http://127.0.0.1:${server.address().port}/upgrade-fixture/?token=${token}`;
   await page.evaluate(async input => {
     const { settings } = await window.beings.snapshot();
-    await window.beings.save({ ...settings, ...input, backgroundEnabled: true, autoStart: false, allowExec: true, kitsEnabled: true });
+    await window.beings.save({ ...settings, ...input, backgroundEnabled: true, autoStart: false, allowExec: true, kitsEnabled: true, permissionMode: 'full-access' });
     await window.beings.stopPortal();
     await window.beings.save({ ...(await window.beings.snapshot()).settings, backgroundEnabled: false });
   }, { connectionLink, portalName: 'upgrade-fixture', workspace, portalConfigPath: configPath, portalEnvironmentPath: `${path.join(root, 'custom bin')}:${process.env.PATH}` });
@@ -170,7 +170,7 @@ try {
   });
   await until('installation commits', async () => !(await readdir(profile)).includes('client-install.json'));
   const after = await readJSON(path.join(profile, 'connection.json'));
-  for (const key of ['endpoint', 'being', 'workspace', 'portalName', 'portalConfigPath', 'portalEnvironmentPath', 'backgroundEnabled', 'autoStart', 'allowExec', 'kitsEnabled']) assert.deepEqual(after.settings[key], before.settings[key], key);
+  for (const key of ['endpoint', 'being', 'workspace', 'portalName', 'portalConfigPath', 'portalEnvironmentPath', 'backgroundEnabled', 'autoStart', 'allowExec', 'kitsEnabled', 'permissionMode']) assert.deepEqual(after.settings[key], before.settings[key], key);
   assert.equal(sha(await readFile(after.settings.portalBinary)), expectedBundle.sha256);
   assert.equal((await readJSON(path.join(profile, 'portal-service.json'))).bundleId, expectedBundle.id);
   assert.equal(await readFile(configPath, 'utf8'), config);

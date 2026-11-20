@@ -159,6 +159,7 @@ try {
   await frame.locator('#file-input').setInputFiles({ name: 'draft.txt', mimeType: 'text/plain', buffer: Buffer.from('private draft attachment') });
   await frame.locator('#pending-files.active').waitFor();
   const openPortal = async () => {
+    await waitForChatReady(page);
     await page.locator('#options-trigger').click();
     await clickWhenPointerReady(page, page.locator('#client-settings-button'));
     await page.locator('#client-settings-dialog[open]').waitFor();

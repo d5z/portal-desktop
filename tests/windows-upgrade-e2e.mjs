@@ -152,7 +152,7 @@ try {
   assert.equal(await app.evaluate(({ app }) => app.getVersion()), previous);
   await page.evaluate(async input => {
     const { settings } = await window.beings.snapshot();
-    await window.beings.save({ ...settings, ...input, backgroundEnabled: true, autoStart: false, allowExec: true, kitsEnabled: true });
+    await window.beings.save({ ...settings, ...input, backgroundEnabled: true, autoStart: false, allowExec: true, kitsEnabled: true, permissionMode: 'full-access' });
   }, { connectionLink: `http://127.0.0.1:${server.address().port}/upgrade-fixture/?token=${token}`, portalName: 'upgrade-fixture', workspace, portalConfigPath: configPath });
   await until('old client Portal connects', async () => (await page.evaluate(() => window.beings.snapshot())).portal.phase === 'connected');
   const before = await page.evaluate(() => window.beings.snapshot());
@@ -201,7 +201,7 @@ try {
   });
   await until('installation transaction commits', async () => !(await readdir(profile)).includes('client-install.json'));
   const after = await json(path.join(profile, 'connection.json')), service = await json(path.join(profile, 'portal-service.json'));
-  for (const key of ['endpoint', 'being', 'workspace', 'portalName', 'portalConfigPath', 'backgroundEnabled', 'autoStart', 'allowExec', 'kitsEnabled']) assert.deepEqual(after.settings[key], before.settings[key], key);
+  for (const key of ['endpoint', 'being', 'workspace', 'portalName', 'portalConfigPath', 'backgroundEnabled', 'autoStart', 'allowExec', 'kitsEnabled', 'permissionMode']) assert.deepEqual(after.settings[key], before.settings[key], key);
   assert.equal(sha(await readFile(path.join(service.root, 'heart-portal.exe'))), bundle.sha256);
   const actualBinary = await powershell(`(Get-CimInstance Win32_Process -Filter 'ProcessId=${state.pid}').ExecutablePath`);
   assert.equal(actualBinary.toLowerCase(), path.join(service.root, 'heart-portal.exe').toLowerCase());
