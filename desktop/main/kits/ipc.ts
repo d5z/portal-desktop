@@ -3,6 +3,8 @@ import { mkdir } from 'node:fs/promises';
 import type { KitInstaller } from './install';
 import { deleteLocalKit, importLocalKit, kitLocation, localKits, readKit } from './catalog';
 import type { SettingsStore } from '../app/settings';
+import type { HomeKitPreparation } from '../../shared/home';
+import type { HomeConnectors } from '../home/connectors';
 import type { KitInstallInput } from '../../shared/types';
 
 type RegisterHandler = (channel: string, callback: (...args: any[]) => unknown) => void;
@@ -13,6 +15,7 @@ export interface KitsIpcOptions {
   window: () => BrowserWindow | null;
   store: SettingsStore;
   kitInstaller: KitInstaller;
+  homeConnectors: HomeConnectors;
 }
 
 export function registerKitsIpc(options: KitsIpcOptions) {
@@ -28,6 +31,11 @@ export function registerKitsIpc(options: KitsIpcOptions) {
   handle('beings:kit-prepare', (id: string) => exclusive(async () => {
     if (!store.connection) throw new Error('请先连接 Being，再安装本机 Kit。');
     return kitInstaller.prepare(id, store.settings);
+  }));
+  handle('beings:kit-prepare-home', (input: Omit<HomeKitPreparation, 'detail'>) => exclusive(async () => {
+    if (!store.connection) throw new Error('请先连接 Being，再安装本机 Kit。');
+    const detail = options.homeConnectors.localKitSource(input.releaseId);
+    return kitInstaller.prepare(input.sourceId, store.settings, { ...input, detail });
   }));
   handle('beings:kit-install', (input: KitInstallInput) => exclusive(() => kitInstaller.install(input, store.settings)));
   handle('beings:kit-discard', (ticket: string) => exclusive(() => kitInstaller.discard(ticket)));

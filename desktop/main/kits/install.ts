@@ -8,6 +8,7 @@ import { x as extract } from 'tar';
 import { pipeline } from 'node:stream/promises';
 import { Readable, Transform } from 'node:stream';
 import { createGunzip } from 'node:zlib';
+import { homeKitBundlePath, type HomeKitPreparation } from '../../shared/home';
 import { TOWN_ORIGIN, TownClient } from '../town/client';
 import { readKit, kitLocation } from './catalog';
 import { redact } from '../chat/connection';
@@ -101,22 +102,38 @@ export async function runInstallCommand(program: string, args: string[], cwd: st
     child.once('exit', code => { clearTimeout(timer); child.stdout?.destroy(); child.stderr?.destroy(); const secrets = Object.entries(env).filter(([key]) => /KEY|TOKEN|SECRET|PASSWORD/i.test(key)).map(([, value]) => value || ''); code === 0 ? resolve() : reject(new Error(timedOut ? '安装依赖超时，请重试。' : `安装依赖失败：${redact(output, secrets)}`)); });
   });
 }
-interface Prepared { plan: KitInstallPlan; root: string; directory: string; manifest: any; settings: Settings; created: number }
+interface Prepared { sourceId: string; releaseId?: string; plan: KitInstallPlan; root: string; directory: string; manifest: any; settings: Settings; created: number }
 export class KitInstaller {
   private pending = new Map<string, Prepared>();
   constructor(private fetcher: typeof fetch = fetch) {}
-  async prepare(id: string, settings: Settings): Promise<KitInstallPlan> {
+  async prepare(id: string, settings: Settings, home?: HomeKitPreparation): Promise<KitInstallPlan> {
     for (const [ticket, value] of this.pending) if (Date.now() - value.created > 30 * 60000) await this.discard(ticket);
     if (this.pending.size >= 3) throw new Error('请先关闭其他 Kit 安装窗口。');
     const { directory, enabled } = await kitLocation(settings);
     if (!enabled) throw new Error('请先在本机设置或现有 Portal 配置中启用 Kits。');
-    const details = await new TownClient(() => '', this.fetcher).query({ kind: 'kit', id });
-    if (!details.ok) throw new Error(details.message);
-    if (details.data.ambiguous) throw new Error('此名称对应多个 Kit，请通过市集中的具体条目安装。');
-    if (details.data.kind === 'app') throw new Error('Grove App 没有 Kit bundle，请前往其仓库获取安装方式。');
-    if (groveEntryKind(details.data) === 'plugin') throw new Error('此条目是客户端 Plugin，请使用插件安装入口。');
-    if (details.data.has_bundle === false && !details.data.source_url) throw new Error('此 Kit 没有可下载的安装包。');
-    const data = await downloadKit(id, this.fetcher);
+    let data: Buffer, name: string, version: string, catalogManifest: any;
+    if (home) {
+      const detail = home.detail;
+      if (detail?.kind !== 'local_kit' || detail.app?.release_id !== home.releaseId || detail.app.availability !== 'listed' || detail.local_kit?.source_id !== id || home.sourceId !== id || detail.local_kit.installer !== 'desktop_legacy' || !detail.local_kit.bundle) throw new Error('本地 Kit 来源或安装包不可用，请刷新后重试。');
+      homeKitBundlePath(home.releaseId, detail.local_kit.bundle);
+      if (!(home.archive instanceof Uint8Array)) throw new Error('本地 Kit 安装包无效。');
+      data = Buffer.from(home.archive);
+      if (data.length !== detail.local_kit.bundle.size_bytes || createHash('sha256').update(data).digest('hex') !== detail.local_kit.bundle.sha256) throw new Error('本地 Kit 安装包大小或 SHA-256 校验失败，请重新下载。');
+      catalogManifest = detail.local_kit.install_manifest;
+      name = catalogManifest?.name;
+      version = catalogManifest?.version;
+      if (typeof name !== 'string' || !name || typeof version !== 'string' || !version || version !== detail.app.version) throw new Error('Home 安装清单名称或版本无效。');
+    } else {
+      const details = await new TownClient(() => '', this.fetcher).query({ kind: 'kit', id });
+      if (!details.ok) throw new Error(details.message);
+      if (details.data.ambiguous) throw new Error('此名称对应多个 Kit，请通过市集中的具体条目安装。');
+      if (details.data.kind === 'app') throw new Error('Grove App 没有 Kit bundle，请前往其仓库获取安装方式。');
+      if (groveEntryKind(details.data) === 'plugin') throw new Error('此条目是客户端 Plugin，请使用插件安装入口。');
+      if (details.data.has_bundle === false && !details.data.source_url) throw new Error('此 Kit 没有可下载的安装包。');
+      data = await downloadKit(id, this.fetcher);
+      name = String(details.data.name); version = String(details.data.version);
+      catalogManifest = details.data.manifest;
+    }
     // Stage beside kits_dir, so final activation uses an atomic same-filesystem rename.
     await mkdir(path.dirname(directory), { recursive: true });
     const root = await mkdtemp(path.join(path.dirname(directory), '.beings-download-'));
@@ -124,18 +141,20 @@ export class KitInstaller {
       const source = await unpackKit(data, path.join(root, 'unpacked'));
       const file = path.join(source, 'manifest.json');
       if ((await stat(file)).size > 1024 * 1024) throw new Error('Kit manifest 超过 1 MB。');
-      const manifest = JSON.parse((await readFile(file, 'utf8')).replace(/^\uFEFF/, ''));
-      if (manifest.name !== details.data.name || manifest.version !== details.data.version) throw new Error('下载包名称或版本与 Grove 清单不一致，请刷新后重试。');
-      // Grove can enrich provision metadata without rewriting the stored archive.
-      const catalogManifest = details.data.manifest as any;
-      manifest.provision = { ...(catalogManifest?.provision || {}), ...(manifest.provision || {}) };
+      const archivedManifest = JSON.parse((await readFile(file, 'utf8')).replace(/^\uFEFF/, ''));
+      if (archivedManifest.name !== name || archivedManifest.version !== version) throw new Error('下载包名称或版本与发布清单不一致，请刷新后重试。');
+      const manifest = home ? { ...archivedManifest, ...catalogManifest } : archivedManifest;
+      // Home preserves the author's execution/provision manifest alongside the original archive.
+      manifest.provision = home ? { ...archivedManifest.provision, ...catalogManifest.provision } : { ...catalogManifest?.provision, ...manifest.provision };
+
       if (manifest.transport && manifest.transport !== 'stdio') throw new Error('当前 Portal 仅支持 stdio Kit。');
       manifest.platform ??= manifest.provision?.platforms;
-      manifest.tools = (manifest.tools || []).map((t: any) => ({ ...t, description: t.description || '', params: t.params || t.inputSchema || { type: 'object', properties: {} } }));
+      manifest.tools = (manifest.tools || []).map((t: any) => ({ ...t, description: t.description || '', params: t.params || t.inputSchema || (home && t.input_schema) || { type: 'object', properties: {} } }));
       await writeFile(file, JSON.stringify(manifest));
       const kit = await readKit(source); if (!kit.compatible) throw new Error('此 Kit 不支持当前系统。');
       // Normalize the platform command before dependency setup and final write.
-      manifest.command = kit.command;
+      manifest.command = home ? kit.command.map(value => value.replaceAll('{{KIT_HOME}}', '{{KIT_DIR}}')) : kit.command;
+      if (home && manifest.command.some((value: string) => /\{\{.*?\}\}/.test(value.replaceAll('{{KIT_DIR}}', '')))) throw new Error('Kit 启动命令包含未配置占位符，请联系作者。');
       if (await exists(path.join(directory, kit.name))) throw new Error('同名 Kit 已安装，当前安装不会覆盖已有配置。');
       const environment = (manifest.provision?.env || []).map((v: any) => {
         if (!v || typeof v.name !== 'string' || !/^[A-Za-z_][A-Za-z0-9_]{0,99}$/.test(v.name) || /^(PATH|HOME|USERPROFILE|NODE_OPTIONS|LD_PRELOAD|DYLD_.*|ELECTRON_.*|PORTAL_.*)$/i.test(v.name)) throw new Error('Kit 声明了不支持的环境变量。');
@@ -147,7 +166,7 @@ export class KitInstaller {
       const plan: KitInstallPlan = { ticket: randomUUID(), name: kit.name, version: kit.version, description: kit.description, tools: kit.tools.length,
         command: kit.command, environment, dependency, sha256: createHash('sha256').update(data).digest('hex'),
         notes: manifest.provision?.install || manifest.provision?.post_install ? '作者还声明了自定义安装步骤；本客户端只自动处理 package.json / requirements.txt，未执行自定义命令。' : '' };
-      this.pending.set(plan.ticket, { plan, root, directory: source, manifest, settings: { ...settings }, created: Date.now() });
+      this.pending.set(plan.ticket, { sourceId: id, releaseId: home?.releaseId, plan, root, directory: source, manifest, settings: { ...settings }, created: Date.now() });
       return plan;
     } catch (error) { await rm(root, { recursive: true, force: true }); throw error; }
   }
@@ -159,8 +178,10 @@ export class KitInstaller {
     const supplied = input.environment || {};
     if (Object.keys(supplied).some(key => !item.plan.environment.some(e => e.name === key))) throw new Error('无效的 Kit 配置字段。');
     for (const field of item.plan.environment) {
-      if (typeof supplied[field.name] !== 'string' || supplied[field.name].length > 8192 || supplied[field.name].includes('\0')) throw new Error(`无效的 ${field.name} 配置。`);
-      if (field.required && !supplied[field.name].trim()) throw new Error(`请填写 ${field.name}。`);
+      const value = supplied[field.name];
+      if (value === undefined && !field.required) continue;
+      if (typeof value !== 'string' || value.length > 8192 || value.includes('\0')) throw new Error(`无效的 ${field.name} 配置。`);
+      if (field.required && !value.trim()) throw new Error(`请填写 ${field.name}。`);
     }
     const location = await kitLocation(settings); const target = path.join(location.directory, item.plan.name);
     if (await exists(target)) throw new Error('同名 Kit 已安装。');
@@ -200,7 +221,7 @@ export class KitInstaller {
     await rm(path.join(item.directory, '.env'), { force: true });
     if (Object.values(supplied).some(Boolean)) await writeFile(path.join(item.directory, '.env'), dotenv(supplied), { mode: 0o600 });
     await writeFile(path.join(item.directory, 'manifest.json'), JSON.stringify(finalManifest, null, 2) + '\n');
-    await writeFile(path.join(item.directory, '.beings-install.json'), JSON.stringify({ sha256: item.plan.sha256, installedAt: new Date().toISOString() }), { mode: 0o600 });
+    await writeFile(path.join(item.directory, '.beings-install.json'), JSON.stringify({ ...(item.releaseId ? { sourceId: item.sourceId, releaseId: item.releaseId } : {}), sha256: item.plan.sha256, installedAt: new Date().toISOString() }), { mode: 0o600 });
     await mkdir(location.directory, { recursive: true });
     await rename(item.directory, target); await this.discard(input.ticket);
     return { name: item.plan.name, tools: item.plan.tools, message: '已安装。Portal 将自动刷新清单，并在首次调用时启动 Kit。' };

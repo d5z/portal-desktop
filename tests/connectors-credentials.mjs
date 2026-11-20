@@ -46,7 +46,12 @@ try {
         return { id, release_id: 'qq-mail', status: 'ready', connection_id: 'qq-account', installation_id: 'mail-install' };
       },
       beingAccess: async () => ({ enabled: true, revision: 1, being_profile_id: 'fixture-being' }),
-      tools: async id => { f.toolReads++; f.lastToolsInstallation = id; return f.rows.map(row => ({ ...row, available: row.enabled && f.installed.find(item => item.id === id)?.status === 'ready' })); },
+      tools: async id => {
+        f.toolReads++; f.lastToolsInstallation = id;
+        const rows = f.rows.map(row => ({ ...row, available: row.enabled && f.installed.find(item => item.id === id)?.status === 'ready' }));
+        if (f.holdTools) { f.holdTools = false; await new Promise(resolve => { f.releaseTools = resolve; }); }
+        return rows;
+      },
       setTool: async (id, input) => {
         f.updates.push({ id, ...input });
         if (f.holdUpdate) await new Promise(resolve => { f.releaseUpdate = resolve; });
@@ -78,17 +83,19 @@ try {
   await settings.getByRole('switch', { name: 'list_messages', exact: true }).waitFor();
   assert(await settings.getByRole('button', { name: 'fixture@qq.com 已连接', exact: true }).getAttribute('aria-pressed') === 'true');
   assert.equal(await settings.locator('.connector-preview').count(), 0, 'Saved accounts show their tools instead of another empty form');
-  // A catalog prefetch may still reflect the snapshot from before authorization.
+  // Hover must not cache a stale authorization snapshot before opening the app.
   await page.evaluate(() => { mailFixture.staleDetail = true; });
   await back();
+  const detailsBeforeHover = await page.evaluate(() => mailFixture.details);
   await card().hover();
-  await page.waitForFunction(() => mailFixture.lastDetailAccountCount === 0);
+  assert.equal(await page.evaluate(() => mailFixture.details), detailsBeforeHover, 'Hover does not prefetch authorization state');
   await page.evaluate(() => { mailFixture.staleDetail = false; });
   await card().click();
   await settings.locator('.connector-tools-toggle[aria-expanded=false]').click();
   await settings.getByRole('switch', { name: 'list_messages', exact: true }).waitFor();
   assert.equal(await settings.locator('.connector-preview').count(), 0, 'A stale preauthorization snapshot must not bring back the empty credential form');
   assert.equal(await page.evaluate(() => mailFixture.previews), 1, 'Opening an already authorized account must not create another authorization intent');
+  assert.equal(await page.evaluate(() => mailFixture.details), detailsBeforeHover + 1, 'Opening reads current authorization state once');
   await back();
   await page.evaluate(() => mailFixture.accounts.unshift({ id: 'old-account', display_name: 'old@qq.com', auth_type: 'custom_credential', status: 'active', usable: true, grant_revoked: false, installation_ids: [] }));
   // Remount to discard in-memory preferences and exercise initial account selection.
@@ -115,23 +122,54 @@ try {
   await page.evaluate(() => mailFixture.rows[0].revision++);
   await settings.getByRole('switch', { name: 'list_messages', exact: true }).click();
   await settings.getByRole('alert').filter({ hasText: '工具设置已变化' }).waitFor();
+  const revisionReads = await page.evaluate(() => mailFixture.toolReads);
+  await settings.getByRole('button', { name: '刷新工具', exact: true }).click();
+  await page.waitForFunction(reads => mailFixture.toolReads > reads, revisionReads);
   await settings.getByRole('switch', { name: 'list_messages', exact: true }).check();
   await page.waitForFunction(() => mailFixture.rows[0].enabled);
   await settings.screenshot({ path: 'output/playwright/connectors-mail-connected.png' });
-  // Restore a preparing installation, then finish it while a tool save is in flight.
+  // A manual refresh can finish before an in-flight tool save.
   await back();
   await settings.getByRole('tab', { name: '通用', exact: true }).click();
-  await page.evaluate(() => { localStorage.setItem('portal.home.connector.intent.qq-mail', 'background-intent'); mailFixture.holdUpdate = true; });
+  await page.evaluate(() => { mailFixture.holdUpdate = true; });
   await settings.getByRole('tab', { name: '应用', exact: true }).click();
   await card().click();
   await settings.locator('.connector-tools-toggle[aria-expanded=false]').click();
   await settings.getByRole('switch', { name: 'list_messages', exact: true }).uncheck();
   await page.waitForFunction(() => mailFixture.releaseUpdate);
-  const reads = await page.evaluate(() => { mailFixture.pendingReady = true; window.dispatchEvent(new Event('focus')); return mailFixture.toolReads; });
+  const reads = await page.evaluate(() => mailFixture.toolReads);
+  await settings.getByRole('button', { name: '刷新工具', exact: true }).click();
   await page.waitForFunction(reads => mailFixture.toolReads > reads, reads);
   await page.evaluate(() => { mailFixture.holdUpdate = false; mailFixture.releaseUpdate(); });
-  await settings.locator('.connector-account-add:not(:disabled)').waitFor();
+  await settings.locator('input[aria-label="list_messages"]:not(:disabled)').waitFor();
+  await page.waitForFunction(() => mailFixture.rows[0].enabled === false);
   assert(!await settings.getByRole('switch', { name: 'list_messages', exact: true }).isChecked(), 'Refresh during a save preserves the saved tool state and releases busy state');
+  // Also keep the saved value when an older refresh returns after the save.
+  await page.evaluate(() => { mailFixture.holdUpdate = true; mailFixture.holdTools = true; mailFixture.releaseUpdate = undefined; });
+  await settings.getByRole('switch', { name: 'list_messages', exact: true }).check();
+  await page.waitForFunction(() => mailFixture.releaseUpdate);
+  await settings.getByRole('button', { name: '刷新工具', exact: true }).click();
+  await page.waitForFunction(() => mailFixture.releaseTools);
+  await page.evaluate(() => { mailFixture.holdUpdate = false; mailFixture.releaseUpdate(); });
+  await settings.locator('input[aria-label="list_messages"]:not(:disabled)').waitFor();
+  await page.evaluate(() => mailFixture.releaseTools());
+  assert(await settings.getByRole('switch', { name: 'list_messages', exact: true }).isChecked(), 'An older refresh cannot overwrite a completed save');
+  assert(await settings.getByRole('button', { name: '刷新工具', exact: true }).isEnabled(), 'Superseded requests release the loading state');
+  await settings.getByRole('switch', { name: 'list_messages', exact: true }).uncheck();
+  await settings.locator('input[aria-label="list_messages"]:not(:disabled)').waitFor();
+  // Saving one account must not put its tools into another selected account.
+  await page.evaluate(() => { mailFixture.holdUpdate = true; mailFixture.releaseUpdate = undefined; });
+  await settings.getByRole('switch', { name: 'list_messages', exact: true }).check();
+  await page.waitForFunction(() => mailFixture.releaseUpdate);
+  await settings.getByRole('button', { name: 'old@qq.com 待启用', exact: true }).click();
+  await page.evaluate(() => { mailFixture.holdUpdate = false; mailFixture.releaseUpdate(); });
+  await page.waitForFunction(() => mailFixture.rows[0].enabled);
+  assert.equal(await settings.locator('.connector-tools-section').count(), 0, 'An old save cannot restore tools on the newly selected uninstalled account');
+  await settings.getByRole('button', { name: 'fixture@qq.com 已连接', exact: true }).click();
+  await settings.getByRole('switch', { name: 'list_messages', exact: true }).waitFor();
+  assert(await settings.getByRole('switch', { name: 'list_messages', exact: true }).isChecked(), 'Returning to the saved account reads its completed update');
+  await settings.getByRole('switch', { name: 'list_messages', exact: true }).uncheck();
+  await settings.locator('input[aria-label="list_messages"]:not(:disabled)').waitFor();
   // Detail can arrive before the refreshed installation list.
   await back();
   await page.evaluate(() => { mailFixture.holdInstallations = true; mailFixture.installed[0].id = 'new-install'; mailFixture.accounts.find(item => item.id === 'qq-account').installation_ids = ['new-install']; });
@@ -155,9 +193,9 @@ try {
   await page.evaluate(() => { mailFixture.installed.find(item => item.id === 'new-install').status = 'degraded'; });
   await settings.getByRole('button', { name: '刷新连接状态', exact: true }).click();
   await settings.getByRole('button', { name: '已启用 1/2 个', exact: true }).waitFor();
-  await settings.getByRole('alert').filter({ hasText: '部分工具运行异常' }).waitFor();
+  await settings.getByText('部分已启用的工具暂不可用，请检查账号连接和运行状态。', { exact: true }).waitFor();
   assert(await settings.getByRole('switch', { name: 'send_mail', exact: true }).isChecked());
-  await settings.getByRole('button', { name: 'fixture@qq.com 部分工具运行异常', exact: true }).waitFor();
+  await settings.getByRole('button', { name: 'fixture@qq.com 已连接', exact: true }).waitFor();
   await page.setViewportSize({ width: 720, height: 720 });
   await settings.screenshot({ path: 'output/playwright/connectors-mail-narrow.png' });
   assert(await settings.evaluate(el => el.scrollWidth <= el.clientWidth + 1));

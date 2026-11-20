@@ -34,5 +34,5 @@ export async function createDesktopHome(options: {
   });
   const connectors = new HomeConnectors(homeClient, url => shell.openExternal(url));
   registerHomeIpc(handle, home, homeViewer, homeFiles, connectors, options.network);
-  return home;
+  return { home, connectors };
 }

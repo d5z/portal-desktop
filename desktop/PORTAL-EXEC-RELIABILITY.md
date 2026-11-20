@@ -81,3 +81,24 @@ macOS arm64 首版运行时展开约 216 MiB（含 npm/npx）；两份上游压�
 本轮真实客户端配置检测为“始终允许”，测试未调整此设置；真实对话验证的是全权限执行路径。“每次询问”及真实 Seatbelt 沙箱通过上述隔离工作区自动化验收，不能用全权限对话代替沙箱验收。
 
 这些结果覆盖 macOS arm64 本地测试包；Windows 和其他架构尚未做原生验收。网络包下载和原生扩展编译未计入本轮通过范围。
+
+## 2026-11-19 DeepSeek Harness 对照
+
+对照 `/Users/d5/Desktop/code/deepseek-harness` 的 `dsh-sandbox`、`dsh-subprocess-local`、`bash-sandbox` 和 `tool-execution-pipeline` 后，Town 的权限入口和 macOS/Windows 平台隔离已经满足“受限调用不回退宿主”的核心要求；差异主要在执行生命周期：DeepSeek 将每次调用的沙箱事实、进程范围和输出句柄绑定在同一个 execution handle 上。
+
+本轮修复了两处会影响后台任务可靠性的缺口：
+
+- `portal_process kill` 改为使用创建时的 POSIX process group／Windows Job Object，先对整个 managed range 做优雅终止，再在 grace 超时后强制终止，不再只给 shell leader PID 发信号。
+- `portal_process write` 不再持有全局 session map 锁等待 stdin 写完；子进程退出时释放写端。多个后台会话的 shutdown 也并行终止，已结束的会话不会无条件等待完整 grace 时间。
+
+仍保留为明确平台边界的项目：Linux 受限模式目前没有 bwrap/Landlock 后端，会直接失败而不降级；后台输出仍是有界 UTF-8 ring（游标过期会报告 `truncated`），没有引入 DeepSeek 的可选 spill 文件和独立 stdout/stderr reader。它们属于能力扩展，不应在没有 Linux 原生验收或输出持久化需求时私自扩大实现范围。
+
+回归覆盖新增的进程组后代清理和阻塞 stdin 场景；完整 Rust 测试继续作为发布前门槛。`heart-portal` 是子模块，源码改动需在子模块提交后再更新父仓库 gitlink。
+
+## 2026-11-19 实机 MCP 验收
+
+使用当前构建的 `heart-portal` 二进制，在临时 TCP 端口和隔离工作区逐项调用 MCP 工具。`initialize`、`tools/list`、状态、文件读写/编辑/复制/列表、正则搜索、网页抓取、截图、权限查询、工具重载、Kit 状态/设置/重载/用量、OAuth 参数校验和受控重启均得到预期响应。截图实际生成 2940×1912 PNG；网页抓取返回 Example Domain；重启响应返回后进程已退出。
+
+Python/Node 前台命令分别返回 `5`、`42`，并通过 `sys.executable` 与 `process.execPath` 确认路径来自客户端 `resources/portal-runtime`。后台任务完成 stdin 写入、游标读取和取消；另一个任务启动 `sleep` 子进程后被 `portal_process kill` 终止，子 PID 的 `kill -0` 检查确认已清理。受限模式在没有桌面审批处理器时对 exec 和 file write 均返回“未执行”，目标文件不存在。MCP token 错误值返回 JSON-RPC `-32002` 未授权错误，正确值完成认证。
+
+直接从源码调试目录启动且不传 `HEART_PORTAL_RUNTIME_DIR` 时，exec 会按设计返回“Bundled Python/Node runtime is missing”；Town Desktop 的 Portal supervisor 会注入该环境变量（`desktop/main/portal/background.ts`、`desktop/main/updates/runtime.ts`），因此打包客户端链路使用了随包运行时。OAuth 的真实授权需要用户在浏览器完成，本轮只验证了 provider 边界拒绝，不把不可交互的授权流程冒充成功。

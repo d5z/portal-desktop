@@ -96,6 +96,26 @@ export interface HomeConnectorDetail {
   methods: { method: 'oauth2' | 'api_key' | 'custom_credential'; fields: HomeConnectorField[] }[];
   reason?: string | null;
 }
+export interface HomeLocalKitDetail {
+  source_id: string;
+  installer: 'desktop_legacy';
+  tools: { name: string; description: string; input_schema: Record<string, unknown> }[];
+  install_manifest: Record<string, unknown>;
+  bundle: { download_url: string; sha256: string; size_bytes: number } | null;
+}
+export type HomeAppDetail =
+  | { kind: 'cloud_connector'; app: HomeConnectorCatalogItem; connector: HomeConnectorDetail }
+  | { kind: 'local_kit'; app: HomeConnectorCatalogItem; local_kit: HomeLocalKitDetail };
+export interface HomeKitPreparation { sourceId: string; releaseId: string; detail: Extract<HomeAppDetail, { kind: 'local_kit' }>; archive: Uint8Array }
+export const MAX_LOCAL_KIT_BUNDLE = 64 * 1024 * 1024;
+/** Only published Home bundle resources can cross the desktop download bridge. */
+export function homeKitBundlePath(releaseId: string, bundle: NonNullable<HomeLocalKitDetail['bundle']>) {
+  if (!/^[0-9a-f-]{36}$/i.test(releaseId) || !/^[0-9a-f]{64}$/.test(bundle.sha256) || !Number.isSafeInteger(bundle.size_bytes) || bundle.size_bytes <= 0 || bundle.size_bytes > MAX_LOCAL_KIT_BUNDLE) throw new Error('本地 Kit 安装包信息无效或超过 64 MB。');
+  const url = new URL(bundle.download_url, HOME_ORIGIN + '/');
+  const expected = `/v1/local-kit-bundles/${releaseId}/${bundle.sha256}`;
+  if (url.origin !== HOME_ORIGIN || url.pathname !== expected || url.search || url.hash || url.username || url.password) throw new Error('Home 返回了无效的本地 Kit 下载地址。');
+  return expected;
+}
 export interface HomeConnectorPreview { id: string; expires_at: string; requires_adoption: boolean; read_actions: string[]; write_actions: string[]; scopes: string[]; permission_notes: string[] }
 export interface HomeConnectorEnableState { id: string; release_id: string; status: 'awaiting_account' | 'needs_auth' | 'preparing' | 'ready' | 'paused' | 'failed' | 'unknown' | 'cancelled' | 'expired'; installation_id: string | null; connection_id: string | null; authorization_url?: string | null }
 export interface HomeConnectorTool {
@@ -104,12 +124,15 @@ export interface HomeConnectorTool {
 }
 export interface HomeConnectorBeingAccess { enabled: boolean; revision: number; being_profile_id: string }
 export const CONNECTOR_NETWORK_METHODS = {
+  'app-detail': 'GET', 'local-kit-bundle': 'GET',
   catalog: 'GET', 'legacy-catalog': 'GET', 'local-kit-history': 'GET', 'report-local-kit-history': 'POST', installations: 'GET', installation: 'GET', detail: 'GET',
   'remove-account': 'POST', preview: 'POST', confirm: 'POST', state: 'GET', advance: 'POST', cancel: 'POST',
   tools: 'GET', 'set-tool': 'PUT', 'being-access': 'PUT', 'get-being-access': 'GET', lifecycle: 'POST',
 } as const;
 /** Renderer-visible protocol paths mirror the corresponding Home API resource names. */
 export const CONNECTOR_NETWORK_ROUTES = {
+  'app-detail': '/api/v1/me/app-catalog/:release_id',
+  'local-kit-bundle': '/api/v1/local-kit-bundles/:release_id/:sha256',
   catalog: '/api/v1/me/app-catalog', 'legacy-catalog': '/api/v1/me/kit-catalog', 'local-kit-history': '/api/v1/me/local-kit-history', 'report-local-kit-history': '/api/v1/me/local-kit-history', installations: '/api/v1/me/kit-installations',
   installation: '/api/v1/me/kit-installations/:installation_id',
   detail: '/api/v1/me/kit-releases/:release_id/connector',
@@ -132,13 +155,14 @@ export function connectorNetworkPath(operation: keyof typeof CONNECTOR_NETWORK_R
     return encodeURIComponent(value);
   };
   let path: string = CONNECTOR_NETWORK_ROUTES[operation];
-  for (const name of ['installation_id', 'release_id', 'connection_id', 'intent_id']) {
+  for (const name of ['installation_id', 'release_id', 'connection_id', 'intent_id', 'sha256']) {
     const token = ':' + name;
     if (path.includes(token)) path = path.replace(token, value(name));
   }
   return path;
 }
 export interface HomeConnectorAPI {
+  appDetail(releaseId: string): Promise<HomeAppDetail>;
   catalog(query?: { q?: string; after?: string }): Promise<HomeConnectorCatalogPage>;
   localKitHistory(after?: string): Promise<HomeLocalKitHistoryPage>;
   reportLocalKitHistory(input: { source_id: string; version: string }): Promise<HomeLocalKitHistory>;

@@ -44,7 +44,19 @@ export async function localKits(settings: Settings, home?: string): Promise<KitL
   for (const entry of entries.sort((a, b) => a.name.localeCompare(b.name))) {
     if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
     const directory = path.join(location.directory, entry.name);
-    try { kits.push(await readKit(directory)); }
+    try {
+      const kit = await readKit(directory);
+      // Receipts are optional for imports and older installs; unreadable provenance does not hide a usable Kit.
+      try {
+        const receipt = JSON.parse(await readFile(path.join(directory, '.beings-install.json'), 'utf8'));
+        if (typeof receipt.sha256 === 'string' && /^[0-9a-f]{64}$/.test(receipt.sha256)) kit.installSource = {
+          sha256: receipt.sha256,
+          ...(typeof receipt.sourceId === 'string' ? { sourceId: receipt.sourceId } : {}),
+          ...(typeof receipt.releaseId === 'string' ? { releaseId: receipt.releaseId } : {}),
+        };
+      } catch { /* No trustworthy receipt; match the published manifest when viewing details. */ }
+      kits.push(kit);
+    }
     catch (error) { kits.push({ name: entry.name, directory, version: '', description: '', command: [], tools: [], compatible: false, eager: false, problem: `无法加载：${error instanceof Error ? error.message : 'manifest.json 无效'}` }); }
   }
   return { ...location, kits };
