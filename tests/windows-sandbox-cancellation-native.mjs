@@ -68,9 +68,9 @@ async function marker(name) {
   }
 }
 function longCommand(label) {
-  const late = `[Threading.Thread]::Sleep(7000); [IO.File]::WriteAllText(${quote(path.join(workspace, `${label}-leaked.txt`))}, 'leaked')`;
+  const late = `[Threading.Thread]::Sleep(20000); [IO.File]::WriteAllText(${quote(path.join(workspace, `${label}-leaked.txt`))}, 'leaked')`;
   const encoded = Buffer.from(late, 'utf16le').toString('base64');
-  return `$ErrorActionPreference='Stop'; $info=New-Object Diagnostics.ProcessStartInfo; $info.FileName=$PSHOME+'\\powershell.exe'; $info.Arguments='-NoProfile -NonInteractive -EncodedCommand ${encoded}'; $info.UseShellExecute=$false; $descendant=[Diagnostics.Process]::Start($info); [IO.File]::WriteAllText(${quote(path.join(workspace, `${label}-started.txt`))}, 'started'); [Threading.Thread]::Sleep(20000)`;
+  return `$ErrorActionPreference='Stop'; $info=New-Object Diagnostics.ProcessStartInfo; $info.FileName=$PSHOME+'\\powershell.exe'; $info.Arguments='-NoProfile -NonInteractive -EncodedCommand ${encoded}'; $info.UseShellExecute=$false; $descendant=[Diagnostics.Process]::Start($info); [IO.File]::WriteAllText(${quote(path.join(workspace, `${label}-started.txt`))}, 'started'); [Threading.Thread]::Sleep(30000)`;
 }
 try {
   // Only PowerShell runs here. A small disposable sidecar exercises runtime ACL
@@ -90,7 +90,9 @@ try {
   const until = Date.now() + 15000;
   while (!relay) { assert(child.exitCode === null && Date.now() < until, diagnostics); await delay(25); }
   const original = acls();
-  const timed = await call('portal_exec', { command: longCommand('timeout'), shell: 'powershell', timeout_secs: 3 });
+  // Cold sandboxed PowerShell startup exceeds 3s on hosted runners. Leave time
+  // for the child marker, while still timing out before its delayed write.
+  const timed = await call('portal_exec', { command: longCommand('timeout'), shell: 'powershell', timeout_secs: 10 });
   assert.equal(timed.result?.failure_code, 'command_timeout', JSON.stringify(timed));
   await marker('timeout-started.txt');
   // A timeout during the first preparation must restore the captured ACLs;
@@ -101,7 +103,7 @@ try {
   await marker('kill-started.txt');
   // A standing grant no longer holds a mutex for the command lifetime, so a
   // short command can run while the long background task is still active.
-  const queued = await call('portal_exec', { command: "'must not run' | Set-Content queued-ran.txt", shell: 'powershell', timeout_secs: 1 });
+  const queued = await call('portal_exec', { command: "'must not run' | Set-Content queued-ran.txt", shell: 'powershell', timeout_secs: 10 });
   ok(queued);
   assert.equal(await exists(path.join(workspace, 'queued-ran.txt')), true);
   ok(await call('portal_process', { action: 'kill', session_id: session }));
@@ -114,12 +116,12 @@ try {
   const entry = pending.get(cancelId); clearTimeout(entry.timer); pending.delete(cancelId); entry.resolve(); await cancelled;
   const restoredBy = Date.now() + 12000;
   while (acls() !== original) { assert(Date.now() < restoredBy, 'MCP cancellation must restore exact ACLs'); await delay(50); }
-  await delay(7500);
+  await delay(21000);
   assert.equal(await exists(path.join(workspace, 'timeout-leaked.txt')), false, 'Timed-out descendants must not survive');
   assert.equal(await exists(path.join(workspace, 'kill-leaked.txt')), false, 'Cancelled descendants must not survive');
   assert.equal(await exists(path.join(workspace, 'notification-leaked.txt')), false, 'MCP-cancelled descendants must not survive');
   assert.doesNotMatch(diagnostics, /Sandbox ACL cleanup failed/);
-  console.log('Windows sandbox cancellation: exec timeout, process kill, MCP cancellation and mutex-wait cancellation restore exact ACLs; descendants do not survive.');
+  console.log('Windows sandbox cancellation: exec timeout, process kill and MCP cancellation restore exact ACLs; concurrent commands run; descendants do not survive.');
 } finally {
   for (const entry of pending.values()) clearTimeout(entry.timer);
   if (child && child.exitCode === null) { const ended = once(child, 'exit'); child.kill(); await ended; }
