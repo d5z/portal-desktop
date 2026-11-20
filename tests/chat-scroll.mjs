@@ -186,8 +186,7 @@ try {
   await child().waitForFunction(()=>{const el=document.querySelector('#messages');return el.scrollHeight-el.scrollTop-el.clientHeight<2;});
   event(heldResponse, 'content_block_delta', { delta: { text: '\n\n恢复跟随底部' } });
   await frame.getByText('恢复跟随底部', { exact: true }).waitFor();
-  assert.ok(await messages.evaluate(el => el.scrollHeight - el.scrollTop - el.clientHeight < 2),
-    'Returning to latest resumes following streamed output');
+  await expectBottom('Returning to latest resumes following streamed output');
 
   // A tiny upward gesture still belongs to the reader; a downward gesture at
   // the floor must not turn off following when it produces no scroll event.

@@ -118,7 +118,8 @@ try {
   const scenesResult = await rpc('@scenes');
   assert.match(scenesResult.result.content[0].text, /scene-b.*messages: 1/);
   assert.match(scenesResult.result.content[0].text, /desktop-empty — 新会话.*messages: 0/);
-  const unknown = await rpc('@not-a-shell ; echo forbidden');
+  // Reserved client verbs must never execute their arguments as shell syntax.
+  const unknown = await rpc('@context missing-scene ; echo forbidden');
   assert.ok(unknown.error || unknown.result?.isError);
   await application.evaluate(async () => { globalThis.fixture.reader.close(); await globalThis.fixture.server.close(); });
   console.log('PASS: Rust MCP relay → authenticated Desktop bridge → sandboxed Electron IDB, with scene metadata and no visible chat.');

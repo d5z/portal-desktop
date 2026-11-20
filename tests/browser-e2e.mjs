@@ -29,6 +29,7 @@ try {
   await page.locator('#browser-address').press('Enter');
   await page.waitForFunction(() => document.querySelector('#browser-title').textContent === '浏览器测试');
   await page.waitForFunction(async () => !(await window.beings.browserState()).loading);
+  await page.waitForFunction(() => !document.querySelector('#browser-panel').hasAttribute('data-animating'));
   assert.equal(await visible(), true);
   const divider = page.getByRole('separator', { name: '调整浏览器宽度' });
   const originalWidth = await page.locator('#browser-panel').evaluate(el => el.getBoundingClientRect().width);

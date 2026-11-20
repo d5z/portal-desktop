@@ -39,7 +39,7 @@ const llmPatches = [];
 const pending = new Map();
 const rpc = (method, params = {}) => new Promise((resolve, reject) => {
   const id = ++rpcID;
-  const timer = setTimeout(() => { pending.delete(id); reject(new Error(`RPC timed out: ${method}`)); }, 8000);
+  const timer = setTimeout(() => { pending.delete(id); reject(new Error(`RPC timed out: ${method} ${params?.name || ""}`)); }, 8000);
   pending.set(id, { resolve, reject, timer });
   relay.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }));
 });
@@ -85,6 +85,7 @@ const server = createServer(async (request, response) => {
     }
     event('tool_use', { name: 'portal_file_write', input: { path: 'hello.txt', content: '来自 Being 的问候' } });
     const result = await rpc('tools/call', { name: 'portal_file_write', arguments: { path: 'hello.txt', content: '来自 Being 的问候' } });
+    assert.notEqual(result.isError, true, JSON.stringify(result));
     event('tool_result', { name: 'portal_file_write', content: result, is_error: false });
     event('content_block_delta', { delta: { text: '\n\n已在工作目录创建 **hello.txt**，本机 Portal 已完成操作。' } });
     messages.push({ seq: seq++, role: 'being', content: '正在整理你的想法。\n\n已在工作目录创建 **hello.txt**，本机 Portal 已完成操作。', scene_id: chatBody.scene_id, at: new Date().toISOString() });
@@ -257,6 +258,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   // in test:attachments-ui; this relay smoke test exercises Portal tool calls.
   await frame.locator('#input').fill('请帮我写一份问候。');
   await frame.locator('#send-btn').dispatchEvent('click');
+  await page.getByRole('dialog', { name: '此操作需要你的允许' }).getByRole('button', { name: /^允许(这一次|并记住)$/ }).click();
   await frame.getByText('本机 Portal 已完成操作。', { exact: false }).waitFor();
   assert.equal(chatBody.attachments, undefined);
   assert.equal(await readFile(path.join(dir, '工作目录/hello.txt'), 'utf8'), '来自 Being 的问候');
@@ -273,6 +275,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   appendHistory('being', '配置检查完成。');
   // Feed real history through the API instead of calling retired DOM globals.
   await childFrame.goto(childFrame.url());
+  await waitForChatReady(page);
   await childFrame.waitForFunction(() => document.querySelectorAll('.message.user').length === 13);
   await frame.locator('#input').fill('索引跳转保留的草稿');
   await frame.locator('#messages').hover();
@@ -287,7 +290,9 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   await frame.getByText('索引浏览时收到新回复。', { exact: true }).waitFor();
   await page.waitForTimeout(100);
   assert.equal(await childFrame.evaluate(() => document.querySelector('#messages').scrollTop), readingPosition);
+  await openOptions(page);
   assert.match(await page.locator('#local-portal-status').getAttribute('aria-label'), /^本机 Portal：/);
+  await page.locator('#options-trigger').click();
   await childFrame.evaluate(() => {
     document.querySelector('#input').addEventListener('keydown', event => event.stopPropagation(), { once: true });
   });
@@ -323,7 +328,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   // Model settings and the compact options menu preserve the draft.
   await openClientSettings(page);
   await page.getByRole('tab',{name:'模型',exact:true}).click();
-  await page.getByRole('tab', { name: 'Being 模型', exact: true }).click();
+  await page.getByRole('button', { name: 'Being 模型', exact: true }).click();
   const modelPanel = page.locator('#subagent-model-panel #settings-panel');
   await modelPanel.waitFor();
   await modelPanel.getByRole('button', { name: /^Alternate Model/ }).click();
@@ -394,7 +399,7 @@ readline.createInterface({ input: process.stdin }).on('line', line => {
   if (background.enabled) {
     backgroundTest = true;
     const beforeBackground = handshakeCount;
-    await restored.evaluate(async () => { const { settings } = await window.beings.snapshot(); await window.beings.save({ ...settings, backgroundEnabled: true }); });
+    await restored.evaluate(async () => { const { settings } = await window.beings.snapshot(); await window.beings.save({ ...settings, backgroundEnabled: true, permissionMode: 'full-access' }); });
     await restored.waitForFunction(() => document.querySelector('#portal-phase').textContent === '已连接', { timeout: 25000 });
     const backgroundSnapshot = await restored.evaluate(() => window.beings.snapshot());
     assert.equal(backgroundSnapshot.background.enabled, true);

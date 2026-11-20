@@ -43,7 +43,7 @@ try {
   });
   if (process.platform === 'win32') assert.deepEqual(nativeChrome, { menu: false, menuBarVisible: false, menuBarAutoHide: true });
   else assert.equal(nativeChrome.menu, true);
-  assert.equal(await page.locator('#open-loom').isDisabled(), true);
+  assert.equal(await page.locator('#open-loom').count(), 0);
   await assert.rejects(page.evaluate(() => window.beings.openLoom()), /请先配置 Being/);
   assert.match(page.url(), /^beings:\/\/desktop\//);
   assert(await page.title());

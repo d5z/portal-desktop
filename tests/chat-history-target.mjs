@@ -83,7 +83,7 @@ try{
     assert.equal(position.seq,seq);
     assert.ok(position.top>=0&&position.bottom<=position.height,JSON.stringify(position));
     assert.ok(await frame.locator('.message').count()<160,'A jump loads context, not all 1,000 cached rows');
-    assert.equal(await page.locator('aside').count(),0);
+    assert.equal(await page.locator('aside').count(),1,'History navigation keeps the Being details panel open');
   };
   await jump(101);await landed(101); // same scene, outside initial cache/DOM window
   assert.ok(!historyRequests.some(q=>q.includes('after=100&')),'Cache target needs no targeted network read');

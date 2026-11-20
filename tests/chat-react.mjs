@@ -339,7 +339,7 @@ try {
   assert.equal(await frame.locator('#input').evaluate(el => el instanceof HTMLTextAreaElement ? el.value : el.textContent), '保留草稿');
   await frame.locator('#messages').evaluate(el=>{el.scrollTop=0;el.dispatchEvent(new Event('scroll'));});
   await frame.locator('#chat-jump-latest').waitFor();
-  assert.match(await frame.locator('#chat-jump-latest').getAttribute('title'), /^下方还有[1-9]\d*条消息$/);
+  assert.match(await frame.locator('#chat-jump-latest').getAttribute('aria-description'), /^下方还有[1-9]\d*条消息$/);
   await frame.locator('#chat-jump-latest').click();
   await child().waitForFunction(()=>{const el=document.querySelector('#messages');return el.scrollHeight-el.scrollTop-el.clientHeight<2;});
   await frame.locator('#chat-jump-latest').waitFor({state:'hidden'});
@@ -435,9 +435,10 @@ try {
   assert.equal(requests.length, 1); assert.equal(requests[0].attachments[0].media_type, 'image/png'); assert.equal(requests[0].attachments[0].data, image.toString('base64'));
   assert.equal(await frame.locator('.run-activity').count(), 1, 'One process record per completed turn');
   assert.equal(await frame.locator('.run-activity.running').count(), 0);
-  await frame.locator('.run-activity > summary').click(); assert.match(await frame.locator('.run-list').innerText(), /fixture file read/);
+  await frame.locator('.run-activity > summary').click(); assert.match(await frame.locator('.run-list').innerText(), /fixture.txt/);
   assert.equal(await frame.locator('.run-tool-details pre').count(), 0, 'Collapsed tool details do not mount full output');
-  await frame.locator('.run-tool-details > summary').click();
+  await frame.locator('.run-entry[data-tool] > summary').click();
+  assert.match(await frame.locator('.run-tool-details').innerText(), /fixture file read/);
   await frame.locator('.run-tool-details pre').filter({hasText:'final diagnostic'}).waitFor();
   assert.match(await frame.locator('.run-tool-details').innerText(), /退出码\s*0/);
   assert.match(await frame.locator('.run-tool-details').innerText(), /1.25 秒/);
@@ -491,12 +492,13 @@ try {
   await pasteDraft('   ');
   assert.equal(await frame.locator('#send-btn').getAttribute('aria-label'), '停止处理');
   await pasteDraft('继续补充');
-  assert.equal(await frame.locator('#send-btn').getAttribute('aria-label'), '立即打断并发送');
+  assert.equal(await frame.locator('#send-btn').getAttribute('aria-label'), '引导');
   await pasteDraft('');
   await frame.getByRole('button', {name:'停止处理',exact:true}).waitFor();
   await frame.locator('#file-input').setInputFiles({ name: 'splice.txt', mimeType: 'text/plain', buffer: Buffer.from('splice attachment') });
   await frame.locator('#pending-files.active').waitFor();
-  assert.equal(await frame.locator('#send-btn').getAttribute('aria-label'), '立即打断并发送', 'Attachments can be sent without text');
+  await child().waitForFunction(() => !document.querySelector('#send-btn').disabled);
+  assert.equal(await frame.locator('#send-btn').isEnabled(), true, 'Attachments can be sent without text after reading completes');
   await pasteDraft('additional input'); await frame.locator('#send-btn').click();
   await waitUntil(() => requests.at(-1)?.message === 'additional input', 'The interrupting message reaches the server');
   assert.equal(requests.at(-1).attachments[0].data, Buffer.from('splice attachment').toString('base64'));
@@ -507,7 +509,7 @@ try {
   assert.equal(activeDuringHold.finished, false);
   assert.ok(activeDuringHold.events.some(item => item.event === 'content_block_delta'));
   await frame.locator('#send-btn.stop').click();
-  await frame.getByText('停止请求尚未确认', { exact: true }).waitFor();
+  await frame.getByRole('alert').filter({hasText:'停止请求尚未确认'}).waitFor({state:'attached'});
   await frame.getByRole('button', {name:'再次停止',exact:true}).waitFor();
   // Recheck the live task after the attention debounce, as a slow CI run does.
   await page.waitForTimeout(1600);
@@ -519,7 +521,7 @@ try {
   rejectStop = false;
   await frame.getByRole('button', {name:'再次停止',exact:true}).click();
   await frame.locator('.run-activity[data-outcome="stopped"]').waitFor(); assert.equal(stopCount, 2);
-  await pasteDraft('http-error'); await frame.locator('#send-btn').click(); await frame.getByText(/fixture request failed/).waitFor();
+  await pasteDraft('http-error'); await frame.locator('#send-btn').click(); await frame.getByRole('alert').filter({hasText:'fixture request failed'}).waitFor({state:'attached'});
   assert.equal(await frame.locator('.run-activity.running').count(), 0);
   assert.equal(await frame.locator('.run-activity').last().getAttribute('data-outcome'), 'error');
   await pasteDraft('');

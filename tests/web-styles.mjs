@@ -30,7 +30,7 @@ try {
   await page.goto(origin);
   const frame = page.frameLocator('iframe');
   try {
-    await frame.getByRole('textbox', { name: 'message input' }).waitFor({ timeout: 15000 });
+    await frame.getByRole('textbox', { name: '消息输入框' }).waitFor({ timeout: 15000 });
   } catch (error) {
     console.error({ errors, frames: page.frames().map(frame => frame.url()), body: await page.locator('body').innerText() });
     throw error;
@@ -44,7 +44,7 @@ try {
       await page.getByRole('group', { name: '外观主题' }).getByRole('button', { name: label, exact: true }).click();
       await navigation.getByRole('button', { name: '对话', exact: true }).click();
       await frame.locator(`html[data-theme="${theme}"]`).waitFor();
-      await frame.getByRole('textbox', { name: 'message input' }).fill('保留编辑器布局');
+      await frame.getByRole('textbox', { name: '消息输入框' }).fill('保留编辑器布局');
       assert.equal(await page.locator('html').getAttribute('data-theme'), theme);
       assert.equal(await page.locator('.web-app').evaluate(el => el.scrollWidth > el.clientWidth + 1), false);
       assert.equal(await frame.locator('#input-area').evaluate(el => el.scrollWidth > el.clientWidth + 1), false);

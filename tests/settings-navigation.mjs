@@ -56,30 +56,19 @@ try {
   await settings.getByRole('button',{name:'本机配置 名称、工作目录、后台常驻与工具权限',exact:true}).click();
   assert.equal(await settings.locator('#workspace-input').inputValue(),'/fixture/retained-draft');
   await settings.getByRole('tab',{name:'模型',exact:true}).click();
-  await settings.getByRole('tab',{name:'subagent',exact:true}).click();
-  await page.evaluate(()=>{window.inlineSaves=0;const save=fixtureApp.api.save;fixtureApp.api.save=async (...args)=>{inlineSaves++;return save(...args);};});
-  await settings.getByRole('button',{name:'编辑配置',exact:true}).click();
-  await settings.locator('#subagent-s2-model').fill('staged-inline-model');
-  assert.equal(await settings.locator('#subagent-llm-step1').isVisible(),false);
-  assert.equal(await settings.locator('#subagent-enabled-input').isVisible(),false);
-  assert.equal(await settings.getByRole('tab',{name:'subagent',exact:true}).isVisible(),false);
-  assert.equal(await settings.locator('.settings-page-title').innerText(),'编辑 subagent 模型');
-  assert.equal(await settings.getByRole('button',{name:'返回模型',exact:true}).isVisible(),true);
+  await settings.getByRole('button',{name:'subagent',exact:true}).click();
+  await settings.locator('#subagent-source').selectOption('custom');
+  await settings.locator('#subagent-custom-model').fill('inline-model-draft');
   await mkdir('test-results',{recursive:true});
   await page.screenshot({path:'test-results/settings-model-subpage-wide.png'});
   await page.setViewportSize({width:435,height:746});
   assert.equal(await settings.evaluate(n=>n.scrollWidth>n.clientWidth),false);
   await page.screenshot({path:'test-results/settings-model-subpage-narrow.png'});
   await page.setViewportSize({width:1440,height:960});
-  await settings.getByRole('button',{name:'使用此配置并返回',exact:true}).click();
-  await page.waitForFunction(()=>fixtureApp.form?.subagentSetup?.model==='staged-inline-model');
-  assert.equal(await page.evaluate(()=>inlineSaves),0,'Staging a model must not save or erase another category draft');
-  assert.equal(await page.evaluate(()=>fixtureApp.form.workspace),'/fixture/retained-draft');
-  assert.equal(await settings.locator('.settings-page-title').innerText(),'模型');
-  await settings.locator('#subagent-model-panel').waitFor({state:'visible'});
-  await settings.getByRole('button',{name:'编辑配置',exact:true}).click();
-  await settings.getByRole('button',{name:'返回模型',exact:true}).click();
-  await settings.locator('#subagent-enabled-input').waitFor({state:'visible'});
+  await settings.getByRole('button',{name:'Being 模型',exact:true}).click();
+  await settings.getByRole('button',{name:'subagent',exact:true}).click();
+  assert.equal(await settings.locator('#subagent-custom-model').inputValue(),'inline-model-draft');
+  assert.equal(await page.evaluate(()=>fixtureApp.form.workspace),'/fixture/retained-draft', 'Independent model editing preserves the Portal draft');
   assert.equal(await page.locator('dialog[open]').count(),1);
   await settings.getByRole('tab',{name:'Portal',exact:true}).click();
   await settings.getByRole('button',{name:'本机配置 名称、工作目录、后台常驻与工具权限',exact:true}).click();
@@ -192,39 +181,31 @@ try {
   await page.waitForFunction(()=>boundsCalls.at(-1)?.visible===true);
   await page.evaluate(()=>fixtureBrowserState({open:false,title:'Fixture',address:'',loading:false,canGoBack:false,canGoForward:false}));
   await page.waitForFunction(()=>boundsCalls.at(-1)?.visible===false);
-  // Saving keeps the same settings surface mounted: refresh its persisted switch baseline.
+  // Independent subagent validation saves in the same mounted model page.
   await page.evaluate(()=>{
-    window.savedSubagentEnabled=true;
-    fixtureApp.api.subagentConfig=async()=>({enabled:savedSubagentEnabled,provider:'openai',model:'fixture',thinking:'medium'});
-    fixtureApp.api.save=async form=>{
-      savedSubagentEnabled=form.subagentEnabled??savedSubagentEnabled;
-      return fixtureApp.snapshot;
-    };
+    window.savedSubagentMode=false;
+    fixtureApp.api.subagentStatus=async()=>({enabled:true,inheritModel:savedSubagentMode,configured:true,provider:'openai',model:'fixture',thinking:'medium',apiKeyConfigured:true,ready:true,health:'ok',message:''});
+    fixtureApp.api.save=async form=>{savedSubagentMode=form.subagentInherit;return fixtureApp.snapshot;};
     fixtureApp.openConnectionSettings('subagent');
   });
-  await settings.getByRole('tab',{name:'subagent',exact:true}).click();
-  const subagentSwitch=settings.locator('#subagent-enabled-input');
-  await page.waitForFunction(()=>document.querySelector('#subagent-enabled-input')?.disabled===false);
-  assert.equal(await subagentSwitch.isChecked(),true);
-  for(const enabled of [false,true]) {
-    await subagentSwitch.setChecked(enabled);
-    await settings.locator('#save-settings').click();
-    await page.waitForFunction(()=>!fixtureApp.saving&&!fixtureApp.hasConnectionDraft);
-    await page.waitForFunction(()=>document.querySelector('#subagent-enabled-input')?.disabled===false);
-    assert.equal(await page.evaluate(()=>savedSubagentEnabled),enabled);
-    assert.equal(await subagentSwitch.isChecked(),enabled,'Saved switch must match persisted configuration without reopening settings');
+  await settings.getByRole('button',{name:'subagent',exact:true}).click();
+  const source=settings.locator('#subagent-source');
+  await page.waitForFunction(()=>document.querySelector('#subagent-source')?.value==='custom');
+  for(const mode of ['inherit','custom']) {
+    await source.selectOption(mode);
+    await settings.getByRole('button',{name:'验证并应用 subagent 配置',exact:true}).click();
+    await settings.getByText('模型验证成功，已应用并重启 Portal。',{exact:true}).waitFor();
+    assert.equal(await page.evaluate(()=>savedSubagentMode),mode==='inherit');
+    assert.equal(await source.inputValue(),mode);
     assert.equal(await settings.isVisible(),true);
   }
   await page.evaluate(()=>{fixtureApp.api.save=async()=>{throw new Error('保存失败测试');};});
-  await subagentSwitch.uncheck();
-  await settings.locator('#save-settings').click();
+  await source.selectOption('inherit');
+  await settings.getByRole('button',{name:'验证并应用 subagent 配置',exact:true}).click();
   await settings.getByText('保存失败测试',{exact:true}).waitFor();
-  assert.equal(await subagentSwitch.isChecked(),false,'A failed save retains the switch draft');
-  assert.equal(await page.evaluate(()=>savedSubagentEnabled),true);
-  await settings.getByRole('button',{name:'放弃修改',exact:true}).click();
-  await page.waitForFunction(()=>document.querySelector('#subagent-enabled-input')?.disabled===false);
-  assert.equal(await subagentSwitch.isChecked(),true,'Discard restores the persisted switch');
-  console.log('PASS: draft navigation/discard, persisted subagent switches after save/retry, shared second-level pages and stable modal geometry, Town shared settings, keyboard tabs, closed-browser zero IPC and modal visibility.');
+  assert.equal(await source.inputValue(),'inherit','A failed save retains the model draft');
+  assert.equal(await page.evaluate(()=>savedSubagentMode),false);
+  console.log('PASS: draft navigation/discard, independent subagent validation and failed-save drafts, shared second-level pages and stable modal geometry, Town shared settings, keyboard tabs, closed-browser zero IPC and modal visibility.');
 } finally {
   await browser?.close();
   server.kill();

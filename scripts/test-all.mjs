@@ -24,14 +24,14 @@ async function persist() {
     `Background lifecycle: ${report.background.enabled ? 'included in desktop E2E (see step outcome)' : 'SKIPPED — ' + report.background.reason}\n\n` +
     '| Step | Result | Seconds |\n| --- | --- | ---: |\n' + report.steps.map(step => `| ${step.name} | ${step.status} | ${step.seconds} |`).join('\n') + '\n');
 }
-async function step(name, file, args, cwd = process.cwd()) {
+async function step(name, file, args, cwd = process.cwd(), env = process.env) {
   console.log(`\n[${name}]`);
   const start = Date.now();
   const log = createWriteStream(path.join(directory, name + '.log'));
   let result;
   try {
     result = await new Promise((resolve, reject) => {
-      const child = spawn(file, args, { cwd, shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env: process.env });
+      const child = spawn(file, args, { cwd, shell: false, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'], env });
       for (const stream of [child.stdout, child.stderr]) stream.on('data', data => { log.write(data); process.stdout.write(data); });
       child.once('error', reject);
       child.once('close', (code, signal) => resolve({ code, signal }));
@@ -100,7 +100,7 @@ try {
   await step('being-panel-retention', process.execPath, ['tests/being-panel-retention.mjs']);
   // Some engine tests share process-level environment variables; serialize Rust tests.
   const rustArgs = ['test', '--locked', '-p', 'heart-portal', '--', '--test-threads=1'];
-  await step('portal-rust', 'cargo', rustArgs, source);
+  await step('portal-rust', 'cargo', rustArgs, source, { ...process.env, HEART_PORTAL_RUNTIME_DIR: path.resolve('resources/portal-runtime') });
   if (!flags.has('--reuse-package')) {
     await npm('package', ['run', 'package']);
   }

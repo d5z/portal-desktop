@@ -56,6 +56,7 @@ const bundle = await build({ plugins:[browserAssets(),{name:'preview-chat-origin
     ? {routes:[{id:'self-hosted',name:'本机模型线路',base_url:'https://example.invalid/v1',has_key:true}]}
     : {models:[{id:'glm-5.3',name:'GLM 5.3',context:262144,reasoning:true,tool_call:true},{id:'fixture-next',name:'示例备用模型'}]}});
   app.api.subagentConfig = async () => ({provider:'openai',model:'local-fixture',thinking:'medium'});
+  app.api.subagentStatus = async () => ({enabled:true,inheritModel:false,configured:true,provider:'openai',model:'local-fixture',thinking:'medium',apiKeyConfigured:true,ready:true,health:'ok',message:''});
   window.fixtureApp = app;
   window.fixtureDsh = dshRuntime;
   createRoot(document.getElementById('root')).render(<App model={app} />);

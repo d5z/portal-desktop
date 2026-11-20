@@ -12,7 +12,7 @@ const { outputFiles } = await build({ plugins: [browserAssets()], stdin: { resol
   import { createRoot } from 'react-dom/client';
   import { AppModel } from './desktop/renderer/app/models/app';
   import { useModel } from './desktop/renderer/shared/hooks/use-model';
-  import { BeingInfo } from './desktop/renderer/app/components/workspace-navigation';
+  import { BeingInfo, WorkspaceNavigation } from './desktop/renderer/app/components/workspace-navigation';
   import { Topbar } from './desktop/renderer/app/components/topbar';
   import { ClientSettings } from './desktop/renderer/app/components/settings';
   const app = new AppModel({ copyText: async text => { window.copiedScene = text; }, appearance: async theme => theme,
@@ -43,7 +43,7 @@ const { outputFiles } = await build({ plugins: [browserAssets()], stdin: { resol
   });
   function Fixture() {
     useModel(app);
-    return <><ClientSettings model={app} /><div className="workspace-body"><div className="workspace-stage"><Topbar model={app} /><div className="workspace-content"><section id="chat-view" className="view"><iframe id="chat-frame" title="Loom fixture"
+    return <><ClientSettings model={app} /><div className="workspace-body"><WorkspaceNavigation app={app} /><div className="workspace-stage"><Topbar model={app} /><div className="workspace-content"><section id="chat-view" className="view"><iframe id="chat-frame" title="Loom fixture"
       src={'/loom' + new URL(app.chatSource).search} onLoad={() => app.frameLoaded()} /></section></div></div><BeingInfo app={app} /></div></>;
   }
   localStorage.setItem('beings:scenes-pinned', 'true');
@@ -156,7 +156,6 @@ try {
   const contextToggle = page.getByRole('checkbox', { name: '显示全部场景上下文', exact: true });
   const currentSceneButton = page.getByRole('button', { name: '切换到场景：桌面·测试电脑', exact: true });
   const chat = page.frameLocator('#chat-frame');
-  await sceneButton.click();
   await scenePanel.waitFor();
   await chat.getByText('当前桌面的对话', { exact: true }).waitFor();
   assert.equal(await chat.locator('.chat-history-scope').count(), 0, 'Embedded chat has no duplicate scope toolbar');
@@ -196,9 +195,8 @@ try {
   await page.waitForFunction(() => document.querySelector('#chat-scene-indicator').title.includes('桌面·测试电脑'));
   assert.equal(await chat.locator('#input').evaluate(el => el.value ?? el.editor.getMarkdown()), '切换时保留的草稿');
   assert.equal(await chat.locator('#input').isDisabled(), false, '全部场景上下文仍向当前场景发送');
-  await page.getByLabel('场景列表选项', { exact: true }).click();
-  await page.getByRole('button', { name: '关闭场景列表', exact: true }).click();
-  assert.equal(await scenePanel.count(), 0);
+  await page.getByRole('button', { name: '收起场景列表', exact: true }).click();
+  await scenePanel.waitFor({state:'detached'});
   assert.equal(await sceneButton.evaluate(el => el === document.activeElement), true);
   await sceneButton.click();
   assert.equal(await contextToggle.isChecked(), true);

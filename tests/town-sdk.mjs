@@ -214,7 +214,8 @@ try {
   await fillTownDraft('语气温和一些');
   assert.equal(await page.locator('#town-send-dialog').getByRole('button', { name: '让 Being 回复', exact: true }).count(), 1);
   await page.locator('#town-ask-being').click();
-  await page.waitForFunction(() => document.body.dataset.view === 'chat');
+  await page.waitForFunction(() => !document.querySelector('#chat-view').inert);
+  assert.equal(await page.evaluate(() => document.body.dataset.view), 'bonfire', 'Asking the Being keeps the Town context open');
   await app.evaluate(async () => {
     const deadline = Date.now() + 5000;
     while (globalThis.sdkPairChats.length < 4) {
@@ -261,7 +262,8 @@ try {
   await fillTownDraft('邀请大家分享今天最开心的一件事，语气自然');
   assert.equal(await page.getByRole('button', { name: '让 Being 发送', exact: true }).isEnabled(), true);
   await page.getByRole('button', { name: '让 Being 发送', exact: true }).click();
-  await page.waitForFunction(() => document.body.dataset.view === 'chat');
+  await page.waitForFunction(() => !document.querySelector('#chat-view').inert);
+  assert.equal(await page.evaluate(() => document.body.dataset.view), 'bonfire', 'Asking the Being keeps the Town context open');
   await app.evaluate(async () => {
     const deadline = Date.now() + 5000;
     while (globalThis.sdkPairChats.length < 5) {

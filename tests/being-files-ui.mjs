@@ -97,7 +97,7 @@ try {
   await page.screenshot({animations:'disabled',path:'output/playwright/being-files-narrow.png'});
   await page.evaluate(()=>document.documentElement.dataset.theme='dark');
   await page.screenshot({animations:'disabled',path:'output/playwright/being-files-dark.png'});
-  assert.equal(await card.evaluate(el=>getComputedStyle(el).color), 'rgb(236, 238, 241)');
+  assert.equal(await card.evaluate(el=>getComputedStyle(el).color), 'rgb(246, 246, 246)');
   await page.evaluate(()=>document.documentElement.dataset.theme='light');
   await card.getByText('文件交付链路测试',{exact:true}).click();
   const dialog=page.getByRole('complementary',{name:'文件预览：index.html'});

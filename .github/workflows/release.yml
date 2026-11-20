@@ -140,6 +140,8 @@ jobs:
           PORTAL_DESKTOP_NATIVE_UPGRADE_TESTS: '1'
         run: npx vitest run tests/background-native.test.ts
       - run: cargo test --manifest-path heart-portal/Cargo.toml --locked -- --test-threads=1
+        env:
+          HEART_PORTAL_RUNTIME_DIR: ${{ github.workspace }}/resources/portal-runtime
       - name: Verify native Windows service upgrade and rollback
         if: runner.os == 'Windows'
         env:

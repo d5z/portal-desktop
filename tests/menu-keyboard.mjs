@@ -34,7 +34,7 @@ const server = createServer((request, response) => {
   if (request.url === '/menu.js') { response.setHeader('Content-Type', 'text/javascript'); response.end(bundle.outputFiles.find(file => file.path.endsWith('.js')).contents); return; }
   if (request.url === '/app.css') { response.setHeader('Content-Type', 'text/css'); response.end(css); return; }
   response.setHeader('Content-Type', 'text/html; charset=utf-8');
-  response.end('<!doctype html><link rel="stylesheet" href="/app.css"><div id="root"></div><button id="outside" style="position:fixed;right:24px;top:24px">Outside</button><script src="/menu.js"></script>');
+  response.end('<!doctype html><link rel="stylesheet" href="/app.css"><div id="root"></div><button id="outside" style="position:fixed;right:24px;bottom:24px">Outside</button><script src="/menu.js"></script>');
 });
 await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
 let browser, page;

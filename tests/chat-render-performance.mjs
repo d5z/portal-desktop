@@ -84,6 +84,10 @@ try {
   await page.locator('.run-activity > summary').last().click();
   await page.locator('.run-entry').first().waitFor({state:'detached'});
   assert.equal(await page.locator('.run-entry').count(),0);
+  // Opening tool details intentionally pauses following; resume before measuring the live tail.
+  await page.locator('#messages').hover();
+  await page.mouse.wheel(0, -800);
+  await page.getByRole('button', {name:'回到底部',exact:true}).click();
   // Hosted browsers can present at 10 Hz even when their main thread is idle.
   // Measure that cadence on this page before streaming, so compositor scheduling
   // is not mistaken for application work. Long tasks still have an absolute cap.
