@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type {
   HomeConnectorAPI, HomeConnectorBeingAccess, HomeConnectorCatalogPage, HomeConnectorDetail, HomeConnectorEnableState,
-  HomeConnectorInstallation, HomeConnectorInstallationPage, HomeConnectorPreview, HomeConnectorTool, HomeLocalKitHistory, HomeLocalKitHistoryPage,
+  HomeConnectorInstallation, HomeConnectorInstallationPage, HomeConnectorPreview, HomeConnectorTool, HomeLocalKitHistory, HomeLocalKitHistoryPage, HomeAppDetail,
 } from '../../shared/home';
 import type { HomeClient } from './client';
 import { HomeError, homeURL } from './protocol';
+import { MAX_LOCAL_KIT_BUNDLE } from '../../shared/home';
 
 const json = (body: unknown): RequestInit => ({
   method: 'POST',
@@ -29,6 +30,7 @@ function utf8Prefix(value: string, limit: number) {
 
 /** Home Connector transport. Credential submissions go directly to Home and are never stored. */
 export class HomeConnectors implements HomeConnectorAPI {
+  private localDetails = new Map<string, { session: number; detail: Extract<HomeAppDetail, { kind: 'local_kit' }> }>();
   constructor(private client: HomeClient, private openExternal: (url: string) => Promise<void>) {}
 
   private iconURL(value: string | null | undefined) {
@@ -79,6 +81,48 @@ export class HomeConnectors implements HomeConnectorAPI {
     return this.client.request<HomeConnectorDetail>('/v1/me/kit-releases/' + encodeURIComponent(requiredId(releaseId, 'release_id')) + '/connector').then(detail => ({
       ...detail, icon_url: this.iconURL(detail.icon_url),
     }));
+  }
+
+  appDetailResponse(releaseId: string) {
+    const session = this.client.sessionVersion;
+    return this.client.request<Response>('/v1/me/app-catalog/' + encodeURIComponent(requiredId(releaseId, 'release_id')), {}, async response => {
+      const body = await response.text();
+      // Bind installation to metadata actually received by main, never renderer-supplied commands or hashes.
+      const detail = JSON.parse(body) as HomeAppDetail;
+      if (detail.kind === 'local_kit') this.localDetails.set(releaseId, { session, detail });
+      else this.localDetails.delete(releaseId);
+      return new Response(body, { status: response.status, headers: { 'Content-Type': response.headers.get('Content-Type') || 'application/json' } });
+    });
+  }
+
+  localKitSource(releaseId: string) {
+    const source = this.localDetails.get(releaseId);
+    if (!this.client.authenticated || !source || source.session !== this.client.sessionVersion) throw new Error('Home 登录或安装信息已变化，请重新准备安装。');
+    return source.detail;
+  }
+
+  async appDetail(releaseId: string): Promise<HomeAppDetail> {
+    return (await this.appDetailResponse(releaseId)).json();
+  }
+
+  bundleResponse(releaseId: string, sha256: string) {
+    if (!/^[0-9a-f-]{36}$/i.test(releaseId) || !/^[0-9a-f]{64}$/.test(sha256)) throw new HomeError(400, 'invalid_request');
+    // Public archive: raw deliberately bypasses HomeClient.request's Bearer token.
+    return this.client.raw<Response>(`/v1/local-kit-bundles/${releaseId}/${sha256}`, { credentials: 'omit', headers: { Accept: 'application/gzip' } }, async (response, progress) => {
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('Kit 下载内容为空。');
+      const chunks: Uint8Array[] = []; let size = 0;
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          size += value.length;
+          if (size > MAX_LOCAL_KIT_BUNDLE) throw new Error('Kit 压缩包超过 64 MB。');
+          chunks.push(value); progress();
+        }
+      } catch (error) { await reader.cancel().catch(() => {}); throw error; }
+      return new Response(Buffer.concat(chunks), { status: response.status, headers: response.headers });
+    });
   }
 
   installation(installationId: string) {

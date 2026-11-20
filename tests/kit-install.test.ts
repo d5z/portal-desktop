@@ -1,3 +1,6 @@
+import { createHash } from 'node:crypto';
+import type { HomeKitPreparation } from '../desktop/shared/home';
+import { localKits } from '../desktop/main/kits/catalog';
 import { afterEach, expect, it } from 'vitest';
 import { mkdtemp, mkdir, readFile, rm, stat, symlink, writeFile } from 'node:fs/promises';
 import path from 'node:path';
@@ -111,4 +114,41 @@ it('does not download App repositories or entries without an installable Kit bun
     return Response.json({ name: 'fixture-kit', version: '1', kind: 'kit', has_bundle: false });
   };
   await expect(new KitInstaller(noBundle as typeof fetch).prepare('kit-id', f.settings)).rejects.toThrow('没有可下载');
+});
+
+async function homePreparation(f: Awaited<ReturnType<typeof fixture>>): Promise<HomeKitPreparation> {
+  const releaseId = '20000000-0000-8000-8000-000000000001';
+  const sha256 = createHash('sha256').update(f.data).digest('hex');
+  const manifest = JSON.parse(await readFile(path.join(f.source, 'manifest.json'), 'utf8'));
+  return { sourceId: 'original-town-id', releaseId, archive: f.data, detail: {
+    kind: 'local_kit', app: { release_id: releaseId, kit_id: 'town/original-town-id', name: 'Display name differs from manifest', icon_url: null, version: manifest.version, description: '', runtimes: ['local'], requires_accounts: false, account_providers: [], category: 'other', availability: 'listed', unavailable_reason: null, installation_ids: [], local_install: {kind: 'town', source_id: 'original-town-id'} },
+    local_kit: { source_id: 'original-town-id', installer: 'desktop_legacy', tools: [], install_manifest: { ...manifest, command: {posix: [process.execPath, '{{KIT_HOME}}/server.mjs'], windows: [process.execPath, '{{KIT_HOME}}/server.mjs']}, provision: {env: [{name: 'OPTIONAL_KEY', required: false}]} }, bundle: { download_url: `v1/local-kit-bundles/${releaseId}/${sha256}`, sha256, size_bytes: f.data.length } },
+  }};
+}
+it('installs a Home archive with its published manifest, portable paths and source receipt without Town', async () => {
+  const f = await fixture(); const home = await homePreparation(f);
+  const plan = await f.installer.prepare(home.sourceId, f.settings, home);
+  expect(plan.environment).toEqual([{name:'OPTIONAL_KEY', description:'', required:false}]);
+  expect(f.requests).toEqual([]);
+  await f.installer.install({ticket:plan.ticket, environment:{}}, f.settings);
+  const manifest = JSON.parse(await readFile(path.join(f.kits, plan.name, 'manifest.json'), 'utf8'));
+  expect(manifest.command).toEqual([process.execPath, path.join(f.kits, plan.name) + '/server.mjs']);
+  const kit = (await localKits(f.settings)).kits[0];
+  expect(kit.installSource).toEqual({sourceId: home.sourceId, releaseId: home.releaseId, sha256: plan.sha256});
+  expect(f.requests).toEqual([]);
+});
+it.each(['hash', 'size', 'source', 'release', 'missing', 'remote', 'name', 'version'] as const)('rejects invalid Home %s without falling back to Town or activating files', async issue => {
+  const f = await fixture(); const home = await homePreparation(f);
+  const local = home.detail.local_kit;
+  if (issue === 'hash') home.archive = Uint8Array.from(f.data, value => value ^ 1);
+  if (issue === 'size') local.bundle!.size_bytes++;
+  if (issue === 'source') local.source_id = 'another-source';
+  if (issue === 'release') home.detail.app.release_id = 'another-release';
+  if (issue === 'missing') local.bundle = null;
+  if (issue === 'remote') local.bundle!.download_url = 'https://beings.town/api/grove/original-town-id/download';
+  if (issue === 'name') local.install_manifest.name = 'another-name';
+  if (issue === 'version') local.install_manifest.version = '2';
+  await expect(f.installer.prepare(home.sourceId, f.settings, home)).rejects.toThrow();
+  expect((await localKits(f.settings)).kits).toEqual([]);
+  expect(f.requests).toEqual([]);
 });

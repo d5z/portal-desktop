@@ -1564,13 +1564,13 @@ export class TownModel extends Store {
       this.selectLocal(kit);
     }
   }
-  async prepareKit(id: string) {
+  async prepareKit(id: string, releaseId?: string) {
     if (this.prepareBusy || this.plan) return;
     this.prepareBusy = true;
     this.changed();
     try {
       const revision = this.lifecycleRevision;
-      const plan = await this.api.prepareKit(id);
+      const plan = await this.api.prepareKit(id, releaseId);
       if (revision !== this.lifecycleRevision) {
         await this.api.discardKit(plan.ticket);
         return;

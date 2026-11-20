@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { DesktopAPI, PortalState, TownLiveState } from '../shared/types';
-import { HOME_ORIGIN, CONNECTOR_NETWORK_METHODS, connectorNetworkPath } from '../shared/home';
+import { HOME_ORIGIN, CONNECTOR_NETWORK_METHODS, connectorNetworkPath, homeKitBundlePath } from '../shared/home';
 
 async function connectorRequest(operation: keyof typeof CONNECTOR_NETWORK_METHODS, ...args: unknown[]): Promise<any> {
   const key = await ipcRenderer.invoke('beings:home-connector-network-key');
@@ -12,9 +12,10 @@ async function connectorRequest(operation: keyof typeof CONNECTOR_NETWORK_METHOD
   const response = await fetch(url.href, {
     method, credentials: 'omit', cache: 'no-store',
     headers: { 'Content-Type': 'application/json', 'X-Connector-Access': key },
-    ...(method === 'GET' ? {} : { body: JSON.stringify(requestArgs) }),
+    ...(method === 'GET' ? {} : { body: JSON.stringify(operation === 'report-local-kit-history' ? requestArgs[0] : requestArgs) }),
   });
   if (response.status === 204) return;
+  if (operation === 'local-kit-bundle' && response.ok) return new Uint8Array(await response.arrayBuffer());
   const body = await response.text();
   if (operation === 'catalog' && [404, 405].includes(response.status)) return connectorRequest('legacy-catalog', ...args);
   if (!response.ok && response.headers.has('X-Connector-Error')) throw new Error(decodeURIComponent(response.headers.get('X-Connector-Error')!));
@@ -30,6 +31,15 @@ async function connectorRequest(operation: keyof typeof CONNECTOR_NETWORK_METHOD
     if (!page || !Array.isArray(page.items)) throw new Error('统一应用目录响应无效。');
     return { ...page, items: page.items.map(item => ({ ...item, icon_url: item.icon_url ? URL.parse(item.icon_url, HOME_ORIGIN)?.href ?? null : item.icon_url ?? null })) };
   }
+  if (operation === 'app-detail') {
+    const detail = value as import('../shared/home').HomeAppDetail;
+    if (!detail?.app || !['cloud_connector', 'local_kit'].includes(detail.kind) ||
+        (detail.kind === 'local_kit' ? !detail.local_kit || !Array.isArray(detail.local_kit.tools) : !detail.connector || !Array.isArray(detail.connector.accounts) || !Array.isArray(detail.connector.methods))) throw new Error('统一应用详情响应无效。');
+    const icon = (url: string | null | undefined) => url ? URL.parse(url, HOME_ORIGIN + '/')?.href ?? null : null;
+    detail.app.icon_url = icon(detail.app.icon_url);
+    if (detail.kind === 'cloud_connector') detail.connector.icon_url = icon(detail.connector.icon_url);
+    return detail;
+  }
   return value;
 }
 
@@ -42,7 +52,12 @@ const api: DesktopAPI = {
       installations: after => connectorRequest('installations', after),
       installation: installationId => connectorRequest('installation', installationId),
       removeAccount: (releaseId, connectionId) => connectorRequest('remove-account', releaseId, connectionId),
-      detail: releaseId => connectorRequest('detail', releaseId),
+      appDetail: releaseId => connectorRequest('app-detail', releaseId),
+      detail: async releaseId => {
+        const detail = await connectorRequest('app-detail', releaseId) as import('../shared/home').HomeAppDetail;
+        if (detail.kind !== 'cloud_connector') throw new Error('本地 Kit 不支持云端连接操作。');
+        return detail.connector;
+      },
       preview: (releaseId, input) => connectorRequest('preview', releaseId, input),
       confirm: (intentId, input) => connectorRequest('confirm', intentId, input),
       state: intentId => connectorRequest('state', intentId),
@@ -178,7 +193,15 @@ const api: DesktopAPI = {
   localKits: () => ipcRenderer.invoke('beings:kits'),
   deleteKit: name => ipcRenderer.invoke('beings:kit-delete', name),
   importKit: () => ipcRenderer.invoke('beings:kit-import'),
-  prepareKit: id => ipcRenderer.invoke('beings:kit-prepare', id),
+  prepareKit: async (id, releaseId) => {
+    if (!releaseId) return ipcRenderer.invoke('beings:kit-prepare', id);
+    const detail = await connectorRequest('app-detail', releaseId) as import('../shared/home').HomeAppDetail;
+    if (detail.kind !== 'local_kit' || detail.app.release_id !== releaseId || detail.local_kit.source_id !== id || detail.local_kit.installer !== 'desktop_legacy') throw new Error('本地 Kit 来源与目录不一致，请刷新后重试。');
+    if (detail.app.availability !== 'listed' || !detail.local_kit.bundle) throw new Error(detail.app.unavailable_reason || '此 Kit 暂无可用的安装包。');
+    homeKitBundlePath(releaseId, detail.local_kit.bundle);
+    const archive = await connectorRequest('local-kit-bundle', releaseId, detail.local_kit.bundle.sha256);
+    return ipcRenderer.invoke('beings:kit-prepare-home', { sourceId: id, releaseId, archive });
+  },
   installKit: input => ipcRenderer.invoke('beings:kit-install', input),
   discardKit: ticket => ipcRenderer.invoke('beings:kit-discard', ticket),
   openKits: () => ipcRenderer.invoke('beings:kits-open'),

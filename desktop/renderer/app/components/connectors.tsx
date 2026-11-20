@@ -1,7 +1,7 @@
 import { memo, useEffect, useRef, useState } from 'react';
 import type {
   HomeConnectorAccount, HomeConnectorBeingAccess, HomeConnectorCatalogItem, HomeConnectorDetail, HomeConnectorEnableState,
-  HomeConnectorInstallation, HomeConnectorPreview, HomeConnectorTool,
+  HomeConnectorInstallation, HomeConnectorPreview, HomeConnectorTool, HomeLocalKitDetail,
 } from '../../../shared/home';
 import type { AppModel } from '../models/app';
 import type { LocalKit } from '../../../shared/types';
@@ -29,7 +29,7 @@ const isLocalKit = (kit: HomeConnectorCatalogItem) => kit.local_install === unde
   : kit.local_install?.kind === 'town';
 const localSourceId = (kit: HomeConnectorCatalogItem) => kit.local_install?.source_id
   || (kit.local_install === undefined && hasLocalRuntime(kit) ? kit.kit_id : undefined);
-const localKitFor = (kit: HomeConnectorCatalogItem, localKits: LocalKit[]) => localKits.find(item => item.name === kit.kit_id || item.name === kit.name);
+const localKitFor = (kit: HomeConnectorCatalogItem, localKits: LocalKit[]) => localKits.find(item => item.installSource?.releaseId === kit.release_id || Boolean(localSourceId(kit) && item.installSource?.sourceId === localSourceId(kit)) || item.name === kit.kit_id || item.name === kit.name);
 const localKitDetail = (kit: HomeConnectorCatalogItem): HomeConnectorDetail => ({ name: kit.name, icon_url: kit.icon_url, skills: [], accounts: [], methods: [] });
 const toolKey = (tool: Pick<HomeConnectorTool, 'component_id' | 'connection_id' | 'export'>) => `${tool.component_id}:${tool.connection_id}:${tool.export}`;
 type ToggleTool = (installationId: string, tool: HomeConnectorTool, enabled: boolean) => void;
@@ -62,6 +62,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   const [preparingSourceId, setPreparingSourceId] = useState<string>();
   const [selected, setSelected] = useState<HomeConnectorCatalogItem>();
   const [detail, setDetail] = useState<HomeConnectorDetail>();
+  const [localDetail, setLocalDetail] = useState<HomeLocalKitDetail>();
   const [accountId, setAccountId] = useState<string>();
   const [preview, setPreview] = useState<HomeConnectorPreview>();
   const [flow, setFlow] = useState<HomeConnectorEnableState>();
@@ -179,6 +180,14 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
 
   const refreshDetail = async (releaseId: string, preferredAccount?: string) => {
     const request = navigation.current;
+    if (page.current && isLocalKit(page.current)) {
+      const result = await api!.appDetail(releaseId);
+      if (request !== navigation.current || page.current?.release_id !== releaseId) return;
+      if (result.kind !== 'local_kit') throw new Error('应用类型已变化，请返回列表刷新。');
+      page.current = result.app; setSelected(result.app);
+      setLocalDetail(result.local_kit); setDetail(localKitDetail(result.app));
+      return;
+    }
     const result = await api!.detail(releaseId);
     if (request !== navigation.current || page.current?.release_id !== releaseId) return;
     setDetail(result);
@@ -298,7 +307,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
       const preparing = installationsRef.current.some(item => item.root_release_id === page.current?.release_id && item.desired_state === 'enabled' && ['preparing', 'waiting_device', 'unknown'].includes(item.status));
       if (!changed && !force && !preparing) return;
       await load();
-      if (page.current && !isLocalKit(page.current)) await refreshDetail(page.current.release_id, preferredAccounts.current.get(page.current.release_id));
+      if (page.current) await refreshDetail(page.current.release_id, preferredAccounts.current.get(page.current.release_id));
     }).catch(e => setError(publicErrorMessage(e, '无法更新连接状态，请重试。')));
   };
   useEffect(() => {
@@ -319,7 +328,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   const back = () => {
     navigation.current++; toolRequest.current++;
     page.current = undefined;
-    setSelected(undefined); setDetail(undefined); setPreview(undefined); setFlow(undefined); setAccountId(undefined);
+    setSelected(undefined); setDetail(undefined); setLocalDetail(undefined); setPreview(undefined); setFlow(undefined); setAccountId(undefined);
     setTools(undefined); setError(''); setBusy(false); setToolsLoading(false); setToolsError(''); setPendingConnection(undefined); setValues({});
     onDetailChange?.(null);
     void load();
@@ -333,13 +342,8 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   const openKit = async (kit: HomeConnectorCatalogItem) => {
     if (!api) return;
     const request = ++navigation.current;
-    enter(kit); chooseAccount(); setPendingConnection(undefined); setDetail(undefined); setPreview(undefined); setMethod(undefined); setValues({}); setError(''); setBusy(true);
+    enter(kit); chooseAccount(); setPendingConnection(undefined); setDetail(undefined); setLocalDetail(undefined); setPreview(undefined); setMethod(undefined); setValues({}); setError(''); setBusy(true);
     setFlow([...pending.current.values()].find(entry => entry.state.release_id === kit.release_id)?.state);
-    if (isLocalKit(kit)) {
-      setDetail(localKitDetail(kit));
-      setBusy(false);
-      return;
-    }
     try {
       const next = await refreshDetail(kit.release_id, preferredAccounts.current.get(kit.release_id));
       if (!next || request !== navigation.current) return;
@@ -634,7 +638,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
 
   // Account authorization and installation readiness are separate backend states.
   const connected = (kit: HomeConnectorCatalogItem) => installations.some(item => kit.installation_ids.includes(item.id) && item.desired_state !== 'removed');
-  const localInstalled = (kit: HomeConnectorCatalogItem) => localKitFor(kit, localKits);
+  const localInstalled = (kit: HomeConnectorCatalogItem) => localKitFor(kit, localKits) || (selected?.release_id === kit.release_id && localDetail ? localKits.find(item => item.name === localDetail.install_manifest.name) : undefined);
   const filteredCatalog = catalog.filter(item => runtimeFilter === 'all' || runtimeFilter === 'local' && Boolean(localSourceId(item)) || runtimeFilter === 'cloud' && hasRemoteRuntime(item));
   const installedKits = filteredCatalog.filter(item => connected(item) || Boolean(localInstalled(item)));
   const usedKits = filteredCatalog.filter(item => catalogEnabled && item.availability === 'listed' && isLocalKit(item) && !localInstalled(item) && item.local_install?.used_before);
@@ -644,7 +648,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
     const sourceId = localSourceId(kit);
     if (!catalogEnabled || kit.availability !== 'listed' || !localKitsReady || town.prepareBusy || town.plan || localInstalled(kit) || !sourceId) return;
     setPreparingSourceId(sourceId);
-    void town.prepareKit(sourceId);
+    void town.prepareKit(sourceId, kit.release_id);
   };
 
   if (!api) return <p className="field-help">当前客户端未启用 Home Connector。</p>;
@@ -667,7 +671,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
     {selected ? <>
       {!detail && <div className="connector-detail-heading"><h3>{selected.name}</h3></div>}
       {!detail && !busy && <button type="button" onClick={() => void openKit(selected)}>重试</button>}
-      {detail && <ConnectorDetailView kit={selected} detail={detail} localKit={localInstalled(selected)} localKitsReady={localKitsReady} localKitsError={localKitsError} localInstallAvailable={catalogEnabled && selected.availability === 'listed'} localPreparing={town.prepareBusy} onInstallLocal={() => installLocal(selected)} onOpenLocal={localKit => { model.town.localOnly = true; model.closeClientSettings(); model.navigate("kits"); void model.town.showInstalledKit(localKit.name); }} onDeleteLocal={localKit => model.town.requestDeleteKit(localKit)} installations={installations} accountId={accountId} onAccount={chooseAccount} preview={preview} flow={flow} method={method} values={values} adopt={adopt} busy={busy} toolBusy={toolBusy} toolToggleRef={toolToggleRef} onConnect={(account, method) => void connect(selected, account, method)} onValue={(name, value) => setValues(current => ({ ...current, [name]: value }))} onAdopt={setAdopt} onConfirm={() => void confirmConnection()} onAdvance={() => void advance()} onCancel={() => void cancelAuthorization()} onOpenAuthorization={() => void openAuthorization()} beingAccess={beingAccess} onRestoreConnection={restoreConnection} tools={tools} toolsLoading={toolsLoading} toolsError={toolsError} onLoadTools={loadTools} removalPending={Boolean(removals.current.get(selected.release_id)?.size)} onRemove={account => void disconnect(selected, account)} onDisconnect={() => void disconnect(selected)} />}
+      {detail && <ConnectorDetailView kit={selected} detail={detail} localKit={localInstalled(selected)} localDetail={localDetail} localKitsReady={localKitsReady} localKitsError={localKitsError} localInstallAvailable={catalogEnabled && selected.availability === 'listed' && Boolean(localDetail?.bundle)} localPreparing={town.prepareBusy} onInstallLocal={() => installLocal(selected)} onDeleteLocal={localKit => model.town.requestDeleteKit(localKit)} installations={installations} accountId={accountId} onAccount={chooseAccount} preview={preview} flow={flow} method={method} values={values} adopt={adopt} busy={busy} toolBusy={toolBusy} toolToggleRef={toolToggleRef} onConnect={(account, method) => void connect(selected, account, method)} onValue={(name, value) => setValues(current => ({ ...current, [name]: value }))} onAdopt={setAdopt} onConfirm={() => void confirmConnection()} onAdvance={() => void advance()} onCancel={() => void cancelAuthorization()} onOpenAuthorization={() => void openAuthorization()} beingAccess={beingAccess} onRestoreConnection={restoreConnection} tools={tools} toolsLoading={toolsLoading} toolsError={toolsError} onLoadTools={loadTools} removalPending={Boolean(removals.current.get(selected.release_id)?.size)} onRemove={account => void disconnect(selected, account)} onDisconnect={() => void disconnect(selected)} />}
     </> : catalogLoading && !catalog.length ? null : <>
       {installedKits.length > 0 && <ConnectorGroup title={`已添加（${installedKits.length}）`} kits={installedKits} connected pendingConnection={pendingConnection} localKits={localKits} localKitsReady={localKitsReady} prepareBusy={town.prepareBusy || Boolean(town.plan)} preparingSourceId={preparingSourceId} onOpen={openKit} onConnect={connect} onInstallLocal={installLocal} />}
       {usedKits.length > 0 && <ConnectorGroup title={`使用过（${usedKits.length}）`} kits={usedKits} pendingConnection={pendingConnection} localKits={localKits} localKitsReady={localKitsReady} prepareBusy={town.prepareBusy || Boolean(town.plan)} preparingSourceId={preparingSourceId} onOpen={openKit} onConnect={connect} onInstallLocal={installLocal} />}
@@ -726,8 +730,8 @@ const ConnectorToolRow = memo(function ConnectorToolRow({ installationId, tool, 
 });
 
 
-function ConnectorDetailView({ kit, detail, localKit, localKitsReady, localKitsError, localInstallAvailable, localPreparing, onInstallLocal, onOpenLocal, onDeleteLocal, installations, accountId, onAccount, preview, flow, method, values, adopt, busy, toolBusy, toolToggleRef, onConnect, onValue, onAdopt, onConfirm, onAdvance, onCancel, onOpenAuthorization, beingAccess, onRestoreConnection, tools, toolsLoading, toolsError, onLoadTools, removalPending, onRemove, onDisconnect }: {
-  kit: HomeConnectorCatalogItem; detail: HomeConnectorDetail; localKit?: LocalKit; localKitsReady: boolean; localKitsError: string; localInstallAvailable: boolean; localPreparing: boolean; onInstallLocal: () => void; onOpenLocal: (kit: LocalKit) => void; onDeleteLocal: (kit: LocalKit) => void; installations: HomeConnectorInstallation[]; accountId?: string; onAccount: (account: HomeConnectorAccount) => void;
+function ConnectorDetailView({ kit, detail, localKit, localDetail, localKitsReady, localKitsError, localInstallAvailable, localPreparing, onInstallLocal, onDeleteLocal, installations, accountId, onAccount, preview, flow, method, values, adopt, busy, toolBusy, toolToggleRef, onConnect, onValue, onAdopt, onConfirm, onAdvance, onCancel, onOpenAuthorization, beingAccess, onRestoreConnection, tools, toolsLoading, toolsError, onLoadTools, removalPending, onRemove, onDisconnect }: {
+  kit: HomeConnectorCatalogItem; detail: HomeConnectorDetail; localKit?: LocalKit; localDetail?: HomeLocalKitDetail; localKitsReady: boolean; localKitsError: string; localInstallAvailable: boolean; localPreparing: boolean; onInstallLocal: () => void; onDeleteLocal: (kit: LocalKit) => void; installations: HomeConnectorInstallation[]; accountId?: string; onAccount: (account: HomeConnectorAccount) => void;
   preview?: HomeConnectorPreview; flow?: HomeConnectorEnableState; method?: string; values: Record<string, string>; adopt: boolean; busy: boolean; toolBusy: Set<string>; toolToggleRef: { current: ToggleTool };
   onConnect: (account?: HomeConnectorAccount, method?: string) => void; onValue: (name: string, value: string) => void; onAdopt: (value: boolean) => void;
   onConfirm: () => void; onAdvance: () => void; onCancel: () => void; onOpenAuthorization: () => void;
@@ -747,6 +751,7 @@ function ConnectorDetailView({ kit, detail, localKit, localKitsReady, localKitsE
   const flowError = flow && ['failed', 'needs_auth', 'expired'].includes(flow.status);
   const skills = detail.skills || [];
   const visibleSkills = skillsExpanded ? skills : skills.slice(0, 5);
+  const localTools = localKit?.tools ?? localDetail?.tools ?? [];
   useEffect(() => {
     setSkillsExpanded(false);
   }, [kit.release_id, accountId, installationId]);
@@ -755,16 +760,18 @@ function ConnectorDetailView({ kit, detail, localKit, localKitsReady, localKitsE
       <ConnectorIcon name={kit.name} iconURL={kit.icon_url} />
       <div className="connector-detail-name"><h3>{kit.name}</h3><div className="connector-runtime-tabs" aria-label="运行环境"><span className="connector-runtime-tab">本地</span></div></div>
       <div className="connector-detail-actions">
-        {localKit ? <><button type="button" onClick={() => onOpenLocal(localKit)} disabled={busy || !localKitsReady}>查看本机 Kit</button><button className="danger" type="button" onClick={() => onDeleteLocal(localKit)} disabled={busy}>卸载本机 Kit</button></> : <button type="button" onClick={onInstallLocal} disabled={busy || localPreparing || !localKitsReady || !localInstallAvailable}>{localPreparing ? '正在准备…' : '安装'}</button>}
+        {localKit ? <button className="danger" type="button" onClick={() => onDeleteLocal(localKit)} disabled={busy}>卸载本机 Kit</button> : <button type="button" onClick={onInstallLocal} disabled={busy || localPreparing || !localKitsReady || !localInstallAvailable}>{localPreparing ? '正在准备…' : '安装'}</button>}
       </div>
     </div>
     {kit.description && <p className="connector-detail-description">{kit.description}</p>}
-    {!localKit && !localInstallAvailable && <p className="field-help" role="status">{kit.unavailable_reason || '此应用当前不可安装。'}</p>}
+    {localKit?.problem && <p className="form-error" role="alert">{localKit.problem}</p>}
+    {!localKit && !localInstallAvailable && <p className="field-help" role="status">{kit.unavailable_reason || (localDetail?.bundle ? '此应用当前不可安装。' : '此 Kit 暂无可用的安装包。')}</p>}
     <section className="connector-tools-section" aria-label="工具">
       <h4>工具</h4>
-      {localKit && localKit.tools.length > 0 ? <div className="connector-tools">
-        <button className="connector-tools-toggle" type="button" aria-expanded={toolsExpanded} onClick={() => setToolsExpanded(value => !value)}><span>{localKit.tools.length} 个工具</span><Icon className="connector-line-icon" name="chevron-down" aria-hidden="true" style={{ transform: toolsExpanded ? 'rotate(180deg)' : undefined }} /></button>
-        {toolsExpanded && <div className="connector-tool-list" role="list">{localKit.tools.map(tool => <div className="connector-tool" role="listitem" key={tool.name}><span><strong>{tool.name}</strong>{tool.description && <small>{tool.description}</small>}</span></div>)}</div>}
+      {!localKit && Boolean(localDetail?.tools.length) && <p className="field-help">以下为发布的工具声明，安装到本机后可使用。</p>}
+      {localTools.length ? <div className="connector-tools">
+        <button className="connector-tools-toggle" type="button" aria-expanded={toolsExpanded} onClick={() => setToolsExpanded(value => !value)}><span>{localTools.length} 个工具</span><Icon className="connector-line-icon" name="chevron-down" aria-hidden="true" style={{ transform: toolsExpanded ? 'rotate(180deg)' : undefined }} /></button>
+        {toolsExpanded && <div className="connector-tool-list" role="list">{localTools.map(tool => <div className="connector-tool" role="listitem" key={tool.name}><span><strong>{tool.name}</strong>{tool.description && <small>{tool.description}</small>}</span></div>)}</div>}
       </div> : <p className="field-help">{!localKitsReady ? localKitsError ? '暂时无法显示本机工具。' : '正在读取本机状态…' : localKit ? '此 Kit 未声明工具。' : '安装后可查看此 Kit 提供的本地工具。'}</p>}
     </section>
     <section className="connector-info-section"><h4>信息</h4><dl className="connector-info">
@@ -778,7 +785,7 @@ function ConnectorDetailView({ kit, detail, localKit, localKitsReady, localKitsE
       <ConnectorIcon name={detail.name} iconURL={detail.icon_url} /><div className="connector-detail-name"><h3>{detail.name}</h3>{!!kit.runtimes?.length && <div className="connector-runtime-tabs" aria-label="运行环境">{[...new Set(kit.runtimes.map(runtimeTabLabel))].map(label => <span className="connector-runtime-tab" key={label}>{label}</span>)}</div>}</div>
       <div className="connector-detail-actions">
         {!isLocalKit(kit) && <button className="connector-refresh" type="button" aria-label="刷新连接状态" onClick={onAdvance} disabled={busy}><Icon className="connector-line-icon" name="refresh-20" aria-hidden="true" /></button>}
-        {localSourceId(kit) && <>{localKit ? <><button type="button" onClick={() => onOpenLocal(localKit)} disabled={busy || !localKitsReady}>查看本机 Kit</button><button className="danger" type="button" onClick={() => onDeleteLocal(localKit)} disabled={busy}>卸载本机 Kit</button></> : <button type="button" onClick={onInstallLocal} disabled={busy || localPreparing || !localKitsReady || !localInstallAvailable}>{localPreparing ? '正在准备…' : '安装'}</button>}</>}
+        {localSourceId(kit) && <>{localKit ? <button className="danger" type="button" onClick={() => onDeleteLocal(localKit)} disabled={busy}>卸载本机 Kit</button> : <button type="button" onClick={onInstallLocal} disabled={busy || localPreparing || !localKitsReady || !localInstallAvailable}>{localPreparing ? '正在准备…' : '安装'}</button>}</>}
         {(detail.accounts.length > 0 || removalPending) && <button className="danger" type="button" onClick={onDisconnect} disabled={busy}>断开</button>}
         {!detail.accounts.length && !removalPending && !preview && (!flow || !pendingStatuses.includes(flow.status)) && detail.methods.length > 0 && <button type="button" onClick={() => onConnect()} disabled={busy}>连接</button>}
       </div>

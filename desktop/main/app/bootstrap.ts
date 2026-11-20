@@ -198,8 +198,9 @@ export function createDesktopApplication(options: DesktopOptions) {
       window: () => lifecycle.window, shellURL, isQuitting: () => lifecycle.quitting,
       recoveryBlocked: () => portalController.recoveryBlocked, errorLog
     });
-    home = await createDesktopHome({ directory, assets, secretStorage, store, window: () => lifecycle.window, handle, network: connectorNetwork,
+    const desktopHome = await createDesktopHome({ directory, assets, secretStorage, store, window: () => lifecycle.window, handle, network: connectorNetwork,
       log: (event, fields) => errorLog.info('home-viewer', JSON.stringify({ event, ...fields })) });
+    home = desktopHome.home;
     registerShellIpc({
       handle, exclusive, directory, store, localFiles, attachmentDownloads, approvalDialogs,
       window: () => lifecycle.window, browser: () => lifecycle.browser
@@ -235,7 +236,7 @@ export function createDesktopApplication(options: DesktopOptions) {
       clearWarning: () => { townWarning = undefined; },
       open: url => lifecycle.browser?.open(url),
     });
-    registerKitsIpc({ handle, exclusive, window: () => lifecycle.window, store, kitInstaller });
+    registerKitsIpc({ handle, exclusive, window: () => lifecycle.window, store, kitInstaller, homeConnectors: desktopHome.connectors });
     desktopPlugins.registerIpc(handle, exclusive);
     registerDshIpc(handle, dshPlugins!, () => lifecycle.window);
     const chatIpc = registerChatIpc({

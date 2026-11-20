@@ -8,6 +8,20 @@ function transport() {
 }
 
 describe('Home Connector transport', () => {
+  it('binds local installation metadata to the Home session and keeps the raw detail body', async () => {
+    const published = { kind: 'local_kit', app: { release_id: 'release' }, local_kit: { source_id: 'source', install_manifest: { name: 'published-kit' } } };
+    const body = JSON.stringify(published, null, 2);
+    const client = { authenticated: true, sessionVersion: 1, request: vi.fn(async (_path, _init, read) => read(new Response(body, { headers: { 'Content-Type': 'application/json; charset=utf-8' } }))) };
+    const api = new HomeConnectors(client as never, vi.fn());
+    const response = await api.appDetailResponse('release');
+    expect(await response.text()).toBe(body);
+    const rendererDetail = await api.appDetail('release');
+    if (rendererDetail.kind === 'local_kit') rendererDetail.local_kit.install_manifest.name = 'renderer-altered';
+    expect(api.localKitSource('release').local_kit.install_manifest.name).toBe('published-kit');
+    client.sessionVersion++;
+    expect(() => api.localKitSource('release')).toThrow('登录或安装信息已变化');
+    expect(client.request.mock.calls.every(([pathname]) => pathname === '/v1/me/app-catalog/release')).toBe(true);
+  });
   it('keeps actionable error codes ahead of generic HTTP messages', () => {
     expect(homeErrorMessage(400, 'invalid_grant')).toContain('登录已过期');
     expect(homeErrorMessage(400, 'invalid_path')).toContain('文件路径无效');
