@@ -36,7 +36,7 @@ try {
       const client = new HomeClient(directory, {isEncryptionAvailable:()=>true,encryptString:value=>Buffer.from(value),decryptString:value=>value.toString()}, async()=>{}, async (url, init) => {
         const target = new URL(String(url));
         const pathname = target.pathname;
-        requests.push({pathname, method:init.method || 'GET', authorization:new Headers(init.headers).get('Authorization')});
+        requests.push({pathname, method:init.method || 'GET', body:init.body, authorization:new Headers(init.headers).get('Authorization')});
         if (pathname.endsWith('/remove')) return new Response(null, {status:204});
         if (pathname.endsWith('/actions')) return Response.json({error:'kit_operation_changed'}, {status:409});
         if (pathname.includes('/offline/')) throw new Error('Fixture transport offline');
@@ -88,6 +88,7 @@ try {
     await Promise.all(bodyReads);
     assert.equal((await page.evaluate(() => window.beings.home.connectors.detail('gmail'))).name, 'Gmail');
     await page.evaluate(() => window.beings.home.connectors.removeAccount('gmail', 'account'));
+    await page.evaluate(() => window.beings.home.connectors.reportLocalKitHistory({source_id:'local-kit',version:'1.2.3'}));
     assert.equal((await page.evaluate(() => window.beings.home.connectors.lifecycle('install', 'uninstall', 2, 'request-id'))).accepted, false);
     await assert.rejects(page.evaluate(() => window.beings.home.connectors.detail('offline')), /网络连接失败/);
     await assert.rejects(page.evaluate(() => window.beings.home.connectors.detail('empty')), error => !String(error).includes('Unexpected end of JSON input'));
@@ -109,7 +110,15 @@ try {
   assert(legacy.every(item => item.status === 200 && new Headers(item.headers).get('Content-Type') === 'application/json; charset=utf-8' && item.body === '{ "enabled": true, "items": [{"release_id":"gmail","name":"Gmail","icon_url":"/assets/icon.svg"}] }'));
   assert.equal(JSON.parse(catalogBodies[0].body).items[0].name, 'Gmail');
   const upstream = await app.evaluate(() => globalThis.fixture.requests);
-  assert.equal(upstream.length, 20, 'Unauthenticated local requests never reach Home; writes are not duplicated');
+  assert.equal(upstream.length, 22, 'Unauthenticated local requests never reach Home; writes are not duplicated');
+  const historyRequests = requests.filter(event => event.request.method === 'POST' && event.request.url.endsWith('/local-kit-history'));
+  const historyUpstream = upstream.filter(request => request.pathname.endsWith('/local-kit-history'));
+  assert.equal(historyRequests.length, 2);
+  assert.equal(historyUpstream.length, 2);
+  for (let index = 0; index < historyRequests.length; index++) {
+    assert.equal(historyRequests[index].request.postData, historyUpstream[index].body);
+    assert.deepEqual(JSON.parse(historyRequests[index].request.postData), {source_id:'local-kit',version:'1.2.3'});
+  }
   assert(upstream.every(request => request.authorization === 'Bearer private-access'));
   assert(!JSON.stringify({requests,responses}).includes('private-access'));
   assert(!JSON.stringify({requests,responses}).includes('private-refresh'));

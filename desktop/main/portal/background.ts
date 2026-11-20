@@ -9,7 +9,7 @@ import { portalArguments, portalConfig } from './supervisor';
 import { readPortalSample, readPortalReady, portalSampleState } from './status';
 import type { BackgroundState, PortalState, Settings } from '../../shared/types';
 import { permissionMode } from '../../shared/security';
-import { windowsEnvironment, windowsExecutable } from './windows';
+import { windowsEnvironment, windowsExecutable, windowsSandboxCancellation } from './windows';
 import { ensurePortalRuntime, portalRuntimeId } from './task-runtime';
 import { windowsLogCopy } from './windows-log-copy';
 
@@ -520,8 +520,10 @@ else { [string]$t.State }`);
         if (attempt >= 120) throw new Error('旧 Portal 进程尚未退出，已中止安装。');
         await new Promise(resolve => setTimeout(resolve, 250));
       }
-    } else await this.powershell(`$task=Find-PortalTask ${ps(service.label)};
-if ($task) { Disable-ScheduledTask -TaskName ${ps(service.label)} | Out-Null; Stop-ScheduledTask -TaskName ${ps(service.label)}; }
+    } else await this.powershell(`${windowsSandboxCancellation}
+$deadline=[DateTime]::UtcNow.AddSeconds(15);
+$task=Find-PortalTask ${ps(service.label)};
+if ($task) { Disable-ScheduledTask -TaskName ${ps(service.label)} | Out-Null; }
 # A PID file is only a hint: Windows may already have reused that PID.
 # Discover this installation's runners even if the hint is missing or stale.
 $runner=${ps(path.join(service.root, 'run.ps1'))};
@@ -533,13 +535,17 @@ function Test-PortalRunner($item) {
 function Test-SamePortalProcess($item, $expected) {
   return $item -and $item.CreationDate -eq $expected.CreationDate -and $item.ExecutablePath -eq $expected.ExecutablePath -and $item.CommandLine -eq $expected.CommandLine
 }
+$engine=${ps(path.join(service.root, 'heart-portal.exe'))};
+$children=@(Get-CimInstance Win32_Process -Filter "Name='heart-portal.exe'" | Where-Object { $_.ExecutablePath -eq $engine });
 $supervisors=@(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { Test-PortalRunner $_ });
+Stop-PortalSandboxTasks @($supervisors + $children) $deadline;
+# Stop-ScheduledTask may terminate the tree too, so it must follow ACL cleanup.
+if ($task) { Stop-ScheduledTask -TaskName ${ps(service.label)}; }
 foreach ($supervisor in $supervisors) {
   $supervisorId=$supervisor.ProcessId;
   $current=Get-CimInstance Win32_Process -Filter "ProcessId=$supervisorId";
   if (-not (Test-SamePortalProcess $current $supervisor)) { continue }
   & taskkill.exe /PID $supervisorId /T /F | Out-Null;
-  $deadline=[DateTime]::UtcNow.AddSeconds(15);
   do {
     $remaining=Get-CimInstance Win32_Process -Filter "ProcessId=$supervisorId";
     if (-not (Test-SamePortalProcess $remaining $supervisor)) { break }
@@ -550,17 +556,18 @@ foreach ($supervisor in $supervisors) {
 if (@(Get-CimInstance Win32_Process -Filter "Name='powershell.exe'" | Where-Object { Test-PortalRunner $_ }).Count) { throw 'Portal supervisor is still running' }
 # The runner may have started the engine before its PID file was written.
 # Select only this installation's executable, never a global process name kill.
-$engine=${ps(path.join(service.root, 'heart-portal.exe'))};
 $children=@(Get-CimInstance Win32_Process -Filter "Name='heart-portal.exe'" | Where-Object { $_.ExecutablePath -eq $engine });
 foreach ($child in $children) {
   $portalId=$child.ProcessId;
+  $current=Get-CimInstance Win32_Process -Filter "ProcessId=$portalId";
+  if (-not (Test-SamePortalProcess $current $child)) { continue }
   & taskkill.exe /PID $portalId /T /F | Out-Null;
   if ($LASTEXITCODE -ne 0 -and (Get-Process -Id $portalId -ErrorAction SilentlyContinue)) { throw 'Portal process tree did not stop' }
-  Wait-Process -Id $portalId -Timeout 15 -ErrorAction SilentlyContinue;
+  $remaining=[Math]::Max(1,[int][Math]::Ceiling(($deadline-[DateTime]::UtcNow).TotalSeconds));
+  Wait-Process -Id $portalId -Timeout $remaining -ErrorAction SilentlyContinue;
   if (Get-Process -Id $portalId -ErrorAction SilentlyContinue) { throw 'Portal is still running' }
 }
 if (@(Get-CimInstance Win32_Process -Filter "Name='heart-portal.exe'" | Where-Object { $_.ExecutablePath -eq $engine }).Count) { throw 'Old Portal is still running' }
-$deadline=[DateTime]::UtcNow.AddSeconds(15);
 while (($task=Find-PortalTask ${ps(service.label)}) -and $task.State -eq 'Running') {
   if ([DateTime]::UtcNow -ge $deadline) { throw 'Portal supervisor task is still running' }
   Start-Sleep -Milliseconds 200;

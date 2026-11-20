@@ -66,6 +66,10 @@ try {
   // Native Windows unit tests exercise the bundled Portal from resources/.
   // Build it before Vitest; a clean CI checkout has no generated binary yet.
   if (!flags.has('--reuse-package')) await npm('build-portal', ['run', 'build:portal']);
+  if (process.platform === 'win32') {
+    await step('sandbox-cancellation-native', process.execPath, ['tests/windows-sandbox-cancellation-native.mjs']);
+    await npm('portal-permissions-native', ['run', 'test:portal-permissions']);
+  }
   await npm('unit', ['test', '--', '--reporter=default', '--reporter=junit', '--outputFile.junit=test-results/unit.xml']);
   await npm('menu-keyboard', ['run', 'test:menu-keyboard']);
   await npm('taskbar-icons', ['run', 'test:taskbar-icons']);

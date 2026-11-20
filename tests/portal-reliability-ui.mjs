@@ -38,7 +38,7 @@ const server=createServer(async(req,res)=>{
   const pathname=new URL(req.url,'http://localhost').pathname;
   const json=value=>{res.setHeader('Content-Type','application/json');res.end(JSON.stringify(value));};
   if(assets.has(pathname)){res.setHeader('Content-Type',pathname.endsWith('.js')?'text/javascript':pathname.endsWith('.css')?'text/css':'text/html; charset=utf-8');res.end(assets.get(pathname));return;}
-  const output=bundle.outputFiles.find(file=>file.path.endsWith(pathname));
+  const output=bundle.outputFiles.find(file=>file.path.replaceAll('\\','/').endsWith(pathname));
   if(output){res.setHeader('Content-Type',pathname.endsWith('.css')?'text/css':'text/javascript');res.end(output.contents);return;}
   if(pathname==='/api/history')return json({messages:[]});
   if(pathname==='/api/chat/stream'&&req.method==='POST'){
@@ -62,9 +62,12 @@ try {
   const page=await browser.newPage({viewport:{width:1200,height:800},reducedMotion:'reduce'});
   const errors=[];page.on('pageerror',error=>errors.push(error.message));
   await page.goto(url);
-  await page.getByText('消息未发送',{exact:true}).waitFor();
-  assert.match(await page.getByText('消息未发送',{exact:true}).getAttribute('title'),/重试附件处理或删除/);
+  const failedScene = page.getByRole('button',{name:'切换到场景：building',exact:true});
+  await failedScene.waitFor();
+  assert.equal(await failedScene.getAttribute('aria-description'),'消息未发送');
+  assert.match(await failedScene.locator('[data-status="send-failed"]').getAttribute('title'),/重试附件处理或删除/);
   await page.locator('.run-activity > summary').click();
+  await page.locator('.run-entry > summary').click();
   await page.getByText('查看已保留的输出；长任务使用 background=true。',{exact:true}).waitFor();
   const menu=page.getByRole('menu',{name:'电脑操作权限',exact:true});
   await page.getByRole('button',{name:'电脑操作权限',exact:true}).click();
@@ -102,18 +105,19 @@ try {
   });
   await page.goto(url+'/loom.html?scene_id=building&scene_strict=1');
   const row=page.locator('.composer-queue-item');await row.waitFor();
-  await row.getByText('附件解析失败：report.pdf，请重试或删除这条排队消息',{exact:true}).waitFor();
+  await row.getByRole('alert').waitFor();
+  assert.equal(await row.getByRole('alert').textContent(),'附件解析失败：report.pdf，请重试或删除这条排队消息');
   await page.screenshot({path:'output/playwright/portal-failed-queue-narrow.png'});
   await row.getByRole('button',{name:'取消排队：处理报告附件',exact:true}).click();
   await row.waitFor({state:'detached'});
-  const input=page.getByRole('textbox',{name:'message input'});
-  const rateLimit=page.getByText('⚠ LLM API error 429 Too Many Requests: Rate exceeded.',{exact:true});
+  const input=page.getByRole('textbox',{name:'消息输入框'});
+  const rateLimit=page.getByRole('alert').filter({hasText:'LLM API error 429 Too Many Requests: Rate exceeded.'});
   await input.fill('test duplicate model error');await input.press('Enter');
   await rateLimit.waitFor();assert.equal(await rateLimit.count(),1);
   await page.getByRole('button',{name:'发送消息',exact:true}).waitFor();
   await page.screenshot({path:'output/playwright/model-error-once.png'});
   await input.fill('new turn, same rate limit');await input.press('Enter');
-  await page.waitForFunction(()=>document.querySelectorAll('.message.system').length===2);
+  await page.waitForFunction(()=>Array.from(document.querySelectorAll('[role="alert"]')).filter(item=>item.textContent.includes('LLM API error 429 Too Many Requests: Rate exceeded.')).length===2);
   assert.equal(await rateLimit.count(),2,'A new request must retain its own failure');
   assert.deepEqual(errors,[]);
   console.log('Portal reliability UI passed: two permission options and saving, consecutive approval, visible recovery, narrow/dark dialog, restored failure/removal, repeated 429 once per turn.');

@@ -37,6 +37,10 @@ export class ConnectorNetwork {
     let args: unknown;
     try { args = request.method === 'GET' ? JSON.parse(url.searchParams.get('args') || '[]') : await request.json(); }
     catch { return Response.json({ error: '无效的 Connector 请求。' }, { status: 400, headers }); }
+    if (operation === 'report-local-kit-history') {
+      if (!args || typeof args !== 'object' || Array.isArray(args)) return Response.json({ error: '无效的 Connector 请求。' }, { status: 400, headers });
+      args = [args];
+    }
     if (!Array.isArray(args)) return Response.json({ error: '无效的 Connector 请求。' }, { status: 400, headers });
     try {
       const value = await callback(...(matched?.args || []), ...args);

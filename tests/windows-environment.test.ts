@@ -1,7 +1,10 @@
 import { afterEach, expect, it, vi } from 'vitest';
 import path from 'node:path';
 import { command, portableCommand, windowsPowerShellScript, windowsRunner } from '../desktop/main/portal/background';
-import { windowsEnvironment, windowsExecutable, windowsRoot } from '../desktop/main/portal/windows';
+import { signalWindowsSandboxCancel, windowsEnvironment, windowsExecutable, windowsRoot } from '../desktop/main/portal/windows';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { spawn } from 'node:child_process';
+import os from 'node:os';
 
 afterEach(() => vi.unstubAllEnvs());
 
@@ -49,3 +52,24 @@ it.skipIf(process.platform !== 'win32')('runs real Windows PowerShell with an em
   expect(error.message).toContain('中文生命周期错误');
   expect(error.message).not.toContain('CLIXML');
 }, 15_000);
+
+it.skipIf(process.platform !== 'win32')('signals and waits for a descendant sandbox wrapper before force-kill', async () => {
+  const root = await mkdtemp(path.join(os.tmpdir(), 'portal-cancel-helper-'));
+  const child = path.join(root, 'child.ps1');
+  const parent = path.join(root, 'parent.ps1');
+  const ready = path.join(root, 'ready');
+  const clean = path.join(root, 'clean');
+  const quote = (value: string) => "'" + value.replaceAll("'", "''") + "'";
+  await writeFile(child, `$event=[Threading.EventWaitHandle]::new($false,[Threading.EventResetMode]::ManualReset,('Local\\Town.Portal.SandboxCancel.'+$PID));
+    [IO.File]::WriteAllText(${quote(ready)},'ready'); $null=$event.WaitOne(); Start-Sleep -Milliseconds 3500;
+    [IO.File]::WriteAllText(${quote(clean)},'clean'); $event.Dispose();`);
+  await writeFile(parent, `Start-Process powershell.exe -WindowStyle Hidden -ArgumentList ${quote('-NoProfile -NonInteractive -File "' + child + '"')} -Wait\n`);
+  const engine = spawn(windowsExecutable('powershell'), ['-NoProfile', '-NonInteractive', '-File', parent], { windowsHide: true });
+  const exited = new Promise<void>((resolve, reject) => { engine.once('error', reject); engine.once('close', code => code === 0 ? resolve() : reject(new Error(`exit ${code}`))); });
+  try {
+    await vi.waitFor(async () => expect(await readFile(ready, 'utf8')).toBe('ready'), { timeout: 5000 });
+    expect(await signalWindowsSandboxCancel(engine.pid!)).toBe(true);
+    expect(await readFile(clean, 'utf8')).toBe('clean');
+    await exited;
+  } finally { engine.kill(); await rm(root, { recursive: true, force: true }); }
+}, 20_000);

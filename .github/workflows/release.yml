@@ -79,7 +79,7 @@ jobs:
         os: [macos-14, macos-15-intel, windows-latest]
     # Keep the original job/artifact IDs used by staging and publication retries.
     runs-on: ${{ matrix.os == 'macos-14' && 'macos-15' || matrix.os }}
-    timeout-minutes: 45
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 120 || 45 }}
     env:
       PORTAL_DESKTOP_UPDATE_REPOSITORY: ${{ vars.PORTAL_DESKTOP_UPDATE_REPOSITORY || github.repository }}
     steps:
@@ -117,8 +117,22 @@ jobs:
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN_PATH"
           echo "PORTAL_DESKTOP_MAC_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
       - run: npm ci
+      - name: Cache patched Windows Node build
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: |
+            output/node-*/node.exe
+            output/node-*/node.sha256
+          key: windows-task-node-${{ hashFiles('scripts/portal-runtime/lock.json', 'scripts/portal-runtime/libuv-appcontainer.patch', 'scripts/portal-runtime/build-windows-node.mjs') }}
       - run: npm run typecheck
       - run: npm run build:portal
+      - name: Verify isolated Windows Python and Node task workflows
+        if: runner.os == 'Windows'
+        run: |
+          node tests/windows-sandbox-cancellation-native.mjs
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          npm run test:portal-permissions
       - run: npm test
       - name: Verify native Windows credential and task registration
         if: runner.os == 'Windows'

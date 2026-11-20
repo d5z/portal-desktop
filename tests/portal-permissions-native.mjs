@@ -62,7 +62,7 @@ async function start(mode, executable = binary, runtimeDirectory) {
   await writeFile(config, `name = "permissions-fixture"\nworkspace = ${JSON.stringify(workspace)}\nkits_enabled = false\n[subagent]\nenabled = false\n[tools]\ncustom_tools_enabled = ${mode !== 'full-access'}\n[security]\npermission_mode = "full-access"\n`);
   child = spawn(executable, ['--config', config, '--connect', `http://127.0.0.1:${port}/fixture/?token=native-test`, '--permission-mode', mode],
     {windowsHide:true,stdio:['ignore','pipe','pipe'],env:{...process.env,PATH:process.platform === 'win32' ? path.join(process.env.SystemRoot,'System32') : '/usr/bin:/bin',USERPROFILE:temporary,HOME:temporary,HEART_PORTAL_CLIENT_MANAGED:'1',HEART_PORTAL_SUPERVISED:'1',HEART_PORTAL_CLIENT_FILE:registration,
-      ...(runtimeDirectory ? {HEART_PORTAL_RUNTIME_DIR:runtimeDirectory} : {})}});
+      HEART_PORTAL_RUNTIME_DIR:runtimeDirectory}});
   child.stdout.on('data', bytes => {diagnostics=(diagnostics+bytes).slice(-12000);});
   child.stderr.on('data', bytes => {diagnostics=(diagnostics+bytes).slice(-12000);});
   const deadline = Date.now()+15000;
@@ -74,7 +74,9 @@ async function start(mode, executable = binary, runtimeDirectory) {
 function call(name, args) {
   return new Promise((resolve,reject) => {
     const id = ++sequence;
-    const timer = setTimeout(()=>{pending.delete(id);reject(new Error('Portal call timed out: '+diagnostics));},20000);
+    if (process.env.PORTAL_NATIVE_TRACE) console.log(`Call ${id}: ${name} ${JSON.stringify(args)}`);
+    // Allow the engine's default 30-second command timeout to return diagnostics.
+    const timer = setTimeout(()=>{pending.delete(id);reject(new Error(`Portal call timed out: ${name} ${JSON.stringify(args)}\n${diagnostics}`));},45000);
     pending.set(id,{resolve,timer});
     relay.send(JSON.stringify({jsonrpc:'2.0',id,method:'tools/call',params:{name,arguments:args,_meta:{scene_id:'native-scene'}}}));
   });
@@ -131,6 +133,8 @@ try {
   const venvPython = process.platform === 'win32' ? '.venv\\Scripts\\python.exe' : '.venv/bin/python';
   const venvCheck = await call('portal_exec',{...shellArgs(`${venvPython} -c "import sys; assert sys.prefix != sys.base_prefix; print('VENV_OK')"`),workdir:'project'});ok(venvCheck);
   assert.match(JSON.stringify(venvCheck),/VENV_OK/);
+  const defaultVenv = await call('portal_exec',{...shellArgs(`python -c "import sys; assert sys.prefix != sys.base_prefix; print('DEFAULT_VENV_OK')"`),workdir:'project'});ok(defaultVenv);
+  assert.match(JSON.stringify(defaultVenv),/DEFAULT_VENV_OK/);
   await writeFile(path.join(workspace,'project/wheel.py'), `import pathlib,zipfile\np=pathlib.Path('fixture_pkg-1.0-py3-none-any.whl')\nfiles={'fixture_pkg.py': 'VALUE = "LOCAL_WHEEL_OK"\\n', 'fixture_pkg-1.0.dist-info/METADATA': 'Metadata-Version: 2.1\\nName: fixture-pkg\\nVersion: 1.0\\n', 'fixture_pkg-1.0.dist-info/WHEEL': 'Wheel-Version: 1.0\\nGenerator: portal-test\\nRoot-Is-Purelib: true\\nTag: py3-none-any\\n'}\nfiles['fixture_pkg-1.0.dist-info/RECORD']=''.join(k+',,\\n' for k in [*files,'fixture_pkg-1.0.dist-info/RECORD'])\nwith zipfile.ZipFile(p,'w') as z:\n for name,value in files.items(): z.writestr(name,value)\n`);
   const pipResult = await call('portal_exec',{...shellArgs(chain(`${python} wheel.py`,`${venvPython} -m pip install --no-index fixture_pkg-1.0-py3-none-any.whl`,`${venvPython} -c "import fixture_pkg; print(fixture_pkg.VALUE)"`)),workdir:'project'});ok(pipResult);
   assert.match(JSON.stringify(pipResult),/LOCAL_WHEEL_OK/);
@@ -141,40 +145,45 @@ try {
   const npmLocal = await call('portal_exec',{...shellArgs(chain('npm install --offline --no-audit --no-fund ../local-package','node -e "console.log(require(\'portal-local-fixture\'))"','npx --offline portal-fixture')),workdir:'project'});ok(npmLocal);
   assert.match(JSON.stringify(npmLocal),/LOCAL_NPM_OK/);
   assert.match(JSON.stringify(npmLocal),/LOCAL_NPX_OK/);
-  await writeFile(path.join(workspace,'project/test_fixture.py'), `import concurrent.futures,ssl,unittest,fixture_pkg\nclass Fixture(unittest.TestCase):\n def test_runtime(self):\n  self.assertEqual(fixture_pkg.VALUE,'LOCAL_WHEEL_OK')\n  self.assertTrue(ssl.create_default_context())\n  with concurrent.futures.ThreadPoolExecutor(2) as pool: self.assertEqual(list(pool.map(abs,[-1,-2])),[1,2])\n`);
-  const pythonTests=await call('portal_exec',{...shellArgs(process.platform === 'win32' ? `${venvPython} -m unittest discover -v` : '. .venv/bin/activate && python -m unittest discover -v'),workdir:'project'});ok(pythonTests);
+  ok(await call('portal_exec',{...shellArgs('portal-fixture'),workdir:'project'}));
+  await writeFile(path.join(workspace,'project/test_fixture.py'), `import concurrent.futures,ssl,unittest,fixture_pkg,tempfile,pathlib,socket\nclass Fixture(unittest.TestCase):\n def test_runtime(self):\n  self.assertEqual(fixture_pkg.VALUE,'LOCAL_WHEEL_OK')\n  self.assertTrue(ssl.create_default_context())\n  with concurrent.futures.ThreadPoolExecutor(2) as pool: self.assertEqual(list(pool.map(abs,[-1,-2])),[1,2])\n  with tempfile.TemporaryDirectory() as directory:\n   target=pathlib.Path(directory)/'private.txt'; target.write_text('private'); self.assertEqual(target.read_text(),'private')\n  with self.assertRaises(PermissionError): pathlib.Path(${JSON.stringify(outside)}).read_text()\n  with self.assertRaises(OSError): socket.create_connection(('127.0.0.1',${port}),timeout=2)\n`);
+  const pythonTests=await call('portal_exec',{...shellArgs(process.platform === 'win32' ? `${venvPython} -I -m unittest discover -v` : '. .venv/bin/activate && python -I -m unittest discover -v'),workdir:'project'});ok(pythonTests);
   assert.match(JSON.stringify(pythonTests),/test_runtime/);
-  await writeFile(path.join(workspace,'project/runtime.test.cjs'), `const {test}=require('node:test');const assert=require('node:assert/strict');const {Worker}=require('node:worker_threads');\ntest('bundled Node worker and dependency',async()=>{assert.equal(require('portal-local-fixture'),'LOCAL_NPM_OK');const worker=new Worker('require("node:worker_threads").parentPort.postMessage(42)',{eval:true});const [value]=await require('node:events').once(worker,'message');assert.equal(value,42);});`);
-  const nodeTests=await call('portal_exec',{...shellArgs('node --test runtime.test.cjs'),workdir:'project'});ok(nodeTests);
+  await writeFile(path.join(workspace,'project/runtime.test.cjs'), `const {test}=require('node:test');const assert=require('node:assert/strict');const {Worker}=require('node:worker_threads');\ntest('bundled Node worker and dependency',async()=>{assert.equal(require('portal-local-fixture'),'LOCAL_NPM_OK');const worker=new Worker('require("node:worker_threads").parentPort.postMessage(42)',{eval:true});const [value]=await require('node:events').once(worker,'message');assert.equal(value,42);assert.throws(()=>require('node:fs').readFileSync(${JSON.stringify(outside)}),e=>['EPERM','EACCES'].includes(e.code));await assert.rejects(new Promise((resolve,reject)=>{const socket=require('node:net').connect(${port},'127.0.0.1');socket.on('connect',()=>{socket.destroy();resolve()});socket.on('error',reject);socket.setTimeout(2000,()=>{socket.destroy();reject(new Error('blocked timeout'))})}));});`);
+  await writeFile(path.join(workspace,'project/ipc-child.cjs'), `process.on('message',value=>{process.send(value+1);process.disconnect()});`);
+  await writeFile(path.join(workspace,'project/process.test.cjs'), `const {test}=require('node:test');const assert=require('node:assert/strict');const {once}=require('node:events');test('fork IPC and piped child output',async()=>{const child=require('node:child_process').fork('ipc-child.cjs',[],{silent:true});const message=once(child,'message');const closed=once(child,'close');child.send(41);assert.equal((await message)[0],42);assert.equal((await closed)[0],0)});`);
+  const nodeTests=await call('portal_exec',{...shellArgs('node --test runtime.test.cjs process.test.cjs'),workdir:'project'});ok(nodeTests);
   assert.match(JSON.stringify(nodeTests),/bundled Node worker and dependency/);
+  assert.match(JSON.stringify(nodeTests),/fork IPC and piped child output/);
   console.log('Task fixtures: CSV/SQLite/ZIP/UTF-8, venv, offline pip wheel and npm/npx local dependency passed.');
   const started = await call('portal_exec',{...shellArgs(`node -e "console.log('BUNDLED_BACKGROUND_OK')"`),background:true});ok(started);
   const session = JSON.parse(started.result.content[0].text).session_id;
   let log;
-  for(let i=0;i<50;i++){
-    log=await call('portal_process',{action:'log',session_id:session});ok(log);
+  for(let i=0;i<10;i++){
+    log=await call('portal_process',{action:'poll',session_id:session,timeout_ms:3000});ok(log);
     if(JSON.stringify(log).includes('BUNDLED_BACKGROUND_OK'))break;
-    await new Promise(resolve=>setTimeout(resolve,50));
   }
   assert.match(JSON.stringify(log),/BUNDLED_BACKGROUND_OK/);
   // Output/error states, interactive input, process-tree cleanup and repeated execution.
-  const nonzero = await call('portal_exec',shellArgs('node -e "console.log(\'BEFORE_ERROR\');console.error(\'EXPECTED_STDERR\');process.exit(7)"'));failed(nonzero);
+  const nonzero = await call('portal_exec',shellArgs('node -e "console.log(\'BEFORE_ERROR\');console.error(\'EXPECTED_STDERR\');process.exit(7)"'+(process.platform === 'win32' ? '; exit $LASTEXITCODE' : '')));failed(nonzero);
   assert.equal(nonzero.result.exit_code,7);
   assert.match(JSON.stringify(nonzero),/BEFORE_ERROR/);assert.match(JSON.stringify(nonzero),/EXPECTED_STDERR/);
   const bounded = await call('portal_exec',{...shellArgs('node -e "process.stdout.write(\'界\'.repeat(10000))"'),max_output_bytes:257});ok(bounded);
   assert.equal(bounded.result.truncated,true);assert.equal(bounded.result.total_output_bytes,30000);
   assert(!bounded.result.content[0].text.includes('\ufffd'),'Truncation must retain complete UTF-8 characters');
-  const timed = await call('portal_exec',{...shellArgs('node -e "console.log(\'TIMEOUT_STDOUT\');console.error(\'TIMEOUT_STDERR\');setTimeout(()=>require(\'fs\').writeFileSync(\'outputs/timeout-leak.txt\',\'leaked\'),2500)"'),timeout_secs:1});failed(timed);
+  // Include native ACL setup in the deadline and leave the write beyond it.
+  const timed = await call('portal_exec',{...shellArgs('node -e "console.log(\'TIMEOUT_STDOUT\');console.error(\'TIMEOUT_STDERR\');setTimeout(()=>require(\'fs\').writeFileSync(\'outputs/timeout-leak.txt\',\'leaked\'),15000)"'),timeout_secs:10});failed(timed);
   assert.equal(timed.result.failure_code,'command_timeout');assert.match(JSON.stringify(timed),/TIMEOUT_STDOUT/);assert.match(JSON.stringify(timed),/TIMEOUT_STDERR/);
   const interactive = await call('portal_exec',{...shellArgs('node -e "process.stdin.once(\'data\',d=>{console.log(\'STDIN_OK\',d.toString().trim());process.exit(0)})"'),background:true});ok(interactive);
   const interactiveId = JSON.parse(interactive.result.content[0].text).session_id;
   allow=false;failed(await call('portal_process',{action:'write',session_id:interactiveId,data:'must not arrive\n'}));
   allow=true;ok(await call('portal_process',{action:'write',session_id:interactiveId,data:'你好 Portal\n'}));
-  const interactiveLog = await call('portal_process',{action:'poll',session_id:interactiveId,timeout_ms:3000});ok(interactiveLog);
+  const interactiveLog = await call('portal_process',{action:'poll',session_id:interactiveId,timeout_ms:10000});ok(interactiveLog);
   assert.match(JSON.parse(interactiveLog.result.content[0].text).output,/STDIN_OK 你好 Portal/);
   const cancellable = await call('portal_exec',{...shellArgs('node -e "console.log(\'CANCEL_READY\');setTimeout(()=>require(\'fs\').writeFileSync(\'outputs/cancel-leak.txt\',\'leaked\'),2500)"'),background:true});ok(cancellable);
   const cancelId = JSON.parse(cancellable.result.content[0].text).session_id;
-  ok(await call('portal_process',{action:'poll',session_id:cancelId,timeout_ms:3000}));
+  const cancelReady = await call('portal_process',{action:'poll',session_id:cancelId,timeout_ms:10000});ok(cancelReady);
+  assert.match(JSON.parse(cancelReady.result.content[0].text).output,/CANCEL_READY/);
   ok(await call('portal_process',{action:'kill',session_id:cancelId}));
   const parallel = await Promise.all([0,1,2].map(i=>call('portal_exec',shellArgs(`node -e "const cp=require('child_process'); const v=cp.execFileSync('${python}',['-c','import sys; print(sys.version.split()[0])'],{encoding:'utf8'}).trim(); console.log('PARALLEL_${i}',v,process.versions.node)"`))));
   parallel.forEach((reply,i)=>{ok(reply);assert.match(JSON.stringify(reply),new RegExp(`PARALLEL_${i} 3\\.12\\.`));});
@@ -250,6 +259,9 @@ try {
   await start('full-access');
   const beforeFull = approvals.length;
   ok(await call('portal_exec',shellArgs(chain(`${python} --version`,'node --version','npm --version'))));
+  if (process.platform === 'win32') {
+    ok(await call('portal_exec',shellArgs(`$env:HEART_PORTAL_SANDBOX='1'; ${python} -I -c "import inspect,os; assert inspect.isbuiltin(os.mkdir)"`)));
+  }
   ok(await call('portal_file_write',{path:outside,content:'full file write'}));
   ok(await call('portal_exec',shellArgs(writeCommand(outside,'full shell write'))));
   assert.equal(await readFile(outside,'utf8'),'full shell write');

@@ -26,7 +26,7 @@ jobs:
       matrix:
         os: [macos-15, macos-15-intel, windows-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
+    timeout-minutes: ${{ matrix.os == 'windows-latest' && 120 || 40 }}
     defaults:
       run:
         working-directory: client
@@ -51,6 +51,14 @@ jobs:
         run: rustup show
       - name: Install locked dependencies
         run: npm ci
+      - name: Cache patched Windows Node build
+        if: runner.os == 'Windows'
+        uses: actions/cache@v4
+        with:
+          path: |
+            client/output/node-*/node.exe
+            client/output/node-*/node.sha256
+          key: windows-task-node-${{ hashFiles('client/scripts/portal-runtime/lock.json', 'client/scripts/portal-runtime/libuv-appcontainer.patch', 'client/scripts/portal-runtime/build-windows-node.mjs') }}
       - name: Initialize native Windows test services
         if: runner.os == 'Windows'
         shell: powershell

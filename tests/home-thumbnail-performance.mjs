@@ -20,7 +20,7 @@ root.render(<HomeFileThumbnail file={{ name: 'large.png', path: 'large.png', typ
 window.unmount = () => root.unmount();
 ` }, bundle: true, write: false, jsx: 'automatic', format: 'esm', outfile: 'thumbnail.js', define: { 'process.env.NODE_ENV': '"production"' } });
 const server = createServer((req, res) => {
-  const file = bundle.outputFiles.find(file => file.path.endsWith(req.url));
+  const file = bundle.outputFiles.find(file => file.path.replaceAll('\\', '/').endsWith(req.url));
   res.setHeader('Content-Type', file ? req.url.endsWith('.css') ? 'text/css' : 'text/javascript' : 'text/html');
   res.end(file ? file.contents : '<link rel="stylesheet" href="/thumbnail.css"><div id="root" style="margin-top:2000px"></div><script type="module" src="/thumbnail.js"></script>');
 });

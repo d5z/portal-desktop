@@ -3,14 +3,16 @@ import { createHash, randomUUID } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { access, cp, mkdir, mkdtemp, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import os from 'node:os';
 import { fileURLToPath } from 'node:url';
 import lock from './portal-runtime/lock.json' with { type: 'json' };
 
 export async function preparePortalRuntime(destination = path.resolve('resources/portal-runtime')) {
   const target = lock.targets[`${{darwin:'mac',win32:'win',linux:'linux'}[process.platform]}-${process.arch}`];
   if (!target) throw new Error(`No Portal runtime for ${process.platform}/${process.arch}`);
-  const id = createHash('sha256').update(JSON.stringify({layout:3,node:lock.nodeVersion,python:lock.pythonVersion,target})).digest('hex');
+  const windowsSite = process.platform === 'win32' ? await readFile(new URL('./portal-runtime/windows-sitecustomize.py', import.meta.url), 'utf8') : '';
+  const windowsPipePatch = process.platform === 'win32' ? await readFile(new URL('./portal-runtime/libuv-appcontainer.patch', import.meta.url), 'utf8') : '';
+  const windowsNodeRecipe = process.platform === 'win32' ? await readFile(new URL('./portal-runtime/build-windows-node.mjs', import.meta.url), 'utf8') : '';
+  const id = createHash('sha256').update(JSON.stringify({layout:5,node:lock.nodeVersion,python:lock.pythonVersion,target,windowsSite,windowsPipePatch,windowsNodeRecipe,windowsNodeBuild:process.platform==='win32' ? lock.windowsNodeBuild : undefined})).digest('hex');
   const current = await readFile(path.join(destination,'runtime.json'),'utf8').catch(error => {if(error.code==='ENOENT')return null;throw error;});
   const manifest = current && JSON.parse(current);
   if (manifest && manifest.id === id) {
@@ -20,7 +22,7 @@ export async function preparePortalRuntime(destination = path.resolve('resources
   }
   const cache = path.resolve('output/portal-runtime-downloads');
   await mkdir(cache,{recursive:true});
-  const stage = await mkdtemp(path.join(os.tmpdir(),'portal-runtime-'));
+  const stage = await mkdtemp(path.join(cache,'stage-'));
   const payload = path.join(stage,'portal-runtime');
   await mkdir(payload);
   try {
@@ -43,12 +45,26 @@ export async function preparePortalRuntime(destination = path.resolve('resources
     }
     const nodeRoot = path.join(stage,nodeName.replace(/\.(zip|tar\.gz)$/,''));
     await mkdir(path.join(payload,'node/bin'),{recursive:true});
-    await cp(path.join(nodeRoot,process.platform==='win32'?'node.exe':'bin/node'),path.join(payload,'node/bin',process.platform==='win32'?'node.exe':'node'));
+    const nodeBinary = process.platform === 'win32'
+      ? await (await import('./portal-runtime/build-windows-node.mjs')).buildWindowsNode(cache,path.join(stage,'python'))
+      : path.join(nodeRoot,'bin/node');
+    await cp(nodeBinary,path.join(payload,'node/bin',process.platform==='win32'?'node.exe':'node'));
     await cp(path.join(nodeRoot,'LICENSE'),path.join(payload,'node/LICENSE'));
     // npm/npx belong to the Node distribution and are needed for ordinary projects.
     if (process.platform === 'win32') {
       await cp(path.join(nodeRoot,'node_modules/npm'),path.join(payload,'node/bin/node_modules/npm'),{recursive:true,verbatimSymlinks:true});
       for (const file of ['npm','npm.cmd','npx','npx.cmd']) await cp(path.join(nodeRoot,file),path.join(payload,'node/bin',file));
+      // The sandbox has already canonicalized this root. Seed npm's cache so
+      // it resolves descendants without inspecting inaccessible host ancestors.
+      const realpathFile = path.join(payload,'node/bin/node_modules/npm/node_modules/@npmcli/arborist/lib/realpath.js');
+      const realpath = await readFile(realpathFile,'utf8');
+      const anchor = 'const realpathCached = (path, rpcache, stcache, depth) => {';
+      if (!realpath.includes(anchor)) throw new Error('Bundled npm realpath adapter needs updating');
+      await writeFile(realpathFile,realpath.replace(anchor,anchor+`
+  if (process.env.HEART_PORTAL_SANDBOX === '1' && process.env.HEART_PORTAL_WORKSPACE) {
+    const root = resolve(process.env.HEART_PORTAL_WORKSPACE)
+    rpcache.set(root, root)
+  }`));
     } else {
       await cp(path.join(nodeRoot,'lib/node_modules/npm'),path.join(payload,'node/lib/node_modules/npm'),{recursive:true,verbatimSymlinks:true});
       for (const file of ['npm','npx']) await cp(path.join(nodeRoot,'bin',file),path.join(payload,'node/bin',file),{verbatimSymlinks:true});
@@ -57,7 +73,10 @@ export async function preparePortalRuntime(destination = path.resolve('resources
     await cp(path.join(stage,'python'),path.join(payload,'python'),{recursive:true,verbatimSymlinks:true});
     const python = process.platform==='win32'?'python/python.exe':'python/bin/python3';
     const node = `node/bin/${process.platform==='win32'?'node.exe':'node'}`;
-    if(process.platform==='win32')await cp(path.join(payload,python),path.join(payload,'python/python3.exe'));
+    if(process.platform==='win32') {
+      await cp(path.join(payload,python),path.join(payload,'python/python3.exe'));
+      await writeFile(path.join(payload,'python/Lib/sitecustomize.py'),windowsSite);
+    }
     execFileSync(path.join(payload,python),['-I','-B','-c',`import sys; assert sys.version.split()[0] == '${lock.pythonVersion}'`],{stdio:'inherit'});
     execFileSync(path.join(payload,node),['-e',`if(process.versions.node!=='${lock.nodeVersion}')process.exit(1)`],{stdio:'inherit'});
     execFileSync(path.join(payload,node),[path.join(payload,process.platform==='win32'?'node/bin/node_modules/npm/bin/npm-cli.js':'node/lib/node_modules/npm/bin/npm-cli.js'),'--version'],{stdio:'inherit'});

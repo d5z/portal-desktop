@@ -2,6 +2,12 @@
   "nodeVersion": "24.21.0",
   "pythonVersion": "3.12.14",
   "pythonRelease": "20260901",
+  "windowsNodeBuild": {
+    "sourceSha256": "622424efb5dc0c26c93fbb619ff10737ee289c605b837c88778e186925d82777",
+    "libuvCommit": "2cadaa40167050baf7c6905ac897e6fb57afb2c6",
+    "nasmVersion": "2.16.03",
+    "nasmSha256": "3ee4782247bcb874378d02f7eab4e294a84d3d15f3f6ee2de2f47a46aa7226e6"
+  },
   "targets": {
     "win-x64": {
       "nodeArchive": "win-x64.zip",

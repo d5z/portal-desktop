@@ -9,7 +9,7 @@ import { StringDecoder } from 'node:string_decoder';
 import type { Connection } from '../chat/connection';
 import { redact } from '../chat/connection';
 import type { PortalState, Settings } from '../../shared/types';
-import { windowsEnvironment, windowsExecutable } from './windows';
+import { signalWindowsSandboxCancel, windowsEnvironment, windowsExecutable } from './windows';
 import { saveForegroundRecord } from './foreground-record';
 import { permissionMode } from '../../shared/security';
 import { ensurePortalRuntime } from './task-runtime';
@@ -222,14 +222,21 @@ export class PortalSupervisor extends EventEmitter {
         this.publish({ phase: 'error', message: '无法确认 Portal 已停止，请检查进程或系统权限后重试。' });
         reject(new Error('Portal process cleanup was not confirmed'));
       }, 18_000);
+      let forcing = false;
       const force = () => {
-        if (!child.pid) return;
-        if (process.platform === 'win32') {
-          const killer = spawn(windowsExecutable('taskkill'), ['/PID', String(child.pid), '/T', '/F'], { windowsHide: true });
-          killer.on('error', () => { child.kill(); });
-        } else {
-          try { process.kill(-child.pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); }
-        }
+        if (!child.pid || forcing || done) return;
+        const pid = child.pid;
+        forcing = true;
+        void (async () => {
+          if (process.platform === 'win32') {
+            await signalWindowsSandboxCancel(pid);
+            if (done || child.exitCode !== null || child.signalCode !== null) return;
+            const killer = spawn(windowsExecutable('taskkill'), ['/PID', String(pid), '/T', '/F'], { windowsHide: true });
+            killer.on('error', () => { child.kill(); });
+          } else {
+            try { process.kill(-pid, 'SIGKILL'); } catch { child.kill('SIGKILL'); }
+          }
+        })();
       };
       const timer = setTimeout(force, 12_000);
       child.once('exit', finish);
