@@ -73,6 +73,9 @@ jobs:
           fi
   build:
     needs: preflight
+    defaults:
+      run:
+        working-directory: client
     strategy:
       fail-fast: false
       matrix:
@@ -86,12 +89,14 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ needs.preflight.outputs.commit }}
+          path: client
           persist-credentials: false
           submodules: recursive
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
+          cache-dependency-path: client/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
       - name: Import Apple Developer ID certificate (same secrets as Heart Portal)
         if: runner.os == 'macOS'
@@ -123,18 +128,18 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
-            output/node-*/node.exe
-            output/node-*/node.sha256
-          key: windows-task-node-${{ hashFiles('scripts/portal-runtime/lock.json', 'scripts/portal-runtime/libuv-appcontainer.patch', 'scripts/portal-runtime/build-windows-node.mjs') }}
+            client/output/node-*/node.exe
+            client/output/node-*/node.sha256
+          key: windows-task-node-${{ hashFiles('client/scripts/portal-runtime/lock.json', 'client/scripts/portal-runtime/libuv-appcontainer.patch', 'client/scripts/portal-runtime/build-windows-node.mjs') }}
       - run: npm run typecheck
       - run: npm run build:portal
       - name: Save completed Windows Node build
-        if: always() && runner.os == 'Windows' && steps.task-node-cache.outputs.cache-hit != 'true' && hashFiles('output/node-*/node.sha256') != ''
+        if: always() && runner.os == 'Windows' && steps.task-node-cache.outputs.cache-hit != 'true' && hashFiles('client/output/node-*/node.sha256') != ''
         uses: actions/cache/save@v4
         with:
           path: |
-            output/node-*/node.exe
-            output/node-*/node.sha256
+            client/output/node-*/node.exe
+            client/output/node-*/node.sha256
           key: ${{ steps.task-node-cache.outputs.cache-primary-key }}
       - name: Verify isolated Windows Python and Node task workflows
         if: runner.os == 'Windows'
@@ -150,7 +155,7 @@ jobs:
         run: npx vitest run tests/background-native.test.ts
       - run: cargo test --manifest-path heart-portal/Cargo.toml --locked -- --test-threads=1
         env:
-          HEART_PORTAL_RUNTIME_DIR: ${{ github.workspace }}/resources/portal-runtime
+          HEART_PORTAL_RUNTIME_DIR: ${{ github.workspace }}/client/resources/portal-runtime
       - name: Verify native Windows service upgrade and rollback
         if: runner.os == 'Windows'
         env:
@@ -197,15 +202,15 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-installer-diagnostics
-          path: test-results/windows-installer/
+          path: client/test-results/windows-installer/
           if-no-files-found: ignore
           retention-days: 14
       - uses: actions/upload-artifact@v4
         with:
           name: portal-desktop-${{ matrix.os }}
           path: |
-            out/make/
-            resources/runtime-bundle.json
+            client/out/make/
+            client/resources/runtime-bundle.json
           if-no-files-found: error
           retention-days: 30
   publish:

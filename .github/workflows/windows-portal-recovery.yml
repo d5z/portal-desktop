@@ -17,15 +17,20 @@ jobs:
   recovery:
     runs-on: windows-latest
     timeout-minutes: 90
+    defaults:
+      run:
+        working-directory: client
     steps:
       - uses: actions/checkout@v4
         with:
+          path: client
           persist-credentials: false
           submodules: recursive
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
+          cache-dependency-path: client/package-lock.json
       - uses: dtolnay/rust-toolchain@stable
       - run: npm ci
       - name: Cache patched Windows Node build
@@ -33,17 +38,17 @@ jobs:
         uses: actions/cache/restore@v4
         with:
           path: |
-            output/node-*/node.exe
-            output/node-*/node.sha256
-          key: windows-task-node-${{ hashFiles('scripts/portal-runtime/lock.json', 'scripts/portal-runtime/libuv-appcontainer.patch', 'scripts/portal-runtime/build-windows-node.mjs') }}
+            client/output/node-*/node.exe
+            client/output/node-*/node.sha256
+          key: windows-task-node-${{ hashFiles('client/scripts/portal-runtime/lock.json', 'client/scripts/portal-runtime/libuv-appcontainer.patch', 'client/scripts/portal-runtime/build-windows-node.mjs') }}
       - run: npm run build:portal
       - name: Save completed Windows Node build
-        if: always() && runner.os == 'Windows' && steps.task-node-cache.outputs.cache-hit != 'true' && hashFiles('output/node-*/node.sha256') != ''
+        if: always() && runner.os == 'Windows' && steps.task-node-cache.outputs.cache-hit != 'true' && hashFiles('client/output/node-*/node.sha256') != ''
         uses: actions/cache/save@v4
         with:
           path: |
-            output/node-*/node.exe
-            output/node-*/node.sha256
+            client/output/node-*/node.exe
+            client/output/node-*/node.sha256
           key: ${{ steps.task-node-cache.outputs.cache-primary-key }}
       - run: npx vitest run tests/portal-orphan-windows.test.ts
       - name: Check sandbox cancellation and ACL restoration
