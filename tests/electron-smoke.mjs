@@ -194,7 +194,8 @@ try {
   await page.locator('#background-input').uncheck();
   await page.getByRole('tab',{name:'Being',exact:true}).click();
   await page.getByRole('button', { name: '保存、连接并启动' }).click();
-  await page.waitForFunction(async () => (await window.beings.snapshot()).settings.hasToken && !document.querySelector('#save-settings').disabled, null, { timeout: 15000 });
+  // First connection stages the bundled runtimes before Portal's own 25s readiness window.
+  await page.waitForFunction(async () => (await window.beings.snapshot()).settings.hasToken && !document.querySelector('#save-settings').disabled, null, { timeout: 60000 });
   await page.locator('#close-client-settings').click();
   await page.locator('#client-settings-dialog').waitFor({state:'hidden'});
   const frame = page.frameLocator('#chat-frame');
