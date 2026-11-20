@@ -45,7 +45,9 @@ Windows builds require Visual Studio C++ Build Tools with the Clang/LLVM
 toolset. The builder uses the bundled Python and a checksum-locked portable
 NASM, preserving OpenSSL assembly support. It caches the compiled binary under
 `output/`, keyed by the source version and patch, and verifies its digest before
-reuse. First builds take longer because Node must be compiled.
+reuse. The build keeps Node’s upstream parallel build settings; forcing one
+compiler process exceeded the hosted runner’s 90-minute budget. First builds
+take longer because Node must be compiled.
 
 Run `npm run build:portal` followed by `npm run test:portal-permissions` on
 Windows. The native suite exercises venv/ensurepip, offline pip and npm/npx,

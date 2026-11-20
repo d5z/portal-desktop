@@ -51,7 +51,7 @@ export async function buildWindowsNode(cache, pythonDirectory) {
     cwd:source,stdio:'inherit',windowsHide:true,
     env:{...process.env,TEMP:temporary,TMP:temporary,
       PATH:[pythonDirectory,path.join(directory,`nasm-${lock.windowsNodeBuild.nasmVersion}`),process.env.PATH].join(path.delimiter),
-      msbuild_args:'/m:1 /p:MultiProcMaxCount=1'},
+    },
   });
   await cp(path.join(source,'Release/node.exe'),binary);
   await writeFile(digestFile,createHash('sha256').update(await readFile(binary)).digest('hex'));
