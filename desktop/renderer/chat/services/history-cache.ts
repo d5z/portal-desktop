@@ -17,7 +17,9 @@ export interface HistoryMessage {
 
 /** A history page is an upsert, never a replacement for the local transcript. */
 export function mergeHistoryRow(previous: HistoryMessage | undefined, incoming: HistoryMessage): HistoryMessage {
-  const row: HistoryMessage = { seq: Number(incoming.seq), role: incoming.role, content: incoming.content };
+  // An empty snapshot is not a deletion: retain the last readable copy.
+  const row: HistoryMessage = { seq: Number(incoming.seq), role: incoming.role,
+    content: incoming.content.trim() ? incoming.content : previous?.content || incoming.content };
   for (const key of ["at", "from", "type", "scene_id", "scene_label"] as const) {
     const value = key === "scene_label" ? messageScene(incoming).sceneLabel : incoming[key];
     // Older servers and partial snapshots can omit scene metadata. Do not move
@@ -230,6 +232,24 @@ export class HistoryCache {
       return true;
     });
     return [...scenes.values()];
+  }
+
+  /** Merge by identity before display, including cached rows outside the visible window. */
+  async merge(messages: HistoryMessage[]): Promise<HistoryMessage[]> {
+    if (!messages.length) return messages;
+    try {
+      const db = await this.open();
+      if (!db || this.closed) return messages;
+      const tx = db.transaction('messages', 'readonly');
+      const done = transactionDone(tx);
+      const merged = [...messages];
+      for (let index = 0; index < messages.length; index++) {
+        const request = tx.objectStore('messages').get(messages[index].seq);
+        request.onsuccess = () => { merged[index] = mergeHistoryRow(request.result, messages[index]); };
+      }
+      await done;
+      return merged;
+    } catch { return messages; }
   }
 
   async write(messages: HistoryMessage[], cursor: number) {

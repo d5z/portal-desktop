@@ -41,6 +41,7 @@ export interface Message extends MessageScene {
   timestamp: string;
   createdAt?: number;
   historySeq?: number;
+  historyContentError?: boolean;
   persistedFrom?: "final" | "act_talk" | "partial";
   persistedStreamId?: string;
   /** Authoritative history content, applied after live rendering finishes. */
@@ -257,7 +258,7 @@ export interface ChatRuntime {
   loadSbsState(): Promise<boolean | undefined>;
   revealHistory(rows: import("../services/history-cache").HistoryMessage[]): void;
   loadOlderHistory(before?: number): Promise<number>;
-  loadHistoryTarget(seq: number, sceneId: string): Promise<boolean>;
+  loadHistoryTarget(seq: number, sceneId: string, refresh?: boolean): Promise<boolean>;
   refreshHistory(): Promise<void>;
   refreshOnRegainedAttention(): Promise<void>;
   request(path: string, init?: RequestInit): Promise<Response>;

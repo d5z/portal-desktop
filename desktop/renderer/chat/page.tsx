@@ -596,7 +596,8 @@ export function ChatView({
           const before = <>
           {state.historyLoading && <SceneLoading sceneName={currentSceneName} />}
           {!state.historyLoading && state.historyRefreshing && <div className="chat-refresh-overlay"><div className="chat-refresh-status" role="status"><span aria-hidden="true" />正在刷新对话…</div></div>}
-          {!state.historyLoading && !state.historyRefreshing && state.historyLoadFailed && (
+          {!state.historyLoading && !state.historyRefreshing && state.historyLoadFailed &&
+            !visibleItems.some(item => item.kind === 'message' && item.historySeq && item.text.trim()) && (
             <div className="chat-scope-empty" role="status">
               <span>{visibleItems.length ? '暂时无法更新对话，已保留现有记录。' : '暂时无法读取对话记录。'}</span>
               <button type="button" onClick={() => void runtime.refreshHistory()}>重试读取记录</button>
@@ -713,7 +714,12 @@ export function ChatView({
                       </ChatActionTooltip>}
                       {mediaActions}
                   </>}>
-                    {attachment ? <AttachmentMessageContent message={item} processing={processing} /> : <ImageGenerationAnswer
+                    {item.historyContentError && !item.streaming && !item.text.trim() ? <ChatStatusRow
+                      title="历史消息内容为空"
+                      detail="本地和服务端都没有这条回复的正文，可以重新读取。"
+                      tone="error"
+                      retry={{ label: '重新读取这条消息', run: () => void runtime.loadHistoryTarget(item.historySeq!, item.sceneId || '', true) }}
+                    /> : attachment ? <AttachmentMessageContent message={item} processing={processing} /> : <ImageGenerationAnswer
                       text={item.role === 'being' ? item.text : ''}
                       streaming={item.streaming}
                       endpoint={historyEndpoint}

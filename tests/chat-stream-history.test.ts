@@ -41,6 +41,25 @@ describe("stream progress and persisted replies", () => {
     };
   }
 
+  it('keeps an empty history reply visible as an error and refetches its seq below the sync cursor', async () => {
+    const f = fixture();
+    f.history.push({ seq: 1, role: 'assistant', content: '', scene_id: 'desktop-test' });
+    try {
+      await f.runtime.start();
+      expect(f.replies()).toMatchObject([{ historySeq: 1, text: '', historyContentError: true }]);
+      f.history[0].content = 'recovered reply';
+      expect(await f.runtime.loadHistoryTarget(1, 'desktop-test', true)).toBe(true);
+      expect(f.replies()).toMatchObject([{ historySeq: 1, text: 'recovered reply', historyContentError: false }]);
+      expect(vi.mocked(fetch).mock.calls.some(([url]) => String(url).endsWith('/api/history?after=0&limit=1'))).toBe(true);
+      f.runtime.revealHistory([{ ...f.history[0], content: '' }]);
+      expect(f.replies()).toMatchObject([{ historySeq: 1, text: 'recovered reply', historyContentError: false }]);
+      f.history.push({ seq: 2, role: 'assistant', content: '  ', scene_id: 'desktop-test' });
+      await f.runtime.refreshHistory();
+      expect(f.replies()).toHaveLength(2);
+      expect(f.replies()[1]).toMatchObject({ historySeq: 2, text: '', historyContentError: true });
+    } finally { f.runtime.dispose(); }
+  });
+
   it.each(['live', 'replay', 'routed'])('shows consecutive duplicate model errors once through %s', async transport => {
     const f = fixture();
     const error = {message:'LLM API error 429 Too Many Requests: Rate exceeded.'};

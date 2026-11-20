@@ -32,6 +32,7 @@ export function replyBubbles(items: ChatItem[]): ChatItem[] {
     const previous = result.at(-1);
     if (item.kind === 'message' && item.role === 'being' && item.replyId &&
         previous?.kind === 'message' && previous.role === 'being' &&
+        !previous.historyContentError && !item.historyContentError &&
         !isImageGenerationText(previous.text) && !isImageGenerationText(item.text) &&
         previous.replyId === item.replyId &&
         (!previous.sceneId || !item.sceneId || previous.sceneId === item.sceneId)) {

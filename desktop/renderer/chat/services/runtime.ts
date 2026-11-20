@@ -2773,8 +2773,11 @@ function createStreamRuntime(state: any, options: any): any {
       item.historySeq === Number(row.seq) && item.role === (row.role === "user" ? "user" : "being"));
     if (!message) return false;
     applyHistoryIdentity(message, historyIdentity(row));
-    message.persistedText = cleanContent(row.role === "user" ? stripSceneTransition(stripClientMessageContext(row.content)) : row.content);
-    if (!message.streaming) message.text = message.persistedText;
+    message.historyContentError = row.role !== 'user' && !row.content.trim() && !message.text.trim();
+    if (row.content.trim()) {
+      message.persistedText = cleanContent(row.role === "user" ? stripSceneTransition(stripClientMessageContext(row.content)) : row.content);
+      if (!message.streaming) message.text = message.persistedText;
+    }
     changed();
     return true;
   }
@@ -2914,6 +2917,10 @@ function createStreamRuntime(state: any, options: any): any {
   }
 
   function addHistoryMessage(message: any) {
+    if (message.role !== 'user' && !message.content.trim()) {
+      insertCachedHistory([message]);
+      return;
+    }
     const scene = messageScene(message);
     const rendered = addMessage(
       message.role === "user" ? "user" : "being",
@@ -2953,10 +2960,11 @@ function createStreamRuntime(state: any, options: any): any {
       const text = isHistoryMarker(message)
         ? `· ${breathMarkerLabel(message.content)} · ${identity.timestamp} ·`
         : cleanContent(role === "user" ? stripSceneTransition(stripClientMessageContext(message.content)) : message.content);
-      if (!text) continue;
+      const historyContentError = !isHistoryMarker(message) && role === 'being' && !message.content.trim();
+      if (!text && !historyContentError) continue;
       const item = isHistoryMarker(message)
         ? { ...identity, kind: "separator", id: `marker-${options.nextId()}`, marker: true, handoffMarker: /^\[breath (?:yielded|superseded)/i.test(message.content || ''), stopMarker: /^\[breath interrupted/i.test(message.content || ''), text }
-        : { ...identity, kind: "message", id: `message-${options.nextId()}`, role, text,
+        : { ...identity, kind: "message", id: `message-${options.nextId()}`, role, text, historyContentError,
             streaming: false, label: role === "user" ? "you" : beingName, consecutive: false };
       // Insert old records in sequence order without rebuilding live bubbles,
       // moving their tool runs, or changing the current stream's grouping state.
@@ -3025,7 +3033,7 @@ function createStreamRuntime(state: any, options: any): any {
         if (messages.length) return normalizeHistoryRows(messages);
         throw error;
       }
-      const page = normalizeHistoryRows(data.messages);
+      const page = await historyCache.merge(normalizeHistoryRows(data.messages));
       // Keep overlap too: a cursor says where to request next, not which rows
       // the local cache contains (old versions may have left holes).
       messages.push(...page);
@@ -3063,7 +3071,7 @@ function createStreamRuntime(state: any, options: any): any {
           try {
             if (recent?.ok) {
               const data = await recent.json();
-              const older = normalizeHistoryRows(data.messages).filter(m => m.seq <= cached.lastSeq);
+              const older = await historyCache.merge(normalizeHistoryRows(data.messages).filter(m => m.seq <= cached.lastSeq));
               if (older.length) {
                 await historyCache.write(older, cached.lastSeq);
                 if (!disposed) insertCachedHistory(older.sort((a: any, b: any) => a.seq - b.seq));
@@ -3851,24 +3859,27 @@ function createStreamRuntime(state: any, options: any): any {
     bindPersisted,
     registerPersistedGroup,
     revealHistory: (rows: any[]) => insertCachedHistory(rows),
-    async loadHistoryTarget(seq: number, sceneId: string) {
-      if (!Number.isSafeInteger(seq) || seq <= 0 || !sceneId || disposed) return false;
+    async loadHistoryTarget(seq: number, sceneId: string, refresh = false) {
+      if (!Number.isSafeInteger(seq) || seq <= 0 || (!sceneId && !refresh) || disposed) return false;
       const found = () => state.items.some((item: any) => item.kind === 'message' && item.historySeq === seq && item.sceneId === sceneId);
-      if (found()) return true;
-      const cached = await historyCache.readAround(seq, sceneId);
-      if (disposed) return false;
-      insertCachedHistory(cached);
-      if (found()) return true;
+      if (!refresh) {
+        if (found()) return true;
+        const cached = await historyCache.readAround(seq, sceneId);
+        if (disposed) return false;
+        insertCachedHistory(cached);
+        if (found()) return true;
+      }
       // A targeted read must not advance the global incremental sync cursor.
       try {
-        const response = await fetch(apiUrl(`/api/history?after=${seq - 1}&limit=21`), { cache: 'no-store', signal: timeoutSignal(8000) });
+        const response = await fetch(apiUrl(`/api/history?after=${seq - 1}&limit=${refresh ? 1 : 21}`), { cache: 'no-store', signal: timeoutSignal(8000) });
         if (!response.ok || disposed) return false;
         const data = await response.json();
-        const rows = normalizeHistoryRows(data.messages).filter(row => messageScene(row).sceneId === sceneId && row.seq >= seq).slice(0, 21);
+        const merged = await historyCache.merge(normalizeHistoryRows(data.messages));
+        const rows = merged.filter(row => refresh ? row.seq === seq : messageScene(row).sceneId === sceneId && row.seq >= seq).slice(0, 21);
         if (disposed) return false;
         insertCachedHistory(rows);
         await historyCache.write(rows, 0);
-        return found();
+        return refresh ? rows.some(row => row.seq === seq && !!row.content.trim()) : found();
       } catch { return false; }
     },
     async loadOlderHistory(before?: number) {

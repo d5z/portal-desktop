@@ -4,6 +4,12 @@ import {historyTargetBubble,replyBubbles} from '../desktop/renderer/chat/models/
 import type {Message} from '../desktop/renderer/chat/models/chat';
 const rows=(n:number)=>Array.from({length:n},(_,i)=>({kind:'separator' as const,id:String(i),text:''}));
 describe('progressive chat history window',()=>{
+ it('keeps an empty failed fragment separate so retry targets its own history seq',()=>{
+  const first={kind:'message',id:'first',historySeq:1,role:'being',text:'part one',replyId:'reply',sceneId:'scene'} as Message;
+  const missing={...first,id:'missing',historySeq:2,text:'',historyContentError:true};
+  const last={...first,id:'last',historySeq:3,text:'part three'};
+  expect(replyBubbles([first,missing,last])).toEqual([first,missing,last]);
+ });
  it('locates a later durable fragment inside its combined reply bubble',()=>{
   const first={kind:'message',id:'first',historySeq:1,role:'being',text:'part one',replyId:'reply',sceneId:'scene'} as Message;
   const second={...first,id:'second',historySeq:2,text:'part two'};

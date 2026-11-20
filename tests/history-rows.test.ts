@@ -1,7 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeHistoryRows } from '../desktop/renderer/chat/services/history-cache';
+import { mergeHistoryRow, normalizeHistoryRows } from '../desktop/renderer/chat/services/history-cache';
 
 describe('durable history rows', () => {
+  it('retains readable cached content when a later snapshot is blank, and accepts a repaired reply', () => {
+    const previous = { seq: 2, role: 'assistant', content: 'saved reply', scene_id: 'room' };
+    for (const content of ['', ' \n ']) {
+      expect(mergeHistoryRow(previous, { seq: 2, role: 'assistant', content })).toEqual(previous);
+    }
+    expect(mergeHistoryRow(previous, { ...previous, content: 'repaired reply' }).content).toBe('repaired reply');
+    expect(normalizeHistoryRows([{ seq: 3, role: 'assistant', content: '' }])).toHaveLength(1);
+  });
   it('orders by seq, preserves distinct equal text, and merges duplicate metadata', () => {
     expect(normalizeHistoryRows([
       { seq: 3, role: 'being', content: 'same' },
