@@ -60,6 +60,9 @@ try {
   const initial = await page.evaluate(() => snapshot());
   assert.ok(initial.text.length > 0 && initial.text.length < text.length, 'First packet must not appear as one block');
   assert.equal(initial.pending, 1, 'StrictMode leaves exactly one frame writer');
+  await page.evaluate(() => tick(-16));
+  assert.equal((await page.evaluate(() => snapshot())).text, initial.text, 'An earlier frame timestamp cannot expand or rewind the reveal');
+  await page.evaluate(() => tick(16));
   const samples = [];
   for (let i = 0; i < 16; i++) {
     samples.push(await page.evaluate(() => { tick(16); return snapshot(); }));
@@ -142,7 +145,7 @@ try {
     mount({ content, streaming: true });
   }), text);
   assert.ok(new Set(paints).size >= 3, 'Real paint frames reveal intermediate text: ' + JSON.stringify(paints.map(value => value.length)));
-  assert.ok(paints.every((value, index) => text.startsWith(value) && (!index || value.length >= paints[index - 1].length)), 'Real frame timestamps must not move the reveal backwards');
+  assert.ok(paints.every((value, index) => text.startsWith(value) && (!index || value.length >= paints[index - 1].length)), 'Real frame timestamps must not move the reveal backwards: ' + JSON.stringify(paints.map(value => value.length)));
   assert.deepEqual(errors, []);
   console.log('PASS: smooth packet reveal, bounded catch-up, final drain, Unicode, 120 Hz, isolated renders, history, code highlighting and cleanup.');
 } finally {

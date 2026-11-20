@@ -6,6 +6,6 @@
 
 修复侧栏切换时已关闭面板意外重新占位的问题，完善场景列表、消息定位、附件与设置的回归验证。
 
-修复 Windows 内置 Node 构建补丁的换行兼容问题，并统一使用内置运行时验证沙箱行为。
+修复 Windows 沙箱 PowerShell 模块加载与旧版 subagent 启动器的运行时选择，复用内置 Node 编译缓存；修复逐字显示在特定帧时间戳下回退的问题。
 
 提供 macOS Apple Silicon、macOS Intel 和 Windows x64 安装包，均内置配套 Heart Portal。

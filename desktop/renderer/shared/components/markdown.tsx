@@ -202,8 +202,10 @@ const MarkdownText = memo(function MarkdownText({
     let previous = performance.now();
     let frame = requestAnimationFrame(tick);
     function tick(now: number) {
-      progress.position = Math.min(source.length, progress.position + (now - previous) * speed);
-      previous = now;
+      // A callback scheduled during this frame can receive its frame-start
+      // timestamp, which predates the effect's performance.now().
+      progress.position = Math.min(source.length, progress.position + Math.max(0, now - previous) * speed);
+      previous = Math.max(previous, now);
       let end = Math.floor(progress.position);
       // Do not expose half of an emoji's UTF-16 surrogate pair.
       const last = source.charCodeAt(end - 1);
