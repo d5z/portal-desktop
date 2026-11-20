@@ -145,7 +145,7 @@ try {
     const installed = (await page.evaluate(() => window.beings.localKits())).kits[0];
     assert.equal(installed.name, 'network-kit');
     assert.equal(installed.installSource.releaseId, releaseId);
-    assert.equal(installed.command[1], path.join(directory,'kits','network-kit','server.mjs'));
+    assert.equal(path.normalize(installed.command[1]), path.normalize(path.join(directory,'kits','network-kit','server.mjs')));
     await page.evaluate(() => window.beings.home.connectors.reportLocalKitHistory({source_id:'original-id',version:'1.0'}));
     await page.evaluate(() => window.beings.deleteKit('network-kit'));
     assert.equal((await page.evaluate(() => window.beings.localKits())).kits.length, 0);

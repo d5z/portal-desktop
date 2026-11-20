@@ -35,7 +35,7 @@ export class ConnectorNetwork {
     if (request.headers.get('X-Connector-Access') !== this.key) return new Response(null, { status: 403, headers });
     if (request.method !== CONNECTOR_NETWORK_METHODS[operation]) return new Response(null, { status: 405, headers });
     let args: unknown;
-    try { args = request.method === 'GET' ? JSON.parse(url.searchParams.get('args') || '[]') : operation === 'report-local-kit-history' ? [await request.json()] : await request.json(); }
+    try { args = request.method === 'GET' ? JSON.parse(url.searchParams.get('args') || '[]') : await request.json(); }
     catch { return Response.json({ error: '无效的 Connector 请求。' }, { status: 400, headers }); }
     if (operation === 'report-local-kit-history') {
       if (!args || typeof args !== 'object' || Array.isArray(args)) return Response.json({ error: '无效的 Connector 请求。' }, { status: 400, headers });

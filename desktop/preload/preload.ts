@@ -9,7 +9,6 @@ async function connectorRequest(operation: keyof typeof CONNECTOR_NETWORK_METHOD
   while (requestArgs.length && requestArgs.at(-1) === undefined) requestArgs.pop();
   const url = new URL(`beings://desktop${connectorNetworkPath(operation, requestArgs)}`);
   if (method === 'GET' && requestArgs.length) url.searchParams.set('args', JSON.stringify(requestArgs));
-  const requestBody = operation === 'report-local-kit-history' ? requestArgs[0] : requestArgs;
   const response = await fetch(url.href, {
     method, credentials: 'omit', cache: 'no-store',
     headers: { 'Content-Type': 'application/json', 'X-Connector-Access': key },
