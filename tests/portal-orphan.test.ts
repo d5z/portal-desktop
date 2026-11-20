@@ -55,8 +55,10 @@ it.skipIf(process.platform !== 'darwin')('recovers a real detached child after i
   expect(inspected.proof).toMatch(/^[a-f0-9]{64}$/);
   const listed = await command('/bin/ps', ['-axo', 'pid=,uid=,comm=']);
   expect(listed.split('\n').find(line => Number(line.trim().split(/\s+/)[0]) === pid)).toContain(binary);
-  let targets = await recovery.conflicts(connection);
-  await vi.waitFor(async () => { targets = await recovery.conflicts(connection); expect(targets).toHaveLength(1); });
+  // The native inspection above already confirms reparenting. Await the full
+  // process scan instead of racing it against waitFor's one-second default.
+  const targets = await recovery.conflicts(connection);
+  expect(targets).toHaveLength(1);
   expect(targets[0]).toMatchObject({ pid, root, orphan: { binary } });
   expect(await new OrphanPortalRecovery(path.join(root, 'other-profile')).conflicts(connection)).toEqual([]);
   expect(await recovery.conflicts(parseConnection('http://127.0.0.1:1/another/?token=local-test'))).toEqual([]);

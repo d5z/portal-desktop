@@ -40,6 +40,8 @@ try {
   await page.evaluate(() => { fixtureApp.startup = 'ready'; fixtureApp.changed(); });
   await page.locator('#options-trigger').waitFor({ state: 'visible' });
   await page.evaluate(()=>fixtureApp.openConnectionSettings('portal'));
+  // The dialog establishes its initial focus on the next animation frame.
+  await settings.getByRole('searchbox', { name: '搜索设置' }).and(page.locator(':focus')).waitFor();
   await settings.getByRole('searchbox', { name: '搜索设置' }).fill('应用');
   const filteredTab = settings.getByRole('tab', { name: '应用', exact: true });
   assert.equal(await filteredTab.getAttribute('tabindex'), '0', 'Filtered settings remain reachable when the selected tab is hidden');

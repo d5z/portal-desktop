@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import path from 'node:path';
 import os from 'node:os';
 import { build } from '../scripts/renderer-build.mjs';
+import { clickWhenPointerReady } from './support/desktop.mjs';
 import { launchDesktop } from './support/electron-lifecycle.mjs';
 const directory = await mkdtemp(path.join(os.tmpdir(), 'preview-browser-split-'));
 const web = createServer((_request, response) => { response.setHeader('Content-Type','text/html; charset=utf-8'); response.end('<title>链接目标页</title><h1>右侧网页</h1><p>原对话保持在左侧</p>'); });
@@ -49,7 +50,8 @@ try {
   const native=()=>application.evaluate(()=>{const view=globalThis.fixtureWindow.contentView.children.find(view=>view.webContents);return view?{bounds:view.getBounds(),visible:view.getVisible()}:null});
   await page.getByRole('button',{name:'打开文件',exact:true}).click();
   await page.getByRole('button',{name:'展开全部',exact:true}).click();
-  await page.frameLocator('iframe[title="云端 HTML 预览"]').getByRole('link',{name:'访问链接'}).click({noWaitAfter:true});
+  await page.waitForFunction(() => !document.querySelector('.client-file-viewer').hasAttribute('data-animating'));
+  await clickWhenPointerReady(page, page.frameLocator('iframe[title="云端 HTML 预览"]').getByRole('link',{name:'访问链接'}));
   await page.locator('.client-file-viewer').waitFor({state:'detached'});
   await page.locator('#browser-title').filter({hasText:'链接目标页'}).waitFor();
   await page.waitForFunction(async()=>!(await window.beings.browserState()).loading);
@@ -81,7 +83,8 @@ try {
   await page.locator('#browser-panel').waitFor({state:'hidden'});
   await page.frameLocator('iframe[title="云端 HTML 预览"]').getByRole('heading',{name:'index.html'}).waitFor();
   assert.equal(await native(),null,'Opening a file releases the native browser');
-  await page.frameLocator('iframe[title="云端 HTML 预览"]').getByRole('link',{name:'访问链接'}).click({noWaitAfter:true});
+  await page.waitForFunction(() => !document.querySelector('.client-file-viewer').hasAttribute('data-animating'));
+  await clickWhenPointerReady(page, page.frameLocator('iframe[title="云端 HTML 预览"]').getByRole('link',{name:'访问链接'}));
   await page.locator('.client-file-viewer').waitFor({state:'detached'});
   await application.evaluate(()=>globalThis.fixtureWindow.setContentSize(920,680));
   await page.waitForFunction(()=>document.querySelector('#browser-panel').getBoundingClientRect().right<=innerWidth+1);

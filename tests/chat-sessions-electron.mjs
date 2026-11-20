@@ -372,6 +372,7 @@ try {
   const replacement = await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id);
   assert.notEqual(replacement,discussion);
   await page.reload();
+  await waitForChatReady(page);
   await page.getByRole('button',{name:'收起场景列表',exact:true}).waitFor();
   await page.getByRole('button',{name:'切换到场景：新场景'}).waitFor();
   assert.equal(await page.evaluate(async () => (await window.beings.snapshot()).chatScene.scene_id),replacement);
@@ -403,6 +404,7 @@ try {
   assert.equal(await chat.locator('.message.user').filter({hasText:'Bound scene message'}).count(),1);
   assert.equal((await application.evaluate(() => globalThis.fixture.requests)).at(-1).scene_id,'feishu-shared');
   await page.reload();
+  await waitForChatReady(page);
   await page.getByRole('button',{name:'收起场景列表',exact:true}).waitFor();
   await page.getByRole('button',{name:'切换到场景：跨客户端场景'}).waitFor();
   assert.equal((await page.evaluate(() => window.beings.snapshot())).chatScene.scene_id,'feishu-shared');

@@ -275,8 +275,9 @@ readline.createInterface({input:process.stdin}).on('line',line=>{const r=JSON.pa
   assert(requests.filter(r => ['/api', '/api/grove', '/api/embers'].includes(r.path)).every(r => r.authorization === null));
   assert(requests.some(r => r.path === '/api/messages' && r.authorization === 'Bearer town-fixture-token'));
   const bodyBackground = await page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  if (process.platform === 'darwin') assert.equal(bodyBackground, 'rgba(0, 0, 0, 0)', 'macOS exposes the native window material');
-  else assert.match(bodyBackground, /^rgb\(\d+, \d+, \d+\)$/, 'Other platforms use an opaque app background');
+  const nativeMaterial = process.platform === 'darwin' && await page.evaluate(() => matchMedia('(prefers-reduced-transparency: no-preference)').matches);
+  if (nativeMaterial) assert.equal(bodyBackground, 'rgba(0, 0, 0, 0)', 'macOS exposes the native window material');
+  else assert.match(bodyBackground, /^rgb\(\d+, \d+, \d+\)$/, 'Reduced transparency and other platforms use an opaque app background');
   assert.deepEqual(errors, []); console.log('Town UI passed: native material, real IPC, auth, mail folders, markdown, pagination, Kit import and tool schemas.');
 } catch (error) {
   await mkdir('test-results', { recursive: true });

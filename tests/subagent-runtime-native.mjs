@@ -3,7 +3,9 @@
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {WebSocketServer} from 'ws';
-import {spawn} from 'node:child_process';
+import {spawn,execFile} from 'node:child_process';
+import {promisify} from 'node:util';
+import {portalSource} from '../scripts/portal-source.mjs';
 import {once} from 'node:events';
 import {cp,mkdtemp,mkdir,readFile,writeFile,rm} from 'node:fs/promises';
 import os from 'node:os';
@@ -78,7 +80,15 @@ const spawnCase=async(name,budget={})=>call('portal_subagent_spawn',{brief:`CASE
 const finish=async(task,ms=40000)=>until(async()=>{const s=await call('portal_subagent_status',{task_id:task.task_id});return s.status==='running'?false:s;},ms);
 async function run(name,status='done',budget){const task=await spawnCase(name,budget);const result=await finish(task);assert.equal(result.status,status,JSON.stringify(result));const log=await call('portal_subagent_log',{task_id:task.task_id});report.cases.push({name,status:result.status,turns:result.turns,log:JSON.stringify(log).slice(-3000)});console.log('PASS',name,result.status);return result;}
 try{
- await writeFile(configFile,stringify({name:'subagent-native',workspace,bind:'127.0.0.1:0',kits_enabled:false,tools:{exec:true,file:true},security:{permission_mode:'full-access'},subagent:{enabled:true,inherit_model:true,auto_install:false,state_dir:path.join(root,'state'),model:{provider:'portal-custom',model:'inherited-one',base_url:`http://127.0.0.1:${port}/v1`,api:'openai-completions',thinking:'off',api_key:'fixture-model-key'}}}));
+ // Install Portal's pinned Pi into this fixture; a clean CI host has no user-level Pi.
+ const piSource=await readFile(path.join(portalSource,'portal/src/subagent/pi_daemon.rs'),'utf8');
+ const piPackage=piSource.match(/PI_NPM_PACKAGE: &str = "([^"]+)"/)[1];
+ const piVersion=piSource.match(/PI_PINNED_VERSION: &str = "([^"]+)"/)[1];
+ const runtimeNode=path.join(sharedRuntime,runtimeManifest.node.path);
+ const npm=path.join(sharedRuntime,'node/lib/node_modules/npm/bin/npm-cli.js');
+ const piRoot=path.join(root,'pi');
+ await promisify(execFile)(runtimeNode,[npm,'install','--prefix',piRoot,'--no-audit','--no-fund',`${piPackage}@${piVersion}`],{timeout:120000,env:{...process.env,PATH:path.dirname(runtimeNode)+path.delimiter+'/usr/bin:/bin'}});
+ await writeFile(configFile,stringify({name:'subagent-native',workspace,bind:'127.0.0.1:0',kits_enabled:false,tools:{exec:true,file:true},security:{permission_mode:'full-access'},subagent:{enabled:true,inherit_model:true,auto_install:false,command:[runtimeNode,path.join(piRoot,'node_modules',piPackage,'dist/cli.js')],state_dir:path.join(root,'state'),model:{provider:'portal-custom',model:'inherited-one',base_url:`http://127.0.0.1:${port}/v1`,api:'openai-completions',thinking:'off',api_key:'fixture-model-key'}}}));
  await start();
  const tools=await rpc('tools/list',{});assert(tools.tools.some(t=>t.name==='portal_subagent_spawn'));
  const status=await call('portal_subagent_status');assert(status.command_resolved);assert(!JSON.stringify(status).includes('fixture-model-key'));

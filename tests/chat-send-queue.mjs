@@ -97,6 +97,7 @@ try{
   await later.getByRole('button',{name:'取消排队：稍后发送',exact:true}).click();
   await page.locator('.composer-queue-item').filter({hasText:'稍后发送'}).waitFor({state:'detached'});
   await input.fill('');
+  await sendControl.and(page.getByRole('button', { name: '停止处理', exact: true })).waitFor();
   await input.press('ArrowUp');
   const editing = page.locator('#input').and(page.getByRole('textbox', { name: '编辑待发消息', exact: true }));
   await editing.waitFor();
