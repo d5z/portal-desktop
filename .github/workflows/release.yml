@@ -118,8 +118,9 @@ jobs:
           echo "PORTAL_DESKTOP_MAC_KEYCHAIN=$KEYCHAIN_PATH" >> "$GITHUB_ENV"
       - run: npm ci
       - name: Cache patched Windows Node build
+        id: task-node-cache
         if: runner.os == 'Windows'
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: |
             output/node-*/node.exe
@@ -127,6 +128,14 @@ jobs:
           key: windows-task-node-${{ hashFiles('scripts/portal-runtime/lock.json', 'scripts/portal-runtime/libuv-appcontainer.patch', 'scripts/portal-runtime/build-windows-node.mjs') }}
       - run: npm run typecheck
       - run: npm run build:portal
+      - name: Save completed Windows Node build
+        if: always() && runner.os == 'Windows' && steps.task-node-cache.outputs.cache-hit != 'true' && hashFiles('output/node-*/node.sha256') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            output/node-*/node.exe
+            output/node-*/node.sha256
+          key: ${{ steps.task-node-cache.outputs.cache-primary-key }}
       - name: Verify isolated Windows Python and Node task workflows
         if: runner.os == 'Windows'
         run: |

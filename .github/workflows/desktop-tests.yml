@@ -52,8 +52,9 @@ jobs:
       - name: Install locked dependencies
         run: npm ci
       - name: Cache patched Windows Node build
+        id: task-node-cache
         if: runner.os == 'Windows'
-        uses: actions/cache@v4
+        uses: actions/cache/restore@v4
         with:
           path: |
             client/output/node-*/node.exe
@@ -73,6 +74,14 @@ jobs:
           Get-ScheduledTask | Out-Null
       - name: Run complete suite
         run: npm run test:all
+      - name: Save completed Windows Node build
+        if: always() && runner.os == 'Windows' && steps.task-node-cache.outputs.cache-hit != 'true' && hashFiles('client/output/node-*/node.sha256') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            client/output/node-*/node.exe
+            client/output/node-*/node.sha256
+          key: ${{ steps.task-node-cache.outputs.cache-primary-key }}
       - name: Publish test summary
         if: always()
         shell: bash

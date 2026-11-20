@@ -26,11 +26,20 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
       - run: npm ci
       - name: Cache patched Windows Node build
-        uses: actions/cache@v4
+        id: task-node-cache
+        uses: actions/cache/restore@v4
         with:
           path: |
             output/node-*/node.exe
             output/node-*/node.sha256
           key: windows-task-node-${{ hashFiles('scripts/portal-runtime/lock.json', 'scripts/portal-runtime/libuv-appcontainer.patch', 'scripts/portal-runtime/build-windows-node.mjs') }}
       - run: npm run build:portal
+      - name: Save completed Windows Node build
+        if: always() && runner.os == 'Windows' && steps.task-node-cache.outputs.cache-hit != 'true' && hashFiles('output/node-*/node.sha256') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            output/node-*/node.exe
+            output/node-*/node.sha256
+          key: ${{ steps.task-node-cache.outputs.cache-primary-key }}
       - run: npx vitest run tests/portal-orphan-windows.test.ts
