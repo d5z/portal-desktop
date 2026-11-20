@@ -245,6 +245,9 @@ export function WorkspaceDrawer({
       edge,
       finish: () => {
         if (!item.open) {
+          node.hidden = true;
+          item.size = 0;
+          item.gap = 0;
           setRetained(false);
           return;
         }

@@ -128,7 +128,7 @@ try {
       });
       assert.equal(motion.shared,true,`${kind} uses the shared drawer`);
       assert.equal(motion.count,1,`${kind} has no competing entrance animation`);
-      assert.ok(Math.abs(motion.surfaceWidth-Math.max(motion.from,motion.to))<1,`${kind} keeps a full-width surface while sliding`);
+      assert.ok(Math.abs(motion.surfaceWidth-Math.max(motion.from,motion.to))<1,`${kind} keeps a full-width surface while sliding: ${JSON.stringify(motion)}`);
       assert.ok(motion.width>Math.min(motion.from,motion.to) && motion.width<Math.max(motion.from,motion.to),`${kind} ${open?'opens':'closes'} continuously: ${JSON.stringify(motion)}`);
       await page.waitForFunction(selector => !document.querySelector(selector)?.hasAttribute('data-animating'),selector);
     }
