@@ -179,7 +179,9 @@
   .composer-add-menu {
     @include chat-menu.popover-presence;
 
-    > [role='menuitem'] { @include chat-menu.action-row; }
+    > [role='menuitem'] {
+      @include chat-menu.action-row;
+    }
   }
 
   :is(.composer-add-menu, .composer-slash-menu) {
@@ -210,4 +212,6 @@
   }
 }
 
-.composer-slash-menu { transform-origin: bottom left; }
+.composer-slash-menu {
+  transform-origin: bottom left;
+}

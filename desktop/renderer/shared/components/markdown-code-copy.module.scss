@@ -1,3 +1,4 @@
+/* stylelint-disable-next-line selector-class-pattern -- Shared global component selector. */
 :global(.markdown-code-modes) button.copy {
   display: inline-grid;
   place-items: center;
@@ -6,7 +7,11 @@
   min-height: 26px;
   padding: 0;
 
-  > svg { display: block; width: var(--chat-icon-action, 16px); height: var(--chat-icon-action, 16px); }
+  > svg {
+    display: block;
+    width: var(--chat-icon-action, 16px);
+    height: var(--chat-icon-action, 16px);
+  }
 }
 
 .feedback {
@@ -18,4 +23,7 @@
   white-space: nowrap;
 }
 
-:global(.markdown-code-modes) button.copy[data-failed] { color: var(--chat-error-icon, #d33145); }
+/* stylelint-disable-next-line selector-class-pattern -- Shared global component selector. */
+:global(.markdown-code-modes) button.copy[data-failed] {
+  color: var(--chat-error-icon, #d33145);
+}

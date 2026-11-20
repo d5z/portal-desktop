@@ -349,7 +349,11 @@
   margin: 0;
   padding: 4px;
   color: var(--text);
-  @include chat-menu.surface(var(--chat-menu-surface, var(--bg)), var(--chat-menu-border, 1px solid var(--border)), var(--chat-menu-shadow, 0 4px 12px #0001));
+  @include chat-menu.surface(
+    var(--chat-menu-surface, var(--bg)),
+    var(--chat-menu-border, 1px solid var(--border)),
+    var(--chat-menu-shadow, 0 4px 12px #0001)
+  );
   @include chat-menu.popover-presence;
 
   > button {
@@ -624,7 +628,8 @@ dialog.intelligent-ui {
   --iui-expanded-inset: 20px;
 
   position: fixed;
-  inset: calc(var(--chat-top-inset, 0px) + var(--iui-expanded-inset)) var(--iui-expanded-inset) var(--iui-expanded-inset);
+  inset: calc(var(--chat-top-inset, 0px) + var(--iui-expanded-inset)) var(--iui-expanded-inset)
+    var(--iui-expanded-inset);
   width: auto;
   height: auto;
   margin: 0;
@@ -650,7 +655,9 @@ dialog.intelligent-ui {
   margin: auto;
 }
 
-.iui-expanded .iui-source { max-height: none; }
+.iui-expanded .iui-source {
+  max-height: none;
+}
 
 @media (max-width: 600px) {
   .iui-body {

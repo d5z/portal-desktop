@@ -4,6 +4,7 @@
 #composer-dock > .composer-queue-wrap {
   width: 100%;
   max-width: none;
+
   --queue-tray-radius: var(--chat-prompt-radius, 22px);
 
   box-sizing: border-box;
@@ -53,8 +54,16 @@
     color: var(--chat-ink);
     font: 400 var(--chat-prompt-text-size)/var(--chat-prompt-line-height) var(--chat-reading-font);
 
-    &[data-working], &.dragging { opacity: 0.6; }
-    &.dragging { position: relative; z-index: 1; background: transparent; box-shadow: none; }
+    &[data-working],
+    &.dragging {
+      opacity: 0.6;
+    }
+    &.dragging {
+      position: relative;
+      z-index: 1;
+      background: transparent;
+      box-shadow: none;
+    }
   }
 
   .composer-queue-leading {
@@ -64,7 +73,11 @@
     color: var(--chat-secondary);
   }
 
-  .composer-queue-row-actions { align-items: center; gap: var(--space-xs); flex-shrink: 0; }
+  .composer-queue-row-actions {
+    align-items: center;
+    gap: var(--space-xs);
+    flex-shrink: 0;
+  }
 
   .composer-queue-item > button,
   .composer-queue-row-actions button,
@@ -81,11 +94,18 @@
 
     @include chat-icon-control.feedback;
 
-    &:focus-visible { outline: 1px solid var(--chat-secondary); outline-offset: -1px; }
-    &:disabled { color: var(--neutral-disabled); }
+    &:focus-visible {
+      outline: 1px solid var(--chat-secondary);
+      outline-offset: -1px;
+    }
+    &:disabled {
+      color: var(--neutral-disabled);
+    }
   }
 
-  .composer-queue-copy .chat-error-indicator > button { color: var(--chat-error-icon); }
+  .composer-queue-copy .chat-error-indicator > button {
+    color: var(--chat-error-icon);
+  }
 
   .composer-queue-row-actions button.composer-queue-steer {
     display: inline-flex;
@@ -97,17 +117,27 @@
   }
 
   @media (pointer: coarse) {
-    .composer-queue { --queue-action-size: var(--touch-target); }
-    .composer-queue-item { touch-action: pan-y; }
-    .composer-queue-row-actions button.composer-queue-steer { min-inline-size: var(--touch-target); }
+    .composer-queue {
+      --queue-action-size: var(--touch-target);
+    }
+    .composer-queue-item {
+      touch-action: pan-y;
+    }
+    .composer-queue-row-actions button.composer-queue-steer {
+      min-inline-size: var(--touch-target);
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .composer-queue-item { transition: none !important; }
+    .composer-queue-item {
+      transition: none !important;
+    }
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .composer-queue-item[data-working] .composer-queue-leading > svg { animation: run-spin 900ms linear infinite; }
+    .composer-queue-item[data-working] .composer-queue-leading > svg {
+      animation: run-spin 900ms linear infinite;
+    }
   }
 }
 

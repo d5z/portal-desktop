@@ -1,7 +1,9 @@
 .viewport {
   position: relative;
 
-  &:has(> [inert]) { overflow: clip; }
+  &:has(> [inert]) {
+    overflow: clip;
+  }
 
   > [inert] {
     position: absolute;

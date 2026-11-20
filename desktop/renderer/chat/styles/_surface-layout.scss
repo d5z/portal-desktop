@@ -223,30 +223,50 @@
   cursor: pointer;
   user-select: none;
 
-  &::-webkit-details-marker { display: none; }
-  &:hover { background: var(--hover-overlay); }
-  &:focus-visible { outline: 1px solid var(--text-dim); outline-offset: -1px; }
+  &::-webkit-details-marker {
+    display: none;
+  }
+  &:hover {
+    background: var(--hover-overlay);
+  }
+  &:focus-visible {
+    outline: 1px solid var(--text-dim);
+    outline-offset: -1px;
+  }
 }
 
 .run-entry-icon {
   position: relative;
 
-  > :is(svg, .run-tool-mark) { transition: opacity 100ms; }
+  > :is(svg, .run-tool-mark) {
+    transition: opacity 100ms;
+  }
 }
 
-.run-tool-mark { width: 16px; height: 16px; }
+.run-tool-mark {
+  width: 16px;
+  height: 16px;
+}
 
 .run-entry-disclosure {
   position: absolute;
   inset: 0;
   opacity: 0;
   color: var(--text-dim);
-  transition: opacity 100ms, transform 150ms;
+  transition:
+    opacity 100ms,
+    transform 150ms;
 }
 
-.run-entry:is([open], :hover, :focus-within) .run-entry-icon > :is(svg, .run-tool-mark) { opacity: 0; }
-.run-entry:is([open], :hover, :focus-within) .run-entry-disclosure { opacity: 1; }
-.run-entry[open] .run-entry-disclosure { transform: rotate(90deg); }
+.run-entry:is([open], :hover, :focus-within) .run-entry-icon > :is(svg, .run-tool-mark) {
+  opacity: 0;
+}
+.run-entry:is([open], :hover, :focus-within) .run-entry-disclosure {
+  opacity: 1;
+}
+.run-entry[open] .run-entry-disclosure {
+  transform: rotate(90deg);
+}
 
 .run-entry-title,
 .run-entry-chip {
@@ -272,7 +292,9 @@
   font-size: 13px;
   line-height: 20px;
 
-  .run-entry[data-tool] & { font-family: var(--mono); }
+  .run-entry[data-tool] & {
+    font-family: var(--mono);
+  }
 }
 
 .run-entry-heading small {
@@ -281,7 +303,9 @@
   color: var(--text-muted);
   white-space: nowrap;
 
-  &.run-failures { color: var(--chat-error-icon, var(--red)); }
+  &.run-failures {
+    color: var(--chat-error-icon, var(--red));
+  }
 }
 
 .run-entry-detail {
@@ -307,8 +331,14 @@
 }
 
 @keyframes run-step-reveal {
-  from { opacity: 0; transform: translateY(2px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .run-tool-details h5 {
@@ -373,8 +403,12 @@
     animation: none;
   }
 
-  :is(.run-chevron, .run-entry-disclosure, .run-entry-icon > :is(svg, .run-tool-mark)) { transition: none; }
-  .run-entry-detail { animation: none; }
+  :is(.run-chevron, .run-entry-disclosure, .run-entry-icon > :is(svg, .run-tool-mark)) {
+    transition: none;
+  }
+  .run-entry-detail {
+    animation: none;
+  }
 }
 
 /* The conversation belongs to the same shared place as the reading surfaces. */
@@ -586,7 +620,9 @@ button:focus-visible {
   cursor: pointer;
 }
 
-.run-subagent-activity > span { white-space: nowrap; }
+.run-subagent-activity > span {
+  white-space: nowrap;
+}
 .run-subagent-mark {
   display: grid;
   place-items: center;
@@ -600,8 +636,27 @@ button:focus-visible {
   height: 14px;
 }
 
-.run-subagent-activity > svg { width: 12px; height: 12px; flex: none; }
-.run-subagent-activity[data-status='running'] :is(.run-subagent-mark, .run-subagent-status) { color: var(--accent); }
-.run-subagent-activity:is([data-status='failed'], [data-status='timeout'], [data-status='budget_exhausted']) :is(.run-subagent-mark, .run-subagent-status) { color: var(--red); }
-.run-subagent-activity:hover { background: var(--bg-soft); color: var(--text); }
-.run-subagent-activity:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.run-subagent-activity > svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+}
+.run-subagent-activity[data-status='running'] :is(.run-subagent-mark, .run-subagent-status) {
+  color: var(--accent);
+}
+.run-subagent-activity:is(
+    [data-status='failed'],
+    [data-status='timeout'],
+    [data-status='budget_exhausted']
+  )
+  :is(.run-subagent-mark, .run-subagent-status) {
+  color: var(--red);
+}
+.run-subagent-activity:hover {
+  background: var(--bg-soft);
+  color: var(--text);
+}
+.run-subagent-activity:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}

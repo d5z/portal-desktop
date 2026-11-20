@@ -140,7 +140,11 @@
 }
 
 .welcome-intro h1 {
-  font: 600 clamp(26px, 4.5vw, 40px) / 1.25 'Songti SC', 'Noto Serif CJK SC', Georgia, serif;
+  font:
+    600 clamp(26px, 4.5vw, 40px) / 1.25 'Songti SC',
+    'Noto Serif CJK SC',
+    Georgia,
+    serif;
   margin-bottom: 12px;
 }
 

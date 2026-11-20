@@ -256,7 +256,12 @@
     background: light-dark(var(--neutral-200), var(--selected));
   }
 
-  :is(.chat-session-collapse, .chat-session-options summary, .chat-session-search svg, .chat-session-group button) {
+  :is(
+    .chat-session-collapse,
+    .chat-session-options summary,
+    .chat-session-search svg,
+    .chat-session-group button
+  ) {
     color: var(--scene-sidebar-icon);
   }
 
@@ -266,7 +271,8 @@
   }
 }
 
-html[data-local-sidebar] .chat-session-panel[data-pinned='true'][data-scene-sidebar]
+html[data-local-sidebar]
+  .chat-session-panel[data-pinned='true'][data-scene-sidebar]
   :is(.chat-session-caption, .chat-session-context-toggle) {
   color: var(--scene-sidebar-meta);
 }
@@ -319,9 +325,13 @@ html[data-local-sidebar] .chat-session-panel[data-pinned='true'][data-scene-side
   background: var(--control);
 }
 
-.chat-session-options::details-content { content-visibility: visible; }
+.chat-session-options::details-content {
+  content-visibility: visible;
+}
 
-.chat-session-options:not([open]) .chat-session-options-popover { pointer-events: none; }
+.chat-session-options:not([open]) .chat-session-options-popover {
+  pointer-events: none;
+}
 
 .chat-session-options-popover button {
   display: flex;
@@ -486,7 +496,9 @@ html[data-local-sidebar] .chat-session-panel[data-pinned='true'][data-scene-side
   z-index: 1;
   background: var(--selected);
 
-  > .chat-session-select { pointer-events: none; }
+  > .chat-session-select {
+    pointer-events: none;
+  }
 }
 
 .chat-session-grip {
@@ -503,14 +515,20 @@ html[data-local-sidebar] .chat-session-panel[data-pinned='true'][data-scene-side
   touch-action: none;
 }
 
-.chat-session-item[data-reordering] > .chat-session-grip { cursor: grabbing; }
+.chat-session-item[data-reordering] > .chat-session-grip {
+  cursor: grabbing;
+}
 
 @media (hover: hover) and (pointer: fine) {
-  .chat-session-item:not(:hover, :focus-within, [data-reordering]) > .chat-session-grip { opacity: 0; }
+  .chat-session-item:not(:hover, :focus-within, [data-reordering]) > .chat-session-grip {
+    opacity: 0;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .chat-session-item { transition: none !important; }
+  .chat-session-item {
+    transition: none !important;
+  }
 }
 
 .chat-session-activity {
@@ -547,6 +565,7 @@ html[data-local-sidebar] .chat-session-panel[data-pinned='true'][data-scene-side
 }
 
 // Use the source size even when the scene button applies its default SVG size.
+/* stylelint-disable-next-line selector-class-pattern -- Shared global component selector. */
 .chat-session-activity .chat-session-status-mark .status-mark__glyph {
   width: var(--sm-size);
   height: var(--sm-size);
@@ -643,7 +662,8 @@ html[data-local-sidebar] .chat-session-panel[data-pinned='true'][data-scene-side
   }
 }
 
-.chat-session-panel button:hover:not(:disabled):where(:not(.chat-session-select[aria-current='true'])) {
+.chat-session-panel
+  button:hover:not(:disabled):where(:not(.chat-session-select[aria-current='true'])) {
   background: var(--hover);
 }
 

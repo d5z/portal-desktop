@@ -20,14 +20,26 @@
   border-radius: var(--chat-menu-row-radius, 7px);
   background: transparent;
   color: var(--chat-ink, var(--text));
-  font: 400 var(--chat-ui-text-size, 13px)/var(--chat-ui-line-height, 20px) var(--chat-reading-font, var(--font-sans, system-ui));
+  font: 400 var(--chat-ui-text-size, 13px)/var(--chat-ui-line-height, 20px)
+    var(--chat-reading-font, var(--font-sans, system-ui));
   text-align: start;
   cursor: pointer;
 
-  &:hover:not(:disabled), &:focus-visible { background: var(--chat-menu-hover, var(--hover-overlay)); }
-  &:active:not(:disabled) { background: var(--chat-menu-pressed, var(--pressed-overlay)); }
-  &:focus-visible { outline: 1px solid var(--chat-secondary, currentColor); outline-offset: -2px; }
-  &:disabled { color: var(--neutral-disabled, var(--text-dim)); cursor: default; }
+  &:hover:not(:disabled),
+  &:focus-visible {
+    background: var(--chat-menu-hover, var(--hover-overlay));
+  }
+  &:active:not(:disabled) {
+    background: var(--chat-menu-pressed, var(--pressed-overlay));
+  }
+  &:focus-visible {
+    outline: 1px solid var(--chat-secondary, currentColor);
+    outline-offset: -2px;
+  }
+  &:disabled {
+    color: var(--neutral-disabled, var(--text-dim));
+    cursor: default;
+  }
 
   > svg {
     flex: none;
@@ -40,12 +52,15 @@
   }
 }
 
-
 // Match Animate UI Menu ContentMotion so the native top layer lasts through the fade.
 @mixin popover-presence {
   &[data-menu-popover-motion] {
-    transition: display 220ms allow-discrete, overlay 220ms allow-discrete;
+    transition:
+      display 220ms allow-discrete,
+      overlay 220ms allow-discrete;
 
-    &:not(:popover-open) { pointer-events: none; }
+    &:not(:popover-open) {
+      pointer-events: none;
+    }
   }
 }

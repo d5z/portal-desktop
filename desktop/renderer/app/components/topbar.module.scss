@@ -15,7 +15,13 @@
   inset: 1px 0 0;
   border-radius: inherit;
   z-index: -1;
-  background: linear-gradient(to bottom, var(--workspace-panel) 0%, var(--workspace-panel) 24%, color-mix(in srgb, var(--workspace-panel) 90%, transparent) 56%, transparent 100%);
+  background: linear-gradient(
+    to bottom,
+    var(--workspace-panel) 0%,
+    var(--workspace-panel) 24%,
+    color-mix(in srgb, var(--workspace-panel) 90%, transparent) 56%,
+    transparent 100%
+  );
   pointer-events: none;
 }
 

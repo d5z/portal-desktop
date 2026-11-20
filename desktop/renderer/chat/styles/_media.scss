@@ -22,7 +22,9 @@
 }
 
 @media (hover: none) {
-  .attachment-menu-trigger { opacity: 1; }
+  .attachment-menu-trigger {
+    opacity: 1;
+  }
 }
 
 .attachment-image-card {
@@ -75,7 +77,7 @@
 
 .attachment-image-context-menu button:disabled {
   cursor: wait;
-  opacity: .65;
+  opacity: 0.65;
 }
 
 .attachment-image-context-menu p {

@@ -4,7 +4,8 @@
 }
 
 #messages {
-  padding: calc(24px + var(--chat-top-inset, 0px)) var(--chat-inset-right) max(120px, calc(var(--chat-composer-height, 99px) + 18px)) var(--chat-inset-left);
+  padding: calc(24px + var(--chat-top-inset, 0px)) var(--chat-inset-right)
+    max(120px, calc(var(--chat-composer-height, 99px) + 18px)) var(--chat-inset-left);
   scroll-padding-top: calc(20px + var(--chat-top-inset, 0px));
   /* Keep programmatic focus jumps above the floating composer and its Muse-like gap. */
   scroll-padding-bottom: max(160px, calc(var(--chat-composer-height, 99px) + 60px));
@@ -186,5 +187,4 @@
   #app {
     --chat-composer-bottom: 14px;
   }
-
 }

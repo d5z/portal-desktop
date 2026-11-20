@@ -17,7 +17,7 @@
 }
 
 :root {
-  --attachment-menu-ease: cubic-bezier(.23, 1, .32, 1);
+  --attachment-menu-ease: cubic-bezier(0.23, 1, 0.32, 1);
 }
 
 .attachment-file-popover[popover] {
@@ -33,7 +33,9 @@
   font: 400 13px/20px var(--font-sans);
 }
 
-.attachment-file-popover:popover-open { display: grid; }
+.attachment-file-popover:popover-open {
+  display: grid;
+}
 
 .attachment-details-dialog {
   position: fixed;
@@ -55,7 +57,9 @@
     gap: 12px;
   }
 
-  &::backdrop { background: rgb(0 0 0 / 28%); }
+  &::backdrop {
+    background: rgb(0 0 0 / 28%);
+  }
 
   > header {
     display: flex;
@@ -102,7 +106,11 @@
   }
 }
 
-:is(.attachment-file-popover[popover], .audio-floating-menu[popover], .audio-floating-menu .audio-settings .audio-speed-options) {
+:is(
+  .attachment-file-popover[popover],
+  .audio-floating-menu[popover],
+  .audio-floating-menu .audio-settings .audio-speed-options
+) {
   @include chat-menu.surface(
     var(--chat-menu-surface, var(--neutral-main)),
     var(--chat-menu-border, 1px solid var(--neutral-border))
@@ -126,9 +134,14 @@
 
 .audio-floating-menu[data-submenu-stacked] {
   // Keep the audio settings' bottom margin inside the measured page.
-  .audio-speed-viewport > [data-navigation-menu-content] { display: flow-root; }
+  .audio-speed-viewport > [data-navigation-menu-content] {
+    display: flow-root;
+  }
 
-  &[data-speed-page] > .glide-select__pill { visibility: hidden; }
+  /* stylelint-disable-next-line selector-class-pattern -- Shared global component selector. */
+  &[data-speed-page] > .glide-select__pill {
+    visibility: hidden;
+  }
 
   .audio-settings .audio-speed-options {
     position: relative;
@@ -142,14 +155,21 @@
     overflow: auto;
     transform-origin: top left;
 
-    &::before { content: none; }
-    .audio-speed-back { display: block; }
+    &::before {
+      content: none;
+    }
+    .audio-speed-back {
+      display: block;
+    }
   }
 }
 
-:where([data-attachment-glide]) { isolation: isolate; }
+:where([data-attachment-glide]) {
+  isolation: isolate;
+}
 
 // React Bits GlideSelect-TS-CSS pill, with Being row geometry and tokens.
+/* stylelint-disable-next-line selector-class-pattern -- Shared global component selector. */
 :where([data-attachment-glide]) > .glide-select__pill {
   position: absolute;
   z-index: -1;
@@ -160,10 +180,14 @@
   background: var(--chat-menu-hover, var(--neutral-inset));
   opacity: 0;
   pointer-events: none;
-  transition: transform var(--ui-motion-surface) var(--attachment-menu-ease), opacity 150ms ease;
+  transition:
+    transform var(--ui-motion-surface) var(--attachment-menu-ease),
+    opacity 150ms ease;
 }
 
-:root[data-chat-host='desktop'] :is(.composer-add-menu, [aria-label='消息操作'][role='menu'])[data-gliding] > button:hover:not(:disabled, :active) {
+:root[data-chat-host='desktop']
+  :is(.composer-add-menu, [aria-label='消息操作'][role='menu'])[data-gliding]
+  > button:hover:not(:disabled, :active) {
   background-color: transparent;
 }
 
@@ -181,14 +205,18 @@
   cursor: pointer;
 }
 
-.attachment-file-popover button:disabled { color: var(--neutral-disabled); cursor: default; }
+.attachment-file-popover button:disabled {
+  color: var(--neutral-disabled);
+  cursor: default;
+}
 
 .attachment-file-popover[role='menu'] [role='menuitem'],
 :is(.audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button {
   @include chat-menu.action-row;
 }
 
-.attachment-file-popover[role='menu'][data-gliding] [role='menuitem']:hover:not(:disabled, :active) {
+.attachment-file-popover[role='menu'][data-gliding]
+  [role='menuitem']:hover:not(:disabled, :active) {
   background: transparent;
 }
 
@@ -199,7 +227,9 @@
 
 :root[data-chat-host='desktop'] {
   .audio-floating-menu .audio-settings svg,
-  :is(.audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button svg {
+  :is(.audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content]))
+    > button
+    svg {
     width: var(--chat-icon-action);
     height: var(--chat-icon-action);
     stroke-width: 2;
@@ -209,10 +239,20 @@
     @include chat-icon-control.feedback;
 
     border-radius: var(--space-xs);
-    > svg { display: block; width: var(--chat-icon-action); height: var(--chat-icon-action); }
+    > svg {
+      display: block;
+      width: var(--chat-icon-action);
+      height: var(--chat-icon-action);
+    }
 
-    &:focus-visible { outline: 1px solid currentColor; outline-offset: -1px; }
-    &[aria-expanded='true'] { opacity: 1; pointer-events: auto; }
+    &:focus-visible {
+      outline: 1px solid currentcolor;
+      outline-offset: -1px;
+    }
+    &[aria-expanded='true'] {
+      opacity: 1;
+      pointer-events: auto;
+    }
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -224,15 +264,21 @@
   }
 
   @media (hover: none), (pointer: coarse) {
-    .attachment-file-row .attachment-menu-trigger { opacity: 1; }
+    .attachment-file-row .attachment-menu-trigger {
+      opacity: 1;
+    }
   }
 
   @media (prefers-reduced-motion: no-preference) {
-    .attachment-audio .audio-menu-trigger { transition: opacity 120ms ease; }
+    .attachment-audio .audio-menu-trigger {
+      transition: opacity 120ms ease;
+    }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .attachment-file-row .attachment-menu-trigger { transition: none; }
+    .attachment-file-row .attachment-menu-trigger {
+      transition: none;
+    }
   }
 }
 
@@ -241,7 +287,9 @@
 .audio-floating-menu .audio-settings .audio-speed-options > button {
   border-radius: var(--chat-menu-row-radius, 7px);
   font-size: 13px;
-  &:hover:not(:disabled) { background: transparent; }
+  &:hover:not(:disabled) {
+    background: transparent;
+  }
 }
 
 .audio-floating-menu .audio-settings .audio-speed-options > button[aria-pressed='true'] {
@@ -249,18 +297,32 @@
   background: var(--chat-menu-hover, var(--neutral-inset));
 }
 
-.audio-floating-menu .audio-settings .audio-speed-options[data-gliding] > button[aria-pressed='true'] { background: transparent; }
+.audio-floating-menu
+  .audio-settings
+  .audio-speed-options[data-gliding]
+  > button[aria-pressed='true'] {
+  background: transparent;
+}
 
 .audio-floating-menu .audio-settings .audio-speed-options > button:active:not(:disabled),
 .audio-floating-menu .audio-settings .audio-speed-toggle:active:not(:disabled),
-:is(.audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button:active:not(:disabled) { background: var(--chat-menu-pressed, var(--neutral-border)); }
+:is(.audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content]))
+  > button:active:not(:disabled) {
+  background: var(--chat-menu-pressed, var(--neutral-border));
+}
 
 @media (pointer: coarse) {
   .audio-floating-menu .audio-settings .audio-speed-options > button,
   .audio-floating-menu .audio-settings .audio-speed-toggle,
-  :is(.audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button { min-height: 44px; }
+  :is(.audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content]))
+    > button {
+    min-height: 44px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  :where([data-attachment-glide]) > .glide-select__pill { transition-property: none; }
+  /* stylelint-disable-next-line selector-class-pattern -- Shared global component selector. */
+  :where([data-attachment-glide]) > .glide-select__pill {
+    transition-property: none;
+  }
 }

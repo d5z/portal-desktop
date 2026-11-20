@@ -527,7 +527,6 @@
   }
 }
 
-
 .attachment-download-progress:has(progress) {
   display: grid;
   flex-basis: 100%;
@@ -535,9 +534,16 @@
   align-items: center;
   gap: 3px 8px;
 
-  > small { grid-area: 1 / 1; margin: 0; }
-  > button { grid-area: 1 / 2; }
-  > progress { grid-column: 1 / -1; }
+  > small {
+    grid-area: 1 / 1;
+    margin: 0;
+  }
+  > button {
+    grid-area: 1 / 2;
+  }
+  > progress {
+    grid-column: 1 / -1;
+  }
 }
 
 .attachment-download .attachment-download-progress > button {
@@ -547,6 +553,11 @@
   height: 28px;
   padding: 0;
 
-  &:hover { background: var(--chat-menu-hover, var(--hover-overlay)); }
-  &:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+  &:hover {
+    background: var(--chat-menu-hover, var(--hover-overlay));
+  }
+  &:focus-visible {
+    outline: 1px solid var(--accent);
+    outline-offset: -1px;
+  }
 }

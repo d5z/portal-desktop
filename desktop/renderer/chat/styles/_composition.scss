@@ -843,7 +843,6 @@
   font-size: 18px;
 }
 
-
 :root[data-chat-host='desktop'] {
   .scene-loading-mark {
     border: 0;
@@ -861,10 +860,15 @@
     border-radius: 16px;
     background: color-mix(in srgb, var(--chat-action) 12%, var(--chat-being-bubble));
 
-    i { color: var(--chat-action); opacity: 0.2; }
+    i {
+      color: var(--chat-action);
+      opacity: 0.2;
+    }
   }
 
-  .scene-loading-reply .scene-loading-bubble { border-radius: 16px; }
+  .scene-loading-reply .scene-loading-bubble {
+    border-radius: 16px;
+  }
 
   .chat-refresh-status {
     padding: 5px 10px;

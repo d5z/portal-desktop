@@ -647,8 +647,12 @@
   }
 }
 
-.composer-queue-row-actions { display: flex; }
-.composer-queue-leading { flex: 0 0 26px; }
+.composer-queue-row-actions {
+  display: flex;
+}
+.composer-queue-leading {
+  flex: 0 0 26px;
+}
 .composer-queue-copy {
   display: flex;
   align-items: center;
@@ -679,12 +683,20 @@
   text-align: start;
   font: inherit;
 
-  &:hover { background: transparent; }
-  .composer-queue-content { display: block; width: 100%; }
+  &:hover {
+    background: transparent;
+  }
+  .composer-queue-content {
+    display: block;
+    width: 100%;
+  }
 }
 
 .composer-queue-preview {
-  @include chat-menu.surface(var(--chat-menu-surface, var(--bg)), var(--chat-menu-border, 1px solid var(--border)));
+  @include chat-menu.surface(
+    var(--chat-menu-surface, var(--bg)),
+    var(--chat-menu-border, 1px solid var(--border))
+  );
 
   z-index: var(--chat-layer-menu, 30);
   width: min(var(--chat-queue-preview-width, 432px), calc(100vw - 16px));
@@ -696,13 +708,24 @@
   white-space: pre-wrap;
   user-select: text;
   color: var(--chat-ink, var(--text));
-  font: var(--chat-prompt-text-size, 14px)/var(--chat-prompt-line-height, 20px) var(--chat-reading-font, system-ui);
+  font: var(--chat-prompt-text-size, 14px)/var(--chat-prompt-line-height, 20px)
+    var(--chat-reading-font, system-ui);
 
-  > ul { margin: 0; padding-inline-start: var(--space-lg, 16px); color: var(--chat-secondary, var(--text-dim)); }
-  > div + ul { margin-top: var(--space-sm, 8px); }
+  > ul {
+    margin: 0;
+    padding-inline-start: var(--space-lg, 16px);
+    color: var(--chat-secondary, var(--text-dim));
+  }
+  > div + ul {
+    margin-top: var(--space-sm, 8px);
+  }
 }
 
-.composer-queue-status { font-size: 12px; flex-shrink: 0; color: var(--text-dim); }
+.composer-queue-status {
+  font-size: 12px;
+  flex-shrink: 0;
+  color: var(--text-dim);
+}
 .composer-queue-announcement {
   position: absolute;
   width: 1px;
@@ -808,14 +831,27 @@
   font: 13px/20px var(--font-sans, system-ui);
   cursor: pointer;
 
-  &:hover { background: var(--chat-menu-hover, var(--hover-overlay)); }
-  &:active { background: var(--chat-menu-pressed, var(--bg-soft)); }
-  &:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
-  kbd { color: var(--text-dim); font: inherit; white-space: nowrap; }
+  &:hover {
+    background: var(--chat-menu-hover, var(--hover-overlay));
+  }
+  &:active {
+    background: var(--chat-menu-pressed, var(--bg-soft));
+  }
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: -2px;
+  }
+  kbd {
+    color: var(--text-dim);
+    font: inherit;
+    white-space: nowrap;
+  }
 }
 
 @media (pointer: coarse) {
-  .composer-queue-tip button { min-height: 44px; }
+  .composer-queue-tip button {
+    min-height: 44px;
+  }
 }
 
 @media (max-width: 680px) {

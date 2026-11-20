@@ -196,6 +196,7 @@
   }
 }
 
+/* stylelint-disable-next-line selector-class-pattern -- Shared global component selector. */
 .warm-tooltip__trigger.chat-jump-tip {
   position: absolute;
   bottom: calc(100% + 14px);
@@ -258,17 +259,27 @@
   outline-offset: 3px;
 }
 
-:root[data-chat-host='desktop'] .warm-tooltip__trigger.chat-jump-tip { bottom: calc(100% + 10px); }
+/* stylelint-disable-next-line selector-class-pattern -- Shared global component selector. */
+:root[data-chat-host='desktop'] .warm-tooltip__trigger.chat-jump-tip {
+  bottom: calc(100% + 10px);
+}
 
 :root[data-chat-host='desktop'] #chat-jump-latest {
   @include conversation-control.surface;
+
   justify-content: center;
   width: 32px;
   height: 32px;
   min-height: 0;
   padding: 0;
-  > span { display: none; }
-  svg { width: var(--chat-icon-action); height: var(--chat-icon-action); stroke-width: 2; }
+  > span {
+    display: none;
+  }
+  svg {
+    width: var(--chat-icon-action);
+    height: var(--chat-icon-action);
+    stroke-width: 2;
+  }
 
   @media (pointer: coarse) {
     width: 44px;

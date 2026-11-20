@@ -191,7 +191,9 @@ button.step2-back {
   min-width: 0;
 }
 
-.message-action-space { display: contents; }
+.message-action-space {
+  display: contents;
+}
 
 /* The row owns the width limit; do not apply the role's percentage again inside it. */
 .message:is(.user, .being, .system) .message-bubble-body > .content,
@@ -322,7 +324,15 @@ button.step2-back {
   color: var(--accent, #286197);
 }
 
-.scene-task-list li:is([data-status='failed'], [data-status='cancelled'], [data-status='interrupted'], [data-status='budget_exhausted'], [data-status='timeout']) .scene-task-status {
+.scene-task-list
+  li:is(
+    [data-status='failed'],
+    [data-status='cancelled'],
+    [data-status='interrupted'],
+    [data-status='budget_exhausted'],
+    [data-status='timeout']
+  )
+  .scene-task-status {
   color: var(--red, #b96859);
 }
 
@@ -401,7 +411,12 @@ label.chat-scope-switch input {
 }
 
 .message-bubble-row:focus-within .message-hover-actions,
-.message-bubble-row:has(.message-bubble-body:hover, .message-hover-actions:hover, .message-more[aria-expanded='true']) .message-hover-actions {
+.message-bubble-row:has(
+    .message-bubble-body:hover,
+    .message-hover-actions:hover,
+    .message-more[aria-expanded='true']
+  )
+  .message-hover-actions {
   opacity: 1;
   pointer-events: auto;
 
@@ -442,8 +457,12 @@ label.chat-scope-switch input {
     cursor: pointer;
     pointer-events: inherit;
 
-    &:hover { background: var(--bg-soft); }
-    &:focus-visible { outline: 2px solid var(--accent); }
+    &:hover {
+      background: var(--bg-soft);
+    }
+    &:focus-visible {
+      outline: 2px solid var(--accent);
+    }
   }
 }
 
@@ -458,5 +477,7 @@ label.chat-scope-switch input {
     pointer-events: auto;
   }
 
-  .message-hover-time { display: none; }
+  .message-hover-time {
+    display: none;
+  }
 }

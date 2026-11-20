@@ -5,7 +5,9 @@
   align-items: center;
   gap: 4px;
 
-  &:empty { display: none; }
+  &:empty {
+    display: none;
+  }
 }
 
 :root[data-chat-host='desktop'] {
@@ -25,7 +27,9 @@
     min-width: 0;
     margin-block-end: 4px;
 
-    &:not(:has(button, time, .message-media-actions > *)) { display: none; }
+    &:not(:has(button, time, .message-media-actions > *)) {
+      display: none;
+    }
   }
 
   .message.user .message-bubble-body:has(> .attachment-message-host) {
@@ -37,7 +41,9 @@
   }
 
   @media (max-width: 380px) {
-    .message.being .message-bubble-body:has(.message-caption-actions:not(:empty)) { max-inline-size: 100%; }
+    .message.being .message-bubble-body:has(.message-caption-actions:not(:empty)) {
+      max-inline-size: 100%;
+    }
   }
 
   .message.being .message-bubble-body:has(> .intelligent-answer .intelligent-ui) {
@@ -59,13 +65,17 @@
     pointer-events: auto;
   }
 
-  .message.being .message-hover-time { order: 1; }
+  .message.being .message-hover-time {
+    order: 1;
+  }
 
   .message.user .message-hover-actions {
     margin-inline-start: auto;
   }
 
-  .message-caption-actions:empty { display: none; }
+  .message-caption-actions:empty {
+    display: none;
+  }
 
   :is(.attachment-caption, .markdown-caption) {
     display: flex;
@@ -73,35 +83,55 @@
     gap: 8px;
     max-inline-size: 100%;
 
-    > :first-child { min-inline-size: 0; }
-    > .message-caption-actions { flex: none; }
+    > :first-child {
+      min-inline-size: 0;
+    }
+    > .message-caption-actions {
+      flex: none;
+    }
   }
 
   .message.user :is(.attachment-caption, .markdown-caption) {
     flex-direction: row-reverse;
   }
 
-  .attachment-caption > .message-caption-actions { margin-block-end: 4px; }
+  .attachment-caption > .message-caption-actions {
+    margin-block-end: 4px;
+  }
 
-  .markdown-caption > :first-child { margin: 0; }
+  .markdown-caption > :first-child {
+    margin: 0;
+  }
 
-  .message-media-actions { display: contents; }
-  .message.user .message-media-actions > * { order: -1; }
-  .message.user .message-media-actions > :is(#{$feedback}) { order: 1; }
-  .message.being .message-media-actions > :is(#{$feedback}) { order: -1; }
+  .message-media-actions {
+    display: contents;
+  }
+  .message.user .message-media-actions > * {
+    order: -1;
+  }
+  .message.user .message-media-actions > :is(#{$feedback}) {
+    order: 1;
+  }
+  .message.being .message-media-actions > :is(#{$feedback}) {
+    order: -1;
+  }
 
   @media (hover: hover) and (pointer: fine) {
     .message-bubble-row:not(
       [data-actions-hovered],
       :has(> .message-bubble-body:hover),
-      :has(> .message-action-space:hover):not(:has(.message-media-actions > :is(#{$feedback}):hover)),
+      :has(> .message-action-space:hover):not(
+        :has(.message-media-actions > :is(#{$feedback}):hover)
+      ),
       :has(:focus-visible, .message-hover-buttons [aria-haspopup][aria-expanded='true'])
     ) {
       .message-hover-actions {
         opacity: 0;
         pointer-events: none;
 
-        &:has(.message-media-actions > :is(#{$feedback})) { opacity: 1; }
+        &:has(.message-media-actions > :is(#{$feedback})) {
+          opacity: 1;
+        }
       }
 
       // Keep the toolbar geometry stable while only the active feedback is visible.
@@ -112,7 +142,9 @@
         pointer-events: none;
       }
 
-      .message-media-actions > :is(#{$feedback}) { pointer-events: auto; }
+      .message-media-actions > :is(#{$feedback}) {
+        pointer-events: auto;
+      }
     }
   }
 
@@ -120,8 +152,12 @@
     content: none;
   }
 
-  .message-hover-time { color: var(--neutral-tertiary); }
-  .message-hover-buttons { gap: 4px; }
+  .message-hover-time {
+    color: var(--neutral-tertiary);
+  }
+  .message-hover-buttons {
+    gap: 4px;
+  }
 
   .message-hover-buttons button,
   .message-hover-buttons .chat-error-indicator > button,
@@ -137,8 +173,16 @@
 
     @include chat-icon-control.feedback;
 
-    > svg { display: block; width: var(--chat-icon-compact); height: var(--chat-icon-compact); }
-    &:focus-visible { outline: 1px solid var(--chat-secondary); outline-offset: -1px; }
+    > svg {
+      display: block;
+      width: var(--chat-icon-compact);
+      height: var(--chat-icon-compact);
+    }
+    &:focus-visible {
+      outline: 1px solid var(--chat-secondary);
+      outline-offset: -1px;
+    }
+
     transition: background-color var(--ui-motion-fast) ease;
   }
 
@@ -177,8 +221,13 @@
     gap: 6px;
     padding: 0;
 
-    > svg { margin-inline: 4px; }
-    > .chat-error-indicator { order: -1; gap: 4px; }
+    > svg {
+      margin-inline: 4px;
+    }
+    > .chat-error-indicator {
+      order: -1;
+      gap: 4px;
+    }
     > svg,
     > .chat-error-indicator > button > svg {
       width: 16px;
@@ -216,11 +265,23 @@
       background: transparent;
     }
 
-    .message.user .message-hover-actions { justify-content: flex-end; }
-    .message-bubble-row .message-hover-actions { opacity: 1; pointer-events: auto; }
-    .message .message-hover-time { display: block; visibility: hidden; }
-    .message-bubble-row:focus-within .message-hover-time { visibility: visible; }
-    .message.being .message-hover-time { order: 0; }
+    .message.user .message-hover-actions {
+      justify-content: flex-end;
+    }
+    .message-bubble-row .message-hover-actions {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .message .message-hover-time {
+      display: block;
+      visibility: hidden;
+    }
+    .message-bubble-row:focus-within .message-hover-time {
+      visibility: visible;
+    }
+    .message.being .message-hover-time {
+      order: 0;
+    }
 
     .message-hover-buttons button,
     .message-hover-buttons .chat-error-indicator > button {
@@ -230,6 +291,5 @@
       border-radius: 6px;
       touch-action: manipulation;
     }
-
   }
 }

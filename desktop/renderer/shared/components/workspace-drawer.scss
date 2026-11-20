@@ -19,8 +19,12 @@
   width: var(--drawer-size) !important;
   min-width: 0 !important;
   max-width: none !important;
-  &[data-drawer-edge='right'] { margin-left: var(--drawer-gap) !important; }
-  &[data-drawer-edge='left'] { margin-right: var(--drawer-gap) !important; }
+  &[data-drawer-edge='right'] {
+    margin-left: var(--drawer-gap) !important;
+  }
+  &[data-drawer-edge='left'] {
+    margin-right: var(--drawer-gap) !important;
+  }
 }
 
 [data-workspace-drawer][data-drawer-motion='vertical'] {
@@ -35,7 +39,9 @@
   will-change: transform;
 }
 
-:is(.workspace-body, .workspace-stage, .workspace-content, .plugin-place-layout):has(> [data-drawer-surface]) {
+:is(.workspace-body, .workspace-stage, .workspace-content, .plugin-place-layout):has(
+  > [data-drawer-surface]
+) {
   overflow: clip;
   overflow-clip-margin: content-box;
 }

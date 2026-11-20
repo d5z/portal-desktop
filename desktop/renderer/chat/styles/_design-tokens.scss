@@ -12,7 +12,6 @@
   --chat-icon-primary: 18px;
   --chat-icon-target: 24px;
   --chat-attachment-menu-target: 28px;
-
   --chat-bubble-padding-inline: 16px;
   --chat-bubble-padding-block: 10px;
   --chat-text-bubble-radius: 22px;
@@ -49,7 +48,6 @@
   --chat-queue-max-height: 30dvh;
   --chat-composer-primary-surface: var(--chat-ink);
   --chat-composer-primary-foreground: var(--chat-reply-surface);
-
   --chat-turn-gap: var(--space-xl);
   --chat-message-group-gap: var(--space-lg);
   --chat-message-sequence-gap: var(--space-sm);
@@ -59,9 +57,9 @@
   --chat-time-divider-before: var(--space-xl);
   --chat-time-divider-after: var(--space-lg);
   --chat-history-preview-width: 288px;
-
-  --chat-prompt-shadow: inset 0 0 0 1px var(--chat-edge),
-    0 2px 8px var(--chat-prompt-shadow-near), 0 4px 80px 8px var(--chat-prompt-shadow-far);
+  --chat-prompt-shadow:
+    inset 0 0 0 1px var(--chat-edge), 0 2px 8px var(--chat-prompt-shadow-near),
+    0 4px 80px 8px var(--chat-prompt-shadow-far);
   --chat-prompt-shadow-near: color-mix(in srgb, var(--chat-ink) 4%, transparent);
   --chat-prompt-shadow-far: color-mix(in srgb, var(--chat-ink) 2.4%, transparent);
   --chat-prompt-radius: 22px;
@@ -74,7 +72,10 @@
   --chat-prompt-line-height: 20px;
   --chat-prompt-inline-text-inset: 2px;
   --chat-prompt-single-text-padding: 7px var(--chat-prompt-inline-text-inset);
-  --chat-prompt-inline-text-start: calc(var(--chat-prompt-control-size) + var(--chat-prompt-control-gap) + var(--chat-prompt-inline-text-inset));
+  --chat-prompt-inline-text-start: calc(
+    var(--chat-prompt-control-size) + var(--chat-prompt-control-gap) +
+      var(--chat-prompt-inline-text-inset)
+  );
   --chat-prompt-expanded-text-inset: var(--space-xs);
   --chat-prompt-attachment-radius: var(--radius-md);
   --chat-prompt-attachment-inner-padding: 10px;
@@ -84,7 +85,6 @@
   --chat-prompt-photo-width: 64px;
   --chat-prompt-attachment-label-gap: var(--space-sm);
   --chat-prompt-photo-remove-inset: var(--space-xs);
-
   --chat-layer-inline-action: 1;
   --chat-layer-prompt: 4;
   --chat-layer-fixed-control: 15;
@@ -97,6 +97,8 @@
   }
 
   @media (pointer: coarse) {
-    #app #input-area { --chat-prompt-control-size: var(--touch-target); }
+    #app #input-area {
+      --chat-prompt-control-size: var(--touch-target);
+    }
   }
 }

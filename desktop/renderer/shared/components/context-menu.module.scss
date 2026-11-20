@@ -107,7 +107,9 @@
   padding: var(--chat-menu-inset, 4px);
   font-family: var(--font-sans);
 
-  button { @include chat-menu.action-row; }
+  button {
+    @include chat-menu.action-row;
+  }
 
   kbd {
     color: var(--text-muted);

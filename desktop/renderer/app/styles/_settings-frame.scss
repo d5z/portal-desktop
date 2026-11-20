@@ -758,11 +758,23 @@ html[data-theme='dark'] .town-logo-light {
     transform 160ms ease;
 }
 
-#client-settings-dialog :is(.settings-item-control > button, .download-setting-change, .theme-options button, .history-setting button[type='submit']):hover:not(:disabled) {
+#client-settings-dialog
+  :is(
+    .settings-item-control > button,
+    .download-setting-change,
+    .theme-options button,
+    .history-setting button[type='submit']
+  ):hover:not(:disabled) {
   background: var(--settings-hover);
 }
 
-#client-settings-dialog :is(.settings-item-control > button, .download-setting-change, .theme-options button, .history-setting button[type='submit']):active:not(:disabled) {
+#client-settings-dialog
+  :is(
+    .settings-item-control > button,
+    .download-setting-change,
+    .theme-options button,
+    .history-setting button[type='submit']
+  ):active:not(:disabled) {
   transform: scale(0.975);
   box-shadow: 0 1px 3px rgb(20 24 32 / 5%);
 }
@@ -805,16 +817,24 @@ html[data-theme='dark'] .town-logo-light {
   border-color: var(--line);
 }
 
-#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)) {
+#client-settings-dialog
+  input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  ) {
   width: 40px;
   height: 24px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--secondary) 52%, var(--surface));
   box-shadow: inset 0 0 0 1px rgb(20 24 32 / 8%);
-  transition: background-color 160ms ease, box-shadow 160ms ease;
+  transition:
+    background-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
-#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *))::before {
+#client-settings-dialog
+  input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  )::before {
   width: 18px;
   height: 18px;
   top: 3px;
@@ -824,20 +844,32 @@ html[data-theme='dark'] .town-logo-light {
   transition: transform 160ms ease;
 }
 
-#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):checked {
+#client-settings-dialog
+  input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  ):checked {
   background: #2f86f6;
   box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 20%, transparent);
 }
 
-#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):checked::before {
+#client-settings-dialog
+  input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  ):checked::before {
   transform: translateX(16px);
 }
 
-#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):hover:not(:disabled) {
+#client-settings-dialog
+  input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  ):hover:not(:disabled) {
   filter: brightness(0.94);
 }
 
-#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):focus-visible {
+#client-settings-dialog
+  input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  ):focus-visible {
   outline: 2px solid #2f86f6;
   outline-offset: 2px;
 }
@@ -932,7 +964,19 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  #client-settings-dialog :is(.settings-tabs button, .settings-page-back, .settings-item, .settings-page-link, .settings-plugin-link, .settings-item-control > button, .download-setting-change, .theme-options button, .history-setting button[type='submit'], input[type='checkbox']) {
+  #client-settings-dialog
+    :is(
+      .settings-tabs button,
+      .settings-page-back,
+      .settings-item,
+      .settings-page-link,
+      .settings-plugin-link,
+      .settings-item-control > button,
+      .download-setting-change,
+      .theme-options button,
+      .history-setting button[type='submit'],
+      input[type='checkbox']
+    ) {
     transition: none;
   }
 }
@@ -1326,23 +1370,35 @@ html[data-theme='dark'] .town-logo-light {
   border-radius: 10px;
 }
 
-#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)) {
+#client-settings-dialog
+  input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  ) {
   width: 36px;
   height: 22px;
 }
 
-#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *))::before {
+#client-settings-dialog
+  input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  )::before {
   width: 16px;
   height: 16px;
   top: 3px;
   left: 3px;
 }
 
-#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):checked::before {
+#client-settings-dialog
+  input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  ):checked::before {
   transform: translateX(14px);
 }
 
-#client-settings-dialog input[type='checkbox']:where(:not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)):disabled {
+#client-settings-dialog
+  input[type='checkbox']:where(
+    :not(.dsh-plugin-content *, .dsh-pane-slot *, .dsh-main-panel *, .dsh-shell-overlay *)
+  ):disabled {
   cursor: default;
   opacity: 0.52;
 }
@@ -1438,7 +1494,9 @@ html[data-theme='dark'] .town-logo-light {
   border: 1px solid var(--line);
   border-radius: 12px;
   background: var(--settings-page);
-  transition: background-color 140ms ease, border-color 140ms ease;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
 
   &.is-clickable {
     cursor: pointer;
@@ -1500,7 +1558,9 @@ html[data-theme='dark'] .town-logo-light {
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
-  transition: background-color 140ms ease, border-color 140ms ease;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease;
 
   &[data-icon-only] {
     width: 30px;
@@ -1809,7 +1869,9 @@ html[data-theme='dark'] .town-logo-light {
   border-radius: 20px;
   background: var(--control);
   color: var(--secondary);
-  transition: border-color 160ms ease, box-shadow 160ms ease;
+  transition:
+    border-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 /* Grouped cards keep related controls together and let dividers carry the rhythm. */
@@ -1855,7 +1917,11 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 #client-settings-dialog .settings-section-card > :not(:first-child),
-#client-settings-dialog .settings-section-card .notification-switches .settings-item + .settings-item {
+#client-settings-dialog
+  .settings-section-card
+  .notification-switches
+  .settings-item
+  + .settings-item {
   border-top: 1px solid var(--line);
 }
 
@@ -1892,7 +1958,10 @@ html[data-theme='dark'] .town-logo-light {
   box-shadow: none;
 }
 
-#client-settings-dialog .settings-section-card .notification-switches label.settings-item:has(input:enabled):hover {
+#client-settings-dialog
+  .settings-section-card
+  .notification-switches
+  label.settings-item:has(input:enabled):hover {
   background: var(--settings-hover);
 }
 
@@ -1924,7 +1993,9 @@ html[data-theme='dark'] .town-logo-light {
   outline: none;
 }
 
-:root:not([data-pointer-focus]) #client-settings-dialog .settings-nav-search:has(> input:focus-visible) {
+:root:not([data-pointer-focus])
+  #client-settings-dialog
+  .settings-nav-search:has(> input:focus-visible) {
   border-color: color-mix(in srgb, var(--accent) 30%, var(--line));
   box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 10%, transparent);
 }
@@ -2004,7 +2075,8 @@ html[data-theme='dark'] .town-logo-light {
   line-height: 1.35;
 }
 
-#client-settings-dialog :is(.settings-item-control > button, .download-setting-change, .theme-options button) {
+#client-settings-dialog
+  :is(.settings-item-control > button, .download-setting-change, .theme-options button) {
   min-height: 30px;
   padding: 5px 10px;
   border-radius: 10px;

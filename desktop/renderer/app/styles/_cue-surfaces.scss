@@ -379,6 +379,7 @@
   isolation: isolate;
 }
 
+/* stylelint-disable-next-line selector-class-pattern -- Shared global component selector. */
 #being-info .being-config-actions > .glide-select__pill {
   position: absolute;
   z-index: -1;
@@ -388,7 +389,9 @@
   background: var(--neutral-inset);
   opacity: 0;
   pointer-events: none;
-  transition: transform var(--ui-motion-surface) var(--ui-ease), opacity var(--ui-motion-fast) ease;
+  transition:
+    transform var(--ui-motion-surface) var(--ui-ease),
+    opacity var(--ui-motion-fast) ease;
 }
 
 #being-info .being-action-row::before {
@@ -402,6 +405,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   #being-info .being-tabs::before,
+  /* stylelint-disable-next-line selector-class-pattern -- Shared global component selector. */
   #being-info .being-config-actions > .glide-select__pill {
     transition: none;
   }
@@ -1105,9 +1109,7 @@
   text-align: left;
 }
 
-#client-settings-dialog
-  .connector-accounts
-  > .connector-account-row[aria-pressed="true"] {
+#client-settings-dialog .connector-accounts > .connector-account-row[aria-pressed='true'] {
   background: transparent;
 }
 

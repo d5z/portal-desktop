@@ -22,12 +22,24 @@
     cursor: pointer;
     touch-action: manipulation;
 
-    &:hover:not(:disabled) { background: color-mix(in srgb, currentColor 10%, transparent); }
-    &:active:not(:disabled) { background: color-mix(in srgb, currentColor 18%, transparent); }
+    &:hover:not(:disabled) {
+      background: color-mix(in srgb, currentcolor 10%, transparent);
+    }
+    &:active:not(:disabled) {
+      background: color-mix(in srgb, currentcolor 18%, transparent);
+    }
 
-    :global([data-chat-host='desktop']) & { @include chat-icon-control.feedback(currentColor); }
-    &:focus-visible { outline: 1px solid currentColor; outline-offset: -1px; }
-    &:disabled { opacity: 0.45; cursor: default; }
+    :global([data-chat-host='desktop']) & {
+      @include chat-icon-control.feedback(currentColor);
+    }
+    &:focus-visible {
+      outline: 1px solid currentcolor;
+      outline-offset: -1px;
+    }
+    &:disabled {
+      opacity: 0.45;
+      cursor: default;
+    }
   }
 }
 
@@ -66,11 +78,13 @@
   white-space: nowrap;
 }
 
-
 @media (pointer: coarse) {
   .indicator {
     gap: 6px;
 
-    > :is(.status, .retry) { width: 44px; height: 44px; }
+    > :is(.status, .retry) {
+      width: 44px;
+      height: 44px;
+    }
   }
 }

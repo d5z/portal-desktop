@@ -18,7 +18,9 @@
   gap: 6px;
 }
 
-.pending-files-list { display: contents; }
+.pending-files-list {
+  display: contents;
+}
 
 .pending-file {
   font-size: 12px;

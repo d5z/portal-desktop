@@ -20,7 +20,9 @@
   font-size: 13px;
   line-height: 1.5;
 
-  &[data-extra-actions] { width: min(248px, calc(100vw - 16px)); }
+  &[data-extra-actions] {
+    width: min(248px, calc(100vw - 16px));
+  }
 }
 
 .info {
@@ -37,7 +39,6 @@
   @include chat-menu.surface;
 
   padding: var(--chat-menu-inset);
-
 }
 
 .menu [role='menuitem'] {
@@ -57,9 +58,14 @@
 }
 
 .attachments,
-.attachments > [role='group'] { display: grid; gap: 2px; }
+.attachments > [role='group'] {
+  display: grid;
+  gap: 2px;
+}
 
-.attachments:empty { display: none; }
+.attachments:empty {
+  display: none;
+}
 
 .menu:not([data-extra-actions]) > button + .attachments:not(:empty),
 .attachments > [role='group'] + [role='group'] {
@@ -73,13 +79,19 @@
   margin: 0;
   padding: 4px var(--space-sm, 8px);
   color: var(--chat-secondary, var(--text-dim));
-  font: 500 var(--chat-meta-text-size, 12px)/var(--chat-meta-line-height, 18px) var(--chat-reading-font, var(--font-sans));
+  font: 500 var(--chat-meta-text-size, 12px)/var(--chat-meta-line-height, 18px)
+    var(--chat-reading-font, var(--font-sans));
   overflow-wrap: anywhere;
 }
 
-.attachments > [role='group']:only-child > strong { display: none; }
+.attachments > [role='group']:only-child > strong {
+  display: none;
+}
 
-:global(:root[data-chat-host='desktop']) .menu[data-gliding] .attachments [role='menuitem']:hover:not(:disabled, :active) {
+:global(:root[data-chat-host='desktop'])
+  .menu[data-gliding]
+  .attachments
+  [role='menuitem']:hover:not(:disabled, :active) {
   background-color: transparent;
 }
 

@@ -1,4 +1,8 @@
 /* Native details still own the summary and open state. Presence retains only the closing surface. */
-.details::details-content { content-visibility: visible; }
+.details::details-content {
+  content-visibility: visible;
+}
 
-.details:not([open]) > .surface { pointer-events: none; }
+.details:not([open]) > .surface {
+  pointer-events: none;
+}

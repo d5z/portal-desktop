@@ -84,14 +84,24 @@
   flex-wrap: wrap;
 }
 
-:is(.audio-menu > div, .audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button {
+:is(
+    .audio-menu > div,
+    .audio-floating-menu,
+    .audio-speed-viewport > :where([data-navigation-menu-content])
+  )
+  > button {
   height: auto;
   border-radius: 6px;
   background: transparent;
   color: var(--text);
 }
 
-:is(.audio-menu > div, .audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button:hover {
+:is(
+    .audio-menu > div,
+    .audio-floating-menu,
+    .audio-speed-viewport > :where([data-navigation-menu-content])
+  )
+  > button:hover {
   background: var(--hover-overlay);
 }
 
@@ -184,7 +194,13 @@
 }
 
 .audio-settings svg,
-:is(.audio-menu > div, .audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button svg {
+:is(
+    .audio-menu > div,
+    .audio-floating-menu,
+    .audio-speed-viewport > :where([data-navigation-menu-content])
+  )
+  > button
+  svg {
   width: 20px;
   height: 20px;
   flex-shrink: 0;
@@ -223,7 +239,12 @@
 }
 
 .audio-settings .audio-speed-toggle,
-:is(.audio-menu > div, .audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button {
+:is(
+    .audio-menu > div,
+    .audio-floating-menu,
+    .audio-speed-viewport > :where([data-navigation-menu-content])
+  )
+  > button {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -283,7 +304,12 @@
   flex: 1 1 auto;
 }
 
-:is(.audio-menu > div, .audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button {
+:is(
+    .audio-menu > div,
+    .audio-floating-menu,
+    .audio-speed-viewport > :where([data-navigation-menu-content])
+  )
+  > button {
   white-space: nowrap;
 }
 
@@ -454,13 +480,15 @@
 .audio-floating-menu .audio-settings .audio-speed-toggle:hover,
 .audio-floating-menu .audio-settings .audio-speed-toggle[aria-expanded='true'],
 .audio-floating-menu .audio-settings .audio-speed-options button:hover,
-:is(.audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button:hover {
+:is(.audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content]))
+  > button:hover {
   background: var(--bg-soft);
 }
 
 .audio-floating-menu .audio-settings .audio-speed-options button:focus-visible,
 .audio-floating-menu .audio-settings .audio-speed-toggle:focus-visible,
-:is(.audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content])) > button:focus-visible {
+:is(.audio-floating-menu, .audio-speed-viewport > :where([data-navigation-menu-content]))
+  > button:focus-visible {
   background: var(--bg-soft);
   outline: 2px solid var(--accent);
   outline-offset: -2px;

@@ -114,5 +114,7 @@
   overflow: auto;
   transform-origin: bottom left;
 
-  &:not([inert]) { z-index: 1; }
+  &:not([inert]) {
+    z-index: 1;
+  }
 }

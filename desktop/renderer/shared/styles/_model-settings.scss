@@ -941,6 +941,17 @@
   border: 1px solid var(--border-subtle);
   font-size: 13px;
 }
-#subagent-model-panel .subagent-health-status.error { color: var(--text-danger, #a33); border-color: color-mix(in srgb, currentColor 35%, transparent); }
-#subagent-model-panel .subagent-custom-editor { display: grid; gap: 8px; padding: 12px 0; }
-#subagent-model-panel .subagent-custom-editor .settings-actions { display: flex; gap: 8px; margin-top: 8px; }
+#subagent-model-panel .subagent-health-status.error {
+  color: var(--text-danger, #a33);
+  border-color: color-mix(in srgb, currentcolor 35%, transparent);
+}
+#subagent-model-panel .subagent-custom-editor {
+  display: grid;
+  gap: 8px;
+  padding: 12px 0;
+}
+#subagent-model-panel .subagent-custom-editor .settings-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}

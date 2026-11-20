@@ -19,7 +19,9 @@
     color: var(--chat-secondary);
   }
 
-  #messages .message.user .message-image-group { padding-inline: var(--chat-image-action-rail) 0; }
+  #messages .message.user .message-image-group {
+    padding-inline: var(--chat-image-action-rail) 0;
+  }
 
   .message .message-bubble-body:has(> .attachment-message-host) {
     flex: 0 1 auto;
@@ -39,7 +41,12 @@
     grid-template-columns: minmax(0, 1fr);
   }
 
-  #messages .message-bubble-body .content:is(:has(> .markdown-image-group):not(:has(> :not(.markdown-image-group))), :has(> p.markdown-image-only:only-child)) {
+  #messages
+    .message-bubble-body
+    .content:is(
+      :has(> .markdown-image-group):not(:has(> :not(.markdown-image-group))),
+      :has(> p.markdown-image-only:only-child)
+    ) {
     width: var(--chat-attachment-width);
     max-width: 100%;
     padding: 0;
@@ -47,7 +54,9 @@
     box-shadow: none;
   }
 
-  #messages .message-bubble-body .content:has(> .markdown-image-group):not(:has(> :not(.markdown-image-group))) {
+  #messages
+    .message-bubble-body
+    .content:has(> .markdown-image-group):not(:has(> :not(.markdown-image-group))) {
     width: var(--chat-image-group-width);
   }
 
@@ -81,8 +90,12 @@
 
     @include chat-icon-control.feedback;
 
-    > svg { transition: rotate var(--ui-motion-fast) ease; }
-    &[aria-expanded='true'] > svg { rotate: 180deg; }
+    > svg {
+      transition: rotate var(--ui-motion-fast) ease;
+    }
+    &[aria-expanded='true'] > svg {
+      rotate: 180deg;
+    }
     &:focus-visible {
       outline: 1px solid currentcolor;
       outline-offset: -1px;
@@ -93,36 +106,54 @@
     inset-inline-end: calc((100% - var(--chat-image-action-rail)) * var(--chat-deck-end-inset));
   }
 
-  .message.user .message-image-toggle { inset-inline: 0 auto; }
+  .message.user .message-image-toggle {
+    inset-inline: 0 auto;
+  }
 
   .message.user .message-image-deck + .message-image-toggle {
     inset-inline-start: calc((100% - var(--chat-image-action-rail)) * var(--chat-deck-start-inset));
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .message-image-toggle > svg { transition: none; }
+    .message-image-toggle > svg {
+      transition: none;
+    }
   }
 
   @media (pointer: coarse) {
     --chat-image-toggle-size: var(--touch-target);
 
-    .message-image-toggle { touch-action: manipulation; }
+    .message-image-toggle {
+      touch-action: manipulation;
+    }
   }
 
-  #messages .message .message-bubble-body .content:has(> .markdown-image-only):has(> :not(.markdown-image-only, .markdown-image-group)) {
+  #messages
+    .message
+    .message-bubble-body
+    .content:has(> .markdown-image-only):has(> :not(.markdown-image-only, .markdown-image-group)) {
     --chat-mixed-photo-inset: 12px;
 
-    max-inline-size: min(100%, calc(var(--chat-attachment-width) + 2 * var(--chat-mixed-photo-inset)));
+    max-inline-size: min(
+      100%,
+      calc(var(--chat-attachment-width) + 2 * var(--chat-mixed-photo-inset))
+    );
 
-    &:has(> .markdown-image-only:last-child) { padding-block-end: var(--chat-mixed-photo-inset); }
+    &:has(> .markdown-image-only:last-child) {
+      padding-block-end: var(--chat-mixed-photo-inset);
+    }
 
     > .markdown-image-only {
       margin-inline: calc(var(--chat-mixed-photo-inset) - var(--chat-bubble-padding-inline));
 
-      > [data-slot='image-thumbnail'] { border-radius: var(--chat-bubble-radius); }
+      > [data-slot='image-thumbnail'] {
+        border-radius: var(--chat-bubble-radius);
+      }
 
       &:last-child > [data-slot='image-thumbnail'] {
-        border-end-start-radius: calc(var(--chat-text-bubble-radius) - var(--chat-mixed-photo-inset));
+        border-end-start-radius: calc(
+          var(--chat-text-bubble-radius) - var(--chat-mixed-photo-inset)
+        );
         border-end-end-radius: calc(var(--chat-text-bubble-radius) - var(--chat-mixed-photo-inset));
       }
     }
@@ -135,9 +166,17 @@
     gap: var(--chat-image-grid-gap);
   }
 
-  #messages .message .message-bubble-body .content > .markdown-image-only > [data-slot='image-thumbnail'],
+  #messages
+    .message
+    .message-bubble-body
+    .content
+    > .markdown-image-only
+    > [data-slot='image-thumbnail'],
   #messages .message .attachment-image-upload [data-slot='image-thumbnail'],
-  #messages .message .message-image-group :is([data-slot='image-thumbnail'], .attachment-image-thumbnail),
+  #messages
+    .message
+    .message-image-group
+    :is([data-slot='image-thumbnail'], .attachment-image-thumbnail),
   #messages .message .attachment-image-card .attachment-image-thumbnail {
     display: block;
     box-sizing: border-box;
@@ -150,16 +189,31 @@
     overflow: hidden;
     background: transparent;
 
-    img { display: block; width: auto; height: auto; max-width: 100%; max-height: var(--chat-image-max-height); margin-inline: auto; border: 0; border-radius: inherit; }
+    img {
+      display: block;
+      width: auto;
+      height: auto;
+      max-width: 100%;
+      max-height: var(--chat-image-max-height);
+      margin-inline: auto;
+      border: 0;
+      border-radius: inherit;
+    }
   }
 
-  #messages .message :is(.attachment-image-card, .markdown-image-only) > :is(.attachment-image-thumbnail, [data-slot='image-thumbnail']) {
+  #messages
+    .message
+    :is(.attachment-image-card, .markdown-image-only)
+    > :is(.attachment-image-thumbnail, [data-slot='image-thumbnail']) {
     width: fit-content;
     max-width: 100%;
     margin-inline-end: auto;
   }
 
-  #messages .message.user .attachment-image-card > :is(.attachment-image-thumbnail, [data-slot='image-thumbnail']) {
+  #messages
+    .message.user
+    .attachment-image-card
+    > :is(.attachment-image-thumbnail, [data-slot='image-thumbnail']) {
     margin-inline: auto 0;
   }
 
@@ -170,10 +224,21 @@
     padding: 9% calc(100% * var(--chat-deck-end-inset)) 4% calc(100% * var(--chat-deck-start-inset));
   }
 
-  #messages .message-image-deck :is(.attachment-card-host, .attachment-image-card) { width: 100%; height: 100%; }
-  #messages .message .message-image-deck :is([data-slot='image-thumbnail'], .attachment-image-thumbnail) { max-width: none; }
+  #messages .message-image-deck :is(.attachment-card-host, .attachment-image-card) {
+    width: 100%;
+    height: 100%;
+  }
+  #messages
+    .message
+    .message-image-deck
+    :is([data-slot='image-thumbnail'], .attachment-image-thumbnail) {
+    max-width: none;
+  }
 
-  &:not([data-pointer-focus]) #messages .message :is([data-slot='image-thumbnail'], .attachment-image-thumbnail):focus-visible {
+  &:not([data-pointer-focus])
+    #messages
+    .message
+    :is([data-slot='image-thumbnail'], .attachment-image-thumbnail):focus-visible {
     // Inset rings stay visible in cropped tiles and across light or dark images.
     outline: 2px solid white;
     outline-offset: -4px;
@@ -181,25 +246,48 @@
   }
 
   @media (forced-colors: active) {
-    &:not([data-pointer-focus]) #messages .message :is([data-slot='image-thumbnail'], .attachment-image-thumbnail):focus-visible {
+    &:not([data-pointer-focus])
+      #messages
+      .message
+      :is([data-slot='image-thumbnail'], .attachment-image-thumbnail):focus-visible {
       outline-color: Highlight;
     }
   }
 
-  #messages .message .message-image-group :is(.attachment-image-card, .attachment-image-upload) { width: 100%; min-width: 0; }
-  #messages .message .message-image-group :is([data-slot='image-thumbnail'], .attachment-image-thumbnail) {
+  #messages .message .message-image-group :is(.attachment-image-card, .attachment-image-upload) {
+    width: 100%;
+    min-width: 0;
+  }
+  #messages
+    .message
+    .message-image-group
+    :is([data-slot='image-thumbnail'], .attachment-image-thumbnail) {
     width: 100%;
     height: 100%;
 
-    img { width: 100%; height: 100%; max-height: none; object-fit: cover; }
+    img {
+      width: 100%;
+      height: 100%;
+      max-height: none;
+      object-fit: cover;
+    }
   }
-  #messages .message .message-image-group .message-image-stack > * { height: var(--chat-image-grid-row-height); min-width: 0; }
-  #messages .message .message-image-group .attachment-image-card { height: 100%; }
+  #messages .message .message-image-group .message-image-stack > * {
+    height: var(--chat-image-grid-row-height);
+    min-width: 0;
+  }
+  #messages .message .message-image-group .attachment-image-card {
+    height: 100%;
+  }
 
-  .generated-image-group .message-image-deck .image-generation-photo { height: 100%; }
+  .generated-image-group .message-image-deck .image-generation-photo {
+    height: 100%;
+  }
 
   #messages .message .generated-image-group .message-image-stack {
-    > .image-generation-photo { height: auto; }
+    > .image-generation-photo {
+      height: auto;
+    }
 
     [data-slot='image-thumbnail'] {
       width: fit-content;
@@ -220,15 +308,28 @@
     background: var(--chat-being-bubble);
   }
 
-  #messages .message .attachment-message:not(:has(.message-image-group)) :is(.attachment-card-host, .attachment-image-card):has(.attachment-image-skeleton, .attachment-image-thumbnail) {
+  #messages
+    .message
+    .attachment-message:not(:has(.message-image-group))
+    :is(.attachment-card-host, .attachment-image-card):has(
+      .attachment-image-skeleton,
+      .attachment-image-thumbnail
+    ) {
     width: min(var(--chat-attachment-width), 100%);
   }
 
-  #messages .message.user .attachment-message > div > .attachment-card-host > .attachment-image-card {
+  #messages
+    .message.user
+    .attachment-message
+    > div
+    > .attachment-card-host
+    > .attachment-image-card {
     width: 100%;
   }
 
-  #messages .message .message-image-group .attachment-image-skeleton { height: 100% !important; }
+  #messages .message .message-image-group .attachment-image-skeleton {
+    height: 100% !important;
+  }
 }
 
 :root:not([data-chat-host='desktop']) {
@@ -256,9 +357,14 @@
   }
 
   #messages .message .attachment-message:has(.message-image-group),
-  #messages .message .attachment-message > :has(> .message-image-group) { width: 100%; }
+  #messages .message .attachment-message > :has(> .message-image-group) {
+    width: 100%;
+  }
 
-  #messages .message .message-bubble-body > .content:has(> .markdown-image-group):not(:has(> :not(.markdown-image-group))) {
+  #messages
+    .message
+    .message-bubble-body
+    > .content:has(> .markdown-image-group):not(:has(> :not(.markdown-image-group))) {
     width: min(320px, 100%);
     padding: 0;
     background: transparent;
@@ -279,11 +385,21 @@
     text-align: start;
     cursor: pointer;
 
-    span { flex: 1; }
-    svg { flex: none; }
-    &:hover { background: var(--hover-overlay); }
-    &:focus-visible { outline: 2px solid currentColor; }
-    &[aria-expanded='true'] svg:last-child { transform: rotate(180deg); }
+    span {
+      flex: 1;
+    }
+    svg {
+      flex: none;
+    }
+    &:hover {
+      background: var(--hover-overlay);
+    }
+    &:focus-visible {
+      outline: 2px solid currentcolor;
+    }
+    &[aria-expanded='true'] svg:last-child {
+      transform: rotate(180deg);
+    }
   }
 
   .message-image-stack {
@@ -296,8 +412,12 @@
     grid-template-columns: repeat(3, minmax(0, 1fr));
     pointer-events: none;
 
-    > :nth-child(n + 4) { display: none; }
-    > * { min-width: 0; }
+    > :nth-child(n + 4) {
+      display: none;
+    }
+    > * {
+      min-width: 0;
+    }
   }
 
   .message-image-group[data-expanded='false'] .message-image-stack:not(:has(> :nth-child(3))) {
@@ -328,7 +448,10 @@
     }
   }
 
-  .message .message-image-group[data-expanded='false'] :is([data-slot='image-thumbnail'], .attachment-image-thumbnail) img,
+  .message
+    .message-image-group[data-expanded='false']
+    :is([data-slot='image-thumbnail'], .attachment-image-thumbnail)
+    img,
   .message-image-group[data-expanded='false'] .attachment-image-thumbnail img {
     max-height: 64px;
   }
@@ -358,6 +481,8 @@
     min-height: 52px;
     font-size: 11px;
 
-    :is(.chat-status-copy > span, .chat-status-actions) { display: none; }
+    :is(.chat-status-copy > span, .chat-status-actions) {
+      display: none;
+    }
   }
 }

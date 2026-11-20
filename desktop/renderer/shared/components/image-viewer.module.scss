@@ -13,8 +13,12 @@
   color: white;
   overflow: hidden;
 
-  &:focus-visible { outline: none; }
-  &:has(.thumbnails) { padding-bottom: 88px; }
+  &:focus-visible {
+    outline: none;
+  }
+  &:has(.thumbnails) {
+    padding-bottom: 88px;
+  }
 }
 
 .viewer::backdrop {
@@ -32,12 +36,14 @@
 }
 
 .actions,
+/* stylelint-disable-next-line selector-class-pattern -- Shared global component selector. */
 .actions :global(.attachment-download) {
   display: flex;
   align-items: center;
   gap: 6px;
 }
 
+/* stylelint-disable-next-line selector-class-pattern -- Shared global component selector. */
 .viewer :where(button:not(:global(.chat-error-indicator) > button)) {
   display: grid;
   place-items: center;
@@ -51,10 +57,20 @@
   cursor: pointer;
   transition: background-color var(--ui-motion-fast, 120ms) ease;
 
-  &:hover:not(:disabled) { background-color: rgb(255 255 255 / 18%); }
-  &:active:not(:disabled) { background-color: rgb(255 255 255 / 26%); }
-  &:focus-visible { outline: 1px solid white; outline-offset: 2px; }
-  &:disabled { opacity: 0.4; cursor: default; }
+  &:hover:not(:disabled) {
+    background-color: rgb(255 255 255 / 18%);
+  }
+  &:active:not(:disabled) {
+    background-color: rgb(255 255 255 / 26%);
+  }
+  &:focus-visible {
+    outline: 1px solid white;
+    outline-offset: 2px;
+  }
+  &:disabled {
+    opacity: 0.4;
+    cursor: default;
+  }
 }
 
 .toolbar button,
@@ -86,9 +102,16 @@
   cursor: zoom-in;
 }
 
-.stage[data-zoomed] img { cursor: zoom-out; }
-.stage.canPan img { cursor: grab; }
-.stage.isDragging, .stage.isDragging img { cursor: grabbing; }
+.stage[data-zoomed] img {
+  cursor: zoom-out;
+}
+.stage.canPan img {
+  cursor: grab;
+}
+.stage.isDragging,
+.stage.isDragging img {
+  cursor: grabbing;
+}
 
 .notice {
   position: absolute;
@@ -102,10 +125,16 @@
   animation: spin 0.85s linear infinite;
 }
 
-@keyframes spin { to { transform: rotate(1turn); } }
+@keyframes spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
 
 @media (prefers-reduced-motion: reduce) {
-  .spinner { animation: none; }
+  .spinner {
+    animation: none;
+  }
 }
 
 .footer {
@@ -148,7 +177,9 @@
 
   &:hover,
   &:focus-visible,
-  &[aria-current='true'] { opacity: 1; }
+  &[aria-current='true'] {
+    opacity: 1;
+  }
 
   &[aria-current='true']::after {
     position: absolute;
@@ -167,29 +198,58 @@
   }
 }
 
-html[data-platform='darwin'] .toolbar { top: 56px; }
-html[data-platform='darwin'] .viewer { padding-top: 100px; }
+html[data-platform='darwin'] .toolbar {
+  top: 56px;
+}
+html[data-platform='darwin'] .viewer {
+  padding-top: 100px;
+}
 
 @media (max-width: 520px) {
-  .viewer { padding-inline: 10px; }
-  .viewer:has(.thumbnails) { padding-bottom: 116px; }
-  .footer { grid-template-columns: minmax(0, 1fr); gap: 8px; }
-  .thumbnails, .controls { grid-column: 1; }
-  .controls { justify-self: center; }
+  .viewer {
+    padding-inline: 10px;
+  }
+  .viewer:has(.thumbnails) {
+    padding-bottom: 116px;
+  }
+  .footer {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 8px;
+  }
+  .thumbnails,
+  .controls {
+    grid-column: 1;
+  }
+  .controls {
+    justify-self: center;
+  }
 }
 
 @media (pointer: coarse) {
-  html[data-platform='darwin'] .viewer { padding-top: 110px; }
+  html[data-platform='darwin'] .viewer {
+    padding-top: 110px;
+  }
 
   .toolbar button,
-  .controls button { width: 44px; height: 44px; }
+  .controls button {
+    width: 44px;
+    height: 44px;
+  }
 
-  .thumbnails > button { min-height: 44px; }
+  .thumbnails > button {
+    min-height: 44px;
+  }
 
-  .footer { grid-template-columns: 144px minmax(0, 1fr) 144px; }
+  .footer {
+    grid-template-columns: 144px minmax(0, 1fr) 144px;
+  }
 }
 
 @media (pointer: coarse) and (max-width: 520px) {
-  .viewer:has(.thumbnails) { padding-bottom: 128px; }
-  .footer { grid-template-columns: minmax(0, 1fr); }
+  .viewer:has(.thumbnails) {
+    padding-bottom: 128px;
+  }
+  .footer {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }

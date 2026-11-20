@@ -103,7 +103,9 @@ body {
 }
 
 .message .content {
-  ul:has(> .markdown-task):not(:has(> li:not(.markdown-task))) { padding-inline-start: 0; }
+  ul:has(> .markdown-task):not(:has(> li:not(.markdown-task))) {
+    padding-inline-start: 0;
+  }
 
   .markdown-task {
     display: grid;
@@ -132,7 +134,7 @@ body {
         content: '';
         width: 12px;
         height: 12px;
-        background: currentColor;
+        background: currentcolor;
         mask: var(--chat-task-check) center / contain no-repeat;
       }
     }
@@ -287,7 +289,10 @@ body {
   max-width: 100%;
   margin: 0;
 
-  &:focus-visible { outline: 1px solid var(--accent); outline-offset: -1px; }
+  &:focus-visible {
+    outline: 1px solid var(--accent);
+    outline-offset: -1px;
+  }
 }
 
 .message .content pre[tabindex] code {

@@ -128,6 +128,7 @@
 
 .chat-status-row[data-tone='error'] {
   --status-accent: var(--chat-error-icon, var(--red));
+
   width: fit-content;
   padding: 0;
 }
@@ -236,8 +237,12 @@
   font-weight: 500;
   box-shadow: var(--chat-menu-shadow, 0 5px 14px #0002);
 
-  &:hover { background: var(--chat-menu-hover, var(--bg-soft)); }
-  &:focus-visible { outline: 2px solid var(--chat-link, var(--accent)); }
+  &:hover {
+    background: var(--chat-menu-hover, var(--bg-soft));
+  }
+  &:focus-visible {
+    outline: 2px solid var(--chat-link, var(--accent));
+  }
 }
 
 #scene-selection-action kbd {

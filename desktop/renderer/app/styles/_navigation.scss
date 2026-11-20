@@ -260,7 +260,9 @@ body[data-view='chat'].has-topic .scene-ribbon {
 
 #place-panel #view-title {
   display: block;
-  font: 500 20px/28px 'Being Noto Sans SC', var(--font-sans);
+  font:
+    500 20px/28px 'Being Noto Sans SC',
+    var(--font-sans);
   letter-spacing: -0.3px;
   margin: 0;
   overflow-wrap: anywhere;
@@ -304,7 +306,9 @@ body[data-view='chat'].has-topic .scene-ribbon {
   opacity: 0;
   transform: translateY(8px) scale(0.98);
   transform-origin: bottom right;
-  transition: opacity 220ms ease, transform 240ms cubic-bezier(0.2, 0.75, 0.25, 1);
+  transition:
+    opacity 220ms ease,
+    transform 240ms cubic-bezier(0.2, 0.75, 0.25, 1);
 
   &[data-open='true'] {
     opacity: 1;

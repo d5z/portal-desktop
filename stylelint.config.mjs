@@ -13,6 +13,9 @@ export default {
     'rule-empty-line-before': null,
     'comment-empty-line-before': null,
     'at-rule-empty-line-before': null,
+    // CSS font/line-height slashes and multiline calc() follow Prettier, not Sass operator spacing.
+    'scss/operator-no-newline-after': null,
+    'scss/operator-no-unspaced': null,
   },
   overrides: [
     {
