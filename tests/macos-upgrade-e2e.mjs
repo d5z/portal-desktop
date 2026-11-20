@@ -47,7 +47,7 @@ assert.notEqual(previousVersion, pkg.version);
 const root = await realpath(await mkdtemp(path.join(os.tmpdir(), "portal-upgrade 中文 ' ")));
 const profile = path.join(root, 'profile'), workspace = path.join(root, 'workspace'), kits = path.join(root, 'kits');
 const current = path.join(root, 'Applications/Portal Desktop.app'), executable = path.join(current, 'Contents/MacOS/Portal Desktop');
-let app, upgradedPid, relay, nextId = 0, passed = false, mounted = false;
+let app, upgradedPid, relay, nextId = 0, passed = false, mountedDevice;
 const mount = path.join(root, 'mounted');
 const ownedPortalPids = new Set(), pending = new Map();
 const token = 'local-upgrade-fixture';
@@ -87,10 +87,14 @@ const readJSON = async file => JSON.parse(await readFile(file, 'utf8'));
 try {
   await Promise.all([mkdir(workspace), mkdir(kits), mkdir(path.dirname(current))]);
   await mkdir(mount);
-  await execute('/usr/bin/hdiutil', ['attach', '-readonly', '-nobrowse', '-noautoopen', '-mountpoint', mount, dmg]);
-  mounted = true;
-  await execute('/usr/bin/ditto', [path.join(mount, `${pkg.productName}.app`), current]);
-  await execute('/usr/bin/hdiutil', ['detach', mount]); mounted = false;
+  const attachment = path.join(root, 'mount.plist');
+  await writeFile(attachment, (await execute('/usr/bin/hdiutil', ['attach', '-plist', '-readonly', '-nobrowse', '-noautoopen', '-mountpoint', mount, dmg])).stdout);
+  const entities = JSON.parse((await execute('/usr/bin/plutil', ['-convert', 'json', '-o', '-', attachment])).stdout)['system-entities'];
+  mountedDevice = entities.find(entry => entry['dev-entry'])?.['dev-entry'];
+  const mountedPath = entities.find(entry => entry['mount-point'])?.['mount-point'];
+  assert(mountedDevice && mountedPath, 'hdiutil must report the attached device and volume');
+  await execute('/usr/bin/ditto', [path.join(mountedPath, `${pkg.productName}.app`), current]);
+  await execute('/usr/bin/hdiutil', ['detach', mountedDevice]); mountedDevice = undefined;
   await execute('/usr/bin/codesign', ['--verify', '--deep', '--strict', current]);
   assert.equal(sha(await readFile(path.join(current, 'Contents/Resources/app.asar'))), sha(await readFile(path.join(candidate, 'Contents/Resources/app.asar'))));
   const unpacked = path.join(root, 'asar');
@@ -207,10 +211,10 @@ try {
   console.log(`PASS: DMG installation → ${previousVersion} → ${pkg.version}; GitHub Release check/ZIP download/check/replace/relaunch; original config and files retained; exact bundled Portal ${status.pid} belongs to new client ${upgradedPid}; old guardian disabled; file/exec/tool list verified; no duplicate or restart loop.`);
   passed = true;
 } catch (error) {
-  console.error('Native upgrade failed. Isolated artifacts:', root);
+  console.error('Native upgrade failed. Isolated artifacts:', root, error);
   throw error;
 } finally {
-  if (mounted) await execute('/usr/bin/hdiutil', ['detach', mount]);
+  if (mountedDevice) await execute('/usr/bin/hdiutil', ['detach', mountedDevice]);
   if (app) await app.close().catch(() => {});
   upgradedPid ??= (await clients()).find(p => p.executable === executable)?.pid;
   if (upgradedPid) { try { process.kill(upgradedPid, 'SIGTERM'); } catch { /* Already exited. */ } }

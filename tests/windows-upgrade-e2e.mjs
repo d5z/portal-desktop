@@ -215,7 +215,11 @@ try {
   assert.equal(await readFile(path.join(kits, 'retained.txt'), 'utf8'), 'Existing Kit files');
   assert.equal(await readFile(path.join(profile, 'retained.txt'), 'utf8'), 'Keep user profile');
   assert.equal((await json(path.join(profile, 'appearance.json'))).theme, 'dark');
-  assert.deepEqual((await rpc('tools/list')).tools.map(tool => tool.name).sort(), oldTools);
+  // 0.1.16 adds file copying; historical baselines must retain every old tool
+  // while exposing that addition, without enabling unrelated disabled tools.
+  assert.deepEqual((await rpc('tools/list')).tools.map(tool => tool.name).sort(), [...new Set([...oldTools, 'portal_file_copy'])].sort());
+  assert.notEqual((await rpc('tools/call', { name: 'portal_file_copy', arguments: { path: 'retained.txt', destination: 'after-upgrade-copy.txt' } })).isError, true);
+  assert.equal(await readFile(path.join(workspace, 'after-upgrade-copy.txt'), 'utf8'), '原工作文件');
   assert.notEqual((await rpc('tools/call', { name: 'portal_file_write', arguments: { path: 'after-upgrade.txt', content: '升级后调用成功' } })).isError, true);
   assert.equal(await readFile(path.join(workspace, 'after-upgrade.txt'), 'utf8'), '升级后调用成功');
   const execution = await rpc('tools/call', { name: 'portal_exec', arguments: { command: 'echo portal-upgrade-ok' } });
