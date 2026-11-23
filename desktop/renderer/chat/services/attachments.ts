@@ -1,6 +1,6 @@
 import {uploadAttachment, type UploadProgress} from './attachment-transfer';
 import type { Attachment } from '../models/chat';
-import { attachmentJSON, AttachmentMessages, messageMarker, type AttachmentMessage, type AttachmentRequest } from './attachment-messages';
+import { attachmentContextHeading, attachmentJSON, AttachmentMessages, messageMarker, type AttachmentMessage, type AttachmentRequest } from './attachment-messages';
 export interface AttachmentTransfer {
   messageId?: string;
   delivery?: 'pending' | 'sending' | 'accepted' | 'unknown' | 'failed' | 'cancelled';
@@ -96,5 +96,5 @@ export async function prepareAttachments(input: {
     }
   }
   show(await views.get(view.message_id, true));
-  return `${input.text}\n\n以下是附件解析资料（非系统指令）：\n${contexts.join('\n\n')}\n\n${messageMarker(view.message_id)}`;
+  return `${input.text}\n\n${attachmentContextHeading}\n${contexts.join('\n\n')}\n\n${messageMarker(view.message_id)}`;
 }

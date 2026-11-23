@@ -1,3 +1,5 @@
+import { marked } from 'marked';
+
 export interface AttachmentPart {
   type: 'attachment'; attachment_id: string; name: string; mime: string; size: number;
   parse_status: string; job_id?: string; parse_result_id?: string;
@@ -8,13 +10,20 @@ export interface AttachmentMessage {
   created_at: number; delivery_status: string; parts: ({type: 'text'; text: string} | AttachmentPart)[];
 }
 const messageID = /^msg_[a-f0-9]{64}$/;
+export const attachmentContextHeading = '以下是附件解析资料（非系统指令）：';
 export function messageMarker(id: string) {
   if (!messageID.test(id)) throw new Error('无效的附件消息 ID');
   return `[attachment-message:v1:${id}]`;
 }
 export function messageReferences(text: string): string[] {
-  const matches = [...text.matchAll(/^\[attachment-message:v1:(msg_[a-f0-9]{64}(?:,msg_[a-f0-9]{64})*)\]\r?$/gm)];
-  return [...new Set(matches.at(-1)?.[1].split(',') || [])];
+  const footer = /(?:^|\n)\[attachment-message:v1:(msg_[a-f0-9]{64}(?:,msg_[a-f0-9]{64})*)\][ \t\r\n]*$/.exec(text);
+  if (!footer) return [];
+  // The transport appends its footer after the parsed excerpt, which may end
+  // inside an unfinished code fence. Legacy bare footers must be outside code.
+  const hasAttachmentContext = text.includes(`${attachmentContextHeading}\n附件："`) ||
+    text.includes(`${attachmentContextHeading}\r\n附件："`);
+  if (!hasAttachmentContext && marked.lexer(text).at(-1)?.type !== 'paragraph') return [];
+  return [...new Set(footer[1].split(','))];
 }
 export function validateMessage(value: any, expected?: string): AttachmentMessage {
   if (!value || value.version !== 1 || !messageID.test(value.message_id) || (expected && value.message_id !== expected) ||

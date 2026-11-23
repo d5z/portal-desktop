@@ -8,8 +8,9 @@ import TaskItem from '@tiptap/extension-task-item';
 import { safeLink } from './markdown';
 import { EditorState } from '@tiptap/pm/state';
 import type { Extensions } from '@tiptap/core';
+import { detectStructuredText, hasStructuredTextSuffix } from '../lib/structured-text';
 
-export interface ComposerHandle { focus: () => void; appendText: (text: string) => void }
+export interface ComposerHandle { focus: (caret?: number) => void; appendText: (text: string) => void }
 
 // Empty list items/headings still carry user-entered Markdown structure.
 // Only the initial, empty paragraph should display the input placeholder.
@@ -18,14 +19,17 @@ function isBlankParagraph(editor: Editor): boolean {
   return doc.childCount === 1 && doc.firstChild?.type.name === 'paragraph' && doc.firstChild.content.size === 0;
 }
 
-export function MarkdownEditor({ value, onChange, inputRef, id, label, placeholder, disabled, suggestions, extensions = [] }: {
+export function MarkdownEditor({ value, onChange, onSourcePaste, inputRef, id, label, placeholder, disabled, suggestions, extensions = [] }: {
   value: string; onChange: (value: string) => void; inputRef: RefObject<ComposerHandle | null>;
+  onSourcePaste?: (value: string, caret: number) => void;
   id?: string; label?: string; placeholder?: string; disabled?: boolean;
   suggestions?: { controls?: string; active?: string; autocomplete?: string };
   extensions?: Extensions;
 }) {
   const latest = useRef(onChange);
   latest.current = onChange;
+  const sourcePaste = useRef(onSourcePaste);
+  sourcePaste.current = onSourcePaste;
   const lastValue = useRef(value);
   const wantsFocus = useRef(false);
   const editor: Editor | null = useEditor({
@@ -55,8 +59,30 @@ export function MarkdownEditor({ value, onChange, inputRef, id, label, placehold
         const text = event.clipboardData?.getData('text/plain');
         if (!text || !editor) return false;
         event.preventDefault();
-        // Keep pasted source intact until the user edits it; JSON switches to the code editor.
-        if (isBlankParagraph(editor)) {
+        const blank = isBlankParagraph(editor);
+        const selection = view.dom.ownerDocument.getSelection();
+        const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
+        // The edit menu can restore the DOM selection just before native paste.
+        const { from, to } = range && view.dom.contains(range.commonAncestorContainer)
+          ? { from: view.posAtDOM(range.startContainer, range.startOffset), to: view.posAtDOM(range.endContainer, range.endOffset) }
+          : view.state.selection;
+        const pasteSource = sourcePaste.current;
+        if (pasteSource && (detectStructuredText(text) || (blank && hasStructuredTextSuffix(text)))) {
+          if (blank) pasteSource(text, text.length);
+          else {
+            // Serialize the insertion position through the same Markdown writer
+            // as the rest of the draft, without asking it to parse the JSON.
+            let placeholder = 'JSONPASTE';
+            const draft = editor.getMarkdown();
+            while (draft.includes(placeholder)) placeholder += 'X';
+            const doc = view.state.tr.replaceWith(from, to, view.state.schema.text(placeholder)).doc;
+            const source = editor.markdown!.serialize(doc.toJSON());
+            pasteSource(source.replace(placeholder, () => text), source.indexOf(placeholder) + text.length);
+          }
+          return true;
+        }
+        // Keep pasted Markdown source intact until the user edits it.
+        if (blank) {
           lastValue.current = text;
           editor.commands.setContent(text, { contentType: 'markdown', emitUpdate: false });
           editor.view.dom.dataset.empty = String(isBlankParagraph(editor));
@@ -67,17 +93,7 @@ export function MarkdownEditor({ value, onChange, inputRef, id, label, placehold
           // Inserting a whole Markdown document here splits the surrounding paragraph.
           const content = parsed.content;
           const insertion = content?.length === 1 && content[0].type === 'paragraph' ? content[0].content || [] : content || [];
-          const selection = view.dom.ownerDocument.getSelection();
-          const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
-          // The edit menu can restore the DOM selection just before the native paste event.
-          if (range && view.dom.contains(range.commonAncestorContainer)) {
-            editor.commands.insertContentAt({
-              from: view.posAtDOM(range.startContainer, range.startOffset),
-              to: view.posAtDOM(range.endContainer, range.endOffset),
-            }, insertion);
-          } else {
-            editor.commands.insertContent(insertion);
-          }
+          editor.commands.insertContentAt({ from, to }, insertion);
         }
         return true;
       },

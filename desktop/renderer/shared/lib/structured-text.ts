@@ -16,6 +16,12 @@ export function detectStructuredText(source: string): 'json' | 'jsonl' | undefin
   } catch { /* Incomplete streams and invalid JSON stay as source. */ }
 }
 
+/** A prose lead-in followed by a JSON object or array pasted as source. */
+export function hasStructuredTextSuffix(source: string): boolean {
+  const start = /\s(?=\{\s*["}]|\[\s*(?:["\[{\]\d-]|true\b|false\b|null\b))/.exec(source);
+  return !!start && !!detectStructuredText(source.slice(start.index + 1));
+}
+
 /** Format whitespace only: preserve large numbers, duplicate keys and escapes. */
 export function formatJSON(source: string): string | undefined {
   try { JSON.parse(source); } catch { return; }

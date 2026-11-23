@@ -280,20 +280,22 @@ function createStreamRuntime(state: any, options: any): any {
     const reasoning = (type === "thinking" || type === "reasoning") &&
       typeof (data.text || data.delta?.text || data.delta) === "string" &&
       (data.text || data.delta?.text || data.delta).trim();
-    if (!streamMessage || !streamText || (type !== "tool_use" && !reasoning)) return;
+    if (!streamText || (type !== "tool_use" && !reasoning)) return;
     if (renderTimer) {
       cancelAnimationFrame(renderTimer);
       renderTimer = null;
     }
-    const visible = cleanContent(streamText);
-    if (visible) {
-      updateMessage(streamMessage, visible);
-      streamMessage.interim = true;
-      progressBubbles.push({ message: streamMessage, text: streamText });
-      setMessageStreaming(streamMessage, false);
-      noteLocalEcho("being", streamText, state.activeScene, streamMessage);
-    } else removeMessage(streamMessage);
-    streamReplyPrefix += streamText;
+    if (streamMessage) {
+      const visible = cleanContent(streamText, true);
+      if (visible) {
+        updateMessage(streamMessage, visible);
+        streamMessage.interim = true;
+        progressBubbles.push({ message: streamMessage, text: streamText });
+        setMessageStreaming(streamMessage, false);
+        noteLocalEcho("being", streamText, state.activeScene, streamMessage);
+        streamReplyPrefix += streamText;
+      } else removeMessage(streamMessage);
+    }
     streamMessage = null;
     streamText = "";
   }
@@ -823,7 +825,7 @@ function createStreamRuntime(state: any, options: any): any {
     statusMessageId?: string,
   ) {
     if (disposed) return null;
-    if (!streaming && role !== "system") text = cleanContent(role === "user" ? stripSceneTransition(stripClientMessageContext(text)) : text);
+    if (!streaming && role !== "system") text = visibleMessageText(role, text);
     if (!text && !streaming) return null; // skip empty after cleaning
 
     const ts = timestamp || formatTime();
@@ -955,22 +957,22 @@ function createStreamRuntime(state: any, options: any): any {
   /** Both SSE and replay share one visual writer. After the first bubble,
    * token bursts update the store only once per animation frame. */
   function appendStreamText(text: string) {
-    removeThinkingIndicator();
-    tuiClear();
-    // A final answer can resume after the waiting indicators already cleared.
-    // Refresh the phase once without copying the tool log for every token.
-    if (currentRun?.status !== 'replying') updateRun();
     streamText += text;
     if (!streamMessage) {
-      const visible = cleanContent(streamText);
-      if (visible) streamMessage = addMessage("being", visible, true);
+      const visible = cleanContent(streamText, true);
+      if (!visible) return;
+      livePhase = "text";
+      removeThinkingIndicator();
+      tuiClear();
+      if (currentRun?.status !== 'replying') updateRun();
+      streamMessage = addMessage("being", visible, true);
     } else if (!renderTimer) {
       const rafEpoch = writerEpoch;
       renderTimer = requestAnimationFrame(() => {
         renderTimer = null;
         if (rafEpoch !== writerEpoch) return;
         if (streamMessage && streamText) {
-          const visible = cleanContent(streamText);
+          const visible = cleanContent(streamText, true);
           if (visible) updateMessage(streamMessage, visible);
         }
       });
@@ -1005,11 +1007,15 @@ function createStreamRuntime(state: any, options: any): any {
         date.getDate() === today.getDate()) return time;
     return `${date.getFullYear()}年${pad(date.getMonth() + 1)}月${pad(date.getDate())}日 ${time}`;
   }
+  function visibleMessageText(role: string, text: string) {
+    return role === "user" ? stripSceneTransition(stripClientMessageContext(text)).trim() : cleanContent(text);
+  }
+
   // Filter out DSML/tool_call raw content
-  function cleanContent(text: any) {
+  function cleanContent(text: any, streaming = false) {
     if (!text) return "";
     const fences: any[] = [];
-    text = text.replace(/```[\s\S]*?```/g, (block: any) => {
+    text = text.replace(streaming ? /```[\s\S]*?(?:```|$)/g : /```[\s\S]*?```/g, (block: any) => {
       const key = `@@FENCE_${fences.length}@@`;
       fences.push(block);
       return key;
@@ -1018,7 +1024,17 @@ function createStreamRuntime(state: any, options: any): any {
     const rawToolJson =
       /"name"\s*:\s*"(?:act|remember|learn)"\s*,\s*"args"\s*:/;
     if (/^[\[{]/.test(trimmed) && rawToolJson.test(trimmed)) return "";
+    if (streaming) {
+      // A tool marker can begin with a delta containing only "<". Hold the
+      // ambiguous suffix until the next token identifies it as markup or prose.
+      text = text.replace(/<[^<\n]*$/, (tail: string) => {
+        const prefix = tail.toLowerCase().replaceAll("｜", "|").replace(/^<\//, "<");
+        return ["<|dsml|", "<||dsml||", "<tool_calls", "<tool_use", "<tool_result", "<system"]
+          .some(marker => marker.startsWith(prefix)) ? "" : tail;
+      });
+    }
     // Remove DSML lines — both half-width | and full-width ｜
+    text = text.replace(/<\/?[|｜]+ *DSML *[|｜]+[^\n]*/g, "");
     text = text.replace(/^.*[|｜] *DSML *[|｜].*$/gm, "");
     // Remove raw tool_calls XML blocks (both formats)
     text = text.replace(
@@ -1365,8 +1381,7 @@ function createStreamRuntime(state: any, options: any): any {
     } else if (type === "tool_result") {
       livePhase = "reasoning";
       livePendingTool = null;
-    } else if (type === "content_block_delta") livePhase = "text";
-    else if (type === "thinking" || type === "reasoning")
+    } else if (type === "thinking" || type === "reasoning")
       livePhase = "reasoning";
   }
 
@@ -1788,12 +1803,7 @@ function createStreamRuntime(state: any, options: any): any {
                 renderTimer = null;
               }
               removeThinkingIndicator();
-              if (streamMessage) {
-                setMessageStreaming(streamMessage, false);
-                const visibleText = cleanContent(streamText);
-                if (visibleText) updateMessage(streamMessage, visibleText);
-                else removeMessage(streamMessage);
-              }
+              finalizePartialBubble(true);
               noteStreamEcho();
               settleReplyBoundary();
               streamMessage = null;
@@ -1841,16 +1851,7 @@ function createStreamRuntime(state: any, options: any): any {
           renderTimer = null;
         }
         removeThinkingIndicator();
-        const visibleText = cleanContent(streamText);
-        if (streamMessage && visibleText) {
-          setMessageStreaming(streamMessage, false);
-          updateMessage(streamMessage, visibleText);
-        } else if (streamMessage) {
-          removeMessage(streamMessage);
-          streamMessage = null;
-        } else if (visibleText) {
-          streamMessage = addMessage("being", visibleText);
-        }
+        finalizePartialBubble(true);
         // EOF can finalize a reply without message_stop. Retain its echo before
         // releasing the live scene so a later history read does not append it again.
         noteStreamEcho();
@@ -2212,15 +2213,15 @@ function createStreamRuntime(state: any, options: any): any {
   }
 
   // 把当前 streamMessage 上的流式内容固化下来（去掉光标、做最终 markdown 渲染）。
-  function finalizePartialBubble() {
-    if (!streamMessage) return;
-    setMessageStreaming(streamMessage, false);
-    const visibleText = cleanContent(streamText);
-    if (visibleText) updateMessage(streamMessage, visibleText);
-    else {
+  function finalizePartialBubble(completed = false) {
+    const visibleText = cleanContent(streamText, !completed);
+    if (streamMessage && visibleText) {
+      setMessageStreaming(streamMessage, false);
+      updateMessage(streamMessage, visibleText);
+    } else if (streamMessage) {
       removeMessage(streamMessage);
       streamMessage = null;
-    }
+    } else if (completed && visibleText) streamMessage = addMessage("being", visibleText);
   }
 
   function currentReplyBubble(): Message | undefined {
@@ -2639,8 +2640,9 @@ function createStreamRuntime(state: any, options: any): any {
   // 本地已经渲染、但还没被历史游标覆盖的消息。用于避免"本地回显 + 历史对账"渲染两遍。
   let localEchoes: any[] = [];
   const ECHO_SCENE_FALLBACK_MS = 2 * 60 * 1000;
-  function normalizeEcho(text: any) {
-    return (cleanContent(text || "") || "").replace(/\s+/g, " ").trim();
+  function normalizeEcho(text: any, role = "being") {
+    const body = visibleMessageText(role, text || "");
+    return role === "user" ? body.replace(/\r\n/g, "\n") : body.replace(/\s+/g, " ").trim();
   }
   function echoScene(echo: any) {
     return echo.message || echo.scene || {};
@@ -2775,7 +2777,7 @@ function createStreamRuntime(state: any, options: any): any {
     applyHistoryIdentity(message, historyIdentity(row));
     message.historyContentError = row.role !== 'user' && !row.content.trim() && !message.text.trim();
     if (row.content.trim()) {
-      message.persistedText = cleanContent(row.role === "user" ? stripSceneTransition(stripClientMessageContext(row.content)) : row.content);
+      message.persistedText = visibleMessageText(row.role, row.content);
       if (!message.streaming) message.text = message.persistedText;
     }
     changed();
@@ -2787,7 +2789,7 @@ function createStreamRuntime(state: any, options: any): any {
     const localIndex = state.items.indexOf(message);
     const candidates = state.items.map((item: any, index: any) => ({ item, index })).filter(({ item, index }: any) =>
       index > localIndex && item !== message && item.kind === "message" && item.historySeq && !item.persistedStreamId &&
-      item.role === role && texts.includes(normalizeEcho(item.text)));
+      item.role === role && texts.includes(normalizeEcho(item.text, role)));
     const exact = [...candidates].reverse().find(({ item }: any) => echoScenesMatch(item, message || scene));
     if (exact) return exact.item;
     if (role !== "being" || !message) return null;
@@ -2803,10 +2805,10 @@ function createStreamRuntime(state: any, options: any): any {
     const owner = options.historyOwner?.();
     if (owner) return owner.noteLocalEcho(role, text, scene, localMessage, aliases);
     if (localMessage?.historySeq) return;
-    const t = normalizeEcho(text);
+    const t = normalizeEcho(text, role);
     if (!t) return;
-    const texts = [t, ...aliases.map(normalizeEcho).filter(Boolean)];
-    const message = localMessage || [...state.items].reverse().find(item => item.kind === "message" && item.role === role && item.sceneId === scene.sceneId && normalizeEcho(item.text) === t);
+    const texts = [t, ...aliases.map(alias => normalizeEcho(alias, role)).filter(Boolean)];
+    const message = localMessage || [...state.items].reverse().find(item => item.kind === "message" && item.role === role && item.sceneId === scene.sceneId && normalizeEcho(item.text, role) === t);
     // History can win the race against message_stop. In that order the normal
     // history -> local echo matcher has not been registered yet, so reconcile
     // the already-rendered persisted row back into the live bubble here.
@@ -2861,13 +2863,13 @@ function createStreamRuntime(state: any, options: any): any {
   }
   function consumeLocalEcho(role: any, text: any, scene: any, history: any) {
     if (role === 'user') {
-      text = stripSceneTransition(stripClientMessageContext(text || ''));
-      const ids = messageReferences(text);
+      const body = visibleMessageText(role, text || '');
+      const ids = messageReferences(body);
       if (ids.length) {
         const matching = state.items.filter((item: any) => item.kind === 'message' && item.role === 'user' && !item.historySeq &&
           item.attachmentViews?.some((view: any) => ids.includes(view.message_id)));
         if (matching.length) {
-          const item = matching[0]; item.text = text; item.queued = false;
+          const item = matching[0]; item.text = body; item.queued = false;
           item.attachmentViews = ids.flatMap(id => matching.flatMap((m: any) => m.attachmentViews || []).filter((v: any) => v.message_id === id)).filter((v: any, i: number, all: any[]) => all.findIndex(x => x.message_id === v.message_id) === i);
           applyHistoryIdentity(item, history);
           state.items = state.items.filter((other: any) => other === item || !matching.includes(other));
@@ -2875,7 +2877,7 @@ function createStreamRuntime(state: any, options: any): any {
         }
       }
     }
-    const t = normalizeEcho(text);
+    const t = normalizeEcho(text, role);
     if (!t) return false;
     const candidates = localEchoes.map((echo, index) => ({ echo, index })).filter(({ echo }) =>
       !echo.message?.historySeq && state.items.includes(echo.message) && echo.role === role && echo.texts.includes(t) &&
@@ -2959,7 +2961,7 @@ function createStreamRuntime(state: any, options: any): any {
           consumeLocalEcho(role, message.content, messageScene(message), identity))) continue;
       const text = isHistoryMarker(message)
         ? `· ${breathMarkerLabel(message.content)} · ${identity.timestamp} ·`
-        : cleanContent(role === "user" ? stripSceneTransition(stripClientMessageContext(message.content)) : message.content);
+        : visibleMessageText(role, message.content);
       const historyContentError = !isHistoryMarker(message) && role === 'being' && !message.content.trim();
       if (!text && !historyContentError) continue;
       const item = isHistoryMarker(message)
@@ -3410,7 +3412,7 @@ function createStreamRuntime(state: any, options: any): any {
       return;
     }
 
-    const visibleText = cleanContent(streamText);
+    const visibleText = cleanContent(streamText, true);
     // Replay consumes a whole buffer synchronously. Flush its final text before
     // polling takes a new writer epoch and invalidates the queued render frame.
     // Otherwise only the first token is visible until another network event.
@@ -3598,7 +3600,7 @@ function createStreamRuntime(state: any, options: any): any {
       // segment without stopping the shared reader or the room's pending reply.
       if (autonomousStream && !autonomousHandedOff && PROGRESS_EVENTS.has(eventType) && eventType !== 'message_stop' && eventType !== 'error' &&
           (eventType !== 'content_block_delta' || eventData.delta?.text)) {
-        solidifyReplayBubble();
+        finalizePartialBubble();
         noteStreamEcho();
         streamMessage = null;
         streamText = '';
@@ -3694,7 +3696,7 @@ function createStreamRuntime(state: any, options: any): any {
       cancelAnimationFrame(renderTimer);
       renderTimer = null;
     }
-    solidifyReplayBubble();
+    finalizePartialBubble(true);
     if (!replayingSettledReply) settleReplyBoundary();
     if (!pendingReply && !replayingSettledReply) {
       updateRun(true);
@@ -3710,21 +3712,13 @@ function createStreamRuntime(state: any, options: any): any {
     syncHistoryCursor();
   }
 
-  function solidifyReplayBubble() {
-    if (!streamMessage) return;
-    setMessageStreaming(streamMessage, false);
-    const finalText = cleanContent(streamText);
-    if (finalText) updateMessage(streamMessage, finalText);
-    else removeMessage(streamMessage);
-  }
-
   function finalizeReplayStream() {
     options.finishRoutes?.();
     if (activeStreamPollTimer) clearTimeout(activeStreamPollTimer);
     activeStreamPollTimer = null;
 
     // 先把 streamText 固化为正式消息（如果还没渲染）
-    solidifyReplayBubble();
+    finalizePartialBubble(true);
     noteStreamEcho();
     settleReplyBoundary();
 

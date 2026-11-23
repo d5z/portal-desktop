@@ -2,7 +2,7 @@ import styles from './rich-composer.module.scss';
 import { appendChatText } from '../lib/message-time';
 import { useImperativeHandle, useLayoutEffect, useMemo, useRef, useState, type RefObject, type TextareaHTMLAttributes, type KeyboardEventHandler, type CompositionEventHandler } from 'react';
 import { HighlightedCode } from './markdown';
-import { detectStructuredText } from '../lib/structured-text';
+import { detectStructuredText, hasStructuredTextSuffix } from '../lib/structured-text';
 import { MarkdownEditor, type ComposerHandle } from './markdown-editor';
 import type { Extensions } from '@tiptap/core';
 export type { ComposerHandle } from './markdown-editor';
@@ -26,16 +26,21 @@ export function RichComposer({ textareaRef, value, onChange, onKeyDown, onCompos
   const [source, setSource] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const restoreFocus = useRef(false);
+  const sourceDraft = useRef<string | undefined>(undefined);
+  const pasteCaret = useRef<number | undefined>(undefined);
   const inferred = useMemo(() => detectStructuredText(value) || (/^\s*[\[{]/.test(value) && !/^\s*\[[^\n]*\]\(/.test(value) ? 'json' : 'markdown'), [value]);
   const language = format === 'auto' ? inferred : format;
-  const rich = language === 'markdown' && !source;
+  const literal = !!value && format === 'auto' && (sourceDraft.current === value || hasStructuredTextSuffix(value));
+  const rich = language === 'markdown' && !source && !literal;
   const change = (text: string) => {
     restoreFocus.current = Boolean(root.current?.contains(document.activeElement));
+    sourceDraft.current = literal ? text : undefined;
     onChange(text);
   };
   useLayoutEffect(() => {
-    if (restoreFocus.current) textareaRef.current?.focus();
+    if (restoreFocus.current || pasteCaret.current !== undefined) textareaRef.current?.focus(pasteCaret.current);
     restoreFocus.current = false;
+    pasteCaret.current = undefined;
   }, [rich]);
   return <div ref={root} className={styles.root} data-slot="rich-composer" data-code={language === 'json' || language === 'jsonl'}
     onKeyDownCapture={event => { if ((event.target as HTMLElement).closest('textarea, [contenteditable]')) onKeyDown?.(event); }} onCompositionStart={onCompositionStart} onCompositionEnd={onCompositionEnd}>
@@ -49,15 +54,19 @@ export function RichComposer({ textareaRef, value, onChange, onKeyDown, onCompos
       {language === 'markdown' && <button type="button" aria-pressed={source} onClick={() => setSource(value => !value)}>{source ? '排版' : '源码'}</button>}
     </div>}
     {rich ? <MarkdownEditor inputRef={textareaRef} id={props.id} label={props['aria-label']} placeholder={props.placeholder}
-      value={value} onChange={change} disabled={props.disabled} extensions={editorExtensions} suggestions={{ controls: props['aria-controls'], active: props['aria-activedescendant'], autocomplete: props['aria-autocomplete'] }} />
-      : <SourceEditor {...props} inputRef={textareaRef} value={value} language={language} onChange={change} />}
+      value={value} onChange={change} onSourcePaste={format === 'auto' ? (text, caret) => {
+        sourceDraft.current = text;
+        pasteCaret.current = caret;
+        onChange(text);
+      } : undefined} disabled={props.disabled} extensions={editorExtensions} suggestions={{ controls: props['aria-controls'], active: props['aria-activedescendant'], autocomplete: props['aria-autocomplete'] }} />
+      : <SourceEditor {...props} inputRef={textareaRef} value={value} language={literal && language === 'markdown' ? 'plaintext' : language} onChange={change} />}
   </div>;
 }
 
 function SourceEditor({ inputRef, value, language, onChange, ...props }: Omit<RichComposerProps, 'textareaRef'> & { inputRef: RefObject<ComposerHandle | null>; language: string }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   useImperativeHandle(inputRef, () => ({
-    focus: () => { const el = textareaRef.current; if (el) { el.focus(); el.setSelectionRange(el.value.length, el.value.length); } },
+    focus: caret => { const el = textareaRef.current; if (el) { el.focus(); el.setSelectionRange(caret ?? el.value.length, caret ?? el.value.length); } },
     appendText: text => onChange(appendChatText(textareaRef.current?.value || '', text)),
   }), [onChange]);
   const paint = useRef<HTMLPreElement>(null);

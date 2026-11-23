@@ -3,6 +3,7 @@ import { Markdown } from '../../shared/components/markdown';
 import { composerCommands, parseComposerCommands } from '../models/composer-commands';
 import { stripClientMessageContext } from '../services/local-file-context';
 import { ComposerMenuIcon } from '../../shared/icons/composer-menu';
+import { detectStructuredText, hasStructuredTextSuffix } from '../../shared/lib/structured-text';
 
 function commandContent(text: string) {
   const clean = stripClientMessageContext(text);
@@ -19,6 +20,9 @@ function commandContent(text: string) {
 
 export const CommandMessageMarkdown = memo(function CommandMessageMarkdown({ content, ...props }: ComponentProps<typeof Markdown>) {
   const message = commandContent(content);
+  if (detectStructuredText(message.text) || hasStructuredTextSuffix(message.text)) {
+    return <div className={props.className}>{message.labels}{message.text}</div>;
+  }
   return <Markdown {...props} content={message.text} leadingContent={message.labels}/>;
 });
 

@@ -1,11 +1,18 @@
 import {describe, expect, it, vi} from 'vitest';
-import {AttachmentMessages, attachmentMessageReader, releaseAttachmentMessageReader, messageMarker, messageReferences, validateMessage} from '../desktop/renderer/chat/services/attachment-messages';
+import {AttachmentMessages, attachmentContextHeading, attachmentMessageReader, releaseAttachmentMessageReader, messageMarker, messageReferences, validateMessage} from '../desktop/renderer/chat/services/attachment-messages';
 const id = 'msg_' + 'a'.repeat(64), other = 'msg_' + 'b'.repeat(64);
 const view = {version:1,message_id:id,channel:'portal',scene_id:'room',created_at:1,delivery_status:'pending',parts:[{type:'text',text:'original'}]};
 describe('attachment message identity', () => {
-  it('takes the last valid standalone marker and preserves order without duplicates', () => {
-    expect(messageReferences(`${messageMarker(other)}\ntext\n[attachment-message:v1:${id},${other},${id}]\n[attachment-message:v1:msg_invalid]`)).toEqual([id,other]);
+  it('recognizes a standalone footer outside code and preserves order without duplicates', () => {
+    expect(messageReferences(`${messageMarker(other)}\ntext\n[attachment-message:v1:${id},${other},${id}]\r\n`)).toEqual([id,other]);
     expect(messageReferences(`inline ${messageMarker(id)}`)).toEqual([]);
+    expect(messageReferences(`日志\n${messageMarker(id)}\n后续正文`)).toEqual([]);
+    expect(messageReferences('~~~text\n' + messageMarker(id) + '\n~~~')).toEqual([]);
+    expect(messageReferences('~~~text\n' + messageMarker(id))).toEqual([]);
+  });
+  it('keeps a transport footer when the parsed excerpt ends in an open code fence', () => {
+    const wire = `问题\n\n${attachmentContextHeading}\n附件："notes.md"\n以下为节选，非全文。\n~~~text\n节选\n\n${messageMarker(id)}`;
+    expect(messageReferences(wire)).toEqual([id]);
   });
   it('coalesces reads and rejects mismatched responses', async () => {
     const request = vi.fn(async () => Response.json(view)); const service = new AttachmentMessages(request);

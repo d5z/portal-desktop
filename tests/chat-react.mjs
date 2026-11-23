@@ -587,6 +587,43 @@ try {
   await streamedMarkdown.locator('.markdown-preview h1').waitFor();
   await streamedMarkdown.getByRole('button', { name: '源码', exact: true }).click();
   assert.equal(await streamedMarkdown.locator('code.lang-md').textContent(), markdownSource, 'History reload preserves the streamed Markdown');
+
+  const lead = '请检查下面的长 JSON ';
+  const rawJSON = JSON.stringify({ token: 'x'.repeat(512), events: Array.from({ length: 120 }, (_, seq) => ({
+    seq, data: { delta: { text: '｜DSML｜ `literal` **a  b** \\ </footer>' } },
+  })) }, null, 2);
+  await input.click();
+  await page.keyboard.insertText(lead);
+  await input.evaluate((el, text) => {
+    const clipboardData = new DataTransfer();
+    clipboardData.setData('text/plain', text);
+    el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData }));
+  }, rawJSON);
+  assert.equal(await input.inputValue(), lead + rawJSON);
+  assert.equal(await input.evaluate(el => el.selectionStart), lead.length + rawJSON.length);
+  // Make a temporarily invalid edit, then restore valid JSON in the same draft.
+  await input.press('Backspace');
+  await page.keyboard.insertText(',\n  "edited": true\n}');
+  const expectedJSONMessage = lead + rawJSON.slice(0, -1) + ',\n  "edited": true\n}';
+  assert.equal(await input.inputValue(), expectedJSONMessage);
+  const jsonBubble = frame.locator('.message.user').filter({ hasText: lead.trim() });
+  await frame.locator('#send-btn').click();
+  await jsonBubble.waitFor();
+  assert.equal(await jsonBubble.locator('.content').textContent(), expectedJSONMessage);
+  await waitUntil(() => requests.at(-1)?.message === expectedJSONMessage, 'JSON is sent without rewriting');
+  const jsonSeq = history.find(row => row.content === expectedJSONMessage).seq;
+  const replySeq = jsonSeq + 1;
+  await waitUntil(() => history.some(row => row.seq === replySeq && row.role === 'being'), 'JSON reply is persisted');
+  await frame.locator('.message.being').filter({ hasText: 'React 回复完成' }).last().waitFor();
+  await page.reload();
+  await frame.locator(`.message.being[data-history-seq="${replySeq}"]`).waitFor();
+  assert.equal(await jsonBubble.count(), 1);
+  assert.equal(await jsonBubble.getAttribute('data-history-seq'), String(jsonSeq));
+  assert.equal(await jsonBubble.locator('.content').textContent(), expectedJSONMessage);
+  assert.equal(await jsonBubble.locator('.content').evaluate(bubble => bubble.scrollWidth <= bubble.clientWidth), true);
+  assert.deepEqual(await frame.locator(`.message[data-history-seq="${jsonSeq}"], .message[data-history-seq="${replySeq}"]`)
+    .evaluateAll(items => items.map(item => Number(item.dataset.historySeq))), [jsonSeq, replySeq]);
+
   // The standalone browser build exposes its own React settings controls.
   await page.goto(origin + '/loom.html');
   await page.getByRole('button', { name: '模型设置', exact: true }).click();

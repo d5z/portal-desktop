@@ -102,6 +102,101 @@ describe("stream progress and persisted replies", () => {
     } finally {f.runtime.dispose();}
   });
 
+  it('preserves pasted stream JSON in its original user bubble when history catches up', async () => {
+    const f = fixture();
+    const text = '查看这个 JSON ' + JSON.stringify({
+      events: Array.from({ length: 100 }, (_, seq) => ({
+        seq, event: 'content_block_delta', data: { delta: { text: '｜DSML｜' } },
+      })),
+    });
+    const content = '【客户端场景与 Portal：测试场景；状态：已连接】\n\n' + text;
+    try {
+      await f.runtime.start();
+      await f.runtime.send(text);
+      await vi.advanceTimersByTimeAsync(0);
+      const user = f.state.items.find(item => item.kind === 'message' && item.role === 'user');
+      expect(user).toMatchObject({ text });
+      f.event('content_block_delta', { delta: { text: '收到' } });
+      f.event('message_stop', {});
+      f.close();
+      await vi.advanceTimersByTimeAsync(20);
+      f.history.push(
+        { seq: 1, role: 'user', content, scene_id: 'desktop-test' },
+        { seq: 2, role: 'assistant', content: '收到', scene_id: 'desktop-test' },
+      );
+      await f.runtime.refreshHistory();
+      expect(f.state.items.filter(item => item.kind === 'message')).toMatchObject([
+        { role: 'user', historySeq: 1, text }, { role: 'being', historySeq: 2, text: '收到' },
+      ]);
+      expect(f.state.items).toContain(user);
+    } finally { f.runtime.dispose(); }
+  });
+
+  it('does not bind JSON with different string whitespace to the local user bubble', async () => {
+    const f = fixture();
+    const text = '{"value":"a  b"}';
+    try {
+      await f.runtime.start();
+      await f.runtime.send(text);
+      await vi.advanceTimersByTimeAsync(0);
+      const user = f.state.items.find(item => item.kind === 'message' && item.role === 'user');
+      f.runtime.revealHistory([
+        { seq: 1, role: 'user', content: '{"value":"a b"}', scene_id: 'desktop-test' },
+        { seq: 2, role: 'user', content: text, scene_id: 'desktop-test' },
+      ]);
+      expect(user).toMatchObject({ historySeq: 2, text });
+      expect(f.state.items.filter(item => item.kind === 'message' && item.role === 'user')).toMatchObject([
+        { historySeq: 1, text: '{"value":"a b"}' }, { historySeq: 2, text },
+      ]);
+      f.close();
+    } finally { f.runtime.dispose(); }
+  });
+
+  it.each(['live', 'replay'])('does not render split tool markers or enter replying early through %s', async transport => {
+    const f = fixture();
+    const events: { event: string; data: object; seq: number }[] = [];
+    const push = async (event: string, data: object) => {
+      if (transport === 'live') {
+        f.event(event, data);
+        await vi.advanceTimersByTimeAsync(20);
+      } else {
+        events.push({ event, data: { scene_id: 'desktop-test', ...data }, seq: events.length + 1 });
+        f.setActive({ stream_id: 'split-marker', finished: false, events, next_seq: events.length + 1 });
+        await vi.advanceTimersByTimeAsync(events.length === 1 ? 10000 : 1000);
+      }
+    };
+    const delta = (text: string) => push('content_block_delta', { delta: { text } });
+    const activity = () => f.state.items.filter(item => item.kind === 'run').at(-1)?.status;
+    try {
+      await f.runtime.start();
+      if (transport === 'live') {
+        await f.runtime.send('check');
+        await vi.advanceTimersByTimeAsync(0);
+      }
+      await delta('<');
+      expect(f.replies()).toHaveLength(0);
+      expect(activity()).not.toBe('replying');
+      expect(f.state.thinking).toBe(true);
+      await delta('｜DSML｜');
+      await delta(' calls');
+      expect(f.replies()).toHaveLength(0);
+      await push('tool_use', { name: 'read_file' });
+      expect(activity()).toBe('working');
+      await push('tool_result', { name: 'read_file', summary: 'ok' });
+      await delta('结果：1 <');
+      expect(f.replies()).toMatchObject([{ text: '结果：1' }]);
+      await delta(' 2');
+      expect(f.replies()).toMatchObject([{ text: '结果：1 < 2' }]);
+      expect(activity()).toBe('replying');
+      await delta('<');
+      await delta('｜DSML｜ calls');
+      expect(f.replies()).toMatchObject([{ text: '结果：1 < 2' }]);
+      await push('message_stop', {});
+      expect(f.replies()).toMatchObject([{ text: '结果：1 < 2', streaming: false }]);
+      if (transport === 'live') f.close();
+    } finally { f.runtime.dispose(); }
+  });
+
   it('renders framed multiline SSE, ignores untyped data and discards incomplete acknowledgements', async () => {
     const f = fixture();
     try {

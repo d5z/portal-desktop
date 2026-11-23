@@ -259,11 +259,11 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
   function restoredSendWasAccepted(queued: any) {
     if (queued.saved.attachment?.messageId) return state.items.some((item: any) => item.kind === 'message' && item.role === 'user' && item.historySeq && messageReferences(item.text).includes(queued.saved.attachment.messageId));
     if (queued.saved.phase !== 'sending') return false;
-    const expected = stripSceneTransition(queued.saved.text || '').replace(/\s+/g, ' ').trim();
+    const expected = stripSceneTransition(queued.saved.text || '').replace(/\r\n/g, '\n').trim();
     if (!expected) return false;
     return state.items.some((item: any) => {
       if (item.kind !== 'message' || item.role !== 'user' || !item.historySeq || item === queued.entry.message) return false;
-      const actual = stripSceneTransition(item.text || '').replace(/\s+/g, ' ').trim();
+      const actual = stripSceneTransition(item.text || '').replace(/\r\n/g, '\n').trim();
       if (actual !== expected || !inCurrentScene(item, queued.saved.scene) || !inCurrentScene(queued.saved.scene, item)) return false;
       const sentAt = Number(queued.saved.createdAt), acceptedAt = Number(item.createdAt);
       return Number.isFinite(sentAt) && Number.isFinite(acceptedAt) && Math.abs(sentAt - acceptedAt) <= 2 * 60 * 1000;
