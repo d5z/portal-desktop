@@ -106,7 +106,10 @@ try{
  // Continue protocol tests against the local service; never send fixture credentials to the gateway.
  await saveSubagentPreferences(root,desktopSettings,{provider:'portal-custom',model:'inherited-two',base_url:`http://127.0.0.1:${port}/v1`,api:'openai-completions',thinking:'off',api_key:'fixture-model-key'});
  const tasks=await Promise.all([spawnCase('parallelA'),spawnCase('parallelB')]);const results=await Promise.all(tasks.map(t=>finish(t)));assert(results.every(r=>r.status==='done'));report.cases.push({name:'parallel',status:'done'});console.log('PASS parallel');
- await run('auth','failed');await run('budget','budget_exhausted',{max_turns:1});
+ await run('auth','failed');
+ const uncapped=await run('budget','done',{max_turns:1,max_tokens:1});
+ assert.equal(uncapped.budget.max_turns,0);assert.equal(uncapped.budget.max_tokens,0);
+ assert.ok(uncapped.turns>1);assert.ok(uncapped.tokens.total>1);
  const cancelled=await spawnCase('cancel');await until(()=>requests.some(r=>r.case==='cancel'));await call('portal_subagent_control',{action:'cancel',task_id:cancelled.task_id});assert.equal((await finish(cancelled)).status,'cancelled');report.cases.push({name:'cancel',status:'cancelled'});console.log('PASS cancel');
  await run('timeout','timeout',{timeout_secs:30});
  await start('supervised');await run('denied');await run('allowed');
