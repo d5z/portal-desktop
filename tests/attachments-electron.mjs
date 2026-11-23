@@ -81,7 +81,8 @@ try {
   await page.locator('#input').fill('请分析附件');await page.locator('#send-btn').click();
   const pending = page.getByRole('list',{name:/待发送消息/});
   const pendingRow = pending.getByRole('listitem',{name:/请分析附件/});
-  await pendingRow.getByRole('status',{name:'正在处理附件',exact:true}).waitFor();
+  const progress = pendingRow.getByRole('button',{name:/预览第 1 条待发消息/}).locator('.composer-queue-status');
+  await progress.getByText(/上传中|上传 \d+%|确认中/).waitFor();
   assert.equal(await pendingRow.locator('.composer-queue-drag-handle').count(),0);
   assert.deepEqual(await pendingRow.locator('.composer-queue-row-actions button').evaluateAll(buttons =>
     buttons.map(button=>button.getAttribute('aria-label'))),['取消排队：请分析附件']);
@@ -98,6 +99,7 @@ try {
       await new Promise(resolve => setTimeout(resolve, 20));
     }
   });
+  await progress.getByText('解析 1/1',{exact:true}).waitFor();
   await page.reload();
   await pending.getByRole('button',{name:/预览第 1 条待发消息/}).waitFor();
   assert.equal(await page.locator('.message.user').count(),0);

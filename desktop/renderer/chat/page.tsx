@@ -128,6 +128,19 @@ function QueueRow({ item, index, reorderable, allowInterrupt, onEdit }: {
   const imageCount = files.filter(file => isPreviewImage(file.mime)).length;
   const imageUpload = item.attachmentUploads?.find(file => isPreviewImage(file.mime));
   const imagePart = parts.find(part => isPreviewImage(part.mime));
+  let attachmentProgress = '';
+  if (working && item.queuePhase === 'preparing') {
+    const upload = !parts.length && item.attachmentUploads?.find(file => file.progress?.phase !== 'complete');
+    const parse = parts.find(part => !['ready', 'failed', 'unavailable'].includes(part.parse_status));
+    if (upload) {
+      const progress = upload.progress;
+      const total = progress?.total || upload.size;
+      attachmentProgress = progress?.phase === 'confirming' ? '确认中'
+        : progress?.phase === 'uploading' && total > 0 ? `上传 ${Math.min(99, Math.floor(progress.loaded / total * 100))}%` : '上传中';
+    } else if (parse || (!parts.length && files.length)) {
+      attachmentProgress = parse?.progress?.total ? `解析 ${parse.progress.completed}/${parse.progress.total}` : '解析中';
+    }
+  }
   const text = originalMessageText(item).trim();
   const label = text.replace(/\s+/g, ' ') || (imageCount ? `${imageCount} 张图片` : fileNames.join('、'));
   return <div ref={setNodeRef} className={`composer-queue-item${isDragging ? ' dragging' : ''}`} role="listitem"
@@ -140,11 +153,11 @@ function QueueRow({ item, index, reorderable, allowInterrupt, onEdit }: {
     </button> : <span className="composer-queue-leading" aria-hidden="true">
       <Icon name={working ? 'chat-busy' : 'chat-queue'} width="14" height="14" />
     </span>}
-    <ComposerQueueContent text={text} summary={label} names={fileNames} position={index + 1} dragging={isDragging}
+    <ComposerQueueContent text={text} summary={label} names={fileNames} position={index + 1} dragging={isDragging} progress={attachmentProgress}
       status={status && (failed ? <ErrorIndicator description={status} /> : unconfirmed &&
         <span className="composer-queue-status" role="status" title={status} aria-label={status}>送达未确认</span>)}
       image={imageUpload?.blob ? { blob: imageUpload.blob } : imagePart ? { src: attachmentContentURL(item.attachmentEndpoint || '', imagePart.attachment_id, true) } : undefined} />
-    {status && !failed && !unconfirmed && <span className="composer-queue-announcement" role="status" aria-label={status}>{status}</span>}
+    {status && !failed && !unconfirmed && <span className="composer-queue-announcement" role="status">{attachmentProgress || status}</span>}
     <div className="composer-queue-row-actions">
       {item.retry ? <button type="button" className="composer-queue-steer" disabled={item.queueBusy} aria-label={item.retryLabel || '重试'}
         onClick={() => void item.retry?.()}><Icon name="chat-retry" width="14" height="14" />重试</button>

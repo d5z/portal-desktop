@@ -4,13 +4,14 @@ import {
 } from '@floating-ui/react';
 import { useEffect, useState, type ReactNode } from 'react';
 
-export function ComposerQueueContent({ text, summary, names, image, position, dragging, status }: {
+export function ComposerQueueContent({ text, summary, names, image, position, dragging, progress, status }: {
   text: string;
   summary: string;
   names: string[];
   image?: { src?: string; blob?: Blob };
   position: number;
   dragging: boolean;
+  progress?: string;
   status: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
@@ -38,10 +39,13 @@ export function ComposerQueueContent({ text, summary, names, image, position, dr
   const src = blob ? objectUrl : image?.src;
   return <div className="composer-queue-copy">
     {status}
-    {src && <img className="composer-queue-thumbnail" src={src} alt="图片附件" draggable={false} />}
     <button type="button" className="composer-queue-preview-trigger" ref={refs.setReference} {...getReferenceProps({
       'aria-label': `预览第 ${position} 条待发消息：${summary.replace(/\s+/g, ' ').slice(0, 80)}`,
-    })}><span className="composer-queue-content">{text || summary}</span></button>
+    })}>
+      {src && <img className="composer-queue-thumbnail" src={src} alt="图片附件" draggable={false} />}
+      <span className="composer-queue-content">{text || summary}</span>
+      {progress && <span className="composer-queue-status">{progress}</span>}
+    </button>
     {open && !dragging && <FloatingPortal><FloatingFocusManager context={context} modal={false} initialFocus={-1}>
       <div ref={refs.setFloating} style={floatingStyles} className="composer-queue-preview" {...getFloatingProps({
         'aria-label': '待发消息预览', tabIndex: 0,

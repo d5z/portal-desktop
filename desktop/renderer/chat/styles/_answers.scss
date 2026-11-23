@@ -672,7 +672,9 @@
 }
 
 .composer-queue .composer-queue-preview-trigger {
-  display: block;
+  display: flex;
+  align-items: center;
+  gap: var(--chat-attachment-gap, 6px);
   flex: 1;
   width: auto;
   min-width: 0;
@@ -685,10 +687,6 @@
 
   &:hover {
     background: transparent;
-  }
-  .composer-queue-content {
-    display: block;
-    width: 100%;
   }
 }
 
