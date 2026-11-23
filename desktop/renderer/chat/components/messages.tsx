@@ -12,16 +12,16 @@ const duration = (seconds: number) =>
     ? `${seconds} 秒`
     : `${Math.floor(seconds / 60)} 分钟 ${seconds % 60} 秒`;
 
-function ActivityStep({ entry, finished }: { entry: ActivityEntry; finished: boolean }) {
-  const [open, setOpen] = useState(false);
+function ActivityStep({ entry, finished, initiallyOpen = false }: { entry: ActivityEntry; finished: boolean; initiallyOpen?: boolean }) {
+  const [open, setOpen] = useState(initiallyOpen);
   const thought = entry.type === 'think';
-  const title = thought ? '思考' : entry.label || entry.name || '工具';
+  const title = thought ? '思考' : entry.error ? entry.name || entry.label || '工具' : entry.label || entry.name || '工具';
   const detail = thought ? (entry.text || entry.preview || '等待服务端返回思考内容…').slice(0, 20000) : '';
   const summary = thought ? (entry.preview || entry.text || '') : (entry.arg || entry.result || '');
   const preview = summary.trim().split(/\r?\n/, 1)[0].slice(0, 240);
   const toolStatus = entry.type === 'tool' ? (entry.error ? 'failed' : entry.done ? 'done' : finished ? undefined : 'running') : undefined;
   const state = thought ? '' : entry.error ? '失败' : entry.done ? '' : finished ? '结果未确认' : '进行中';
-  return <details className="run-entry" data-tool={!thought || undefined} onToggle={event => setOpen(event.currentTarget.open)}>
+  return <details className="run-entry" data-tool={!thought || undefined} open={open} onToggle={event => setOpen(event.currentTarget.open)}>
     <summary className="run-entry-heading">
       <span className={`run-entry-icon${entry.error ? ' error' : ''}`} aria-hidden="true">
         {toolStatus
@@ -91,8 +91,8 @@ export function ChatActivity({ run, sceneLabel, showDetails = true, showProgress
       <span className="run-label">用时 {duration(Math.max(0, Math.floor((run.end - run.start) / 1000)))}</span>
     </div></div></div>;
   }
-  if (showDetails || (onOpenSubagents && run.scheduling?.tasks.length) || (!superseded && run.end && run.entries.some(entry => entry.type === 'tool' && entry.error))) {
-    return <DetailedChatActivity run={run} sceneLabel={sceneLabel} repeatError={repeatError} superseded={superseded} onOpenSubagents={onOpenSubagents} showTrace={showDetails || !onOpenSubagents} />;
+  if (showDetails || (onOpenSubagents && run.scheduling?.tasks.length) || (run.end && run.entries.some(entry => entry.type === 'tool' && entry.error))) {
+    return <DetailedChatActivity run={run} sceneLabel={sceneLabel} repeatError={repeatError} superseded={superseded} onOpenSubagents={onOpenSubagents} showTrace={showDetails} />;
   }
   const attention = !superseded && !repeatError && ["error", "timeout", "stopped"].includes(status);
   const artifacts = [...new Set(run.entries.flatMap(entry => entry.artifactPath ? [entry.artifactPath] : []))];
@@ -145,7 +145,8 @@ function DetailedChatActivity({
     return () => clearInterval(timer);
   }, [run.end, showElapsed]);
   const tools = run.entries.filter((entry) => entry.type === "tool");
-  const failed = tools.filter(entry => entry.error).length;
+  const failedTools = tools.filter(entry => entry.error);
+  const failed = failedTools.length;
   const unconfirmed = tools.filter(entry => !entry.done && !entry.error).length;
   const artifacts = [...new Set(tools.flatMap(entry => entry.artifactPath ? [entry.artifactPath] : []))];
   const activeTool = tools.filter(entry => !entry.done && !entry.error).at(-1);
@@ -178,22 +179,26 @@ function DetailedChatActivity({
           />
         </span>}
         <span className="run-caption">
-          <span className="run-label" title={settledSummary ? summary : run.hint || run.arg || summary}>
+          <span className={settledSummary ? "run-label run-elapsed" : "run-label"} title={settledSummary ? summary : run.hint || run.arg || summary}>
             {settledSummary || showTrace ? summary : run.end ? '思考过程' : run.label}
-            {!settledSummary && showElapsed && ` · ${duration(Math.max(0, Math.floor(((run.end || now) - run.start) / 1000)))}`}
           </span>
+          {!settledSummary && showElapsed && <span className="run-elapsed">{`· ${duration(Math.max(0, Math.floor(((run.end || now) - run.start) / 1000)))}`}</span>}
           {run.autonomousOrigin
             ? <span className="message-scene" title="后台自主活动，与当前场景对话分别显示">{run.autonomousOrigin === 'callback' ? 'SBS 自主回调' : 'SBS 自主活动'}</span>
             : sceneLabel && <span className="message-scene" title={run.sceneId}>{sceneLabel}</span>}
         </span>
-        {!superseded && failed > 0 && <span className="run-failures">{failed} 次失败</span>}
-        {!superseded && run.end && unconfirmed > 0 && <span>{unconfirmed} 次结果未确认</span>}
+        {failed > 0 && <span className="run-failures">{failed} 次工具调用失败</span>}
+        {showTrace && run.end && unconfirmed > 0 && <span>{unconfirmed} 次结果未确认</span>}
         <span className="run-chevron" aria-hidden="true">
           <Icon name="chat-chevron-right" />
         </span>
       </summary>
       <div className="run-body">
         <SubagentActivity tasks={run.scheduling?.tasks} onOpen={onOpenSubagents} />
+        {open && !showTrace && failed > 0 && <div className="run-list">
+          {failedTools.map((entry, i) => <ActivityStep key={entry.id || entry.toolCallId || i}
+            entry={entry} finished={!!run.end} initiallyOpen />)}
+        </div>}
         {open && showTrace && <>
         {tools.length > 0 && !run.scheduling?.tasks.length && <div className="run-metrics">
           {tools.length > 0 && <span>{tools.length} 次工具调用</span>}

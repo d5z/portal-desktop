@@ -49,24 +49,24 @@ try{
  const menu=page.getByRole('menu',{name:'消息操作'});
  await menu.waitFor();assert.equal(await menu.evaluate(n=>getComputedStyle(n).borderRadius),'12px');assert.match(await menu.locator('time').innerText(),/10月29日.*15:31/);
  assert.doesNotMatch(await menu.locator('time').innerText(),/2026|15:31:00/);
- assert.deepEqual(await menu.getByRole('menuitem').allTextContents(),['复制']);
+ assert.deepEqual(await menu.getByRole('menuitem').allTextContents(),['复制','复制对话流 JSON']);
  assert.equal(await menu.locator('small').count(),0);
  await page.evaluate(()=>window.failCopy=true);
  await menu.getByRole('menuitem',{name:'复制',exact:true}).click();
  await menu.getByRole('alert').waitFor();assert.equal(await menu.isVisible(),true);
  await page.evaluate(()=>window.failCopy=false);
- await menu.getByRole('menuitem',{name:'复制',exact:true}).click();
+ await menu.getByRole('button',{name:'重新复制',exact:true}).click();
  await menu.waitFor({state:'detached'});
  assert.equal(await page.evaluate(()=>copied.at(-1)),history[1].content);
  const more = page.locator('[data-history-seq="2"]').getByRole('button', { name: '更多消息操作' });
  await bubble.hover();
- assert.equal(await more.count(), 0, 'A plain desktop message has one visible copy affordance');
+ assert.equal(await more.count(), 1, 'Plain messages expose the conversation export menu');
  const copy = page.locator('[data-history-seq="2"]').getByRole('button',{name:'复制正文'});
  assert.equal(await copy.evaluate(el => el.getBoundingClientRect().width), 24);
  await copy.hover();
  await page.getByRole('tooltip').filter({hasText:'复制正文'}).waitFor();
  await bubble.focus();await page.keyboard.press('Shift+F10');await menu.waitFor();
- await page.keyboard.press('ArrowDown');await page.keyboard.press('Enter');
+ await page.keyboard.press('Home');await page.keyboard.press('Enter');
  await menu.waitFor({state:'detached'});assert.equal(await page.evaluate(()=>copied.at(-1)),history[1].content);
  await page.locator('#input').fill('保留我的草稿');
  const select=async()=>{
@@ -101,7 +101,7 @@ try{
  // A selection still has one Copy command; it copies only the selected characters.
  await bubble.focus();await page.evaluate(()=>new Promise(resolve=>requestAnimationFrame(resolve)));await bubble.evaluate(node=>{const text=node.querySelector('.content p').firstChild;const range=document.createRange();range.setStart(text,0);range.setEnd(text,4);getSelection().removeAllRanges();getSelection().addRange(range);});
  await bubble.dispatchEvent('contextmenu',{button:2,clientX:120,clientY:180});await menu.waitFor();
- assert.deepEqual(await menu.getByRole('menuitem').allTextContents(),['复制']);
+ assert.deepEqual(await menu.getByRole('menuitem').allTextContents(),['复制','复制对话流 JSON']);
  await menu.getByRole('menuitem',{name:'复制',exact:true}).click();
  assert.equal(await page.evaluate(()=>copied.at(-1)),'这段文字');
  await page.evaluate(()=>getSelection().removeAllRanges());

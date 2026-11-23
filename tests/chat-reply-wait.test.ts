@@ -170,7 +170,7 @@ it('distinguishes waiting timeout from failed tools in the collapsed activity su
   const summary = html.split('</summary>')[0];
   expect(summary).toContain('data-status="timeout"');
   expect(summary).not.toContain('class="run-entry"');
-  expect(summary).toContain('1 次失败');
+  expect(summary).toContain('1 次工具调用失败');
   expect(summary).toContain('1 次结果未确认');
   expect(summary).not.toContain('含失败项');
 });

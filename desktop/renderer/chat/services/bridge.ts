@@ -5,6 +5,7 @@ import { validChatHistoryLimit } from '../../../shared/chat-history';
 import { HistoryCache } from './history-cache';
 import { localActivityHistory } from './activity-history';
 import { applyPluginAppearance } from '../../shared/plugin-appearance';
+import { CLIPBOARD_TEXT_MAX_LENGTH } from '../../../shared/clipboard';
 
 /** Source-checked desktop transport. It never reads or mutates rendered UI. */
 export function createChatBridge(state: ChatState) {
@@ -48,6 +49,7 @@ export function createChatBridge(state: ChatState) {
   };
   const unsubscribeActivity = state.subscribe(publishActivity);
   async function copyText(text: string): Promise<void> {
+    if (text.length > CLIPBOARD_TEXT_MAX_LENGTH) throw new Error('复制内容过长。');
     if (!embedded || location.protocol !== 'beings:') return navigator.clipboard.writeText(text);
     if (disposed) throw new Error('Chat closed');
     const id = crypto.randomUUID();

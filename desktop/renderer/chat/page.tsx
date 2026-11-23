@@ -661,6 +661,28 @@ export function ChatView({
               text: text.trim() && (attachment || !isImageOnlyMarkdown(text)) ? text : '',
               time: item.createdAt,
               fallbackTime: item.timestamp,
+              conversationJSON: item.role !== 'system' ? () => {
+                const scene = state.items.filter(entry => entry.sceneId === item.sceneId &&
+                  (entry.kind !== 'message' || !entry.queued) && (entry.kind !== 'run' || !entry.autonomousOrigin));
+                const selected = scene.findIndex(entry => entry.id === item.id || item.sourceMessageIds?.includes(entry.id));
+                const isUser = (entry: ChatItem) => entry.kind === 'message' && entry.role === 'user';
+                let start = selected;
+                while (start >= 0 && !isUser(scene[start])) start--;
+                const next = start >= 0 ? scene.findIndex((entry, i) => i > selected && isUser(entry)) : -1;
+                const turn = start < 0 ? [item] : scene.slice(start, next >= 0 ? next : undefined);
+                return JSON.stringify({
+                  version: 1,
+                  sceneId: item.sceneId ?? null,
+                  selectedMessageId: item.id,
+                  timeline: turn.filter(entry => entry.kind !== 'separator').map(entry => {
+                    if (entry.kind === 'run') return entry;
+                    const { id, kind, role, text, timestamp, createdAt, historySeq, replyId,
+                      turnId, streaming, interim, persistedStreamId, statusRunId } = entry;
+                    return { id, kind, role, text, timestamp, createdAt,
+                      historySeq, replyId, turnId, streaming, interim, persistedStreamId, statusRunId };
+                  }),
+                }, null, 2);
+              } : undefined,
             };
             const instant = info.time === undefined ? undefined : new Date(info.time);
             const dateTime = instant && Number.isFinite(instant.getTime()) ? instant.toISOString() : undefined;
@@ -690,7 +712,7 @@ export function ChatView({
                 </div>
                 <MessageHoverRow sent={item.role === 'user'}
                   bodyProps={hasExtraActions => ({ className: 'message-bubble-body', tabIndex: 0, role: 'group',
-                    'aria-label': `${item.role === 'user' ? '你' : item.label}的消息`, 'aria-haspopup': info.text || hasExtraActions ? 'menu' : undefined,
+                    'aria-label': `${item.role === 'user' ? '你' : item.label}的消息`, 'aria-haspopup': 'menu',
                     onContextMenu: event => messageMenu.openMenu(event, { ...info, hasExtraActions }),
                     onKeyDown: event => messageMenu.openMenu(event, { ...info, hasExtraActions }),
                   })}
@@ -705,13 +727,13 @@ export function ChatView({
                         retry={{ label: item.retryLabel || '重试', run: () => void item.retry?.() }} />}
                   </div>}
                   actions={(mediaActions, hasExtraActions) => <>
-                      {hasExtraActions && <ChatActionTooltip content="更多消息操作" disabled={activeMenuMessageId === item.id}>
+                      <ChatActionTooltip content="更多消息操作" disabled={activeMenuMessageId === item.id}>
                         <button type="button" className="message-more" aria-label="更多消息操作"
                           aria-haspopup="menu" aria-expanded={activeMenuMessageId === item.id}
                           onClick={event => messageMenu.showMenu(event.currentTarget, { ...info, hasExtraActions }, { more: true })}>
                           <Icon name="chat-more" width="16" height="16" />
                         </button>
-                      </ChatActionTooltip>}
+                      </ChatActionTooltip>
                       {mediaActions}
                   </>}>
                     {item.historyContentError && !item.streaming && !item.text.trim() ? <ChatStatusRow

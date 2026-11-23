@@ -107,6 +107,11 @@ const server = createServer(async (request, response) => {
     setTimeout(() => {
       event(response, 'tool_use', { name: 'read_file', input: { path: '/tmp/fixture.txt' } });
       event(response, 'tool_result', { name: 'read_file', summary: 'fixture file read', content: 'Full tool output\n<script>window.toolInjected = true</script>\nfinal diagnostic', is_error: false, exit_code: 0, duration_ms: 1250, total_output_bytes: 240 });
+      if (input.message === 'activity summary layout') {
+        event(response, 'tool_use', { id: 'failed-tool', name: 'read_file' });
+        event(response, 'tool_result', { toolCallId: 'failed-tool', is_error: true, content: 'fixture permission denied' });
+        event(response, 'tool_use', { id: 'pending-tool', name: 'read_file' });
+      }
       event(response, 'content_block_delta', { delta: { text: '\n\n**React 回复完成**。查看花园与篝火。' } });
       append('being', continuation ? '**React 回复完成**。查看花园与篝火。' : '开始回复。\n\n**React 回复完成**。查看花园与篝火。', input.scene_id);
       event(response, 'message_stop', { session_id: 'session-fixture' }); response.end();
@@ -623,6 +628,51 @@ try {
   assert.equal(await jsonBubble.locator('.content').evaluate(bubble => bubble.scrollWidth <= bubble.clientWidth), true);
   assert.deepEqual(await frame.locator(`.message[data-history-seq="${jsonSeq}"], .message[data-history-seq="${replySeq}"]`)
     .evaluateAll(items => items.map(item => Number(item.dataset.historySeq))), [jsonSeq, replySeq]);
+
+  await page.setViewportSize({width:390,height:844});
+  await post({type:'beings:reasoning-display',show:true});
+  await input.fill('activity summary layout');
+  await frame.locator('#send-btn').click();
+  const activitySummary = frame.locator('.run-activity[data-outcome="done"] > summary').filter({hasText:'1 次结果未确认'});
+  assert.match(await activitySummary.innerText(), /用时 .+秒\s+1 次工具调用失败\s+1 次结果未确认/);
+  assert.equal(await activitySummary.evaluate(el => {
+    const items = Array.from(el.querySelectorAll('.run-elapsed, .run-failures, :scope > span:not([class])'));
+    const centers = items.map(item => {
+      const rect = item.getBoundingClientRect();
+      return rect.top + rect.height / 2;
+    });
+    return items.length === 3 && Math.max(...centers) - Math.min(...centers) <= 1 &&
+      el.scrollWidth <= el.clientWidth + 1 &&
+      items.every(item => getComputedStyle(item).whiteSpace === 'nowrap' && item.scrollWidth <= item.clientWidth + 1);
+  }), true, 'Elapsed time, failed calls and unconfirmed calls fit on one line');
+
+  await post({type:'beings:reasoning-display',show:false});
+  await activitySummary.waitFor({state:'detached'});
+  const failedRun = frame.locator('.run-activity[data-outcome="done"]').filter({hasText:'1 次工具调用失败'});
+  await failedRun.locator(':scope > summary').click();
+  await failedRun.locator('.run-entry-title').getByText('read_file', {exact:true}).waitFor();
+  await failedRun.locator('.run-tool-details pre').getByText('fixture permission denied', {exact:true}).waitFor();
+  assert.equal(await failedRun.locator('.run-entry').count(), 1);
+  await input.fill('follow up after failed tool');
+  await frame.locator('#send-btn').click();
+  await waitUntil(() => history.some(row => row.content === 'follow up after failed tool' && history.some(reply => reply.seq === row.seq + 1 && reply.role === 'being')), 'Follow-up reply is persisted');
+  await frame.locator('.message.being').filter({hasText:'React 回复完成'}).last().waitFor();
+  await failedRun.locator('.run-tool-details pre').getByText('fixture permission denied', {exact:true}).waitFor();
+
+  await child().evaluate(() => {
+    navigator.clipboard.writeText = async text => { window.copiedConversation = text; };
+  });
+  const selectedMessage = frame.locator('.message.user').filter({hasText:'activity summary layout'});
+  await selectedMessage.locator('.message-bubble-body').hover();
+  await selectedMessage.getByRole('button', {name:'更多消息操作', exact:true}).click();
+  await frame.getByRole('menuitem', {name:'复制对话流 JSON', exact:true}).press('Enter');
+  const exported = await child().evaluate(() => JSON.parse(window.copiedConversation));
+  assert.equal(exported.version, 1);
+  assert.deepEqual(exported.timeline.filter(item => item.role === 'user').map(item => item.text), ['activity summary layout']);
+  assert(exported.timeline.some(item => item.role === 'being' && item.text.includes('React 回复完成')));
+  const trace = exported.timeline.find(item => item.kind === 'run').entries;
+  assert(trace.some(entry => entry.type === 'think' && entry.text.includes('检查 React 状态与协议')));
+  assert(trace.some(entry => entry.error && entry.toolCallId === 'failed-tool' && entry.resultDetail === 'fixture permission denied'));
 
   // The standalone browser build exposes its own React settings controls.
   await page.goto(origin + '/loom.html');

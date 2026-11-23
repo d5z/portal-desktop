@@ -79,6 +79,14 @@
   user-select: none;
 }
 
+.run-activity > summary {
+  white-space: nowrap;
+}
+
+.run-activity > summary > :not(.run-caption) {
+  flex-shrink: 0;
+}
+
 .run-summary > .run-icon,
 .run-activity > summary > .run-icon {
   position: absolute;
@@ -124,14 +132,18 @@
   align-items: baseline;
   gap: 8px;
   min-width: 0;
-  flex-wrap: wrap;
-  row-gap: 2px;
 }
 
 .run-label {
   font-size: 13px;
   font-weight: 500;
-  overflow-wrap: anywhere;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-elapsed {
+  flex-shrink: 0;
 }
 
 .run-metrics {

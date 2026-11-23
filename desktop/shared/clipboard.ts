@@ -1,0 +1,1 @@
+export const CLIPBOARD_TEXT_MAX_LENGTH = 16 * 1024 * 1024;

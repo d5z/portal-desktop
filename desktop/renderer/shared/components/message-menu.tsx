@@ -10,11 +10,12 @@ import {createPortal,flushSync} from 'react-dom';
 import {messageTimeLabel,fullMessageTime} from '../lib/message-time';
 import { positionActionMenu } from '../lib/action-menu-position';
 
-export type MessageInfo = {text:string; time?:number; fallbackTime?:string; hasExtraActions?: boolean};
+export type MessageInfo = {text:string; time?:number; fallbackTime?:string; hasExtraActions?: boolean; conversationJSON?: () => string};
 export function useMessageMenu(copy:(text:string)=>Promise<void>,scope:string) {
   const [context,setContext]=useState<(MessageInfo & {x:number;y:number;portal:HTMLElement;opener:HTMLElement;anchorLeft:number;anchorTop:number;copyText:string;more:boolean})|null>(null);
   const [error,setError]=useState(''),[busy,setBusy]=useState(false),[notice,setNotice]=useState<{text:string;portal:HTMLElement}|null>(null);
   const menu=useRef<HTMLDivElement>(null),revision=useRef(0),current=useRef(context);
+  const retryCopy = useRef<string | (() => string)>('');
   const [closing,setClosing]=useState(false);
   const [attachmentTarget, setAttachmentTarget] = useState<HTMLDivElement | null>(null);
   current.current=context;
@@ -43,7 +44,7 @@ export function useMessageMenu(copy:(text:string)=>Promise<void>,scope:string) {
     const rect=opener.getBoundingClientRect(),selection=window.getSelection();
     const selected=selection?.anchorNode && selection.focusNode && opener.contains(selection.anchorNode) && opener.contains(selection.focusNode) ? selection.toString() : '';
     const copyText = more ? '' : selected || info.text;
-    if (!copyText && !info.hasExtraActions) return false;
+    if (!copyText && !info.hasExtraActions && !info.conversationJSON) return false;
     ++revision.current;setError('');setNotice(null);setBusy(false);setClosing(false);
     setContext({...info,opener,anchorLeft:rect.left,anchorTop:rect.top,portal:opener.closest<HTMLElement>('dialog[open]')||document.body,copyText,more,
       x:point?.x??rect.left+Math.min(24,rect.width),y:point?.y??rect.top+Math.min(24,rect.height)});
@@ -125,9 +126,10 @@ export function useMessageMenu(copy:(text:string)=>Promise<void>,scope:string) {
   },[context,close]);
   useLayoutEffect(()=>{if(error)menu.current?.querySelector<HTMLButtonElement>('button')?.focus({preventScroll:true});},[error]);
   useEffect(()=>{if(!notice)return;const timer=setTimeout(()=>setNotice(null),2200);return()=>clearTimeout(timer);},[notice]);
-  const copyValue=async(text:string)=>{
+  const copyValue=async(value:string | (() => string))=>{
     if(busy)return;const request=revision.current;setBusy(true);setError('');
-    try{await copy(text);if(request===revision.current){setBusy(false);setNotice({text:'已复制',portal:current.current?.portal||document.body});close(true);}}catch{if(request===revision.current)setError('复制失败，请重试。');}finally{if(request===revision.current)setBusy(false);}
+    retryCopy.current = value;
+    try{await copy(typeof value === 'string' ? value : value());if(request===revision.current){setBusy(false);setNotice({text:'已复制',portal:current.current?.portal||document.body});close(true);}}catch{if(request===revision.current)setError('复制失败，请重试。');}finally{if(request===revision.current)setBusy(false);}
   };
   const timestamp=context && !context.more ? fullMessageTime(context.time,context.fallbackTime) : '';
   const shortTime=context?.time!==undefined&&Number.isFinite(new Date(context.time).getTime())?messageTimeLabel(context.time):timestamp;
@@ -135,8 +137,11 @@ export function useMessageMenu(copy:(text:string)=>Promise<void>,scope:string) {
     inert={closing} aria-hidden={closing || undefined} data-extra-actions={context.more || undefined} data-attachment-glide>
     <span className="glide-select__pill" aria-hidden="true" />
     {timestamp&&<div className={styles.info}><time title={timestamp} dateTime={context.time!==undefined&&Number.isFinite(new Date(context.time).getTime())?new Date(context.time).toISOString():undefined}>{shortTime}</time></div>}
-    {error ? <ErrorIndicator description={error} retry={{ label: '重新复制', disabled: busy, run: () => void copyValue(context.copyText) }} />
-      : context.copyText && <button role="menuitem" type="button" disabled={busy} onClick={()=>void copyValue(context.copyText)}><Icon name="chat-copy"/>复制</button>}
+    {error ? <ErrorIndicator description={error} retry={{ label: '重新复制', disabled: busy, run: () => void copyValue(retryCopy.current) }} />
+      : <>
+        {context.copyText && <button role="menuitem" type="button" disabled={busy} onClick={()=>void copyValue(context.copyText)}><Icon name="chat-copy"/>复制</button>}
+        {context.conversationJSON && <button role="menuitem" type="button" disabled={busy} onClick={()=>void copyValue(context.conversationJSON!)}><Icon name="chat-copy"/>复制对话流 JSON</button>}
+      </>}
     {context.hasExtraActions && <div ref={setAttachmentTarget} className={styles.attachments} />}
   </div>,context.portal);
   return {openMenu,showMenu,opener:closing ? undefined : context?.opener,attachmentOpener:context?.opener,attachmentTarget,closeMenu:close,isOpen:!!context && !closing,menu:<>{content}{notice&&createPortal(<div className={styles.notice} role="status"><CopySuccessText>{notice.text}</CopySuccessText></div>,notice.portal)}</>};

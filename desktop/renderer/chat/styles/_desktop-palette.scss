@@ -190,23 +190,12 @@
   .run-activity {
     font: var(--chat-ui-text-size)/var(--chat-ui-line-height) var(--chat-reading-font);
 
-    > summary {
-      max-width: min(100%, var(--chat-run-summary-max-width));
-    }
     > summary:focus-visible {
       outline-offset: -1px;
     }
     :is(.run-icon, .run-entry-icon, .run-chevron, .run-entry-disclosure) > svg {
       width: var(--chat-icon-action);
       height: var(--chat-icon-action);
-    }
-    .run-caption {
-      flex-wrap: nowrap;
-    }
-    .run-label {
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
     }
     .message-scene {
       flex: 0 1 auto;

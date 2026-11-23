@@ -33,6 +33,21 @@ describe('tool activity identity and details', () => {
     expect(completeToolActivity([start(), start()], { name: 'portal_exec' })).toBeUndefined();
   });
 
+  it('correlates Portal camel-case identities with snake-case events', () => {
+    const entry = newToolActivity([], { toolCallId: 'a', name: 'portal_exec' }, 'row-a', 1)!;
+    expect(completeToolActivity([entry, start('b')], { tool_use_id: 'a', content: 'ok' })).toBe(entry);
+    expect(completeToolActivity([start('c'), start('d')], { toolCallId: 'd', isError: true })).toMatchObject({ toolCallId: 'd', error: true });
+  });
+
+  it('links an identified result to a unique call whose start omitted its identity', () => {
+    const namelessId = start(undefined, 'read');
+    const entries = [namelessId, start('write-id', 'write')];
+    const result = { tool_call_id: 'read-id', name: 'read', content: 'ok' };
+    expect(completeToolActivity(entries, result)).toMatchObject({ toolCallId: 'read-id', done: true });
+    expect(completeToolActivity(entries, result)).toBeUndefined();
+    expect(completeToolActivity([start(), start('other')], { tool_call_id: 'unknown' })).toBeUndefined();
+  });
+
   it('preserves structured MCP errors and bounds long details without losing the final error', () => {
     const entries = [start('a')];
     completeToolActivity(entries, { call_id: 'a', summary: 'Build failed', result: {

@@ -3,6 +3,7 @@ import type { AppModel } from "../models/app";
 import { validPlaceTarget } from "../../shared/lib/navigation";
 import { CHAT_SCENE_ACTIVITY_LABELS, type ChatSceneActivity } from "../../../shared/types";
 import { dshRuntime } from '../../plugins/dsh/runtime';
+import { CLIPBOARD_TEXT_MAX_LENGTH } from '../../../shared/clipboard';
 
 /** This is the only shell bridge into the separate, sandboxed Loom document. */
 export function useChatBridge(
@@ -164,7 +165,7 @@ export function useChatBridge(
         return;
       }
       if (message.type === 'beings:chat-copy' && typeof message.id === 'string' && message.id.length <= 64 &&
-          typeof message.text === 'string' && message.text.length <= 200000) {
+          typeof message.text === 'string' && message.text.length <= CLIPBOARD_TEXT_MAX_LENGTH) {
         const reply = (ok: boolean) => {
           if (frame.current === target && new URL(target.src).searchParams.get('revision') === message.revision)
             app.post({ type: 'beings:chat-edit-result', id: message.id, revision: message.revision, ok });

@@ -6,7 +6,7 @@ type Payload = Record<string, unknown>;
 const object = (value: unknown): Payload => value && typeof value === 'object' && !Array.isArray(value) ? value as Payload : {};
 const finite = (value: unknown): number | undefined => typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 const nonnegative = (value: unknown) => { const n = finite(value); return n !== undefined && n >= 0 ? n : undefined; };
-const callId = (data: Payload) => [data.tool_call_id, data.tool_use_id, data.call_id, data.id]
+const callId = (data: Payload) => [data.tool_call_id, data.tool_use_id, data.call_id, data.toolCallId, data.id]
   .find((id): id is string => typeof id === 'string' && id.length > 0);
 
 function bounded(text: string): string {
@@ -31,14 +31,16 @@ export function newToolActivity(entries: ActivityEntry[], data: Payload, id: str
     ts: now, inputDetail: bounded(inputDetail) };
 }
 
-/** Explicit identities never fall back to position. Legacy events must match uniquely. */
+/** Prefer exact identities. A missing identity on either side requires a unique pending match. */
 export function completeToolActivity(entries: ActivityEntry[], data: Payload): ActivityEntry | undefined {
   const id = callId(data);
-  const candidates = entries.filter(entry => entry.type === 'tool' && (id
-    ? entry.toolCallId === id
-    : !entry.done && (!data.name || entry.name === data.name)));
+  const exact = id && entries.find(entry => entry.type === 'tool' && entry.toolCallId === id);
+  const candidates = exact ? [exact] : entries.filter(entry =>
+    entry.type === 'tool' && !entry.done && (!data.name || entry.name === data.name));
   if (candidates.length !== 1 || candidates[0].done) return;
   const entry = candidates[0];
+  if (id && entry.toolCallId && entry.toolCallId !== id) return;
+  if (id) entry.toolCallId = id;
   const result = object(data.result);
   const detail = contentText(data.content) || contentText(result.content) ||
     (typeof data.result === 'string' ? data.result : '') ||
