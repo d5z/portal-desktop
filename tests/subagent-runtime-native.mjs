@@ -19,8 +19,10 @@ await build({entryPoints:['desktop/main/portal/subagent-setup.ts'],bundle:true,p
 const {saveSubagentPreferences,syncSubagentModel}=createRequire(import.meta.url)(modelModule);
 const workspace=path.join(root,'中文 workspace');await mkdir(workspace);
 const configFile=path.join(root,'portal.toml');
-const binary=path.resolve(process.env.PORTAL_SUBAGENT_BINARY||'resources/heart-portal');
-const sourceRuntime=path.join(path.dirname(binary),'portal-runtime');
+const windows=process.platform==='win32';
+const budgetOnly=process.argv.includes('--budget-only');
+const binary=path.resolve(process.env.PORTAL_SUBAGENT_BINARY|| (windows ? 'resources/heart-portal.exe' : 'resources/heart-portal'));
+const sourceRuntime=process.env.PORTAL_SUBAGENT_RUNTIME||path.join(path.dirname(binary),'portal-runtime');
 const runtimeManifest=JSON.parse(await readFile(path.join(sourceRuntime,'runtime.json'),'utf8'));
 const sharedRuntime=path.join(root,'portal-runtimes',runtimeManifest.id);
 await mkdir(path.dirname(sharedRuntime),{recursive:true});
@@ -37,7 +39,7 @@ const steps={
  files:[['portal_file_write',{path:'edit.txt',content:'before 你好'}],['portal_file_edit',{path:'edit.txt',edits:[{old_text:'before',new_text:'after'}]}],['portal_file_read',{path:'edit.txt'}]],
  denied:[['portal_file_write',{path:'denied.txt',content:'must not be written'}]],
  allowed:[['portal_file_write',{path:'allowed.txt',content:'approved'}]],
- budget:[['portal_file_read',{path:'edit.txt'}],['portal_file_read',{path:'edit.txt'}]],
+ budget:[['portal_file_write',{path:'budget.txt',content:'first turn'}],['portal_file_edit',{path:'budget.txt',edits:[{old_text:'first turn',new_text:'second turn'}]}]],
  parallelA:[['portal_file_write',{path:'a.txt',content:'A'}]],
  parallelB:[['portal_file_write',{path:'b.txt',content:'B'}]],
  custom:[['portal_exec',{command:`python3 -c ${quote("import pathlib,sys,json; assert 'portal-runtime' in sys.executable; pathlib.Path('custom-result.json').write_text(json.dumps({'ok':True,'text':'自定义子任务'},ensure_ascii=False),encoding='utf-8')")} && node -e ${quote("const fs=require('node:fs'); if(!process.execPath.includes('portal-runtime'))throw Error('HOST_NODE'); const d=JSON.parse(fs.readFileSync('custom-result.json','utf8')); if(!d.ok)throw Error('BAD_DATA'); console.log('CUSTOM_RUNTIME_OK', d.text)")}`}]],
@@ -54,12 +56,16 @@ const server=createServer(async(req,res)=>{
   if(name==='cancel'||name==='timeout'){held.push(res);return;}
   const index=d.messages.filter(m=>m.role==='tool').length;const step=steps[name]?.[index];
   res.writeHead(200,{'Content-Type':'text/event-stream'});
-  const chunk=(delta,finish=null)=>res.write('data: '+JSON.stringify({id:'fixture-'+requests.length,object:'chat.completion.chunk',created:1,model:d.model,choices:[{index:0,delta,finish_reason:finish}]})+'\n\n');
+  const chunk=(delta,finish=null)=>res.write('data: '+JSON.stringify({id:'fixture-'+requests.length,object:'chat.completion.chunk',created:1,model:d.model,choices:[{index:0,delta,finish_reason:finish}],...(finish&&name==='budget'?{usage:{prompt_tokens:450000,completion_tokens:100,total_tokens:450100,prompt_tokens_details:{cached_tokens:400000}}}:{})})+'\n\n');
   if(step){chunk({role:'assistant',tool_calls:[{index:0,id:'call_'+name+'_'+index,type:'function',function:{name:step[0],arguments:JSON.stringify(step[1])}}]});chunk({},'tool_calls');}
   else {chunk({role:'assistant',content:'CASE_DONE:'+name});chunk({},'stop');}
   res.end('data: [DONE]\n\n');return;
  }
- callbacks.push(req.url);res.setHeader('Content-Type','application/json');res.end('{}');
+ if(new URL(req.url,'http://127.0.0.1').pathname.endsWith('/api/callback')){
+  let body='';for await(const chunk of req)body+=chunk;
+  callbacks.push(JSON.parse(body));
+ }
+ res.setHeader('Content-Type','application/json');res.end('{}');
 });
 const wss=new WebSocketServer({server,path:'/_relay'});
 wss.on('connection',socket=>{let ready=false;socket.on('message',b=>{const d=JSON.parse(b);if(!ready){ready=true;relay=socket;generation++;socket.send(JSON.stringify({ok:true,relay_keepalive:'text-v1'}));return;}if(d.type==='keepalive'){socket.send(JSON.stringify({type:'keepalive_ack'}));return;}const q=pending.get(d.id);if(q){clearTimeout(q.timer);pending.delete(d.id);d.error?q.reject(Error(JSON.stringify(d.error))):q.resolve(d.result);}});});
@@ -72,26 +78,53 @@ async function start(mode='full-access'){
  if(child){const done=once(child,'exit');child.kill();await done;}
  const previous=generation;
  const cfg=parse(await readFile(configFile,'utf8')); cfg.security.permission_mode=mode; await writeFile(configFile,stringify(cfg));
- child=spawn(binary,['--config',configFile,'--connect',`http://127.0.0.1:${port}/fixture/?token=local-subagent-test`],{env:{...process.env,PATH:'/usr/bin:/bin',HEART_PORTAL_CLIENT_MANAGED:'1',HEART_PORTAL_RUNTIME_DIR:sharedRuntime,HEART_PORTAL_SUPERVISED:'1',HEART_PORTAL_CLIENT_FILE:path.join(root,'client.json')},stdio:['ignore','pipe','pipe']});
+ child=spawn(binary,['--config',configFile,'--connect',`http://127.0.0.1:${port}/fixture/?token=local-subagent-test`],{env:{...process.env,...(windows?{}:{PATH:'/usr/bin:/bin'}),HEART_PORTAL_CLIENT_MANAGED:'1',HEART_PORTAL_RUNTIME_DIR:sharedRuntime,HEART_PORTAL_SUPERVISED:'1',HEART_PORTAL_CLIENT_FILE:path.join(root,'client.json')},stdio:['ignore','pipe','pipe']});
  for(const stream of [child.stdout,child.stderr])stream.on('data',b=>{diagnostics=(diagnostics+b).slice(-15000);});
  await until(()=>generation>previous);
 }
 const spawnCase=async(name,budget={})=>call('portal_subagent_spawn',{brief:`CASE:${name} synthetic native test`,session:name,scene_id:'subagent-test-scene',model:'must-be-ignored',budget:{max_turns:10,max_tokens:10000,timeout_secs:60,...budget}});
 const finish=async(task,ms=40000)=>until(async()=>{const s=await call('portal_subagent_status',{task_id:task.task_id});return s.status==='running'?false:s;},ms);
 async function run(name,status='done',budget){const task=await spawnCase(name,budget);const result=await finish(task);assert.equal(result.status,status,JSON.stringify(result));const log=await call('portal_subagent_log',{task_id:task.task_id});report.cases.push({name,status:result.status,turns:result.turns,log:JSON.stringify(log).slice(-3000)});console.log('PASS',name,result.status);return result;}
+async function runBudgetCases() {
+ await run('auth','failed');
+ const uncapped=await run('budget','done',{max_turns:1,max_tokens:1});
+ assert.equal(uncapped.budget.max_turns,0);assert.equal(uncapped.budget.max_tokens,0);
+ assert.ok(uncapped.turns>1);assert.ok(uncapped.tokens.total>400000);
+ assert.ok(uncapped.tokens.cache_read>=400000);
+ assert.equal(await readFile(path.join(workspace,'budget.txt'),'utf8'),'second turn');
+ const delivered=await until(()=>callbacks.find(item=>item.task_id===uncapped.task_id));
+ assert.equal(delivered.result.status,'done');
+ assert.deepEqual(delivered.result.tokens,uncapped.tokens);
+ assert.equal(delivered.result.budget_limit_reached,null);
+ report.budget=uncapped;
+ const cancelled=await spawnCase('cancel');await until(()=>requests.some(r=>r.case==='cancel'));await call('portal_subagent_control',{action:'cancel',task_id:cancelled.task_id});assert.equal((await finish(cancelled)).status,'cancelled');report.cases.push({name:'cancel',status:'cancelled'});console.log('PASS cancel');
+ await run('timeout','timeout',{timeout_secs:30});
+ assert.equal(callbacks.some(item=>item.task_id===cancelled.task_id),false);
+ if(budgetOnly){
+  await start();
+  const restored=await call('portal_subagent_status',{task_id:uncapped.task_id});
+  assert.equal(restored.status,'done');assert.equal(restored.turns,uncapped.turns);
+  assert.equal(restored.tokens.total,uncapped.tokens.total);
+  report.cases.push({name:'restart-ledger',status:'done'});
+  console.log('PASS restart-ledger');
+ }
+}
 try{
  // Install Portal's pinned Pi into this fixture; a clean CI host has no user-level Pi.
  const piSource=await readFile(path.join(portalSource,'portal/src/subagent/pi_daemon.rs'),'utf8');
  const piPackage=piSource.match(/PI_NPM_PACKAGE: &str = "([^"]+)"/)[1];
  const piVersion=piSource.match(/PI_PINNED_VERSION: &str = "([^"]+)"/)[1];
  const runtimeNode=path.join(sharedRuntime,runtimeManifest.node.path);
- const npm=path.join(sharedRuntime,'node/lib/node_modules/npm/bin/npm-cli.js');
+ const npm=path.join(sharedRuntime,'node',windows?'bin':'lib','node_modules/npm/bin/npm-cli.js');
  const piRoot=path.join(root,'pi');
- await promisify(execFile)(runtimeNode,[npm,'install','--prefix',piRoot,'--no-audit','--no-fund',`${piPackage}@${piVersion}`],{timeout:120000,env:{...process.env,PATH:path.dirname(runtimeNode)+path.delimiter+'/usr/bin:/bin'}});
+ await promisify(execFile)(runtimeNode,[npm,'install','--prefix',piRoot,'--no-audit','--no-fund',`${piPackage}@${piVersion}`],{timeout:120000,env:{...process.env,PATH:path.dirname(runtimeNode)+path.delimiter+(windows?process.env.PATH:'/usr/bin:/bin')}});
  await writeFile(configFile,stringify({name:'subagent-native',workspace,bind:'127.0.0.1:0',kits_enabled:false,tools:{exec:true,file:true},security:{permission_mode:'full-access'},subagent:{enabled:true,inherit_model:true,auto_install:false,command:[runtimeNode,path.join(piRoot,'node_modules',piPackage,'dist/cli.js')],state_dir:path.join(root,'state'),model:{provider:'portal-custom',model:'inherited-one',base_url:`http://127.0.0.1:${port}/v1`,api:'openai-completions',thinking:'off',api_key:'fixture-model-key'}}}));
  await start();
  const tools=await rpc('tools/list',{});assert(tools.tools.some(t=>t.name==='portal_subagent_spawn'));
  const status=await call('portal_subagent_status');assert(status.command_resolved);assert(!JSON.stringify(status).includes('fixture-model-key'));
+ if (budgetOnly) {
+ await runBudgetCases();
+ } else {
  await run('python');await run('node');await run('files');
  assert.equal(await readFile(path.join(workspace,'edit.txt'),'utf8'),'after 你好');
  const result=JSON.parse(await readFile(path.join(workspace,'node-result.json'),'utf8'));assert(result.python.includes('portal-runtime'));assert(result.node.includes('portal-runtime'));
@@ -106,15 +139,11 @@ try{
  // Continue protocol tests against the local service; never send fixture credentials to the gateway.
  await saveSubagentPreferences(root,desktopSettings,{provider:'portal-custom',model:'inherited-two',base_url:`http://127.0.0.1:${port}/v1`,api:'openai-completions',thinking:'off',api_key:'fixture-model-key'});
  const tasks=await Promise.all([spawnCase('parallelA'),spawnCase('parallelB')]);const results=await Promise.all(tasks.map(t=>finish(t)));assert(results.every(r=>r.status==='done'));report.cases.push({name:'parallel',status:'done'});console.log('PASS parallel');
- await run('auth','failed');
- const uncapped=await run('budget','done',{max_turns:1,max_tokens:1});
- assert.equal(uncapped.budget.max_turns,0);assert.equal(uncapped.budget.max_tokens,0);
- assert.ok(uncapped.turns>1);assert.ok(uncapped.tokens.total>1);
- const cancelled=await spawnCase('cancel');await until(()=>requests.some(r=>r.case==='cancel'));await call('portal_subagent_control',{action:'cancel',task_id:cancelled.task_id});assert.equal((await finish(cancelled)).status,'cancelled');report.cases.push({name:'cancel',status:'cancelled'});console.log('PASS cancel');
- await run('timeout','timeout',{timeout_secs:30});
+ await runBudgetCases();
  await start('supervised');await run('denied');await run('allowed');
  await assert.rejects(readFile(path.join(workspace,'denied.txt')), {code:'ENOENT'});assert.equal(await readFile(path.join(workspace,'allowed.txt'),'utf8'),'approved');assert.equal(approvals.length,2);assert(approvals.every(a=>a.sceneId==='subagent-test-scene'));
  report.cases.push({name:'approval-policy',status:'passed'});
+ }
  assert(requests.every(r=>r.authorized));assert(requests.every(r=>r.model!=='must-be-ignored'));
  assert(requests.every(r=>!r.tools?.includes('bash')),'All tasks must use Portal tools, including full access');
  const ledger=JSON.parse(await readFile(path.join(root,'state/ledger.json'),'utf8'));assert(ledger.tasks.every(t=>t.scene_id==='subagent-test-scene'));report.ledger=ledger.tasks.map(({task_id,status,scene_id,brief_head,turns})=>({task_id,status,scene_id,brief_head,turns}));

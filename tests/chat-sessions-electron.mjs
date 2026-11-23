@@ -1,30 +1,45 @@
 import assert from 'node:assert/strict';
 import { build } from '../scripts/renderer-build.mjs';
 import { browserAssets } from './support/browser-assets.mjs';
-import { mkdtemp, mkdir, copyFile, writeFile, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, copyFile, readFile, writeFile, rm } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { _electron as electron } from 'playwright';
 import { waitForChatReady } from './support/desktop.mjs';
 
+const budgetReview = process.argv.includes('--budget-review');
+const nativeReport = budgetReview
+  ? JSON.parse(await readFile('test-results/subagent/native-results.json', 'utf8'))
+  : null;
+if (budgetReview) assert.equal(nativeReport?.status === 'passed' && nativeReport.budget?.status === 'done', true);
 const directory = await mkdtemp(path.join(os.tmpdir(), 'portal-chat-sessions-'));
 let application;
-try {
+review: try {
   for (const file of ['loom.html', 'chat.js', 'chat.css', 'highlight.css']) await copyFile(path.resolve('desktop/generated', file), path.join(directory, file));
   await writeFile(path.join(directory, 'index.html'), '<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="shell.css"></head><body><div id="root"></div><script src="shell.js"></script></body></html>');
   await build({ plugins: [browserAssets()], stdin: { loader: 'tsx', resolveDir: process.cwd(), contents: `
-    import React, {useRef, useEffect, useSyncExternalStore} from 'react';
+    import React, {useRef, useEffect, useState, useSyncExternalStore} from 'react';
     import {createRoot} from 'react-dom/client';
     import {AppModel} from './desktop/renderer/app/models/app';
     import {EditContextMenu} from './desktop/renderer/shared/components/context-menu';
     import {ChatSceneIndicator} from './desktop/renderer/app/components/chat-scene';
     import {SbsControl} from './desktop/renderer/shared/components/sbs-control';
     import {useChatBridge} from './desktop/renderer/app/hooks/use-chat-bridge';
+    import {SubagentTaskPanel} from './desktop/renderer/app/components/subagent-tasks';
     import './desktop/renderer/app/styles.scss';
     const app = new AppModel(window.beings); app.showReasoning = true; (window as any).fixtureApp = app;
     function Shell() {
       useSyncExternalStore(app.subscribe, app.getVersion);
       const frame = useRef(null); useChatBridge(app, frame);
+      const [tasks, setTasks] = useState([]);
+      const started = useRef(null);
+      function showTask(status) {
+        started.current ??= Date.now();
+        const next = [{id:'budget-fixture',sceneId:app.snapshot.chatScene.scene_id,brief:'预算回归任务',status,createdAt:started.current,turns:${nativeReport?.budget?.turns ?? 0}}];
+        setTasks(next);
+        frame.current.contentWindow.postMessage({type:'beings:scene-tasks',revision:new URL(frame.current.src).searchParams.get('revision'),
+          endpoint:app.snapshot.settings.endpoint,subagentReady:true,tasks:next},'beings://chat');
+      }
       useEffect(() => { window.beings.snapshot().then(value => app.applySnapshot(value)); }, []);
       return <div id="client-main" className="workspace-stage" style={{height:'100vh',width:'100%'}}><header className="topbar">
         <ChatSceneIndicator scene={app.snapshot?.chatScene} sessions={app.snapshot?.chatSessions} connected={true}
@@ -37,9 +52,14 @@ try {
           showContent={app.chatShowSbsMessages} allScenes={app.chatHistoryScope==='all'}
           visibilityReady={!app.chatLoading && app.chatSbsSceneId===app.snapshot?.chatScene?.scene_id}
           onVisibility={show=>app.changeChatSbsVisibility(show)} onToggle={()=>app.toggleSbs()} />
-        <span>同一个 Being · 会话测试</span></header>
+        <span>${budgetReview ? 'Subagent 预算界面测试' : '同一个 Being · 会话测试'}</span></header>
+        {${budgetReview} && <div style={{display:'flex',gap:16,padding:12,zIndex:2}}>
+          {[['运行中','running'],['任务完成','done'],['任务超时','timeout'],['任务取消','cancelled'],['历史预算用尽','budget_exhausted']].map(([label,status])=>
+            <button key={status} onClick={()=>showTask(status)}>{label}</button>)}
+        </div>}
         <section id="chat-view" className="view"><iframe id="chat-frame" ref={frame} src={app.chatSource || undefined} onLoad={() => app.frameLoaded()} /></section>
         <EditContextMenu edit={async () => true} rootSelector="#client-main, dialog[open]" selectionSelector=".reading-text, .dialog-body, #town-body" />
+        {${budgetReview} && app.subagentTaskIds.length > 0 && <SubagentTaskPanel tasks={tasks} details={[]} error="" onRetry={()=>{}} onClose={app.closeSubagentTasks} />}
       </div>;
     }
     createRoot(document.getElementById('root')).render(<Shell />);
@@ -88,7 +108,8 @@ try {
       const snapshot = () => ({settings:{endpoint:connection.endpoint,being:'being',hasToken:true},portal:{phase:'stopped',logs:[]},chatScene:sessions.current(connection.endpoint),chatSessions:sessions.list(connection.endpoint)});
       ipcMain.handle('snapshot',snapshot);
       ipcMain.handle('session',async (_,operation,value,endpoint,sceneId) => { if(endpoint !== connection.endpoint) throw new Error('Wrong Being'); await sessions.change(endpoint,operation,value,sceneId); return snapshot(); });
-      const window = new BrowserWindow({width:1100,height:800,show:true,webPreferences:{preload:${JSON.stringify(path.join(directory,'preload.cjs'))},sandbox:true,contextIsolation:true,nodeIntegration:false}});
+      const window = new BrowserWindow({width:1100,height:800,show:true,title:${JSON.stringify(budgetReview?'Subagent 预算界面测试':'')},webPreferences:{preload:${JSON.stringify(path.join(directory,'preload.cjs'))},sandbox:true,contextIsolation:true,nodeIntegration:false}});
+      if (${budgetReview}) window.on('page-title-updated', event => event.preventDefault());
       await window.loadURL('beings://desktop/');
     });
   ` }, bundle: true, platform: 'node', external: ['electron'], outfile: path.join(directory, 'main.cjs') });
@@ -101,6 +122,14 @@ try {
   const chat = page.frameLocator('iframe');
   await waitForChatReady(page);
   await page.waitForFunction(() => !window.fixtureApp.chatLoading);
+  if (budgetReview) {
+    await chat.getByRole('textbox',{name:'消息输入框'}).fill('子智能体预算本地回归');
+    await chat.getByRole('button',{name:'发送消息'}).click();
+    await chat.getByText('回复：子智能体预算本地回归',{exact:true}).waitFor();
+    console.log('Computer-use Electron fixture ready');
+    await page.waitForEvent('close',{timeout:0});
+    break review;
+  }
   await page.evaluate(async () => {
     const frame = document.querySelector('iframe');
     const snapshot = await window.beings.snapshot();

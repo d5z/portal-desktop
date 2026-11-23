@@ -65,7 +65,6 @@
 
 .run-summary,
 .run-activity > summary {
-  position: relative;
   list-style: none;
   display: flex;
   align-items: center;
@@ -87,10 +86,13 @@
   flex-shrink: 0;
 }
 
-.run-summary > .run-icon,
-.run-activity > summary > .run-icon {
-  position: absolute;
-  left: calc(var(--chat-bubble-padding-inline, 16px) - var(--run-icon) - var(--run-gap));
+.run-activity > summary:has(> .run-icon:not(:empty)) {
+  padding-inline-start: var(--run-gap);
+}
+
+.run-summary > .run-icon:empty,
+.run-activity > summary > .run-icon:empty {
+  display: none;
 }
 
 .run-activity > summary::-webkit-details-marker {

@@ -486,7 +486,17 @@ try {
   await post({type:'beings:appearance',theme:'light'});
 
   await post({type:'beings:reasoning-display',show:true});
-  await frame.locator('.run-activity.running').waitFor();
+  const thinkingSummary = frame.locator('.run-activity.running > summary');
+  const thinkingSpinner = thinkingSummary.locator('.run-icon');
+  const restingBackground = await thinkingSummary.evaluate(el => getComputedStyle(el).backgroundColor);
+  await thinkingSpinner.hover();
+  assert.notEqual(await thinkingSummary.evaluate(el => getComputedStyle(el).backgroundColor), restingBackground);
+  assert.equal(await thinkingSpinner.evaluate(el => {
+    const icon = el.getBoundingClientRect();
+    const summary = el.closest('summary').getBoundingClientRect();
+    return icon.left > summary.left && icon.right < summary.right &&
+      Math.abs((icon.top + icon.bottom) - (summary.top + summary.bottom)) <= 2;
+  }), true, 'The spinner is centered inside the summary hover target');
 
   // Release the first token only after inspecting the waiting state. Sending it
   // with `thinking` made the screenshot race an intentionally removed indicator.
@@ -577,12 +587,13 @@ try {
   event(markdownResponse, 'message_stop', { session_id: 'session-fixture' });
   markdownResponse.end(); markdownResponse = null;
   await frame.locator('.run-activity.running').waitFor({ state: 'hidden' });
+  assert.equal(await child().evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+  // Keep the final line mounted when history reconciliation replaces the
+  // live row in the narrow timeline.
+  await page.setViewportSize({ width: 420, height: 1400 });
   const finalLine = streamedMarkdown.locator('.markdown-preview').getByText('末尾校验：全文结束。', { exact: true });
   await finalLine.waitFor();
   assert.equal(await finalLine.count(), 1);
-  assert.equal(await child().evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
-  // A taller viewport lets the entire block fit inside the scrolling message pane for visual QA.
-  await page.setViewportSize({ width: 420, height: 1400 });
   await streamedMarkdown.screenshot({ path: 'test-results/chat-markdown-preview-dark-mobile.png' });
   await streamedMarkdown.getByRole('button', { name: '源码', exact: true }).click();
   assert.equal(await streamedMarkdown.locator('code.lang-md').textContent(), markdownSource, 'Finishing the fence retains all source text');

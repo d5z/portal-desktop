@@ -2002,6 +2002,7 @@ function createStreamRuntime(state: any, options: any): any {
     if (res.status === 202) {
       // Heart accepted this input for splice/yield. The Being decides whether
       // to resume, switch scene or delegate; 202 is not task completion.
+      res.body?.cancel().catch(() => {});
       updateSendButton();
       startCatchUpWatcher();
       return;
@@ -2146,8 +2147,8 @@ function createStreamRuntime(state: any, options: any): any {
     setStatus("thinking");
 
     if (res.status === 202) {
-      try { await res.json(); } catch (_: any) {}
       // Accepted is not completed: release the POST reader, retain this scene's run.
+      res.body?.cancel().catch(() => {});
       pendingReply = { baseline: replyBaseline, submittedAt, phase: "queued", autonomousOrigin: interruptedOrigin };
       removeThinkingIndicator();
       tuiClear();

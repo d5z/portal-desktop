@@ -83,6 +83,47 @@ describe('desktop attachment queue and echo',()=>{
       expect(state.items.some((m:any)=>m.attachmentViews?.[0].message_id===id)).toBe(true);
     }finally{runtime.dispose();}
   });
+  it.each([200, 202])('keeps the attachment reply in the right turn while status sync is pending (%s)', async status => {
+    const oldTime = new Date(Date.now() - 1000).toISOString();
+    history = [{seq:1,role:'assistant',content:'上一条回复',scene_id:'room',at:oldTime}];
+    const original = globalThis.fetch;
+    let finishStatus!: () => void;
+    const accepted = new Promise<void>(resolve => { finishStatus = resolve; });
+    vi.stubGlobal('fetch', vi.fn(async (input: string, init: RequestInit = {}) => {
+      const pathname = new URL(input).pathname;
+      if (pathname.startsWith('/api/attachment-messages') && init.method === 'POST' &&
+          JSON.parse(init.body as string).delivery_status === 'accepted') await accepted;
+      if (pathname === '/api/chat/stream') {
+        posts.push(JSON.parse(init.body as string));
+        return status === 200
+          ? new Response('event: content_block_delta\ndata: {"delta":{"text":"附件回复"}}\n\nevent: message_stop\ndata: {}\n\n')
+          : new Response(new ReadableStream(), {status: 202});
+      }
+      return original(input, init);
+    }));
+    const {state,runtime} = await start();
+    try {
+      await runtime.send('原始问题', [file()]);
+      await vi.advanceTimersByTimeAsync(0);
+      expect(posts).toHaveLength(1);
+      const position = () => state.items.map(item => item.kind === 'message' ? item.text : item.kind);
+      expect(position().indexOf('原始问题')).toBeGreaterThan(position().indexOf('上一条回复'));
+      expect(position().indexOf('run')).toBeGreaterThan(position().indexOf('原始问题'));
+      if (status === 202) {
+        const at = new Date().toISOString();
+        history.push({seq:2,role:'user',content:posts[0].message,scene_id:'room',at},
+          {seq:3,role:'assistant',content:'附件回复',scene_id:'room',at});
+        await vi.advanceTimersByTimeAsync(2200);
+      }
+      expect(position().indexOf('附件回复')).toBeGreaterThan(position().indexOf('原始问题'));
+      expect(state.streaming).toBe(false);
+      expect(state.items.filter(item => item.kind === 'run').at(-1)?.waitingForReply).toBe(false);
+    } finally {
+      finishStatus();
+      await vi.advanceTimersByTimeAsync(0);
+      runtime.dispose();
+    }
+  });
   it('does not retry a Heart request with an unknown outcome, including after restart',async()=>{
     failSend=true;let current=await start();
     await current.runtime.send('',[file()]);await vi.advanceTimersByTimeAsync(0);expect(posts).toHaveLength(1);expect(delivery).toBe('unknown');

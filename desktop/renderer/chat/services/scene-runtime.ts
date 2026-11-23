@@ -246,8 +246,10 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
     sendQueue.splice(index, 1);
     queued.session.local.queued = Math.max(0, queued.session.local.queued - 1);
     if (sent) {
-      state.items = [...state.items.filter((item: any) => item !== queued.entry.message), queued.entry.message];
-      queued.entry.message.createdAt = queued.saved.createdAt;
+      if (!queued.saved.attachment) {
+        state.items = [...state.items.filter((item: any) => item !== queued.entry.message), queued.entry.message];
+        queued.entry.message.createdAt = queued.saved.createdAt;
+      }
       queued.entry.message.queued = false;
       queued.entry.message.cancelQueued = undefined;
       queued.entry.message.interruptQueued = undefined;
@@ -320,6 +322,9 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
           if (disposed || next.cancelled) return;
           // Another scene can start while parsing. Retain the prepared identifiers and wait.
           if ([...sessions.values()].some(busy)) { next.saved.phase = 'queued'; await save(); retryDrain(); return; }
+          // Place the user bubble before send creates the wait/run row. Moving
+          // it on acknowledgement would leave that row under the last reply.
+          state.items = [...state.items.filter(item => item !== next.entry.message), next.entry.message];
           await next.session.runtime.send(next.entry.text || `[发送了 ${next.entry.files.length} 个文件]`, [], {
             ...next.entry.sendOptions, queuedMessage:next.entry.message, requestMessage:context,
             attachmentDelivery: async (status: string) => {
@@ -332,8 +337,16 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
                 next.saved.attachment.delivery = status;
                 if (status === 'accepted' || status === 'unknown') detachQueued(next, true);
                 else { next.saved.phase = 'failed'; next.entry.message.queued = true; }
-                try { await save(); show(await views.update(next.saved.attachment.messageId!, {delivery_status:status})); }
+                try { await save(); }
                 catch { next.entry.message.queueNotice = '发送状态尚未同步，请核对历史'; }
+                // The Heart response owns the reply stream. A slow attachment
+                // status write must not block reading SSE or starting catch-up.
+                const sync = views.update(next.saved.attachment.messageId!, {delivery_status:status}).then(show, () => {
+                  if (disposed) return;
+                  next.entry.message.queueNotice = '发送状态尚未同步，请核对历史';
+                  publish();
+                });
+                if (status !== 'accepted') await sync;
               }
             },
           });

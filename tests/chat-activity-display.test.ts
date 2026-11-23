@@ -111,7 +111,8 @@ it.each(['error','timeout','stopped'] as const)('retires an older %s notice when
   expect(detailed).toContain('report.html');
   const quiet = renderToStaticMarkup(createElement(ChatActivity,{run:previous,showDetails:false,superseded:true}));
   expect(quiet).not.toContain('chat-status-row');
-  expect(quiet).not.toContain('run-activity');
+  expect(quiet).toContain('1 次工具调用失败');
+  expect(quiet).not.toContain('旧轮次异常');
   expect(quiet).toContain('report.html');
   expect(previous.outcome).toBe(status);
   expect(previous.entries[0].result).toBe('旧工具错误');
@@ -156,7 +157,7 @@ it.each([true,false])('renders a stopped turn without records as a compact notic
 
 it('keeps elapsed time beside the collapsed thinking label', () => {
   const html=render({...run,start:Date.now()-13000,status:'thinking',label:'思考中',entries:[]},true);
-  expect(html).toContain('思考中 · 13 秒');
+  expect(html).toMatch(/class="run-label"[^>]*>思考中<\/span><span class="run-elapsed">· 13 秒<\/span>/);
   expect(html).not.toContain('总耗时');
 });
 
