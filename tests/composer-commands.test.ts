@@ -7,6 +7,8 @@ import { ChatState } from '../desktop/renderer/chat/models/chat';
 import { createChatRuntime } from '../desktop/renderer/chat/services/runtime';
 import { SceneQueueStore } from '../desktop/renderer/chat/services/scene-queue';
 import { HistoryCache } from '../desktop/renderer/chat/services/history-cache';
+import { workDraftLink } from '../desktop/renderer/shared/lib/navigation';
+import type { WorkStage } from '../desktop/shared/work';
 
 it('sends the Work handover instructions with the selected scene and keeps the visible message short', () => {
   const text = '请接管这项 Work 任务。';
@@ -16,6 +18,58 @@ it('sends the Work handover instructions with the selected scene and keeps the v
   expect(request).toContain('@work run {"item_id":"work_fixture","dispatch_id":"dispatch-fixture","scene_id":"dispatch-scene"');
   expect(request).toContain('收到各项启动回执后立即结束本轮');
   expect(stripClientMessageContext(request)).toBe(text);
+});
+
+it('expands Work references into scoped commands only while sending', () => {
+  const item = 'work_12345678-abcd-4321-9876-123456789abc';
+  const goal = item.replace('work_', 'goal_');
+  const project = item.replace('work_', 'proj_');
+  const session = item.replace('work_', 'agent_codex_');
+  const run = workDraftLink('报表', item, { kind: 'run', value: 'after-original-run' });
+  const result = workDraftLink('报表', session, { kind: 'result', value: `${session}:turn-28` });
+  const assignment = workDraftLink('报表', item, { kind: 'assign', value: 't_fixture_collaborator' });
+  const share = workDraftLink('报表', item, { kind: 'share', value: 't_status_recipient' });
+  const inputs = [
+    [`请为 ${run} 安排下一轮执行。`, [`@work ${item}`, `@work run {"item_id":"${item}","request_id":"after-original-run"}`, `@work status ${item}`, '确认未接收才可重试', '收到各项启动回执后立即结束本轮']],
+    [`一起看看 ${result} 的第 2 版交付。`, [`@work result ${session}:turn-28`, 'files[].path']],
+    [`一起看看 ${workDraftLink('报表', item)} 的进度。`, [`@work ${item}`, `@work results ${item}`]],
+    [`一起看看 ${workDraftLink('会话', session)} 的执行情况。`, [`@work ${session}`, '按 next 翻页']],
+    [`一起看看 ${workDraftLink('目标', goal)} 的进度。`, [`@work goal ${goal}`]],
+    [`帮我在 ${workDraftLink('项目', project, { kind: 'project' })} 创建一个任务：生成 HTML 看板`, [`@work project ${project}`, `projectId 固定为 ${project}`, '@work create', '用户明确要求开工时']],
+    [`请把 ${assignment} 的指派私信发给「协作者」。\n\n> 任务正文`, ['完整 Town ID t_fixture_collaborator', '正文取该指派语句下面的引用块']],
+    [`请私信「协作者」，分享 ${share} 的当前状态。\n\n> 当前状态：待审核`, ['完整 Town ID t_status_recipient', '保持任务负责人、状态和执行原样']],
+  ] as const;
+  for (const [visible, instructions] of inputs) {
+    const request = withComposerCommandContext(visible, false, undefined, undefined, 'desktop-scene', undefined, true);
+    expect(stripClientMessageContext(request)).toBe(visible);
+    expect(request).toContain('状态用面板里的中文名称');
+    for (const instruction of instructions) expect(request).toContain(instruction);
+    expect(request).not.toContain('只发 /work 时');
+    expect(request).not.toContain('在同一 Being 对话按标题或派发记录定位任务');
+  }
+  for (const visible of [`> ${run}`, `\`\`\`md\n${run}\n\`\`\``, run.replace('after-original-run', 'invalid.request'), '[报表](beings://work/' + item + ')', '请为报表安排下一轮执行。']) {
+    expect(withComposerCommandContext(visible, false)).toBe(visible);
+  }
+});
+
+it('scopes Being interaction by task state without dispatching on review or progress checks', () => {
+  const item = 'work_12345678-abcd-4321-9876-123456789abc';
+  const scenarios: [WorkStage, string[]][] = [
+    ['backlog', ['目标、规格和可验证的验收标准', '等我确认后再修改']],
+    ['in_progress', [`@work status ${item}`, '结合 activeRun']],
+    ['review', [`@work results ${item}`, '@work result <result_id>', 'planVersion、goalRevision', '无法核验', '只做评估']],
+    ['blocked', [`@work status ${item}`, `@work results ${item}`, '等我确认再重试']],
+    ['done', ['acceptedDeliveryVersion', '保持结案状态']],
+    ['cancelled', [`@work results ${item}`, '保持已取消状态']],
+  ];
+  for (const [stage, instructions] of scenarios) {
+    const text = `帮我看看 ${workDraftLink('库存看板', item, { kind: 'stage', value: stage })}。`;
+    const transport = withComposerCommandContext(text, false);
+    expect(stripClientMessageContext(transport)).toBe(text);
+    expect(transport).toContain(`@work ${item}`);
+    for (const instruction of instructions) expect(transport).toContain(instruction);
+    for (const mutation of ['@work run ', '@work update ', '@work send ']) expect(transport).not.toContain(mutation);
+  }
 });
 
 it('allows subagent commands without a separate client-side configuration gate', () => {
@@ -36,6 +90,8 @@ it('exposes Work and its client operations through slash commands without leakin
   for (const executor of ['内置 Subagent（internal）', 'Codex（codex）', 'DeepSeek（deepseek）']) expect(request).toContain(executor);
   expect(request).toContain('@work agents');
   expect(request).toContain('新任务默认待办，省略未指定的属性');
+  expect(request).toContain('已阻塞 blocked、已完成 done、已取消 cancelled');
+  expect(request).toContain('原始日志、校验码和长路径留在工具里');
   expect(request).toContain('只在用户要求开工时派发');
   expect(request).toContain('收到各项启动回执后立即结束本轮');
   expect(request).toContain('收到 starting 就回复「正在启动」');
@@ -43,6 +99,8 @@ it('exposes Work and its client operations through slash commands without leakin
   expect(request).toContain('沿用原任务和派发请求');
   expect(request).toContain('在同一 Being 对话');
   expect(request).toContain('@work results <work_id> [<work_id> ...]');
+  expect(request).toContain('只查刚才开工回执中的对应任务');
+  expect(request).toContain('只把回执中的 files[].path 作为本轮交付链接');
   expect(request).toContain('用户确认结案后');
   expect(request).toContain('stage 改为 done');
   expect(request).toContain('[任务标题](beings://work/<work_id>)');
@@ -126,14 +184,17 @@ beforeEach(() => {
 });
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllGlobals(); });
 
-it.each(['a', 'b'])('only carries Work result guidance into the originating scene (reply scene: %s)', async replyScene => {
+it.each(['a', 'b'])('keeps Work result guidance after a file-only reply in the originating scene (reply scene: %s)', async replyScene => {
   vi.stubGlobal('location', new URL('beings://chat/?scene_id=a'));
   vi.stubGlobal('parent', {});
   const received: string[] = [];
   vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
     const route = new URL(url).pathname;
-    if (route === '/api/history') return Response.json({ messages: [{ seq: 1, role: 'assistant', scene_id: replyScene,
-      content: '已派发 [报名页](beings://work/work_5f99bc14-a1c8-41dc-89db-6c9e80df4371)' }] });
+    if (route === '/api/history') return Response.json({ messages: [
+      { seq: 1, role: 'assistant', scene_id: replyScene, content: '已派发 [报名页](beings://work/work_5f99bc14-a1c8-41dc-89db-6c9e80df4371)' },
+      { seq: 2, role: 'user', scene_id: 'a', content: '网页可以打开了吗？' },
+      { seq: 3, role: 'assistant', scene_id: 'a', content: '可以了，[报名页.html](file:///tmp/报名页.html)。' },
+    ] });
     if (route === '/api/stream/active') return new Response(null, { status: 204 });
     if (route === '/api/chat/stream') {
       received.push(JSON.parse(String(init?.body)).message);
@@ -148,7 +209,7 @@ it.each(['a', 'b'])('only carries Work result guidance into the originating scen
     await runtime.send(question);
     await vi.advanceTimersByTimeAsync(20);
     expect(received).toHaveLength(1);
-    for (const command of ['@work results <work_id>', '@work artifact', '@work update']) {
+    for (const command of ['@work results <work_id>', '@work artifact', '@work update', '状态用面板里的中文名称']) {
       expect(received[0].includes(command)).toBe(replyScene === 'a');
     }
     expect(stripClientMessageContext(received[0]).endsWith(question)).toBe(true);

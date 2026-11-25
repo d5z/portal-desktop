@@ -28,8 +28,9 @@ export function createChatBridge(state: ChatState) {
   const subagentEnables = new Map<string, (ok: boolean) => void>();
   let workTitles: Promise<Record<string, string>> | undefined;
   let finishWorkTitles: ((titles: Record<string, string>) => void) | undefined;
-  function loadWorkTitles() {
+  function loadWorkTitles(refresh = false) {
     if (!embedded || location.protocol !== 'beings:' || disposed) return Promise.resolve({});
+    if (refresh && !finishWorkTitles) workTitles = undefined;
     return workTitles ??= new Promise(resolve => {
       const timer = setTimeout(() => { finishWorkTitles?.({}); workTitles = undefined; }, 3000);
       finishWorkTitles = titles => { clearTimeout(timer); finishWorkTitles = undefined; resolve(titles); };
@@ -175,6 +176,7 @@ export function createChatBridge(state: ChatState) {
           if (data.revision !== revision || data.endpoint !== new URLSearchParams(location.search).get('history_scope') || !Array.isArray(data.tasks) || data.tasks.length > 200) return;
           if (!data.tasks.every((t: any) => t && typeof t.id === 'string' && typeof t.sceneId === 'string' && Number.isFinite(t.createdAt) &&
             (!('brief' in t) || typeof t.brief === 'string') && (!('turns' in t) || Number.isSafeInteger(t.turns)) &&
+            (!('session' in t) || typeof t.session === 'string') &&
             ['queued','running','done','failed','cancelled','interrupted','budget_exhausted','timeout'].includes(t.status))) return;
           if (typeof data.subagentConfigured === 'boolean') state.subagentConfigured = data.subagentConfigured;
           if (typeof data.subagentEnabled === 'boolean') state.subagentEnabled = data.subagentEnabled;

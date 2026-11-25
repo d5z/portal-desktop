@@ -1,14 +1,25 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdir, readFile, realpath, rename, rm, stat, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { marked } from 'marked';
 import { localFileReference } from '../../shared/local-file';
 import type { WorkDeliveryFile } from '../../shared/work';
 import { directoryProject } from './work-projects';
 
-export function workDeliveryReferences(text: string) {
-  const links = [...text.matchAll(/\]\(<?([^)>\r\n]+)>?\)/g)].map(match => match[1]);
-  const paths = [...text.matchAll(/`([^`\r\n]+\.(?:html?|md|txt|pdf|pptx?|docx?|xlsx?|csv|json|png|svg))`/gi)].map(match => match[1]);
-  return [...new Set([...links, ...paths])].slice(0, 20);
+export async function archiveWorkDeliveries(directory: string, projectDirectory: string, summary: string) {
+  const links = new Set<string>();
+  const paths = new Set<string>();
+  marked.walkTokens(marked.lexer(summary), token => {
+    if (token.type === 'link') links.add(token.href);
+    else if (token.type === 'codespan' && /\.(?:html?|md|txt|pdf|pptx?|docx?|xlsx?|csv|json|png|svg)$/i.test(token.text))
+      paths.add(token.text);
+  });
+  const save = async (references: Set<string>) => (await Promise.all([...references].slice(0, 20).map(value =>
+    archiveWorkDelivery(directory, projectDirectory, value).catch(() => undefined)))).filter(file => file !== undefined);
+  // A reply can mention other tasks' filenames. Prefer its linked deliverables.
+  const linked = await save(links);
+  const files = linked.length ? linked : await save(paths);
+  return [...new Map(files.map(file => [file.source, file])).values()];
 }
 
 export async function archiveWorkDelivery(directory: string, projectDirectory: string, value: string): Promise<WorkDeliveryFile | undefined> {

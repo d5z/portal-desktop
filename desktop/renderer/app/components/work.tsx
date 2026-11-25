@@ -2,7 +2,7 @@ import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useStat
 import { createPortal } from 'react-dom';
 import type { AppModel } from '../models/app';
 import type { SceneTask, SubagentStep } from '../../../shared/types';
-import { workStages, type WorkAssignee, type WorkGoal, type WorkItem, type WorkResult } from '../../../shared/work';
+import { workStages, type WorkAssignee, type WorkGoal, type WorkItem, type WorkResult, type WorkStage } from '../../../shared/work';
 import { workActive, workStatus } from '../models/work';
 import { useModel } from '../../shared/hooks/use-model';
 import { useMenuDismiss } from '../../shared/hooks/use-menu-dismiss';
@@ -11,7 +11,7 @@ import { IconButton } from '../../shared/components/icon-button';
 import { Dialog } from '../../shared/components/dialog';
 import { cleanContent } from '../../shared/lib/clean-content';
 import { ChatMessageMarkdown } from '../../shared/components/markdown';
-import type { PlaceTarget } from '../../shared/lib/navigation';
+import { workDraftLink, type PlaceTarget } from '../../shared/lib/navigation';
 import { LocalFileDirectory } from '../../shared/components/local-file-link';
 import { RichComposer, type ComposerHandle } from '../../shared/components/rich-composer';
 import { WorkspaceDrawer } from '../../shared/components/workspace-drawer';
@@ -19,12 +19,11 @@ import { PanelResizeHandle, usePanelWidth } from '../../shared/components/panel-
 import { ChatActivity } from '../../chat/components/messages';
 import type { ActivityEntry } from '../../chat/models/chat';
 import StatusMark from '../../shared/components/react-bits/status-mark/StatusMark';
-import { sceneExcerpt } from '../../shared/models/scene';
 import { SplitChatToggle } from './navigation';
 import { WorkImports } from './work-imports';
 import { WorkItemsPanel } from './work-items';
 import { WorkGoalsPanel } from './work-goals';
-import { WorkAssigneeDialog } from './work-assignee';
+import { WorkStatusShareDialog } from './work-status-share';
 import { WorkExecutorMark } from './work-executor-mark';
 import { WorkModelPicker } from './work-model-picker';
 import styles from './work.module.scss';
@@ -32,10 +31,15 @@ import styles from './work.module.scss';
 const filters = [['all', '全部会话'], ['active', '进行中'], ['attention', '需关注'], ['done', '已完成']] as const;
 const DEFAULT_SIDEBAR_WIDTH = 248;
 type WorkMenuAction = { label: string; icon: IconName; run: () => void; danger?: boolean };
-function workTaskLink(title: string, id: string) {
-  const label = title.replace(/[\r\n]+/g, ' ').replace(/[\\[\]`*_~!<&]/g, '\\$&');
-  return `[${label}](beings://work/${id})`;
-}
+const beingTaskActions = {
+  backlog: { label: '让 Being 梳理任务', draft: (task: string) => `帮我理一理 ${task} 要做什么，做到什么样就算好。` },
+  todo: { label: '让 Being 安排执行', draft: (task: string) => `开始做 ${task} 吧。` },
+  in_progress: { label: '让 Being 查看进度', draft: (task: string) => `帮我看看 ${task} 现在做到哪了。` },
+  review: { label: '让 Being 评估结果', draft: (task: string) => `帮我看看 ${task} 做好的结果，符合之前说的要求吗？` },
+  blocked: { label: '让 Being 排查阻塞', draft: (task: string) => `帮我看看 ${task} 卡在哪儿了，接下来怎么办？` },
+  done: { label: '让 Being 总结交付', draft: (task: string) => `帮我看看 ${task} 最后做成了什么。` },
+  cancelled: { label: '让 Being 回顾取消', draft: (task: string) => `说说 ${task} 取消前做了哪些事。` },
+} satisfies Record<WorkStage, { label: string; draft: (task: string) => string }>;
 function StatusIcon({ status }: { status: SceneTask['status'] }) {
   return <svg className={styles.statusIcon} data-status={status} width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" aria-hidden="true">
     <circle cx="8" cy="8" r="5.7" />
@@ -96,7 +100,9 @@ export function Work({ app }: { app: AppModel }) {
   const [sidebarWidth, resizeSidebar] = usePanelWidth('work-navigation', DEFAULT_SIDEBAR_WIDTH);
   const [layout, setLayout] = useState<'wide' | 'standard' | 'compact'>('wide');
   const [sidebarOverlay, setSidebarOverlay] = useState(false);
-  const [assigning, setAssigning] = useState<{ item: WorkItem; endpoint: string }>();
+  const [detailsItemId, setDetailsItemId] = useState('');
+  const [sharing, setSharing] = useState<{ itemId: string; endpoint: string }>();
+  const sharingItem = sharing?.endpoint === work.endpoint ? work.snapshot?.items?.find(item => item.id === sharing.itemId) : undefined;
   const compact = layout === 'compact';
   const sidebarOpen = compact ? sidebarOverlay : !work.sidebarCollapsed;
   useLayoutEffect(() => {
@@ -125,6 +131,12 @@ export function Work({ app }: { app: AppModel }) {
       setSidebarOverlay(false);
       headingRef.current?.focus();
     }
+  };
+  const openProjectTask = (item: WorkItem) => {
+    setDetailsItemId('');
+    const latestRunId = item.runIds.at(-1);
+    const session = latestRunId && work.threads.find(thread => thread.id === latestRunId);
+    work.select(session ? session.id : item.id);
   };
   const endpoint = app.snapshot?.settings.endpoint || '';
   const menuRef = useRef<HTMLDivElement>(null);
@@ -158,9 +170,12 @@ export function Work({ app }: { app: AppModel }) {
     app.toast(`${label}已复制`, true);
   });
   const taskMenuProps = (item: WorkItem) => menuProps('任务操作', item.title, () => [
-    { label: '打开任务', icon: 'chat-external-link', run: () => navigateSidebar(() => work.select(item.id)) },
-    { label: '同步状态到对话', icon: 'rail-chat', run: () => discussItem(item) },
-    { label: '指派给其他 Being', icon: 'rail-mail', run: () => setAssigning({ item, endpoint }) },
+    { label: '查看任务详情', icon: 'chat-external-link', run: () => navigateSidebar(() => {
+      work.select(item.id);
+      setDetailsItemId(item.id);
+    }) },
+    { label: beingTaskActions[item.stage].label, icon: 'rail-chat', run: () => void app.run(() => discussItem(item)) },
+    { label: '分享状态给其他 Being', icon: 'rail-mail', run: () => setSharing({ itemId: item.id, endpoint }) },
     { label: '复制链接', icon: 'chat-copy', run: () => copy(`beings://work/${item.id}`, '任务链接') },
     { label: '复制任务 ID', icon: 'chat-copy', run: () => copy(item.id, '任务 ID') },
     { label: '删除任务', icon: 'lucide-trash', danger: true, run: () => {
@@ -214,7 +229,6 @@ export function Work({ app }: { app: AppModel }) {
   const [overlayProperties, setOverlayProperties] = useState(false);
   const showProperties = layout === 'wide' ? dockedProperties : overlayProperties;
   const setShowProperties = layout === 'wide' ? setDockedProperties : setOverlayProperties;
-  const [detailsItemId, setDetailsItemId] = useState('');
   const projectGroups = useMemo(() => {
     const hiddenRuns = new Set([...(work.snapshot?.removedItemRunIds || []), ...(hiddenProjectSessions || [])]);
     const projectThreads = allThreads.filter(thread => !hiddenRuns.has(thread.id));
@@ -270,6 +284,7 @@ export function Work({ app }: { app: AppModel }) {
   const managedChat = managing && !!selectedItem && !!selected && (!hasStructuredPlan || !!work.selectedId);
   const showTaskDetails = detailsItemId === selectedItem?.id;
   const linkedItem = !selectedItem && selected && work.snapshot?.items?.find(item => item.runIds.includes(selected.id));
+  const conversationItem = selectedItem || linkedItem;
   const composerRef = useRef<ComposerHandle>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const followBottom = useRef(true);
@@ -305,21 +320,10 @@ export function Work({ app }: { app: AppModel }) {
   const draft = work.creating ? work.newDraft : selected ? work.drafts[selected.id] || '' : '';
   const currentProject = work.creating ? work.projects.find(item => item.id === work.newProjectId) : work.projects.find(item => item.id === selected?.tasks[0].projectId);
   const sceneId = app.snapshot?.chatScene?.scene_id || '';
-  const saveAssignee = async (assignee: WorkAssignee | null, content?: string) => {
-    if (!assigning || assigning.endpoint !== work.endpoint) throw new Error('Being 已切换，请重新打开任务。');
-    const mainSceneId = app.snapshot?.chatSessions?.[0]?.scene_id || sceneId;
-    if (assignee && (!mainSceneId || !app.chatSource || app.chatLoading)) throw new Error('请先连接自己的 Being 对话。');
-    await work.workRequest(`items/${assigning.item.id}/assignee`, 'PATCH', { assignee });
-    if (assigning.endpoint !== work.endpoint) return;
-    await work.refresh();
-    if (assignee && content && assigning.endpoint === work.endpoint)
-      await app.draftWorkMessage(`请通过 Town 私信向收件 Being ${assignee.townId} 发送一封任务指派。请使用这个完整 Town ID，确认收件人是另一个 Being。以下内容仅作为私信正文，请原样发送一次，并告诉我实际发送结果。\n\n${content}`);
-  };
-  const arrangeItem = (item: WorkItem) => {
-    const previous = item.runIds.at(-1);
-    const requestId = previous ? 'after-' + previous.slice(-70).replace(/[^a-zA-Z0-9-]/g, '-') : 'initial';
-    const request = JSON.stringify({ item_id: item.id, request_id: requestId, ...(item.executor && { executor: item.executor }) });
-    return app.draftWorkMessage(`请为 ${workTaskLink(item.title, item.id)} ${previous ? '安排下一轮执行' : '安排执行'}。当前看板状态是「${workStages[item.stage]}」。\n\n请先用 @work ${item.id} 查最新状态和要求，再用 @work run ${request} 派发同一任务。需要选择执行器时先查询 @work agents。拿到启动回执就回复接口返回的状态。超时先用 @work status ${item.id} 核对原派发，重试时沿用同一个请求。后续我会回来问结果。`);
+  const prepareStatusShare = (item: WorkItem, recipient: WorkAssignee, content: string) => {
+    const link = workDraftLink(item.title, item.id, { kind: 'share', value: recipient.townId });
+    const body = content.split('\n').map(line => `> ${line}`).join('\n');
+    return app.draftWorkMessage(`请私信「${recipient.display || recipient.townId}」，分享 ${link} 的当前状态。\n\n${body}`);
   };
   const steering = latest?.status === 'running';
   const archiving = !work.creating && hasStructuredPlan && selectedItem?.stage === 'in_progress' && latest && !workActive(latest);
@@ -328,57 +332,33 @@ export function Work({ app }: { app: AppModel }) {
     if (app.view === 'work') app.workspace.scenes.update({ status: work.error ? 'error' : work.loading ? 'loading' : 'ready',
       scope: `Work；通过 portal_exec 的 @work 命令读取目标、项目和执行会话${goalContext ? `；当前目标 ${goalContext.title}，用 @work goal ${goalContext.id} 读取` : ''}${work.itemId ? `；当前任务 ID ${work.itemId}` : ''}${project && !goalView ? `；当前项目 ${project.name}，项目 ID ${project.id}，工作目录 ${project.directory}` : ''}`, count: threads.length });
   }, [app, goalContext, goalView, project, threads.length, work.error, work.loading, work.itemId]);
-  const delegate = async () => {
-    const allTasks = taskOverview && !work.projectId;
-    if (allTasks) {
-      await app.run(() => app.draftWorkMessage('/work 帮我创建一个任务：'));
-      return;
-    }
-    await app.returnToMainChat();
-    const projectContext = project
-      ? `项目「${project.name}」，项目 ID ${project.id}。可用 @work project ${project.id} 查看已有任务。\n项目目录：${project.directory}`
-      : '使用 @work projects 查询项目，按用户需求选择。';
-    app.workspace.scenes.select({ id: project?.id || 'work', title: project?.name || 'Work', private: true,
-      excerpt: sceneExcerpt(`${goalContext ? `先用 @work goal ${goalContext.id} 读取所属目标。\n` : ''}${projectContext}\n用 @work create 建立 Work 任务。明确要求执行时，用 @work agents 选择可用执行器，并通过 @work run 派发同一任务。返回任务标题和 beings://work/<work_id> 链接。`) });
-    app.workspace.compose();
-  };
+  const delegate = () => app.run(() => app.draftWorkMessage(project
+    ? `帮我在 ${workDraftLink(project.name, project.id, { kind: 'project' })} 创建一个任务：`
+    : '/work 帮我创建一个任务：'));
   const share = () => {
-    if (!selected || !latest) return;
-    const result = work.details.find(detail => detail.taskId === latest.id)?.steps.filter(step => step.kind === 'message').at(-1)?.output;
-    app.workspace.scenes.select({ id: latest.id, title, private: true,
-      excerpt: sceneExcerpt(`Work 任务：${title}\n任务 ID：${latest.id}\n状态：${workStatus[latest.status]}${latest.workdir ? `\n工作目录：${latest.workdir}` : ''}\n请通过 portal_exec 执行 @work ${latest.id} 读取任务上下文及独立续聊。${result ? `\n\n最新回复：\n${result}` : ''}`) });
-    app.workspace.compose();
+    if (latest) void app.run(() => app.draftWorkMessage(`一起看看 ${workDraftLink(title, latest.id)} 的执行情况。`, latest.sceneId));
   };
   const discussItem = (item: WorkItem) => {
-    void app.run(() => app.draftWorkMessage(`请同步 ${workTaskLink(item.title, item.id)} 的进度。当前看板状态是「${workStages[item.stage]}」。请通过 portal_exec 用 @work ${item.id} 确认最新状态、执行和交付。这次只同步进度。`));
-  };
-  const discussGoal = async (goal?: WorkGoal) => {
-    await app.returnToMainChat();
-    app.workspace.scenes.select({ id: goal?.id || 'work-goals', title: goal?.title || 'Work 目标', private: true,
-      excerpt: sceneExcerpt(goal ? `用 @work goal ${goal.id} 读取目标和所属项目。按我的要求安排项目和会话，或汇总交付与验收进度。`
-        : '请把我描述的长期需求整理为 Work 目标。用 @work goals 查已有目标，再用 @work create-goal 创建。按我的要求关联项目，明确开工时再派发。') });
-    app.workspace.compose();
-  };
-  const sendResult = (result: WorkResult, title: string, summary: string) => {
-    const versions = [result.goalRevision && `目标 v${result.goalRevision.version}`, result.planVersion && `要求 v${result.planVersion}`, result.deliveryVersion && `交付 v${result.deliveryVersion}`].filter(Boolean);
-    const owner = work.snapshot?.items?.find(item => item.id === result.workItemId || item.runIds.includes(result.taskId));
-    let text = `这是 Work 会话 ${workTaskLink(title.slice(0, 200), result.taskId)} 的结果，本轮执行状态是「${workStatus[result.status]}」${versions.length ? `（${versions.join(' · ')}）` : ''}。`;
-    if (owner) text += `所属任务当前看板状态是「${workStages[owner.stage]}」。`;
-    text += `\n\n请用 @work result ${result.id} 查这轮回执。分享本轮文件时请使用归档路径 files[].path。`;
-    if (result.files?.length) {
-      for (const file of result.files) {
-        const name = file.name.replace(/[\\[\]]/g, '\\$&');
-        const reference = encodeURI(file.path.replace(/\\/g, '/')).replace(/[?#]/g, value => encodeURIComponent(value));
-        const link = `\n- [${name}](<file://${reference.startsWith('/') ? '' : '/'}${reference}>)`;
-        if (text.length + link.length > 4900) break;
-        text += link;
-      }
-    } else {
-      if (result.deliveryVersion) text += '\n\n本轮没有归档文件。';
-      if (summary && text.length + summary.length < 4900) text += '\n\n' + summary;
+    const { stage } = item;
+    const { draft } = beingTaskActions[stage];
+    if (stage === 'todo') {
+      const previous = item.runIds.at(-1);
+      const requestId = previous ? 'after-' + previous.slice(-70).replace(/[^a-zA-Z0-9-]/g, '-') : 'initial';
+      return app.draftWorkMessage(draft(workDraftLink(item.title, item.id, { kind: 'run', value: requestId })));
     }
-    return app.draftWorkMessage(text, result.sceneId);
+    const execution = stage === 'done' && item.acceptedDeliveryVersion
+      ? item.executions?.find(row => row.deliveryVersion === item.acceptedDeliveryVersion) : item.executions?.at(-1);
+    const runId = (stage === 'in_progress' ? item.activeRun?.taskId : undefined) || execution?.taskId || item.runIds.at(-1);
+    const origin = work.snapshot?.tasks.find(task => task.id === runId)?.sceneId
+      || work.snapshot?.results?.entries.find(result => result.id === execution?.resultId)?.sceneId || item.launches?.at(-1)?.sceneId;
+    return app.draftWorkMessage(draft(workDraftLink(item.title, item.id, { kind: 'stage', value: stage })), origin);
   };
+  const discussGoal = (goal?: WorkGoal) => app.run(() => app.draftWorkMessage(goal
+    ? `一起看看 ${workDraftLink(goal.title, goal.id)} 的进度。`
+    : '/work 帮我创建一个长期目标：'));
+  const sendResult = (result: WorkResult, title: string) => app.draftWorkMessage(
+    `一起看看 ${workDraftLink(title, result.taskId, { kind: 'result', value: result.id })} 的${result.deliveryVersion ? `第 ${result.deliveryVersion} 版结果` : '结果'}。`, result.sceneId,
+  );
   const sessionChat = (selected || work.creating) ? <div className={styles.sessionChat}>
     <div className={styles.conversation} ref={scrollRef} onScroll={event => { const el = event.currentTarget; followBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
       <div className={styles.document}>
@@ -467,7 +447,10 @@ export function Work({ app }: { app: AppModel }) {
             onToggle={event => { if (event.newState === 'open') event.currentTarget.querySelector<HTMLButtonElement>('button:not(:disabled)')?.focus(); }}
             onClick={event => { if ((event.target as HTMLElement).closest('button:not(:disabled)')) event.currentTarget.hidePopover(); }}>
             {linkedItem && <button type="button" onClick={() => work.select(linkedItem.id)}>打开所属任务</button>}
-            {selected && <button type="button" disabled={work.detailLoading} onClick={share}><Icon name="rail-chat" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" />与 Being 讨论</button>}
+            {selected && <button type="button" disabled={work.detailLoading} onClick={conversationItem ? () => void app.run(() => discussItem(conversationItem)) : share}>
+              <Icon name="rail-chat" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" />
+              {conversationItem ? beingTaskActions[conversationItem.stage].label : '与 Being 一起看'}
+            </button>}
             {overview && <button type="button" onClick={() => work.startNew()}><Icon name="chat-plus" width="16" height="16" />新建执行会话</button>}
             <button type="button" disabled={work.importLoading || work.importSaving} onClick={() => void work.openImports()}><Icon name="chat-download" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" />导入 / 同步</button>
             {work.panel !== 'results' && <button type="button" onClick={() => work.openPanel('results')}><Icon name="rail-mail" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" />工作结果{unread > 0 && <small>{unread} 未读</small>}</button>}
@@ -551,7 +534,8 @@ export function Work({ app }: { app: AppModel }) {
               </div>
               <div id={`work-project-${item.id}`} className={styles.projectSessions} hidden={!expanded}>
                 {shown.map(entry => <button className={styles.taskLink} key={entry.id} {...(entry.item ? taskMenuProps(entry.item) : sessionMenuProps(entry.id, entry.title))}
-                  aria-current={selected?.id === entry.id || selectedItem?.id === entry.id ? 'page' : undefined} title={`${entry.title} · ${entry.status}`} onClick={() => navigateSidebar(() => work.select(entry.id))}>
+                  aria-current={selected?.id === entry.id || selectedItem?.id === entry.id ? 'page' : undefined} title={`${entry.title} · ${entry.status}`}
+                  onClick={() => navigateSidebar(() => entry.item ? openProjectTask(entry.item) : work.select(entry.id))}>
                   <WorkExecutorMark executor={entry.executor} /><span className={styles.taskTitle}>{entry.title}</span>
                   <span className={styles.taskStatus} data-status={entry.statusKey}>{entry.status}</span>
                 </button>)}
@@ -572,8 +556,10 @@ export function Work({ app }: { app: AppModel }) {
           : goalView ? <WorkGoalsPanel key={work.endpoint} work={work} addDirectory={goalId => void work.addProject(app.api, goalId)} discuss={goal => void discussGoal(goal)} />
           : managing ? <div className={styles.sessionLayout}>
           {managedChat && sessionChat}
-          <WorkItemsPanel key={work.endpoint} work={work} sceneId={sceneId} arrangeItem={arrangeItem} discuss={discussItem} sendResult={sendResult} taskMenuProps={taskMenuProps}
-            assign={item => setAssigning({ item, endpoint })}
+          <WorkItemsPanel key={work.endpoint} work={work} sceneId={sceneId}
+            beingAction={selectedItem && { label: beingTaskActions[selectedItem.stage].label, open: () => discussItem(selectedItem) }}
+            sendResult={sendResult} taskMenuProps={taskMenuProps} openProjectTask={openProjectTask}
+            shareStatus={item => setSharing({ itemId: item.id, endpoint })}
             inConversation={managedChat} showDetails={showTaskDetails} closeDetails={() => setDetailsItemId('')} onPlace={openPlace} openArtifact={url => void app.api.openBrowser(url)} />
         </div> : work.importing ? work.importCatalog ? <WorkImports key={work.endpoint} work={work} catalog={work.importCatalog} /> : <div className={styles.empty}><h2>{work.importLoading ? '正在读取同步清单…' : '无法读取同步清单'}</h2>{work.importError && <p role="alert">{work.importError}</p>}<button onClick={() => void work.openImports()} disabled={work.importLoading}>重试</button><button onClick={() => { work.importing = false; work.changed(); }}>返回</button></div> : !work.creating && (!selected || !latest) ? <div className={styles.overview}>
           {project && <p className={styles.overviewDirectory}><Icon name="lucide-folder" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" />{project.directory}</p>}
@@ -605,8 +591,8 @@ export function Work({ app }: { app: AppModel }) {
         </WorkspaceDrawer>}</div>}
       </section>
     </div>}
-    {assigning && assigning.endpoint === endpoint && <WorkAssigneeDialog key={assigning.item.id} item={assigning.item} self={app.town.live?.beingId}
-      close={() => setAssigning(undefined)} save={saveAssignee} />}
+    {sharingItem && <WorkStatusShareDialog key={sharingItem.id} item={sharingItem} self={app.town.live?.beingId}
+      close={() => setSharing(undefined)} prepare={(recipient, content) => prepareStatusShare(sharingItem, recipient, content)} />}
     {contextMenu && createPortal(<div ref={menuRef} className={`${styles.displayMenu} ${styles.contextMenu}`} role="menu" aria-label={contextMenu.label}
       onContextMenu={event => event.preventDefault()} onKeyDown={event => {
         if (event.key === 'Escape' || event.key === 'Tab') {

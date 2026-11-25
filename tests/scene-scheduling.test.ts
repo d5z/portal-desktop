@@ -79,6 +79,26 @@ it('background work stays active after a partial reply without changing another 
   runtime.dispose();
 });
 
+it.each(['queued', 'running', 'done', 'failed'] as const)('keeps a completed chat reply idle while its Work task is %s', async status => {
+  const state:any = {currentScene:{sceneId:'a'},items:[],draft:'',sceneTasks:[],changed:vi.fn()};
+  const activity = vi.fn();
+  let repliedAt = 0;
+  const runtime = createSceneRuntime(state, {onSceneActivity:activity}, (_state:any, options:any) => ({
+    sceneActivity:()=> 'done', replyCompletedAt:()=>repliedAt,
+    isBusy:()=>false, waitForPendingFiles:async()=>{}, send:(text:string)=>options.prepareMessage(text), dispose:()=>{},
+  }));
+  try {
+    await runtime.send('请做一个活动照片墙，开始了先告诉我。');
+    const createdAt = Date.now();
+    repliedAt = createdAt+5;
+    const task = {id:'sub_gallery',sceneId:'a',session:'work-6e1769d9-3a48-4b98-8c5d-87bc3e3fd279',
+      status,createdAt,endedAt:status === 'done' || status === 'failed' ? createdAt+10 : undefined};
+    runtime.updateSceneTasks([task]);
+    expect(activity.mock.lastCall?.[0].a).toBe('done');
+    expect(state.sceneTasks).toEqual([task]);
+  } finally {runtime.dispose();}
+});
+
 it('attaches interleaved scene tasks and hints to their own turn without mutating runtime state', () => {
   const user = (id:string, sceneId:string, createdAt:number, text = 'question'):any => ({kind:'message',id,role:'user',sceneId,createdAt,text});
   const run = (id:string,sceneId:string,start:number):any => ({kind:'run',id,sceneId,start,end:start+1,entries:[],label:'已回复'});

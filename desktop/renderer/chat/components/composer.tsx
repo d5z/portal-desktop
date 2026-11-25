@@ -1,6 +1,6 @@
 import { AnimatePresence } from 'motion/react';
 import { DropdownMenuMotion } from '../../shared/components/animate-ui/dropdown-menu-motion';
-import { useId, useLayoutEffect, useReducer, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { RichComposer, type RichComposerProps } from '../../shared/components/rich-composer';
 import { useModel } from '../../shared/hooks/use-model';
 import { ComposerMenuIcon } from '../../shared/icons/composer-menu';
@@ -8,9 +8,13 @@ import { ComposerExamples } from './composer-examples';
 import { composerEditorExtensions } from './composer-command-extension';
 import type { ChatState } from '../models/chat';
 import { canUseComposerCommand, composerCommandQuery, insertComposerCommand, matchingComposerCommands, type ComposerCommandId } from '../models/composer-commands';
+import { workDraftLink } from '../../shared/lib/navigation';
 
 /** Keep keystrokes out of the history render path; send always reads the live draft. */
-export function ChatComposer({ state, onKeyDown, onExamples, queueEdit, ...props }: Omit<RichComposerProps, 'value' | 'onChange'> & { state: ChatState; onExamples?: () => void; queueEdit?: { text: string; onChange: (text: string) => void } }) {
+export function ChatComposer({ state, onKeyDown, onExamples, queueEdit, loadWorkTitles, ...props }: Omit<RichComposerProps, 'value' | 'onChange'> & {
+  state: ChatState; onExamples?: () => void; queueEdit?: { text: string; onChange: (text: string) => void };
+  loadWorkTitles?: (refresh: boolean) => Promise<Record<string, string>>;
+}) {
   useModel(state);
   const [, redraw] = useReducer((version: number) => version + 1, 0);
   const id = useId();
@@ -21,17 +25,35 @@ export function ChatComposer({ state, onKeyDown, onExamples, queueEdit, ...props
   const [dismissed, setDismissed] = useState<string | null>(null);
   const [selected, setSelected] = useState(0);
   const [composing, setComposing] = useState(false);
+  const [workTitles, setWorkTitles] = useState<Record<string, string>>({});
   const compositionEndedAt = useRef(0);
   const query = queueEdit ? null : composerCommandQuery(state.draft);
+  const mentionQuery = loadWorkTitles && !queueEdit ? /(?:^|[\s（，。！？：、])@([^@\n[\]()]{0,80})$/u.exec(state.draft)?.[1] : undefined;
+  const mentioning = focused && !composing && mentionQuery !== undefined && dismissed !== state.draft;
+  useEffect(() => {
+    if (!mentioning || !loadWorkTitles) return;
+    let active = true;
+    void loadWorkTitles(true).then(titles => { if (active) setWorkTitles(titles); });
+    return () => { active = false; };
+  }, [mentioning, loadWorkTitles]);
+  const mentions = mentioning ? Object.entries(workTitles).filter(([id, title]) =>
+    id.startsWith('work_') && title.toLowerCase().includes(mentionQuery!.trim().toLowerCase())).slice(0, 6) : [];
   const commands = query === null ? [] : matchingComposerCommands(query);
   const actions = commands.flatMap(command => command.id === 'ui' && onExamples ? [command.id, 'example' as const] : [command.id]);
-  const open = focused && !composing && query !== null && dismissed !== state.draft && commands.length > 0;
-  const active = Math.min(selected, actions.length - 1);
+  const optionCount = mentioning ? mentions.length : actions.length;
+  const open = focused && !composing && dismissed !== state.draft && optionCount > 0;
+  const active = Math.min(selected, optionCount - 1);
   const select = (command: ComposerCommandId | 'example') => {
     if (command === 'example') { setDismissed(state.draft); onExamples?.(); return; }
     if (!canUseComposerCommand(command, state)) { setDismissed(state.draft); return; }
     focusAfterSelection.current = true;
     state.draft = insertComposerCommand(state.draft, command);
+    state.changed();
+  };
+  const selectMention = (index: number) => {
+    const [taskId, title] = mentions[index];
+    focusAfterSelection.current = true;
+    state.draft = state.draft.slice(0, state.draft.lastIndexOf('@')) + workDraftLink(title, taskId) + ' ';
     state.changed();
   };
   useLayoutEffect(() => {
@@ -75,8 +97,12 @@ export function ChatComposer({ state, onKeyDown, onExamples, queueEdit, ...props
   return <div ref={root} className="chat-composer" onFocus={() => setFocused(true)} onBlur={event => {
     if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setFocused(false);
   }}>
-    <AnimatePresence>{open && <DropdownMenuMotion ref={menu} className="composer-slash-menu" role="listbox" aria-label="斜杠功能" id={id}>
-      {commands.map(command => {
+    <AnimatePresence>{open && <DropdownMenuMotion ref={menu} className="composer-slash-menu" role="listbox" aria-label={mentioning ? 'Work 任务' : '斜杠功能'} id={id}>
+      {mentioning ? mentions.map(([taskId, title], index) =>
+        <button key={taskId} className="composer-command-main" type="button" role="option" id={`${id}-${index}`} aria-selected={active === index}
+          tabIndex={-1} onMouseDown={event => event.preventDefault()} onMouseEnter={() => setSelected(index)} onClick={() => selectMention(index)}>
+          <ComposerMenuIcon chat kind="work"/><span className="composer-menu-copy"><strong>{title}</strong></span>
+        </button>) : commands.map(command => {
         const index = actions.indexOf(command.id);
         return <div key={command.id} className="composer-command-row" role="presentation"><button className="composer-command-main" type="button" role="option" id={`${id}-${index}`}
         aria-selected={active === index} title={command.description} tabIndex={-1} onMouseDown={event => event.preventDefault()}
@@ -95,7 +121,8 @@ export function ChatComposer({ state, onKeyDown, onExamples, queueEdit, ...props
           if (['ArrowDown', 'ArrowUp', 'Enter', 'Tab', 'Escape'].includes(event.key)) {
             event.preventDefault(); event.stopPropagation();
             if (event.key === 'Escape') setDismissed(state.draft);
-            else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') setSelected((active + (event.key === 'ArrowDown' ? 1 : -1) + actions.length) % actions.length);
+            else if (event.key === 'ArrowDown' || event.key === 'ArrowUp') setSelected((active + (event.key === 'ArrowDown' ? 1 : -1) + optionCount) % optionCount);
+            else if (mentioning) selectMention(active);
             else select(actions[active]);
             return;
           }

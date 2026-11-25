@@ -19,6 +19,7 @@ import { TownModel } from "../../town/models/town";
 import type { HistoryScope } from "../../chat/models/scenes";
 import { CHAT_HISTORY_LIMIT_KEY, DEFAULT_CHAT_HISTORY_LIMIT, chatHistoryLimit, validChatHistoryLimit } from '../../../shared/chat-history';
 import { LocalHistoryReader } from './local-history';
+import { isWorkProjectId } from '../../shared/lib/navigation';
 
 type SettingsRoute = "" | "connection" | "town" | "model" | "portal" | "diagnostics" | "plugins" | "apps";
 
@@ -37,7 +38,8 @@ export class AppModel extends Store {
     this.work.configure(this.snapshot?.settings.endpoint || "");
     if (taskId) {
       this.work.projectId = ''; this.work.filter = 'all'; this.work.query = '';
-      this.work.select(taskId);
+      if (isWorkProjectId(taskId)) this.work.selectProject(taskId);
+      else this.work.select(taskId);
       if (this.view === 'work') void this.work.refresh();
     }
     this.closeSubagentTasks();
@@ -228,7 +230,7 @@ export class AppModel extends Store {
   async draftWorkMessage(text: string, originSceneId?: string) {
     const source = this.chatSource;
     const currentSceneId = this.snapshot?.chatScene?.scene_id;
-    const sceneId = originSceneId || this.snapshot?.chatSessions?.[0]?.scene_id || currentSceneId;
+    const sceneId = originSceneId || currentSceneId || this.snapshot?.chatSessions?.[0]?.scene_id;
     if (!sceneId || !source || this.chatLoading) throw new Error('Being 对话正在连接，请稍后再试。');
     if (sceneId !== currentSceneId) await this.changeChatSession('select', sceneId);
     if (source !== this.chatSource || sceneId !== this.snapshot?.chatScene?.scene_id)

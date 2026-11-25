@@ -38,6 +38,8 @@ const steps={
  denied:[['portal_file_write',{path:'denied.txt',content:'must not be written'}]],
  allowed:[['portal_file_write',{path:'allowed.txt',content:'approved'}]],
  budget:[['portal_file_read',{path:'edit.txt'}],['portal_file_read',{path:'edit.txt'}]],
+ output:[['portal_exec',{command:`node -e ${quote("process.stdout.write('START'+'x'.repeat(30000)+'END')")}`}]],
+ commandFailure:[['portal_exec',{command:'portal-test-missing-executable'}]],
  parallelA:[['portal_file_write',{path:'a.txt',content:'A'}]],
  parallelB:[['portal_file_write',{path:'b.txt',content:'B'}]],
  custom:[['portal_exec',{command:`python3 -c ${quote("import pathlib,sys,json; assert 'portal-runtime' in sys.executable; pathlib.Path('custom-result.json').write_text(json.dumps({'ok':True,'text':'自定义子任务'},ensure_ascii=False),encoding='utf-8')")} && node -e ${quote("const fs=require('node:fs'); if(!process.execPath.includes('portal-runtime'))throw Error('HOST_NODE'); const d=JSON.parse(fs.readFileSync('custom-result.json','utf8')); if(!d.ok)throw Error('BAD_DATA'); console.log('CUSTOM_RUNTIME_OK', d.text)")}`}]],
@@ -50,6 +52,21 @@ const server=createServer(async(req,res)=>{
   let raw='';for await(const b of req)raw+=b;const d=JSON.parse(raw);if(d.stream===false){res.setHeader('Content-Type','application/json');res.end(JSON.stringify({choices:[{message:{content:'OK'},finish_reason:'stop'}]}));return;}const text=JSON.stringify(d.messages);const name=text.match(/CASE:([A-Za-z]+)/)?.[1]||'unknown';
   if(name==='unknown'){res.setHeader('Content-Type','text/event-stream');res.end('data: '+JSON.stringify({choices:[{delta:{content:'OK'},finish_reason:'stop'}]})+'\n\ndata: [DONE]\n\n');return;}
   requests.push({case:name,model:d.model,tools:d.tools?.map(t=>t.function.name),authorized:req.headers.authorization==='Bearer fixture-model-key'});
+  if(name==='output'){
+   const result=d.messages.find(m=>m.role==='tool');
+   if(result){
+    const text=JSON.stringify(result.content);
+    assert(text.includes('START')&&text.includes('END')&&text.includes('output truncated'));
+    assert(text.length<16100);
+   }
+  }
+  if(name==='commandFailure'){
+   const result=d.messages.find(m=>m.role==='tool');
+   if(result){
+    assert.match(JSON.stringify(result.content),/command_not_found/);
+    assert.match(JSON.stringify(result.content),/Python\/Node/);
+   }
+  }
   if(name==='auth'){res.writeHead(401,{'Content-Type':'application/json'});res.end(JSON.stringify({error:{message:'401 fixture authorization failure',type:'authentication_error'}}));return;}
   if(name==='cancel'||name==='timeout'){held.push(res);return;}
   const index=d.messages.filter(m=>m.role==='tool').length;const step=steps[name]?.[index];
@@ -93,7 +110,7 @@ try{
  await start();
  const tools=await rpc('tools/list',{});assert(tools.tools.some(t=>t.name==='portal_subagent_spawn'));
  const status=await call('portal_subagent_status');assert(status.command_resolved);assert(!JSON.stringify(status).includes('fixture-model-key'));
- await run('python');await run('node');await run('files');
+ await run('python');await run('node');await run('files');await run('output');await run('commandFailure');
  assert.equal(await readFile(path.join(workspace,'edit.txt'),'utf8'),'after 你好');
  const result=JSON.parse(await readFile(path.join(workspace,'node-result.json'),'utf8'));assert(result.python.includes('portal-runtime'));assert(result.node.includes('portal-runtime'));
  const config=parse(await readFile(configFile,'utf8'));config.subagent.model.model='inherited-two';await writeFile(configFile,stringify(config));

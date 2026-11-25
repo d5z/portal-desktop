@@ -146,7 +146,7 @@ export function workPlanPrompt(item: WorkPlanFields, goal?: WorkGoal) {
     item.goal && `任务目标：${item.goal}`, item.specification && `规格：${item.specification}`,
     item.acceptanceCriteria?.length && `验收标准：\n${item.acceptanceCriteria.map(value => `- ${value}`).join('\n')}`].filter(Boolean);
   if (!sections.length) return '';
-  return [...sections, '有实际交付文件时，请在本轮最终回复中用 Markdown 文件链接列出本轮交付（建议使用文件绝对路径）。'].join('\n\n');
+  return [...sections, '在最终回复中，用 Markdown 文件链接列出本轮实际交付的文件。路径含空格或括号时用尖括号包裹；引用其他任务的文件时只写文件名。'].join('\n\n');
 }
 
 export function workContinuationPrompt(message: string, item: WorkPlanFields, goal?: WorkGoal) {

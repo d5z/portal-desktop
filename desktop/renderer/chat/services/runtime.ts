@@ -1907,11 +1907,13 @@ function createStreamRuntime(state: any, options: any): any {
   function hasWorkFollowup(sceneId: string | undefined) {
     if (location.protocol !== 'beings:' || !sceneId) return false;
     const items: ChatState['items'] = state.items;
+    let replies = 0;
     for (let index = items.length - 1; index >= 0; index--) {
       const item = items[index];
-      if (item.kind !== 'message' || item.sceneId !== sceneId || item.queued || item.streaming || item.interim) continue;
-      if (item.role === 'user') return false;
-      if (item.role === 'being') return workTaskReferences(item.text).length > 0;
+      if (item.kind !== 'message' || item.role !== 'being' || item.sceneId !== sceneId || item.streaming || item.interim) continue;
+      if (workTaskReferences(item.text).length) return true;
+      // A result reply may link only to the delivered file.
+      if (++replies === 2) break;
     }
     return false;
   }

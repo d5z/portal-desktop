@@ -48,7 +48,7 @@ export function WorkGoalsPanel({ work, addDirectory, discuss }: {
   const items = work.snapshot?.items || [];
   const fields = editor?.fields;
   const actions = <div className={styles.goalActions}>
-    <button type="button" onClick={() => discuss(goal)}>{goal ? '与 Being 讨论' : '让 Being 建目标'}</button>
+    <button type="button" onClick={() => discuss(goal)}>{goal ? '与 Being 一起看' : '让 Being 建目标'}</button>
     <button type="button" className={styles.goalPrimary} onClick={() => begin(goal)}>{goal ? '编辑目标' : '新建目标'}</button>
   </div>;
   return <section className={`${styles.itemsPanel} ${styles.goalPanel}`} aria-label="Work 目标">

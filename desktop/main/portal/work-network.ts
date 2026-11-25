@@ -8,7 +8,7 @@ import { workContinuationPrompt, workDispatchReply, workGoalRevision, workPlanPr
 import { WorkProjects, directoryProject } from './work-projects';
 import { WorkImports } from './work-imports';
 import { managedNativeSessions, nativeSourceScenes, WorkItems, workItemFields, workModelSelection, workPlanVersion, type PendingWorkResult } from './work-items';
-import { archiveWorkDelivery, workDeliveryReferences } from './work-deliveries';
+import { archiveWorkDeliveries, archiveWorkDelivery } from './work-deliveries';
 import { AgentBridge, mergeProjects } from '../agent-bridge/registry';
 import { AgentError, agentTaskId, type AgentTurn } from '../agent-bridge/types';
 
@@ -143,9 +143,10 @@ export class WorkNetwork {
   }
   private async collect(runtime: ReturnType<WorkNetwork['runtime']>) {
     const { endpoint } = runtime;
-    const data = await this.items.read(endpoint);
     const internal = await this.readTasks();
     if (internal.endpoint !== endpoint) return;
+    // Match a newly completed run against ownership saved before its dispatch.
+    const data = await this.items.read(endpoint);
     const visibleNative = data.pending.length ? (await this.bridge?.snapshot(data.pending.map(row => row.taskId)))?.tasks || [] : [];
     const results: WorkResult[] = [];
     const known = new Set(data.results.map(row => row.id));
@@ -192,9 +193,7 @@ export class WorkNetwork {
         }));
         const directory = projects.find(row => row.id === item?.projectId)?.directory || runs.get(result.taskId)?.workdir;
         if (!item || !directory) return;
-        const archived = await Promise.all(workDeliveryReferences(result.summary).map(value =>
-          archiveWorkDelivery(path.join(this.projectDirectory, 'deliveries'), directory, value).catch(() => undefined)));
-        const files = [...new Map(archived.flatMap(file => file ? [[file.source, file] as const] : [])).values()];
+        const files = await archiveWorkDeliveries(path.join(this.projectDirectory, 'deliveries'), directory, result.summary);
         if (files.length) result.files = files;
       }));
     }

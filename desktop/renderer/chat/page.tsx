@@ -863,6 +863,7 @@ export function ChatView({
               <ChatComposer
                 state={state}
                 onExamples={openExamples}
+                loadWorkTitles={location.protocol === 'beings:' ? bridge.loadWorkTitles : undefined}
                 key={state.currentScene.sceneId || "global"}
                 textareaRef={composer}
                 id="input"

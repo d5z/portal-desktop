@@ -72,14 +72,15 @@ function WorkBoardCard({ item, lane, disabled, before, open, menu, children }: {
     className={styles.itemCard} onClick={open}>{children}</button>;
 }
 
-export function WorkItemsPanel({ work, sceneId, openArtifact, discuss, assign, arrangeItem, inConversation, showDetails, closeDetails, onPlace, sendResult, taskMenuProps }: {
-  work: WorkModel; sceneId: string; openArtifact: (url: string) => void; discuss: (item: WorkItem) => void;
-  assign: (item: WorkItem) => void;
-  arrangeItem: (item: WorkItem) => Promise<void>;
+export function WorkItemsPanel({ work, sceneId, openArtifact, shareStatus, beingAction, inConversation, showDetails, closeDetails, onPlace, sendResult, taskMenuProps, openProjectTask }: {
+  work: WorkModel; sceneId: string; openArtifact: (url: string) => void;
+  shareStatus: (item: WorkItem) => void;
+  beingAction?: { label: string; open: () => Promise<void> };
   inConversation: boolean; showDetails: boolean; closeDetails: () => void;
   onPlace: (target: PlaceTarget) => void;
-  sendResult: (result: WorkResult, title: string, summary: string) => Promise<unknown>;
+  sendResult: (result: WorkResult, title: string) => Promise<unknown>;
   taskMenuProps: (item: WorkItem) => TaskMenuProps;
+  openProjectTask: (item: WorkItem) => void;
 }) {
   const items = work.snapshot?.items || [];
   const item = work.item;
@@ -129,6 +130,8 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, discuss, assign, a
   const moreResults = earlierResults ? earlierResults.next : resultPage?.next;
   const itemProject = item && work.projects.find(project => project.id === item.projectId);
   const itemGoal = work.goalForProject(item?.projectId);
+  const childItems = item ? items.filter(row => row.parentId === item.id) : [];
+  const launchNotice = item && dispatchStatus(item);
   const editingGoal = work.goalForProject(editing?.projectId);
   const editingProject = work.projects.find(project => project.id === editing?.projectId);
   const preparingExecution = !!editor?.startAfterSave;
@@ -137,7 +140,8 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, discuss, assign, a
     return !!project && !!(fields.executor || project.rules?.executor);
   };
   const ready = item && work.agents.some(agent => agent.id === (item.executor || itemProject?.rules?.executor) && agent.available && agent.canExecute !== false);
-  const canArrange = item && !busy && !arranging(item) && item.launches?.at(-1)?.status !== 'unconfirmed' &&
+  const showDirectStart = item && (item.stage === 'todo' || item.stage === 'blocked' || (item.stage === 'in_progress' && !item.runIds.length));
+  const canStart = showDirectStart && !busy && !arranging(item) && item.launches?.at(-1)?.status !== 'unconfirmed' &&
     sceneId && itemProject && !runs?.some(row => row.task && workActive(row.task));
   const liveRuns = new Map(threads.filter(thread => workActive(thread.tasks.at(-1)!)).map(thread => [thread.id, thread.tasks.at(-1)!]));
   const timeline: { key: string; at: number; text: string; result?: WorkResult }[] = item ? [
@@ -175,11 +179,12 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, discuss, assign, a
     catch (failure) { setError((failure as Error).message); }
     finally { setBusy(false); }
   }
-  const openItem = (id: string) => {
+  const openItem = (row: WorkItem, preferConversation = false) => {
     setNote('');
     setLink('');
     setError('');
-    work.select(id);
+    if (preferConversation && row.projectId) openProjectTask(row);
+    else work.select(row.id);
   };
   const update = (fields: Partial<WorkItemFields>) => {
     work.itemEditor = { ...editor!, fields: { ...editing!, ...fields } };
@@ -303,10 +308,9 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, discuss, assign, a
         {column.map(row => {
           const children = visibleFields.includes('children') ? items.filter(candidate => candidate.parentId === row.id) : [];
           const run = row.runIds.map(id => liveRuns.get(id)).find(Boolean);
-          return <WorkBoardCard key={row.id} item={row} lane={lane} disabled={busy} before={active && dropPosition?.before === row.id} open={() => openItem(row.id)} menu={taskMenuProps(row)}>
+          return <WorkBoardCard key={row.id} item={row} lane={lane} disabled={busy} before={active && dropPosition?.before === row.id} open={() => openItem(row, true)} menu={taskMenuProps(row)}>
             <strong className={styles.executorTitle}>{visibleFields.includes('executor') && <WorkExecutorMark executor={row.executor} />}<span>{row.title}</span></strong>
             {run && <span className={styles.activeRun}>{workStatus[run.status]}</span>}
-            {row.assignee && <span>指派给 {row.assignee.display || row.assignee.townId}</span>}
             {dispatchStatus(row) && <span className={row.dispatch?.error ? styles.itemError : undefined}>{dispatchStatus(row)}</span>}
             <span>{[
               visibleFields.includes('project') && work.projects.find(project => project.id === row.projectId)?.name,
@@ -352,8 +356,9 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, discuss, assign, a
             {expanded && <>
               <div className={styles.resultActions}>
                 <button type="button" disabled={busy} onClick={() => openResult(result)}>打开执行会话</button>
-                <button className={styles.sendResult} type="button" disabled={busy} onClick={() => void perform(() => sendResult(result, title, summary))}>
-                  <Icon name="rail-chat" width="15" height="15" />加入 Being 草稿
+                <button className={styles.sendResult} type="button" disabled={busy} title="将结果填入 Being 对话，确认后发送"
+                  onClick={() => void perform(() => sendResult(result, title))}>
+                  <Icon name="rail-chat" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" />与 Being 一起看
                 </button>
               </div>
               {summary ? <LocalFileDirectory.Provider value={work.snapshot?.tasks.find(task => task.id === result.taskId)?.workdir}>
@@ -371,7 +376,7 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, discuss, assign, a
       {!item && <div className={styles.itemsOverview}>
 
         {created && <div className={styles.itemReceipt} role="status"><span>已创建「{created.title}」</span>
-          <button type="button" onClick={() => { openItem(created.id); setCreated(undefined); }}>查看任务</button>
+          <button type="button" onClick={() => { openItem(created); setCreated(undefined); }}>查看任务</button>
           <IconButton label="关闭创建提示" onClick={() => setCreated(undefined)}><Icon name="chat-close" width="14" height="14" /></IconButton>
         </div>}
         {work.itemId && !item && !work.loading && <p role="alert" className={styles.itemError}>此任务不存在或属于其他 Being。</p>}
@@ -447,119 +452,142 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, discuss, assign, a
             <div className={styles.itemsTable}><table><thead><tr><th><input type="checkbox" aria-label="全选当前任务" checked={rowSelection.length === rows.length} onChange={event => setChecked(event.target.checked ? rows.map(row => row.id) : [])} /></th>
               <th>标题</th><th>状态</th><th>优先级</th><th>截止日期</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}>
                 <td><input type="checkbox" aria-label={`选择 ${row.title}`} checked={checked.includes(row.id)} onChange={event => setChecked(current => event.target.checked ? [...current, row.id] : current.filter(id => id !== row.id))} /></td>
-                <td><button type="button" {...taskMenuProps(row)} onClick={() => openItem(row.id)}><span className={styles.executorTitle}><WorkExecutorMark executor={row.executor} /><span>{row.title}</span></span></button></td><td>{workStages[row.stage]}</td><td>{workPriorities[row.priority]}</td><td>{row.dueDate || '—'}</td>
+                <td><button type="button" {...taskMenuProps(row)} onClick={() => openItem(row, true)}><span className={styles.executorTitle}><WorkExecutorMark executor={row.executor} /><span>{row.title}</span></span></button></td><td>{workStages[row.stage]}</td><td>{workPriorities[row.priority]}</td><td>{row.dueDate || '—'}</td>
               </tr>)}</tbody></table></div>
           </>}
       </div>}
       {item && <div id="work-item-details" className={styles.itemDetail} role="region" aria-label="任务详情">
         <header className={styles.itemDetailHeader}>
-          <h2>{item.title}</h2>
-          {inConversation && <IconButton label="关闭任务详情" onClick={() => { closeDetails(); setError(''); }}><Icon name="chat-close" width="16" height="16" /></IconButton>}
+          <div>
+            <h2>{item.title}</h2>
+            {item.description && <p className={styles.itemDescription}>{item.description}</p>}
+          </div>
+          <div className={styles.itemHeaderActions}>
+            <IconButton label="编辑任务" disabled={busy} onClick={() => {
+              setError(''); work.itemEditor = { id: item.id, fields: item, expectedVersion: item.planHistory?.at(-1)?.version || 1 }; work.changed();
+            }}><Icon name="chat-edit" width="16" height="16" strokeWidth="1.5" /></IconButton>
+            {inConversation && <IconButton label="关闭任务详情" onClick={() => { closeDetails(); setError(''); }}><Icon name="chat-close" width="16" height="16" /></IconButton>}
+          </div>
         </header>
-        {item.description && <p className={styles.itemDescription}>{item.description}</p>}
+        <div className={styles.itemDetailToolbar} role="group" aria-label="任务操作">
+          <label className={styles.itemStageControl} data-stage={item.stage}>
+            <span className={styles.itemStageMark} aria-hidden="true" />
+            <select aria-label="任务状态" value={item.stage} disabled={busy} onChange={event => {
+              const stage = event.target.value as WorkStage;
+              void perform(() => work.moveItems([item.id], stage));
+            }}>{stages.map(stage => <option key={stage} value={stage}>{workStages[stage]}</option>)}</select>
+          </label>
+          <div className={styles.itemDetailActions}>
+            {beingAction && <button className={styles.beingTaskAction} type="button" disabled={busy} title="加入 Being 对话草稿" onClick={() => void perform(beingAction.open)}>{beingAction.label}</button>}
+            {showDirectStart && <button type="button" disabled={!canStart || !ready} onClick={() => void perform(() => start(item))}>
+              {item.runIds.length ? '重新执行' : '开始执行'}
+            </button>}
+            <button className={styles.shareStatus} type="button" onClick={() => shareStatus(item)}>
+              <Icon name="rail-mail" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" />分享状态给其他 Being
+            </button>
+          </div>
+        </div>
+        {(launchNotice || launchCheck?.itemId === item.id) && <div className={styles.itemRunNotice}>
+          {launchNotice && <p role="status">{launchNotice}</p>}
+          {['starting', 'unconfirmed'].includes(item.launches?.at(-1)?.status || '') && <button type="button" disabled={busy} onClick={() => void perform(async () => {
+            const reply = await work.workRequest<{ status: string }>(`items/${item.id}/dispatch`);
+            setLaunchCheck({ itemId: item.id, text: reply.status === 'started' ? '已找到原执行会话。' : reply.status === 'starting' ? '原派发正在启动。'
+              : reply.status === 'failed' ? '已确认原派发未启动，可以重试。' : '暂未查到原执行会话。' });
+            await work.refresh();
+          })}>查询原派发</button>}
+          {launchCheck?.itemId === item.id && <p role="status">{launchCheck.text}</p>}
+        </div>}
         <div className={styles.itemDetailLayout}>
-          <section className={`${styles.itemPlan} ${styles.itemOverviewPlan}`} aria-label="任务总览">
-            <header><h3>任务总览</h3><span>要求 v{item.planHistory?.at(-1)?.version || 1}</span></header>
-            <WorkPlanContent plan={item} />
-            {(item.planHistory?.length || 0) > 1 && <details className={styles.planHistory}>
-              <summary>要求版本记录</summary>
-              {item.planHistory!.slice().reverse().map(version => <details key={version.version}>
-                <summary>v{version.version} · {version.source === 'being' ? 'Being' : '用户'} · {date(version.at)}</summary>
-                {version.title !== item.title && <strong>{version.title}</strong>}
-                {version.description && version.description !== item.description && <p className={styles.itemDescription}>{version.description}</p>}
-                <WorkPlanContent plan={version} />
-              </details>)}
-            </details>}
-          </section>
-          <aside className={styles.itemProperties} aria-label="任务属性">
-            <h3>属性</h3>
-            <dl className={styles.itemFacts}>
-              <div><dt>状态</dt><dd>
-                <select aria-label="任务状态" value={item.stage} disabled={busy} onChange={event => {
-                  const stage = event.target.value as WorkStage;
-                  void perform(() => work.moveItems([item.id], stage));
-                }}>{stages.map(stage => <option key={stage} value={stage}>{workStages[stage]}</option>)}</select>
-              </dd></div>
-              <div><dt>项目</dt><dd>{itemProject ? <button className={styles.factLink} type="button" onClick={() => work.selectProject(itemProject.id)}>{itemProject.name}</button> : '未分配'}</dd></div>
-              {itemGoal && <div><dt>目标</dt><dd><button className={styles.factLink} type="button" onClick={() => work.openGoals(itemGoal.id)}>{itemGoal.title}</button></dd></div>}
-              <div><dt>执行器</dt><dd><WorkExecutorMark executor={item.executor} showName /></dd></div>
-              {item.assignee && <div><dt>指派给</dt><dd title={item.assignee.townId}>{item.assignee.display || item.assignee.townId}</dd></div>}
-              {item.modelSelection && <div><dt>模型</dt><dd>{item.modelSelection.model}</dd></div>}
-              {item.priority !== 'none' && <div><dt>优先级</dt><dd>{workPriorities[item.priority]}</dd></div>}
-              {item.dueDate && <div><dt>截止日期</dt><dd>{item.dueDate}</dd></div>}
-              {item.labels.length > 0 && <div><dt>标签</dt><dd>{item.labels.join(' · ')}</dd></div>}
-            </dl>
-            <div className={styles.itemActions}>
-              <button className={styles.assignTask} type="button" disabled={!canArrange} title="加入 Being 对话草稿" onClick={() => void perform(() => arrangeItem(item))}>{item.runIds.length ? '让 Being 安排下一轮' : '让 Being 安排执行'}</button>
-              <button type="button" disabled={!canArrange || !ready} onClick={() => void perform(() => start(item))}>
-                {item.runIds.length ? '新建执行会话' : '开始执行'}
-              </button>
-            </div>
-            <div className={styles.itemActions}>
-              <button className={styles.remoteAssign} type="button" onClick={() => assign(item)}>
-                <Icon name="rail-mail" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" />
-                {item.assignee ? '管理 Being 指派' : '指派给其他 Being'}
-              </button>
-            </div>
-            <div className={`${styles.itemActions} ${styles.secondaryActions}`}>
-              <button type="button" onClick={() => { setError(''); work.itemEditor = { id: item.id, fields: item, expectedVersion: item.planHistory?.at(-1)?.version || 1 }; work.changed(); }}>编辑任务</button>
-              <button type="button" onClick={() => discuss(item)}>同步状态到对话</button>
-              <button type="button" onClick={() => work.createItem({ projectId: item.projectId, executor: item.executor, parentId: item.id })}>添加子任务</button>
-            </div>
-            {dispatchStatus(item) && <p role="status" className={styles.hint}>{dispatchStatus(item)}</p>}
-            {['starting', 'unconfirmed'].includes(item.launches?.at(-1)?.status || '') && <button type="button" disabled={busy} onClick={() => void perform(async () => {
-              const reply = await work.workRequest<{ status: string }>(`items/${item.id}/dispatch`);
-              setLaunchCheck({ itemId: item.id, text: reply.status === 'started' ? '已找到原执行会话。' : reply.status === 'starting' ? '原派发正在启动。'
-                : reply.status === 'failed' ? '已确认原派发未启动，可以重试。' : '暂未查到原执行会话。' });
-              await work.refresh();
-            })}>查询原派发</button>}
-            {launchCheck?.itemId === item.id && <p role="status" className={styles.hint}>{launchCheck.text}</p>}
-            <h3>自动化</h3>
-            <WorkAutomation key={item.id + ':handoff'} item={item} work={work} sceneId={sceneId} kind="handoff" />
-            <WorkAutomation key={item.id + ':wakeup'} item={item} work={work} sceneId={sceneId} kind="wakeup" />
-          </aside>
           <div className={styles.itemDetailMain}>
-            {!runs?.length && <p className={styles.hint}>尚未启动运行。</p>}
-            {runs && !!runs.length && (!inConversation || runs.length > 1) && <><h3>执行会话</h3>{runs.map(({ id, task }) => <div className={styles.resultRow} key={id}>
-              <button type="button" disabled={!task} aria-current={inConversation && work.selected?.id === id ? 'true' : undefined} onClick={() => work.select(id)}>
-                {task ? <span className={styles.executorTitle}><WorkExecutorMark executor={task.executor || 'internal'} showName /> 打开执行会话</span> : '等待同步'}
-              </button>
-              {task && <span>{workStatus[task.status]} · {date(task.createdAt)}</span>}
-            </div>)}</>}
             {!!item.executions?.length && <section className={styles.itemPlan} aria-label="执行与交付版本">
               <header><h3>执行与交付版本</h3>{item.acceptedDeliveryVersion && <span>已验收 v{item.acceptedDeliveryVersion}</span>}</header>
               <ol className={styles.deliveryHistory}>{item.executions.slice().reverse().map(run => <li key={run.resultId}>
                 <div className={styles.deliveryHeading}>
-                  <strong>{run.deliveryVersion ? `交付 v${run.deliveryVersion}` : workStatus[run.status]}</strong>
-                  <span>{[run.goalRevision && `目标 v${run.goalRevision.version}`, run.planVersion && `要求 v${run.planVersion}`, workStatus[run.status], date(run.at)].filter(Boolean).join(' · ')}</span>
+                  <div>
+                    <strong>{run.deliveryVersion ? `交付 v${run.deliveryVersion}` : workStatus[run.status]}</strong>
+                    <span>{[run.goalRevision && `目标 v${run.goalRevision.version}`, run.planVersion && `要求 v${run.planVersion}`, run.deliveryVersion && workStatus[run.status], date(run.at)].filter(Boolean).join(' · ')}</span>
+                  </div>
                   <button type="button" disabled={!threads.some(thread => thread.id === run.taskId || thread.tasks.some(task => task.id === run.taskId))}
                     onClick={() => work.select(run.taskId, run.resultId)}>查看执行</button>
                 </div>
-                {run.files?.length ? <ul>{run.files.map(file => <li key={file.source}>
-                  <LocalFileLink path={file.path}>{file.name}</LocalFileLink><small title={file.sha256}>{file.sha256.slice(0, 8)}</small>
+                {run.files?.length ? <ul>{run.files.map(file => <li key={file.source} title={`SHA-256 ${file.sha256}`}>
+                  <LocalFileLink path={file.path}>{file.name}</LocalFileLink>
                 </li>)}</ul> : <p className={styles.hint}>本轮没有归档文件。</p>}
               </li>)}</ol>
             </section>}
-            {items.some(row => row.parentId === item.id) && <><h3>子任务</h3>{items.filter(row => row.parentId === item.id).map(row =>
-              <div className={styles.resultRow} key={row.id}><button type="button" onClick={() => openItem(row.id)}><span className={styles.executorTitle}><WorkExecutorMark executor={row.executor} /><span>{row.title}</span></span></button><span>{workStages[row.stage]}</span></div>)}</>}
-            <h3>任务动态</h3>
-            <ol className={styles.itemTimeline}>{timeline.map(entry => <li key={entry.key}>
-              <time dateTime={new Date(entry.at).toISOString()}>{date(entry.at)}</time>
-              {entry.result ? <button type="button" onClick={() => openResult(entry.result!)}>{workStatus[entry.result.status]} · 查看执行结果</button> : <p>{entry.text}</p>}
-            </li>)}</ol>
-            <form className={styles.inlineItemForm} onSubmit={event => add(event, 'notes')}>
-              <input aria-label="工作备注" placeholder="添加备注" value={note} onChange={event => setNote(event.target.value)} required />
-              <button type="submit" disabled={busy}>保存备注</button>
-            </form>
-            <h3>产物</h3>
-            {item.artifacts.map(url => <div className={styles.resultRow} key={url}>{url.startsWith('https://')
-              ? <button type="button" onClick={() => openArtifact(url)}>{url}</button>
-              : <LocalFileLink path={url}>{url}</LocalFileLink>}</div>)}
-            <form className={styles.inlineItemForm} onSubmit={event => add(event, 'artifacts')}>
-              <input aria-label="产物链接或路径" placeholder="链接或项目内文件路径" value={link} onChange={event => setLink(event.target.value)} required />
-              <button type="submit" disabled={busy}>添加产物</button>
-            </form>
+            <section className={styles.itemPlan} aria-label="任务总览">
+              <header><h3>任务总览</h3><span>要求 v{item.planHistory?.at(-1)?.version || 1}</span></header>
+              <WorkPlanContent plan={item} />
+              {(item.planHistory?.length || 0) > 1 && <details className={styles.planHistory}>
+                <summary>要求版本记录</summary>
+                {item.planHistory!.slice().reverse().map(version => <details key={version.version}>
+                  <summary>v{version.version} · {version.source === 'being' ? 'Being' : '用户'} · {date(version.at)}</summary>
+                  {version.title !== item.title && <strong>{version.title}</strong>}
+                  {version.description && version.description !== item.description && <p className={styles.itemDescription}>{version.description}</p>}
+                  <WorkPlanContent plan={version} />
+                </details>)}
+              </details>}
+            </section>
+            {runs && (!inConversation || runs.length > 1) && <section className={styles.itemPlan} aria-label="执行会话">
+              <header><h3>执行会话</h3></header>
+              {runs.length ? runs.map(({ id, task }) => <div className={styles.resultRow} key={id}>
+                <button type="button" disabled={!task} aria-current={inConversation && work.selected?.id === id ? 'true' : undefined} onClick={() => work.select(id)}>
+                  {task ? <span className={styles.executorTitle}><WorkExecutorMark executor={task.executor || 'internal'} showName /> 打开执行会话</span> : '等待同步'}
+                </button>
+                {task && <span>{workStatus[task.status]} · {date(task.createdAt)}</span>}
+              </div>) : <p className={styles.hint}>尚未启动运行。</p>}
+            </section>}
+            {!!childItems.length && <section className={styles.itemPlan} aria-label="子任务">
+              <header><h3>子任务</h3></header>
+              {childItems.map(row => <div className={styles.resultRow} key={row.id}>
+                <button type="button" onClick={() => openItem(row)}><span className={styles.executorTitle}><WorkExecutorMark executor={row.executor} /><span>{row.title}</span></span></button>
+                <span>{workStages[row.stage]}</span>
+              </div>)}
+            </section>}
+            <section className={styles.itemPlan} aria-label="产物">
+              <header><h3>产物</h3></header>
+              {item.artifacts.map(url => <div className={styles.resultRow} key={url}>{url.startsWith('https://')
+                ? <button type="button" onClick={() => openArtifact(url)}>{url}</button>
+                : <LocalFileLink path={url}>{url}</LocalFileLink>}</div>)}
+              <form className={styles.inlineItemForm} onSubmit={event => add(event, 'artifacts')}>
+                <input aria-label="产物链接或路径" placeholder="链接或项目内文件路径" value={link} onChange={event => setLink(event.target.value)} required />
+                <button type="submit" disabled={busy}>添加产物</button>
+              </form>
+            </section>
+            <section className={styles.itemPlan} aria-label="任务动态">
+              <header><h3>任务动态</h3></header>
+              <ol className={styles.itemTimeline}>{timeline.map(entry => <li key={entry.key}>
+                <time dateTime={new Date(entry.at).toISOString()}>{date(entry.at)}</time>
+                {entry.result ? <button type="button" onClick={() => openResult(entry.result!)}>{workStatus[entry.result.status]} · 查看执行结果</button> : <p>{entry.text}</p>}
+              </li>)}</ol>
+              <form className={styles.inlineItemForm} onSubmit={event => add(event, 'notes')}>
+                <input aria-label="工作备注" placeholder="添加备注" value={note} onChange={event => setNote(event.target.value)} required />
+                <button type="submit" disabled={busy}>保存备注</button>
+              </form>
+            </section>
           </div>
+          <aside className={styles.itemProperties} aria-label="任务属性">
+            <section>
+              <h3>任务属性</h3>
+              <dl className={styles.itemFacts}>
+                <div><dt>项目</dt><dd>{itemProject ? <button className={styles.factLink} type="button" onClick={() => work.selectProject(itemProject.id)}>{itemProject.name}</button> : '未分配'}</dd></div>
+                {itemGoal && <div><dt>目标</dt><dd><button className={styles.factLink} type="button" onClick={() => work.openGoals(itemGoal.id)}>{itemGoal.title}</button></dd></div>}
+                <div><dt>执行器</dt><dd><WorkExecutorMark executor={item.executor || itemProject?.rules?.executor || ''} showName /></dd></div>
+                {item.modelSelection && <div><dt>模型</dt><dd>{item.modelSelection.model}</dd></div>}
+                {item.priority !== 'none' && <div><dt>优先级</dt><dd>{workPriorities[item.priority]}</dd></div>}
+                {item.dueDate && <div><dt>截止日期</dt><dd>{item.dueDate}</dd></div>}
+                {item.labels.length > 0 && <div><dt>标签</dt><dd>{item.labels.join(' · ')}</dd></div>}
+              </dl>
+              <button className={styles.factLink} type="button" onClick={() => work.createItem({ projectId: item.projectId, executor: item.executor, parentId: item.id })}>
+                <Icon name="chat-plus" width="14" height="14" />添加子任务
+              </button>
+            </section>
+            <section className={styles.itemAutomation} aria-label="自动化">
+              <h3>自动化</h3>
+              <WorkAutomation key={item.id + ':handoff'} item={item} work={work} sceneId={sceneId} kind="handoff" />
+              <WorkAutomation key={item.id + ':wakeup'} item={item} work={work} sceneId={sceneId} kind="wakeup" />
+            </section>
+          </aside>
         </div>
       </div>}
       <dialog ref={dialogRef} aria-labelledby="work-item-editor-title" className={styles.itemDialog}

@@ -16,7 +16,8 @@ it.each(['internal', 'codex', 'deepseek'])('reconciles an accepted %s launch and
   const root = executor === 'internal' ? 'sub_fixture' : `agent_${executor}_native`;
   const results = new Map<string, SubagentTaskDetail>();
   const tasks: SceneTask[] = [];
-  const html = path.join(directory, 'agenda.html');
+  const html = path.join(directory, '议程 (活动).html');
+  const related = path.join(directory, 'sign-in.html');
   let followUp = '';
   const createTask = (id: string, session: string, parentTaskId?: string) => {
     const task: SceneTask = { id, session, parentTaskId, workdir: directory, sceneId: 'scene', status: 'running', createdAt: Date.now() };
@@ -94,11 +95,14 @@ it.each(['internal', 'codex', 'deepseek'])('reconciles an accepted %s launch and
     expect((await request(`work/items/${item.id}`, 'PATCH', { ...plan, stage: 'done' })).status).toBe(409);
     const finish = async (source: string, followup = false) => {
       await writeFile(html, source);
+      await writeFile(related, '<h1>另一个任务的签到页</h1>');
       const task = tasks.at(-1)!;
       const endedAt = Date.now();
       task.status = 'done';
       task.endedAt = endedAt;
-      const message = { kind: 'message' as const, at: endedAt, output: `[agenda.html](${html})` };
+      const message = { kind: 'message' as const, at: endedAt,
+        output: followup ? `新版保存为 \`${html}\`。参考了[帮助](https://example.invalid/help.html)。`
+          : `本轮交付：[议程](<${html}>)。同目录的 \`${related}\` 由另一项任务交付。` };
       if (executor === 'internal') results.set(task.id, { taskId: task.id, steps: [message] });
       else if (followup) turns.push({ task: { ...task, id: `${root}:second` }, steps: [message] });
       else { Object.assign(turns[0].task, { status: 'done', endedAt }); turns[0].steps.push(message); }
@@ -128,6 +132,7 @@ it.each(['internal', 'codex', 'deepseek'])('reconciles an accepted %s launch and
     expect(delivered.planHistory?.map(row => row.version)).toEqual([1, 2]);
     expect(delivered.executions?.map(row => [row.planVersion, row.deliveryVersion])).toEqual([[1, 1], [2, 2]]);
     expect(delivered.executions?.map(row => row.goalRevision)).toEqual([{ goalId: goal.id, version: 1 }, { goalId: goal.id, version: 2 }]);
+    expect(delivered.executions?.map(row => row.files?.map(file => file.source))).toEqual([[html], [html]]);
     expect(await readFile(delivered.executions![0].files![0].path, 'utf8')).toBe('<h1>首版议程</h1>');
     expect(await readFile(delivered.executions![1].files![0].path, 'utf8')).toContain('type="search"');
     const historical = JSON.parse(await network.context(`result ${delivered.executions![0].resultId}`, undefined, 'scene'));
@@ -135,6 +140,54 @@ it.each(['internal', 'codex', 'deepseek'])('reconciles an accepted %s launch and
     expect(await (await request(`work/items/${item.id}`, 'PATCH', { ...changed, stage: 'done', expectedVersion: 2 })).json()).toMatchObject({ acceptedDeliveryVersion: 2 });
     expect(JSON.parse(await network.context(`goal ${goal.id}`))).toMatchObject({ version: 2, projects: [{ id: project.id, tasks: [{ id: item.id, stage: 'done', acceptedDeliveryVersion: 2 }] }] });
   } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
+it('archives a result when its task starts and finishes during a ledger read', async () => {
+  const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), 'work-fast-result-')));
+  const endpoint = 'fixture';
+  const html = path.join(directory, 'gallery.html');
+  const tasks: SceneTask[] = [];
+  let blockLedger = false;
+  let ledgerReadStarted!: () => void;
+  let resumeLedgerRead!: () => void;
+  const readingLedger = new Promise<void>(resolve => { ledgerReadStarted = resolve; });
+  const ledgerGate = new Promise<void>(resolve => { resumeLedgerRead = resolve; });
+  const fetcher = vi.fn<typeof fetch>(async (_url, init) => {
+    const createdAt = Date.now();
+    tasks.push({ id: 'sub_gallery', sceneId: 'scene', workdir: directory,
+      session: `work-${new Headers(init?.headers).get('X-Work-Launch')}`, status: 'done', createdAt, endedAt: createdAt });
+    return Response.json({ task_id: 'sub_gallery' });
+  });
+  const network = new WorkNetwork(() => 'beings://desktop/', () => ({ directory, endpoint, pid: 7 }), fetcher);
+  network.sceneIds = () => ['scene'];
+  network.chooseProject = async directory => directory || null;
+  network.readTasks = async () => {
+    if (blockLedger) {
+      blockLedger = false;
+      ledgerReadStarted();
+      await ledgerGate;
+    }
+    return { endpoint, tasks, subagentReady: true };
+  };
+  network.readDetails = async () => [{ taskId: 'sub_gallery', steps: [{ kind: 'message', at: Date.now(), output: `[照片墙](<${html}>)` }] }];
+  const command = async (args: string) => JSON.parse(await network.context(args, undefined, 'scene'));
+  let collecting: Promise<void> | undefined;
+  try {
+    await writeFile(path.join(directory, '.portal-ready.json'), JSON.stringify({ pid: 7, nonce: 'fixture' }));
+    await writeFile(path.join(directory, '.portal-work.json'), JSON.stringify({ pid: 7, nonce: 'fixture', port: 4321, token: 'fixture' }));
+    await writeFile(html, '<h1>照片墙</h1>');
+    const { project } = await command(`add-project ${JSON.stringify({ directory })}`);
+    const item = await command(`create ${JSON.stringify({ title: '生成照片墙', projectId: project.id, executor: 'internal' })}`);
+    blockLedger = true;
+    collecting = network.collectResults();
+    await readingLedger;
+    expect(await command(`run ${JSON.stringify({ item_id: item.id })}`)).toMatchObject({ task_id: 'sub_gallery' });
+    resumeLedgerRead();
+    await collecting;
+    const [outcome] = await command(`results ${item.id}`);
+    expect(outcome).toMatchObject({ stage: 'review', result: { deliveryVersion: 1, files: [{ source: html }] } });
+    expect(await readFile(outcome.result.files[0].path, 'utf8')).toBe('<h1>照片墙</h1>');
+  } finally { resumeLedgerRead(); await collecting; await rm(directory, { recursive: true, force: true }); }
 });
 
 it('allows a fresh launch only after the original Portal admission is proven absent', async () => {

@@ -6,6 +6,8 @@ import type { SavedSceneSend } from "./scene-queue";
 import { inCurrentScene, messageScene, stripSceneTransition, withSceneTransition } from "../models/scenes";
 import type { ChatRuntime, ChatState, RuntimeOptions, Message } from "../models/chat";
 
+const workLaunchSession = /^work-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
+
 /** One Being coordinator; scene-local state is not a separate agent or breath. */
 export function createSceneRuntime(state: ChatState, options: RuntimeOptions, createRuntime: any): ChatRuntime {
   const sessions = new Map<any, any>();
@@ -392,8 +394,10 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
     const queued = sendQueue.some(next => next.session === session && next.saved.phase !== 'failed');
     const failed = sendQueue.some(next => next.session === session && next.saved.phase === 'failed');
     if (status && ["queued", "thinking", "replying", "working", "waiting", "reconnecting"].includes(status)) return status;
-    const tasks = (state.sceneTasks || []).filter((t: any) => t.sceneId === session.local.currentScene.sceneId);
-    if (tasks.some((t: any) => t.status === 'running' || t.status === 'queued')) return 'working';
+    // Portal gives Work runs and continuations a work-<launch UUID> session.
+    // Their replies and progress are independent of the Being turn that launched them.
+    const tasks = (state.sceneTasks || []).filter(task => task.sceneId === session.local.currentScene.sceneId && !workLaunchSession.test(task.session ?? ''));
+    if (tasks.some(task => task.status === 'running' || task.status === 'queued')) return 'working';
     if (status === 'error' || status === 'timeout' || status === 'stopped') return queued ? 'queued' : status;
     // Creation order is not completion order: an earlier slow task can finish
     // after a stage reply for a later fast task. Inspect every pending result.
@@ -403,13 +407,13 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
       item.sceneId === session.local.currentScene.sceneId && !item.queued).reverse() : [];
     const latestUser = messages.find(item => item.role === 'user');
     const submittedAt = Math.max(session.submittedAt || 0, latestUser?.createdAt || 0);
-    const currentTasks = tasks.filter((t: any) => submittedAt && t.createdAt >= submittedAt);
+    const currentTasks = tasks.filter(task => submittedAt && task.createdAt >= submittedAt);
     const finalReply = messages.find(item => item.role === 'being' &&
       !item.streaming && !item.interim && (item.createdAt || 0) >= submittedAt);
     const repliedAt = Math.max(session.runtime?.replyCompletedAt?.() || 0, finalReply?.createdAt || 0);
-    if (currentTasks.some((t: any) => ['failed','interrupted','budget_exhausted','timeout'].includes(t.status) &&
-        (!t.endedAt || t.endedAt > repliedAt))) return 'task-failed';
-    if (submittedAt && currentTasks.some((t: any) => t.status === 'done' && t.endedAt > repliedAt)) return 'waiting';
+    if (currentTasks.some(task => ['failed','interrupted','budget_exhausted','timeout'].includes(task.status) &&
+        (!task.endedAt || task.endedAt > repliedAt))) return 'task-failed';
+    if (submittedAt && currentTasks.some(task => task.status === 'done' && (task.endedAt ?? 0) > repliedAt)) return 'waiting';
     return queued ? "queued" : failed ? "send-failed" : status;
   };
   function publish() {

@@ -3,16 +3,22 @@ import { NodeViewWrapper, ReactNodeViewRenderer, type NodeViewProps } from '@tip
 import { AllSelection, Plugin, Selection, type EditorState } from '@tiptap/pm/state';
 import { composerCommands } from '../models/composer-commands';
 import { ComposerMenuIcon } from '../../shared/icons/composer-menu';
+import { workDraftReference, workMentionMarkdown } from '../../shared/lib/navigation';
 
 const nodeName = 'composerCommand';
 const commandFor = (token: string) => composerCommands.find(command =>
   [command.id, ...command.aliases].some(name => '/' + name.toLowerCase() === token.toLowerCase()));
 
-/** Keep the draft as slash source; only complete leading commands become atomic labels. */
+/** Keep slash source and Work references in Markdown while presenting them as atomic labels. */
 function normalizeCommands(state: EditorState) {
   const existing: { from: number; to: number; token: string }[] = [];
+  const workMentions: { from: number; to: number; token: string; href: string }[] = [];
   state.doc.descendants((node, pos) => {
-    if (node.type.name === nodeName) existing.push({ from: pos, to: pos + node.nodeSize, token: node.attrs.token });
+    if (node.type.name === nodeName && !node.attrs.href) existing.push({ from: pos, to: pos + node.nodeSize, token: node.attrs.token });
+    if (node.text?.startsWith('@')) {
+      const href = node.marks.find(mark => mark.type.name === 'link')?.attrs.href;
+      if (href && workDraftReference(href)) workMentions.push({ from: pos, to: pos + node.nodeSize, token: node.text, href });
+    }
   });
   const desired: { from: number; to: number; token: string; id: string }[] = [];
   const first = state.doc.firstChild;
@@ -21,7 +27,7 @@ function normalizeCommands(state: EditorState) {
     const positions: number[] = [];
     first.forEach((node, offset) => {
       const from = offset + 1;
-      const text = node.marks.length ? '\ufffc' : node.isText ? node.text! : node.type.name === nodeName ? String(node.attrs.token) : '\ufffc';
+      const text = node.marks.length ? '\ufffc' : node.isText ? node.text! : node.type.name === nodeName && !node.attrs.href ? String(node.attrs.token) : '\ufffc';
       for (let i = 0; i < text.length; i++) positions[source.length + i] = from + (node.isText ? i : 0);
       source += text;
       positions[source.length] = from + node.nodeSize;
@@ -43,6 +49,7 @@ function normalizeCommands(state: EditorState) {
       .map(node => ({ ...node, content: state.schema.text(node.token) })),
     ...desired.filter(node => !existing.some(prev => prev.from === node.from && prev.to === node.to))
       .map(node => ({ ...node, content: state.schema.nodes[nodeName].create({ id: node.id, token: node.token }) })),
+    ...workMentions.map(({ from, to, token, href }) => ({ from, to, content: state.schema.nodes[nodeName].create({ token, href }) })),
   ];
   if (!changes.length) return null;
   const tr = state.tr;
@@ -52,8 +59,10 @@ function normalizeCommands(state: EditorState) {
 
 function CommandLabel({ node, selected }: NodeViewProps) {
   const command = commandFor(node.attrs.token);
+  const mention = !!node.attrs.href;
   return <NodeViewWrapper as="span" className={`composer-command-token${selected ? ' is-selected' : ''}`}
-    style={{ whiteSpace: 'nowrap' }} contentEditable={false} data-command={command?.id} title={node.attrs.token} aria-label={`${command?.label || node.attrs.token} (${node.attrs.token})`}>
+    style={mention ? { maxWidth: '100%', overflowWrap: 'anywhere' } : { whiteSpace: 'nowrap' }} contentEditable={false} data-command={command?.id}
+    data-work-mention={mention || undefined} title={node.attrs.token} aria-label={command ? `${command.label} (${node.attrs.token})` : node.attrs.token}>
     {command && <ComposerMenuIcon kind={command.id}/>}<span>{command?.label || node.attrs.token}</span>
   </NodeViewWrapper>;
 }
@@ -64,10 +73,10 @@ const ComposerCommandNode = Node.create({
   inline: true,
   atom: true,
   marks: '',
-  addAttributes: () => ({ id: { default: '' }, token: { default: '' } }),
+  addAttributes: () => ({ id: { default: '' }, token: { default: '' }, href: { default: '' } }),
   renderHTML: ({ node }) => ['span', { 'data-composer-command': node.attrs.id }, node.attrs.token],
   renderText: ({ node }) => node.attrs.token,
-  renderMarkdown: node => node.attrs?.token || '',
+  renderMarkdown: node => node.attrs?.href ? workMentionMarkdown(node.attrs.token, node.attrs.href) : node.attrs?.token || '',
   addNodeView: () => ReactNodeViewRenderer(CommandLabel),
   addKeyboardShortcuts() {
     const remove = (direction: 'before' | 'after') => {

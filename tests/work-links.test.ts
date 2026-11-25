@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it, vi } from 'vitest';
 import { Markdown, markdownText } from '../desktop/renderer/shared/components/markdown';
-import { placeFromURL, validPlaceTarget, workTaskReferences } from '../desktop/renderer/shared/lib/navigation';
+import { placeFromURL, validPlaceTarget, workDraftLink, workTaskReferences } from '../desktop/renderer/shared/lib/navigation';
 import { AppModel } from '../desktop/renderer/app/models/app';
 import { WorkModel } from '../desktop/renderer/app/models/work';
 import type { DesktopAPI } from '../desktop/shared/types';
@@ -38,6 +38,13 @@ describe('Work conversation references', () => {
     expect(html).toContain('>整理反馈</button>');
     expect(html).toContain(`href="https://example.com/readme"`);
     expect(html).not.toContain('href="beings:');
+  });
+  it('opens a scoped Work reference at its underlying task or project', () => {
+    const id = 'work_894ccaa9-1d4e-4afe-a509-57d22523b7ff';
+    const project = id.replace('work_', 'proj_');
+    expect(render(workDraftLink('报表', id, { kind: 'run', value: 'after-original-run' }))).toContain(`data-work-task="${id}"`);
+    expect(placeFromURL(`beings://work/${project}#project`)).toEqual({ view: 'work', id: project });
+    expect(placeFromURL(`beings://work/${id}#run=not%20valid`)).toBeNull();
   });
   it('opens a native Work goal from a Being conversation link', () => {
     const id = 'goal_6e1769d9-3a48-4b98-8c5d-87bc3e3fd279';
