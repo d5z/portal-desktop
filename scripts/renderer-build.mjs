@@ -6,7 +6,7 @@ import { sassPlugin } from 'esbuild-sass-plugin';
 export function build(options) {
   return esbuild({
     ...options,
-    loader: { '.svg': 'dataurl', ...options.loader },
+    loader: { '.svg': 'dataurl', '.png': 'dataurl', ...options.loader },
     plugins: [
       ...(options.plugins || []),
       sassPlugin({ filter: /\.module\.scss$/, type: 'local-css' }),

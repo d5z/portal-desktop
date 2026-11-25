@@ -1,0 +1,53 @@
+@mixin sent-colors {
+  --chat-file-sent-surface: light-dark(#e9f4ff, #17304b);
+  --chat-file-sent-text: light-dark(#16273c, #ecf5ff);
+  --chat-file-sent-meta: light-dark(#466787, #b4cde6);
+  --chat-file-sent-icon: light-dark(#086bc6, #87bfff);
+}
+
+@mixin surface {
+  --surface: var(--chat-file-sent-surface, var(--chat-file-surface, light-dark(#eaeaea, #343434)));
+  --file-card-margin: 0;
+  --file-card-gap: 8px;
+  --file-card-height: var(--chat-file-height, 48px);
+  --file-card-padding: 8px 16px;
+
+  width: var(--chat-file-width, 156px);
+  max-width: 100%;
+  border: 0;
+  border-radius: var(--chat-file-radius, var(--chat-bubble-radius));
+
+  &:has(> [data-slot='file-card-open'] + button) {
+    --file-card-padding: 8px 40px 8px 16px;
+  }
+
+  [data-slot='file-card-open'] {
+    color: var(--chat-file-sent-text, var(--chat-file-text, light-dark(#202020, #f0f0f0)));
+
+    > :first-child {
+      width: var(--chat-icon-primary, 18px);
+      height: var(--chat-icon-primary, 18px);
+      background: transparent;
+      color: var(--chat-file-sent-icon, var(--chat-file-icon, light-dark(#545454, #cbcbcb)));
+    }
+
+    > span {
+      gap: 0;
+    }
+    > span > span {
+      color: var(--chat-file-sent-meta, var(--chat-file-meta, light-dark(#595959, #bcbcbc)));
+      font-size: 10px;
+      line-height: 14px;
+    }
+    svg {
+      width: 100%;
+      height: 100%;
+      stroke-width: calc(1.25 * 24 / 18);
+    }
+  }
+
+  > button:focus-visible {
+    outline-width: 1px;
+    outline-offset: -2px;
+  }
+}

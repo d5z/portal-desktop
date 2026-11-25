@@ -1,9 +1,8 @@
 import { Fragment, memo, type ComponentProps } from 'react';
-import { Markdown } from '../../shared/components/markdown';
+import { ChatMessageMarkdown } from '../../shared/components/markdown';
 import { composerCommands, parseComposerCommands } from '../models/composer-commands';
 import { stripClientMessageContext } from '../services/local-file-context';
 import { ComposerMenuIcon } from '../../shared/icons/composer-menu';
-import { detectStructuredText, hasStructuredTextSuffix } from '../../shared/lib/structured-text';
 
 function commandContent(text: string) {
   const clean = stripClientMessageContext(text);
@@ -18,12 +17,9 @@ function commandContent(text: string) {
   return { labels, text: labels ? parsed.rest : clean };
 }
 
-export const CommandMessageMarkdown = memo(function CommandMessageMarkdown({ content, ...props }: ComponentProps<typeof Markdown>) {
+export const CommandMessageMarkdown = memo(function CommandMessageMarkdown({ content, ...props }: ComponentProps<typeof ChatMessageMarkdown>) {
   const message = commandContent(content);
-  if (detectStructuredText(message.text) || hasStructuredTextSuffix(message.text)) {
-    return <div className={props.className}>{message.labels}{message.text}</div>;
-  }
-  return <Markdown {...props} content={message.text} leadingContent={message.labels}/>;
+  return <ChatMessageMarkdown {...props} sent content={message.text} leadingContent={message.labels}/>;
 });
 
 /** Attachment captions stay plain text, with the same command labels as normal bubbles. */

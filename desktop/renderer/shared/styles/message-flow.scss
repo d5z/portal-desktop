@@ -1,3 +1,5 @@
+@use 'chat-message';
+
 :root {
   --chat-content-width: 960px;
   --chat-inset-left: max(48px, calc((100% - var(--chat-content-width)) / 2));
@@ -12,6 +14,184 @@
 
   @media (max-width: 520px) {
     --chat-inset-right: max(var(--chat-gutter), env(safe-area-inset-right));
+  }
+}
+
+.chat-message-body {
+  @include chat-message.rich-size;
+  @include chat-message.prose;
+
+  p {
+    margin-block: 0 1em;
+  }
+  > p:last-child {
+    margin-block-end: 0;
+  }
+  strong {
+    font-weight: 600;
+  }
+  a {
+    color: var(--local-file-link-color);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+  code {
+    padding: 2px 5px;
+    border-radius: 4px;
+    background: var(--chat-message-inset);
+    font-size: 0.86em;
+  }
+  blockquote {
+    margin: 1em 0;
+    padding-inline-start: 10px;
+    border-inline-start: 1px solid var(--chat-edge);
+  }
+  .code-block,
+  .table-wrap {
+    max-width: 100%;
+    overflow: auto;
+    overscroll-behavior-inline: contain;
+  }
+  .code-block {
+    background: var(--chat-message-inset);
+  }
+  .code-lang {
+    padding: 6px 16px;
+    color: var(--chat-secondary);
+    font: 12px/18px var(--chat-reading-font);
+  }
+  .markdown-code-toolbar {
+    @include chat-message.code-toolbar;
+  }
+  .markdown-code-modes {
+    display: flex;
+    flex: none;
+    align-items: center;
+    gap: 4px;
+
+    button {
+      min-height: 26px;
+      padding: 4px 8px;
+      border: 0;
+      border-radius: 6px;
+      background: transparent;
+      color: var(--chat-secondary);
+      font: inherit;
+      white-space: nowrap;
+    }
+    button:hover,
+    button[aria-pressed='true'] {
+      background: var(--chat-reply-surface);
+      color: var(--chat-ink);
+    }
+  }
+  pre {
+    max-width: 100%;
+    overflow-x: auto;
+    margin: 0;
+    padding: 10px 16px 16px;
+    white-space: pre;
+    overflow-wrap: normal;
+  }
+  pre code {
+    padding: 0;
+    background: transparent;
+    white-space: inherit;
+  }
+  .markdown-preview {
+    min-width: 0;
+    padding: 16px;
+    background: var(--chat-reply-surface);
+    overflow-wrap: anywhere;
+  }
+  hr {
+    margin-block: 12px;
+    border: 0;
+    border-block-start: 1px solid var(--chat-edge);
+  }
+  .table-wrap {
+    border: 1px solid var(--chat-edge);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  :is(th, td) {
+    min-inline-size: 5rem;
+    padding: 8px;
+    border: 1px solid var(--chat-edge);
+  }
+  th {
+    background: var(--chat-message-inset);
+  }
+  :is(img, video) {
+    max-width: 100%;
+  }
+  > [data-slot='delivered-files'] {
+    display: grid;
+    gap: 6px;
+  }
+}
+
+.chat-message-body:not(.content) {
+  @include chat-message.table-controls;
+
+  .markdown-table-actions button,
+  .markdown-table-preview > header button {
+    display: grid;
+    width: 26px;
+    min-height: 26px;
+    padding: 4px;
+    place-items: center;
+    border: 0;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--chat-secondary);
+
+    svg {
+      width: 16px;
+      height: 16px;
+    }
+    &:hover {
+      background: var(--chat-subtle-surface);
+    }
+  }
+  .markdown-image-group {
+    display: grid;
+    gap: 6px;
+  }
+  .message-image-stack:not([inert]) {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .message-image-stack[inert] {
+    display: none;
+  }
+  .markdown-task {
+    display: grid;
+    grid-template-columns: 14px minmax(0, 1fr);
+    align-items: start;
+    gap: 8px;
+    list-style: none;
+  }
+  ul:has(> .markdown-task):not(:has(> li:not(.markdown-task))) {
+    padding-inline-start: 0;
+  }
+  .markdown-task-marker {
+    display: inline-grid;
+    place-items: center;
+    width: 14px;
+    height: 14px;
+    margin-block-start: calc((1lh - 14px) / 2);
+    border: 1px solid currentcolor;
+    border-radius: 3px;
+    font-size: 11px;
+    line-height: 1;
+
+    &[data-checked='true']::after {
+      content: '✓';
+    }
   }
 }
 
@@ -32,4 +212,28 @@
   align-items: center;
   gap: 5px;
   white-space: nowrap;
+}
+
+button.chat-local-file-link[data-local-file] {
+  display: inline;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--local-file-link-color, var(--accent));
+  font: inherit;
+  text-align: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
+button.chat-local-file-link:hover {
+  opacity: 0.8;
+}
+
+button.chat-local-file-link:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 3px;
 }

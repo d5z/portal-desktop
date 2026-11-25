@@ -1,0 +1,371 @@
+.run-activity {
+  --run-icon: 16px;
+  --run-gap: 8px;
+
+  margin: 8px 0 24px;
+  min-width: 0;
+  color: var(--text-dim);
+  font: 13px/1.6 var(--font-sans);
+  letter-spacing: normal;
+  text-align: left;
+}
+
+.run-summary,
+.run-activity > summary {
+  position: relative;
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--run-gap);
+  width: fit-content;
+  max-width: 100%;
+  min-height: 30px;
+  padding: 3px var(--chat-bubble-padding-inline, 16px);
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+}
+
+.run-activity > summary {
+  white-space: nowrap;
+}
+
+.run-activity > summary > :not(.run-caption) {
+  flex-shrink: 0;
+}
+
+.run-summary > .run-icon,
+.run-activity > summary > .run-icon {
+  position: absolute;
+  left: calc(var(--chat-bubble-padding-inline, 16px) - var(--run-icon) - var(--run-gap));
+}
+
+.run-activity > summary::-webkit-details-marker {
+  display: none;
+}
+
+.run-activity > summary:hover {
+  background: var(--hover-overlay);
+  color: var(--text);
+}
+
+.run-activity > summary:focus-visible {
+  outline: 1px solid var(--text-muted);
+  outline-offset: 4px;
+  border-radius: 4px;
+}
+
+.run-icon,
+.run-entry-icon,
+.run-chevron {
+  display: grid;
+  place-items: center;
+  width: var(--run-icon);
+  height: var(--run-icon);
+  flex: 0 0 var(--run-icon);
+  color: var(--text-dim);
+}
+
+.run-icon svg,
+.run-entry-icon svg,
+.run-chevron svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.run-caption {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+
+.run-label {
+  font-size: 13px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-elapsed {
+  flex-shrink: 0;
+}
+
+.run-metrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0 10px;
+  margin: 2px 0 6px 29px;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.run-chevron {
+  width: 14px;
+  height: 14px;
+  flex-basis: 14px;
+  color: var(--text-muted);
+  transition: transform 0.18s ease;
+}
+
+.run-activity[open] .run-chevron {
+  transform: rotate(90deg);
+}
+
+.run-activity.running .run-icon svg {
+  display: none;
+}
+
+.run-activity.running .run-icon::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--border);
+  border-top-color: var(--text-dim);
+  border-right-color: var(--text-dim);
+  border-radius: 50%;
+  animation: run-spin 1s linear infinite;
+}
+
+.run-activity[data-outcome='error'] .run-icon,
+.run-entry-icon.error {
+  color: var(--red);
+}
+
+.run-activity[data-status='timeout'] .run-icon,
+.run-activity[data-status='timeout'] .run-label {
+  color: var(--yellow);
+}
+
+.run-failures {
+  color: var(--red);
+}
+
+.run-body {
+  margin: 6px 0 0;
+  padding-left: 15px;
+  border-left: 1px solid var(--border);
+  min-width: 0;
+}
+
+.run-list {
+  position: relative;
+  margin: 0;
+  padding: 0 4px 0 0;
+  max-height: 320px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.run-entry-detail {
+  animation: run-step-reveal 150ms cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+.run-entry {
+  margin: 0 0 3px;
+}
+
+.run-entry-heading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  min-height: 28px;
+  padding: 2px 5px;
+  list-style: none;
+  border-radius: 6px;
+  cursor: pointer;
+  user-select: none;
+
+  &::-webkit-details-marker {
+    display: none;
+  }
+  &:hover {
+    background: var(--hover-overlay);
+  }
+  &:focus-visible {
+    outline: 1px solid var(--text-dim);
+    outline-offset: -1px;
+  }
+}
+
+.run-entry-icon {
+  position: relative;
+
+  > :is(svg, .run-tool-mark) {
+    transition: opacity 100ms;
+  }
+}
+
+.run-tool-mark {
+  width: 16px;
+  height: 16px;
+}
+
+.run-entry-disclosure {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  color: var(--text-dim);
+  transition:
+    opacity 100ms,
+    transform 150ms;
+}
+
+.run-entry:is([open], :hover, :focus-within) .run-entry-icon > :is(svg, .run-tool-mark) {
+  opacity: 0;
+}
+.run-entry:is([open], :hover, :focus-within) .run-entry-disclosure {
+  opacity: 1;
+}
+.run-entry[open] .run-entry-disclosure {
+  transform: rotate(90deg);
+}
+
+.run-entry-title,
+.run-entry-chip {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.run-entry-title {
+  flex: 0 0 auto;
+  max-width: 44%;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-dim);
+}
+
+.run-entry-chip {
+  flex: 0 1 auto;
+  padding: 0;
+  background: transparent;
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 20px;
+
+  .run-entry[data-tool] & {
+    font-family: var(--mono);
+  }
+}
+
+.run-entry-heading small {
+  flex: none;
+  font-size: 10px;
+  color: var(--text-muted);
+  white-space: nowrap;
+
+  &.run-failures {
+    color: var(--chat-error-icon, var(--red));
+  }
+}
+
+.run-entry-detail {
+  min-width: 0;
+  margin: 3px 0 7px 12px;
+  padding: 2px 0 2px 12px;
+  border-inline-start: 1px solid var(--border);
+}
+
+.run-entry-detail p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.run-tool-details {
+  min-width: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+@keyframes run-step-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.run-tool-details h5 {
+  margin: 10px 0 4px;
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.run-tool-details pre {
+  margin: 0;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  max-height: 240px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 11px;
+  line-height: 1.6;
+  user-select: text;
+}
+
+.run-tool-details dl {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 3px 12px;
+  margin: 8px 0;
+}
+
+.run-tool-details dd {
+  margin: 0;
+}
+
+.run-tool-details p {
+  margin: 6px 0 0;
+}
+
+.run-artifacts {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 8px 0 12px 24px;
+  min-width: 0;
+}
+
+.run-empty,
+.run-hint {
+  font-size: 12px;
+  line-height: 1.8;
+  margin: 4px 0 8px 24px;
+  color: var(--text-muted);
+}
+
+@keyframes run-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .run-activity.running .run-icon::before {
+    animation: none;
+  }
+
+  :is(.run-chevron, .run-entry-disclosure, .run-entry-icon > :is(svg, .run-tool-mark)) {
+    transition: none;
+  }
+  .run-entry-detail {
+    animation: none;
+  }
+}

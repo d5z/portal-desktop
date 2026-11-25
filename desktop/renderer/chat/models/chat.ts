@@ -241,12 +241,20 @@ export class ChatState extends Store {
   configStatusClass = "";
   configLoading = false;
 }
+export interface ChatSendOptions {
+  mode?: 'interrupt';
+  intelligentUI?: boolean;
+  uiAction?: import('../../shared/intelligent-ui/surfaces').UIInteraction;
+  uiSnapshot?: string;
+  workDispatch?: { itemId: string; id: string };
+}
+
 export interface ChatRuntime {
   updateSceneTasks(tasks: import("../../../shared/types").SceneTask[], subagentReady?: boolean): void;
   start(): Promise<void>;
   selectScene(scene: MessageScene): Promise<void>;
   dispose(): void;
-  send(text: string, files?: Attachment[] | null, options?: { mode?: "interrupt"; intelligentUI?: boolean; uiAction?: import('../../shared/intelligent-ui/surfaces').UIInteraction }): Promise<void>;
+  send(text: string, files?: Attachment[] | null, options?: ChatSendOptions): Promise<void>;
   stopCurrentTurn(): Promise<void>;
   handleFiles(files: Iterable<File>): void;
   removePending(index: number): void;

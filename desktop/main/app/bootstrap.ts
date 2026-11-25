@@ -1,3 +1,8 @@
+import { permissionMode } from '../../shared/security';
+import { WorkNetwork } from '../portal/work-network';
+import { AgentBridge } from '../agent-bridge/registry';
+import { CodexAdapter } from '../agent-bridge/codex';
+import { DeepSeekAdapter } from '../agent-bridge/deepseek';
 import { app, dialog, net, protocol, shell } from 'electron';
 import path from 'node:path';
 import type { PluginEventTopic } from '../../../plugins/sdk';
@@ -182,9 +187,22 @@ export function createDesktopApplication(options: DesktopOptions) {
         return net.fetch(request, { bypassCustomProtocolHandlers: true });
       });
     }
-    registerLocalProtocol(assets, proxy, plugins, attachmentDownloads, localFiles, dshPlugins, connectorNetwork, subagentNetwork, shellURL);
+    const workNetwork = new WorkNetwork(shellURL, () => ({ directory: portal.state.runtimePath || directory, pid: portal.state.pid, endpoint: store.connection?.endpoint || '' }), (url, init) => net.fetch(url as string, init), path.join(directory, 'work-projects'));
+    const codexBridge = new CodexAdapter();
+    const deepseekBridge = new DeepSeekAdapter();
+    codexBridge.permissionMode = deepseekBridge.permissionMode = () => permissionMode(store.settings.permissionMode);
+    codexBridge.allowExec = deepseekBridge.allowExec = () => store.settings.allowExec;
+    const agentBridge = new AgentBridge([codexBridge, deepseekBridge]);
+    workNetwork.bridge = agentBridge;
+    app.once('will-quit', () => agentBridge.close());
+    workNetwork.sceneIds = () => chatSessions?.list(store.connection?.endpoint).map(scene => scene.scene_id) || [];
+    workNetwork.chooseProject = async suggestedDirectory => {
+      const result = await dialog.showOpenDialog(lifecycle.window!, { title: 'Being 请求添加 Work 项目', message: '选择任务将要使用的项目目录。', defaultPath: suggestedDirectory, properties: ['openDirectory', 'createDirectory'] });
+      return result.canceled ? null : result.filePaths[0];
+    };
+    registerLocalProtocol(assets, proxy, plugins, attachmentDownloads, localFiles, dshPlugins, connectorNetwork, subagentNetwork, shellURL, workNetwork, town);
     configureLocalSession(shellURL, () => notifications.state.supported && notifications.state.preferences.enabled);
-    const commands = await createDesktopCommands({ directory, store, plugins, chatSessions, errorLog, shellURL, window: () => lifecycle.window });
+    const commands = await createDesktopCommands({ workContext: (id, signal, sceneId) => workNetwork.context(id, signal, sceneId), directory, store, plugins, chatSessions, errorLog, shellURL, window: () => lifecycle.window });
     const { approvalDialogs } = commands;
     startupNotice = commands.startupNotice || startupNotice;
     const portalController = await createPortalController({
@@ -243,6 +261,11 @@ export function createDesktopApplication(options: DesktopOptions) {
       handle, directory, store, portal, proxy, chatSessions,
       window: () => lifecycle.window, publishPluginEvent: topic => publishPluginEvent(topic)
     });
+    workNetwork.readTasks = chatIpc.taskSnapshot;
+    workNetwork.readDetails = chatIpc.taskDetails;
+    const collectWork = () => void workNetwork.collectResults().catch(error => errorLog.report('work-results', error));
+    const workResultsTimer = setInterval(collectWork, 4000);
+    app.once('will-quit', () => clearInterval(workResultsTimer));
     installApplicationMenu(showWindow, () => {
       showWindow();
       void updates.check();

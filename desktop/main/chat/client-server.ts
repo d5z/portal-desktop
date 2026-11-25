@@ -36,13 +36,14 @@ export class ClientCommandServer {
         }
         const data = JSON.parse(Buffer.concat(chunks).toString('utf8'));
         if (!data || typeof data.verb !== 'string' || !/^[a-z][a-z0-9_-]{0,63}$/.test(data.verb) ||
-            typeof data.args !== 'string' || data.args.length > (['plugins', 'security-approve'].includes(data.verb) ? 16000 : 1024) ||
+            typeof data.args !== 'string' || data.args.length > (data.verb === 'work' ? 32000 : ['plugins', 'security-approve'].includes(data.verb) ? 16000 : 1024) ||
             (data.sceneId != null && (typeof data.sceneId !== 'string' || data.sceneId.length > 256))) {
           reply(400, { error: 'Invalid client command' }); return;
         }
         const endpoint = this.currentEndpoint();
         if (!endpoint || data.endpoint !== endpoint) { reply(409, { error: 'Being connection changed' }); return; }
         let timer: ReturnType<typeof setTimeout> | undefined;
+        const waitsForUser = data.verb === 'security-approve' || (data.verb === 'work' && /^add-project(?:\s|$)/.test(data.args));
         const controller = new AbortController();
         this.pending.add(controller);
         const abort = () => controller.abort();
@@ -51,7 +52,7 @@ export class ClientCommandServer {
           const text = await Promise.race([
             this.execute(data, controller.signal),
             // Return the dialog's expiry before the upstream 120s tool deadline.
-            new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error(data.verb === 'security-approve' ? '审批队列或弹窗等待超时，操作未执行；请重新发起操作' : 'Client command timed out')); }, data.verb === 'security-approve' ? TOOL_APPROVAL_TIMEOUT_MS + 5000 : 8000); }),
+            new Promise<never>((_, reject) => { timer = setTimeout(() => { controller.abort(); reject(new Error(waitsForUser ? '客户端弹窗等待超时，操作未执行；请重新发起操作' : 'Client command timed out')); }, waitsForUser ? TOOL_APPROVAL_TIMEOUT_MS + 5000 : 8000); }),
           ]);
           if (this.currentEndpoint() !== endpoint) { reply(409, { error: 'Being connection changed' }); return; }
           if (typeof text !== 'string' || text.length > 256_000) throw new Error('Client response too large');

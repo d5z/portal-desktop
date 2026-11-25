@@ -35,8 +35,8 @@ export function PlaceHeading({ view, title, actions, navigate, onBack, onForward
 }
 
 /** Shared by place panels and the cloud computer. */
-export function SplitChatToggle({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
+export function SplitChatToggle({ expanded, onToggle, icon = 'split-panel' }: { expanded: boolean; onToggle: () => void; icon?: 'split-panel' | 'rail-chat' }) {
   return <IconButton id="toggle-split-chat" className="split-chat-toggle" label={expanded ? "收起对话" : "展开对话"} aria-expanded={expanded} aria-controls="chat-view" onClick={onToggle}>
-    <Icon name="split-panel" />
+    <Icon name={icon} />
   </IconButton>;
 }

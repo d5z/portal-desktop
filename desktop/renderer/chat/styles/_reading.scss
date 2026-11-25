@@ -1,3 +1,5 @@
+@use '../../shared/styles/chat-message';
+
 #root {
   height: 100%;
 }
@@ -233,16 +235,7 @@ body {
 }
 
 .message .content .markdown-code-toolbar {
-  justify-content: space-between;
-  gap: 12px;
-  padding: 6px 10px 6px 16px;
-
-  > span {
-    min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+  @include chat-message.code-toolbar;
 }
 
 .markdown-code-modes {

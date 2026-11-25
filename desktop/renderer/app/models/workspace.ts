@@ -149,42 +149,45 @@ export class WorkspaceModel extends Store {
       clearTimeout(this.timer);
       this.draftRequest = "";
       if (message.ok) {
-        this.frozen = this.pending;
+        const reference = this.pending?.selection;
+        if (message.appended !== true) this.frozen = this.pending;
         this.pending = null;
         this.scenes.event(
-          "引用已放入对话草稿",
-          this.scenes.reference?.title,
+          reference ? "引用已放入对话草稿" : "任务请求已放入对话草稿",
+          reference ? this.scenes.reference?.title : undefined,
           "尚未发送",
         );
         this.navigate("chat");
         this.toggle(false);
       } else {
         this.pending = null;
-        this.toast("对话输入框已有草稿，请先处理原草稿，再放入引用。");
+        this.toast("对话输入框已有草稿，请先处理原草稿。");
       }
       this.changed();
     }
   }
-  compose() {
+  compose(draft?: { text: string; sceneId: string; append?: boolean }) {
     if (this.draftRequest) return;
-    const scene =
+    const scene = draft ? null :
       this.scenes.reference ||
       (this.scenes.current.selection
         ? structuredClone(this.scenes.current)
         : null);
-    if (!scene?.selection) return;
+    const resource = scene?.selection;
+    if (!draft && !resource) return;
     if (!this.scenes.being || !this.hasFrame()) {
       this.toast("请先连接对话 Being。");
       return;
     }
-    // Explicitly choosing a quotation authorizes placing it in the current
-    // chat draft, regardless of Town identity. The user still decides to send.
-    this.scenes.reference = structuredClone(scene);
-    const resource = scene.selection;
-    const text = `一起看看${scene.title}里的这段${resource.author ? `（${resource.author}）` : ""}：\n\n${resource.excerpt
-      .split("\n")
-      .map((line) => "> " + line)
-      .join("\n")}`;
+    let text = draft?.text;
+    if (scene && resource) {
+      // Choosing a quotation authorizes drafting it regardless of Town identity.
+      this.scenes.reference = structuredClone(scene);
+      text = `一起看看${scene.title}里的这段${resource.author ? `（${resource.author}）` : ""}：\n\n${resource.excerpt
+        .split("\n")
+        .map((line) => "> " + line)
+        .join("\n")}`;
+    }
     this.pending = structuredClone(scene);
     this.draftRequest = crypto.randomUUID();
     this.changed();
@@ -192,6 +195,7 @@ export class WorkspaceModel extends Store {
       type: "beings:scene-draft",
       id: this.draftRequest,
       text,
+      ...(draft && { sceneId: draft.sceneId, reference: false, ...(draft.append && { append: true }) }),
       expiresAt: Date.now() + 2500,
     });
     clearTimeout(this.timer);

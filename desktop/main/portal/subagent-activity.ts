@@ -15,15 +15,32 @@ export async function readSubagentActivity(directory: string, taskId: string, se
     .replace(/(["']?(?:token|secret|password|api[_-]?key|access[_-]?token)["']?\s*[:=]\s*["']?)[^\s,"'}]+/gi, '$1[redacted]')
     .replace(/\bsk-[a-zA-Z0-9_-]+/g, '[redacted]');
   const steps: SubagentStep[] = [];
+  let streaming: SubagentStep | undefined;
+  let streamingParts: string[] = [];
   // A writer's last partial line is picked up by the next directory notification.
   for (const line of text.split('\n').slice(0, -1)) {
     let row;
     try { row = JSON.parse(line); } catch { continue; }
-    if (!row || !Number.isFinite(row.at) || !['started','thinking','tool','tool-result','message','turn-end','finished'].includes(row.kind)) continue;
+    if (!row || !Number.isFinite(row.at) || !['started','thinking','tool','tool-result','message','message-delta','turn-end','finished'].includes(row.kind)) continue;
+    if (row.kind === 'message-delta' && typeof row.output === 'string') {
+      if (!streaming) { streaming = { at: row.at, kind: 'message', output: '' }; streamingParts = []; steps.push(streaming); }
+      streamingParts.push(row.output);
+      continue;
+    }
+    if (row.kind === 'message' && streaming) {
+      streaming.output = clean(typeof row.output === 'string' ? row.output : streamingParts.join(''));
+      streaming = undefined; streamingParts = [];
+      continue;
+    }
+    if (row.kind === 'turn-end' || row.kind === 'finished') {
+      if (streaming) streaming.output = clean(streamingParts.join(''));
+      streaming = undefined; streamingParts = [];
+    }
     const step: SubagentStep = { at: row.at, kind: row.kind };
     for (const key of ['callId', 'name', 'input', 'output'] as const) if (typeof row[key] === 'string') step[key] = clean(row[key]);
     if (typeof row.failed === 'boolean') step.failed = row.failed;
     steps.push(step);
   }
+  if (streaming) streaming.output = clean(streamingParts.join(''));
   return { taskId, steps };
 }

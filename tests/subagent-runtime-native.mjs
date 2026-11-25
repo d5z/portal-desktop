@@ -57,6 +57,7 @@ const server=createServer(async(req,res)=>{
   const chunk=(delta,finish=null)=>res.write('data: '+JSON.stringify({id:'fixture-'+requests.length,object:'chat.completion.chunk',created:1,model:d.model,choices:[{index:0,delta,finish_reason:finish}]})+'\n\n');
   if(step){chunk({role:'assistant',tool_calls:[{index:0,id:'call_'+name+'_'+index,type:'function',function:{name:step[0],arguments:JSON.stringify(step[1])}}]});chunk({},'tool_calls');}
   else {chunk({role:'assistant',content:'CASE_DONE:'+name});chunk({},'stop');}
+  res.write('data: '+JSON.stringify({id:'fixture-'+requests.length,object:'chat.completion.chunk',created:1,model:d.model,choices:[],usage:{prompt_tokens:20,completion_tokens:10,total_tokens:30}})+'\n\n');
   res.end('data: [DONE]\n\n');return;
  }
  callbacks.push(req.url);res.setHeader('Content-Type','application/json');res.end('{}');

@@ -5,9 +5,12 @@ import { checkLocalFile } from '../services/local-file-availability';
 import { postFilePreview } from '../services/file-preview-bridge';
 
 export const LocalFileAction = createContext<((path: string) => void) | undefined>(undefined);
+export const LocalFileDirectory = createContext<string | undefined>(undefined);
 
-export function LocalFileLink({ path, children, card = false, inlineCode = false }: { path: string; children: ReactNode; card?: boolean; inlineCode?: boolean }) {
+export function LocalFileLink({ path: reference, children, card = false, inlineCode = false }: { path: string; children: ReactNode; card?: boolean; inlineCode?: boolean }) {
   const preview = useContext(LocalFileAction);
+  const directory = useContext(LocalFileDirectory);
+  const path = directory && !/^(?:[\\/]|[a-z]:[\\/]|~\/)/i.test(reference) ? `${directory.replace(/[\\/]$/, '')}/${reference}` : reference;
   const [availability, setAvailability] = useState<{path:string;ready:boolean|null}>({ path: '', ready: null });
   const [check, setCheck] = useState(0);
   const version = useRef(0);

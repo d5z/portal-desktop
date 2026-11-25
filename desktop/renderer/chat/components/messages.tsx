@@ -63,7 +63,7 @@ function SubagentActivity({ tasks, onOpen }: { tasks?: SceneTask[]; onOpen?: (ta
     : failed.length ? `${failed.length} 项${status === 'timeout' ? '超时' : status === 'budget_exhausted' ? '预算用尽' : '失败'}`
     : stopped ? `${stopped} 项已停止` : '全部完成';
   return <button type="button" className="run-subagent-activity" data-status={status}
-    aria-label="查看子智能体执行详情" onClick={() => onOpen(tasks.map(task => task.id))}>
+    aria-label="查看子智能体执行详情" onClick={() => onOpen(tasks.map(task => task.id), tasks.length === 1 ? tasks[0].id : undefined)}>
     <span className="run-subagent-mark" aria-hidden="true">
       {status === 'running' ? <StatusMark status="running" size={14} color="currentColor" fillOpacity={0} />
         : <Icon name={status === 'queued' ? 'chat-clock' : status === 'stopped' ? 'chat-stop' : status === 'done' ? 'chat-check' : 'chat-error'} />}
@@ -78,6 +78,7 @@ export function ChatActivity({ run, sceneLabel, showDetails = true, showProgress
 }) {
   const status = run.status || run.outcome || "thinking";
   const repeatError = status === 'error' && errorAlreadyShown;
+  const supersededNotice = superseded && status !== 'done';
   if (run.end && status === 'stopped' && !run.entries.length && !run.scheduling?.tasks.length) {
     if (superseded) return null;
     return <div className="chat-run"><ChatStatusRow
@@ -91,8 +92,8 @@ export function ChatActivity({ run, sceneLabel, showDetails = true, showProgress
       <span className="run-label">用时 {duration(Math.max(0, Math.floor((run.end - run.start) / 1000)))}</span>
     </div></div></div>;
   }
-  if (showDetails || (onOpenSubagents && run.scheduling?.tasks.length) || (run.end && run.entries.some(entry => entry.type === 'tool' && entry.error))) {
-    return <DetailedChatActivity run={run} sceneLabel={sceneLabel} repeatError={repeatError} superseded={superseded} onOpenSubagents={onOpenSubagents} showTrace={showDetails} />;
+  if (showDetails || (onOpenSubagents && run.scheduling?.tasks.length) || (!supersededNotice && run.end && run.entries.some(entry => entry.type === 'tool' && entry.error))) {
+    return <DetailedChatActivity run={run} sceneLabel={sceneLabel} repeatError={repeatError} superseded={supersededNotice} onOpenSubagents={onOpenSubagents} showTrace={showDetails} />;
   }
   const attention = !superseded && !repeatError && ["error", "timeout", "stopped"].includes(status);
   const artifacts = [...new Set(run.entries.flatMap(entry => entry.artifactPath ? [entry.artifactPath] : []))];
@@ -187,7 +188,7 @@ function DetailedChatActivity({
             ? <span className="message-scene" title="后台自主活动，与当前场景对话分别显示">{run.autonomousOrigin === 'callback' ? 'SBS 自主回调' : 'SBS 自主活动'}</span>
             : sceneLabel && <span className="message-scene" title={run.sceneId}>{sceneLabel}</span>}
         </span>
-        {failed > 0 && <span className="run-failures">{failed} 次工具调用失败</span>}
+        {!superseded && failed > 0 && <span className="run-failures">{failed} 次工具调用失败</span>}
         {showTrace && run.end && unconfirmed > 0 && <span>{unconfirmed} 次结果未确认</span>}
         <span className="run-chevron" aria-hidden="true">
           <Icon name="chat-chevron-right" />

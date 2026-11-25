@@ -64,8 +64,8 @@ export function registerShellIpc(options: {
   handle('beings:browser-action', (action: import('../../shared/types').BrowserAction) => getBrowser()?.action(action));
   handle('beings:browser-bounds', (bounds: import('../../shared/types').BrowserBounds) => getBrowser()?.setBounds(bounds));
   handle('beings:choose', async (kind: string) => {
-    if (kind !== 'workspace') throw new Error('Invalid dialog');
-    const result = await dialog.showOpenDialog(getWindow()!, { title: '选择 Being 工作目录', properties: ['openDirectory', 'createDirectory'] });
+    if (kind !== 'workspace' && kind !== 'project') throw new Error('Invalid dialog');
+    const result = await dialog.showOpenDialog(getWindow()!, { title: kind === 'project' ? '添加项目目录' : '选择 Being 工作目录', properties: ['openDirectory', 'createDirectory'] });
     return result.canceled ? null : result.filePaths[0];
   });
   handle('beings:workspace', async () => {

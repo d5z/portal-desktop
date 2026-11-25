@@ -6,19 +6,19 @@ import { Icon } from '../../shared/icons/icon';
 import { PanelResizeHandle, usePanelWidth } from '../../shared/components/panel-resize';
 
 /** One right-hand preview surface for local files, attachments and Home files. */
-export function FilePreviewPanel({ name, path, onClose, actions, children, portal = false, openerPort }: {
-  name: string; path?: string; onClose: () => void; actions?: ReactNode; children: ReactNode; portal?: boolean; openerPort?: MessagePort;
+export function FilePreviewPanel({ name, path, onClose, actions, children, portal = false, openerPort, openerElement }: {
+  name: string; path?: string; onClose: () => void; actions?: ReactNode; children: ReactNode; portal?: boolean; openerPort?: MessagePort; openerElement?: HTMLElement | null;
 }) {
   const panel = useRef<HTMLElement>(null);
   const close = useRef(onClose); close.current = onClose;
   const [width, setWidth] = usePanelWidth('file-preview', 640);
   const [maximized, setMaximized] = useState(false);
   useLayoutEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
+    const opener = openerElement ?? document.activeElement as HTMLElement | null;
     const current = panel.current;
     // Files and the browser share the same right-hand panel.
     window.dispatchEvent(new CustomEvent('beings:side-panel-open', { detail: current }));
-    if (openerPort || opener?.matches('iframe#chat-frame')) current?.focus({ preventScroll: true });
+    if (openerPort || openerElement || opener?.matches('iframe#chat-frame')) current?.focus({ preventScroll: true });
     const replace = (event: Event) => { if ((event as CustomEvent).detail !== current) close.current(); };
     const keyboard = (event: KeyboardEvent) => {
       if (event.key !== 'Escape' || document.querySelector('dialog[open]')) return;
@@ -39,7 +39,7 @@ export function FilePreviewPanel({ name, path, onClose, actions, children, porta
         openerPort?.close();
       });
     };
-  }, [openerPort]);
+  }, [openerElement, openerPort]);
   const content = <WorkspaceDrawer ref={panel} tabIndex={-1} style={{ '--file-preview-width': `${width}px` } as CSSProperties}
     className={`client-file-viewer${maximized ? ' maximized' : ''}`} aria-label={`文件预览：${name}`}>
     <PanelResizeHandle panel={panel} label="调整附件预览宽度" width={width} onResize={setWidth} initial={640} min={280} max={1200} reserve={280} disabled={maximized} />

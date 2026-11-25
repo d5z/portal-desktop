@@ -1,3 +1,4 @@
+import { Work } from './components/work';
 import { WorkspaceDrawer, DrawerPresence } from "../shared/components/workspace-drawer";
 import { HomeFileViewer } from './components/home-file-viewer';
 import { IconButton } from '../shared/components/icon-button';
@@ -31,6 +32,7 @@ import { SubagentTasks } from "./components/subagent-tasks";
 import { Diagnostics } from "./components/diagnostics";
 import { PermissionSettings, ToolApprovalDialog } from './components/permissions';
 import { EditContextMenu } from "../shared/components/context-menu";
+import { CodeClipboard } from "../shared/components/clipboard";
 import { PlaceHeading } from "./components/navigation";
 import { Plugins, PluginCommands, PluginSlots, PluginSidebar } from '../plugins/page';
 import logo from "../../../resources/branding/logo.png";
@@ -98,6 +100,8 @@ export function App({ model }: { model: AppModel }) {
   }, [app]);
   return (
     <HomeFileViewer api={app.api.home} frame={frame} scope={app.chatSource} onNotice={app.toast}>
+      <CodeClipboard.Provider value={app.api.copyText}>
+      <AttachmentFileViewer scope={`${app.chatSource}:${app.snapshot?.chatScene?.scene_id || ''}:${app.view === 'work'}`} frame={frame}>
       <DshPluginSurfaces />
       <AttachmentImageViewer key={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}`} frame={frame}/>
       <section
@@ -186,9 +190,7 @@ export function App({ model }: { model: AppModel }) {
             </div>
           </div>
           <SubagentTasks app={app} />
-          <AttachmentFileViewer scope={`${app.chatSource}:${app.snapshot?.chatScene?.scene_id || ''}`} frame={frame}>
-            <BeingInfo app={app} />
-          </AttachmentFileViewer>
+          <BeingInfo app={app} />
           <DrawerPresence open={app.subagentSettingsOpen && !app.settingsRoute}>{app.subagentSettingsOpen && !app.settingsRoute && <SubagentModelSettings app={app} />}</DrawerPresence>
           <DrawerPresence open={app.view === "chat" && (!app.subagentSettingsOpen || Boolean(app.settingsRoute))}>{app.view === "chat" && (!app.subagentSettingsOpen || Boolean(app.settingsRoute)) && <PluginSidebar model={app.plugins} theme={app.colorScheme} contextKey={`${app.chatSource}:${JSON.stringify(app.snapshot?.chatScene)}:${app.town.live?.generation}`} />}</DrawerPresence>
           <Browser model={app} />
@@ -207,7 +209,9 @@ export function App({ model }: { model: AppModel }) {
       <ToolApprovalDialog app={app}/>
       <Toast message={app.toastMessage} copied={app.toastCopied} />
       <EditContextMenu edit={app.api.editSelection} rootSelector="#client-main, dialog[open]"
-        selectionSelector=".reading-text, .dialog-body pre" />
+        selectionSelector=".reading-text, .chat-message-body, .dialog-body pre" />
+      </AttachmentFileViewer>
+      </CodeClipboard.Provider>
     </HomeFileViewer>
   );
 }
@@ -219,6 +223,7 @@ function PlaceContent({ app, view }: { app: AppModel; view: string }) {
   const selectedPlugin = plugins.selected?.placement === 'page'
     ? plugins.library.plugins.find(plugin => plugin.enabled && plugin.manifest.id === plugins.selected?.id)
     : undefined;
+  if (view === "work") return <Work app={app} />;
   return (
     <>
       <PlaceHeading

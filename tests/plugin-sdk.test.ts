@@ -169,6 +169,12 @@ describe('SDK 1.2 workspace, contributions, events and tasks', () => {
     expect(workspace.read({ ...manifest, capabilities: ['workspace.read', 'town.private.read'] }).resource?.private).toBe(true);
     expect(() => workspace.update({ ...input, context: { ...input.context, resource: { ...input.context.resource!, excerpt: 'x'.repeat(2201) } } })).toThrow();
   });
+  it('accepts the Work surface without exposing local task resources to plugins', () => {
+    const workspace = new PluginWorkspace(() => ({ key: 'a', endpoint: 'test', sceneId: 'a', townGeneration: 1 }), vi.fn());
+    workspace.update({ ...input, context: { revision: 1, view: 'work', title: 'Work 工作', status: 'ready' } });
+    expect(workspace.read(publicManifest)).toMatchObject({ view: 'work', title: 'Work 工作' });
+    expect(workspace.read(publicManifest).resource).toBeUndefined();
+  });
   it('validates slot targets, resource filters, quotas and UI capabilities', () => {
     const slot = { id: 'side', title: 'Sidebar', view: 'board', location: 'right-sidebar' };
     const valid = { ...manifest, minSdkVersion: '1.2.0', capabilities: ['ui'], contributes: { ...manifest.contributes, slots: [slot] } };

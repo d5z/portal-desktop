@@ -59,7 +59,7 @@ import {
 import { inCurrentScene, isGlobalBeingMessage, sceneItems, sceneName, type HistoryScope } from "./models/scenes";
 import { useModel } from "../shared/hooks/use-model";
 import { usePointerFocus } from '../shared/hooks/use-pointer-focus';
-import { CodeClipboard, isImageOnlyMarkdown } from "../shared/components/markdown";
+import { CodeClipboard, isImageOnlyMarkdown, WorkTaskTitles } from "../shared/components/markdown";
 import { type ComposerHandle } from "../shared/components/rich-composer";
 import { ChatComposer } from "./components/composer";
 import { MessageHoverRow } from './components/message-hover-row';
@@ -498,6 +498,7 @@ export function ChatView({
     <SurfaceContext.Provider value={surfaceContext}>
     <ChatTooltipGroup>
     <CodeClipboard.Provider value={bridge.copyText}>
+    <WorkTaskTitles.Provider value={bridge.loadWorkTitles}>
     <HomeFileAction.Provider value={location.protocol === "beings:" && parent !== window ? requestHomeFilePreview : undefined}>
     <LocalFileAction.Provider value={location.protocol === "beings:" && parent !== window ? requestLocalFilePreview : undefined}>
     <div
@@ -761,7 +762,6 @@ export function ChatView({
                       } : undefined}
                       onSnapshot={(text, _values, _apps, active) => { state.recordIntelligentUISnapshot(item.sceneId || 'global', text, active); }}
                       streaming={item.streaming}
-                      chat
                       onPlace={!keywordNavigation ? undefined : openPlace}
                     />}</ImageGenerationAnswer>}
                 </MessageHoverRow>
@@ -983,6 +983,7 @@ export function ChatView({
     </div>
     </LocalFileAction.Provider>
     </HomeFileAction.Provider>
+    </WorkTaskTitles.Provider>
     </CodeClipboard.Provider>
     </ChatTooltipGroup>
     </SurfaceContext.Provider>

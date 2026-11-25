@@ -1,3 +1,4 @@
+import type { WorkNetwork } from '../portal/work-network';
 import type { DshPluginManager } from '../plugins/dsh/manager';
 import { app, dialog, protocol, session, shell } from 'electron';
 import type { LocalFilePreviews } from './local-file-preview';
@@ -10,6 +11,7 @@ import { remoteImage } from '../chat/remote-image';
 import { HTML_PREVIEW_RUNTIME, htmlPreviewPolicy } from './html-preview';
 import type { ConnectorNetwork } from '../home/network';
 import type { SubagentModelNetwork } from '../portal/subagent-network';
+import type { TownClient } from '../town/client';
 
 const MIME_TYPES: Record<string, string> = {
   '.html': 'text/html',
@@ -26,7 +28,7 @@ const CHAT_ASSETS = new Set(['loom.html', 'chat.js', 'highlight.css', 'chat.css'
 export function registerLocalProtocol(assets: string, proxy: ChatProxy, plugins?: PluginRegistry, downloads = new AttachmentDownloads(app.getPath('userData'), async current => {
   const result=await dialog.showOpenDialog({title:'选择附件下载位置',defaultPath:current || app.getPath('downloads'),properties:['openDirectory','createDirectory']});
   return result.canceled ? undefined : result.filePaths[0];
-}, file => shell.openPath(file), file => shell.showItemInFolder(file)), localFiles?: LocalFilePreviews, dshPlugins?: DshPluginManager, connectors?: ConnectorNetwork, subagent?: SubagentModelNetwork, shellURL: () => string = () => 'beings://desktop/') {
+}, file => shell.openPath(file), file => shell.showItemInFolder(file)), localFiles?: LocalFilePreviews, dshPlugins?: DshPluginManager, connectors?: ConnectorNetwork, subagent?: SubagentModelNetwork, shellURL: () => string = () => 'beings://desktop/', work?: WorkNetwork, town?: TownClient) {
   proxy.onAttachmentUploaded = (token,endpoint,id,checksum) => downloads.bindSource(token,endpoint,id,checksum);
   protocol.handle('beings', async request => {
     const url = new URL(request.url);
@@ -43,6 +45,24 @@ export function registerLocalProtocol(assets: string, proxy: ChatProxy, plugins?
       const resultHeaders = new Headers(response.headers);
       for (const [key, value] of Object.entries(headers)) resultHeaders.set(key, value);
       return new Response(response.body, { status: response.status, statusText: response.statusText, headers: resultHeaders });
+    }
+    if (work?.nativeHost(url.hostname)) return work.native(request);
+    if (url.hostname === 'desktop' && work?.matches(url.pathname)) return work.handle(request);
+    if (url.hostname === 'desktop' && url.pathname === '/api/contacts' && !url.search && town) {
+      const shell = new URL(shellURL());
+      const origin = `${shell.protocol}//${shell.host}`;
+      const source = request.headers.get('Origin');
+      if (source && source !== origin) return new Response(null, { status: 403 });
+      const headers = new Headers({ 'Access-Control-Allow-Origin': origin, Vary: 'Origin' });
+      if (request.method !== 'GET') return new Response(null, { status: 405, headers });
+      try {
+        const response = await town.contactDirectory(request.signal);
+        const contentType = response.headers.get('Content-Type');
+        if (contentType) headers.set('Content-Type', contentType);
+        return new Response(response.body, { status: response.status, statusText: response.statusText, headers });
+      } catch {
+        return new Response('Town directory request failed', { status: 502, headers });
+      }
     }
     if (url.hostname === 'desktop' && subagent?.matches(url.pathname)) return subagent.handle(request);
     if (url.hostname === 'desktop' && (url.pathname.startsWith('/api/v1/me/') || url.pathname.startsWith('/api/v1/local-kit-bundles/')) && connectors) return connectors.handle(request);

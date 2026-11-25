@@ -62,10 +62,15 @@ export const CHAT_SCENE_ACTIVITY_ACTIONS: Partial<Record<ChatSceneActivity, stri
   error: '本轮执行遇到异常。打开场景查看错误详情；修正原因后再重试。',
   timeout: '尚未收到回复。打开场景核对执行记录和连接状态，确认后再重试。',
 };
-export interface SceneTask { id: string; sceneId: string; status: "queued" | "running" | "done" | "failed" | "cancelled" | "interrupted" | "budget_exhausted" | "timeout"; createdAt: number; endedAt?: number; brief?: string; turns?: number; error?: string }
+export interface WorkProject { executor?: string; nativeId?: string; id: string; name: string; directory: string; createdAt: number; goalId?: string; rules?: import('./work').WorkProjectRules }
+export interface WorkImportSelection { projectIds: string[]; taskIds: string[] }
+export interface WorkImportCatalog extends WorkImportSelection { projects: WorkProject[]; tasks: SceneTask[]; agents: NonNullable<WorkSnapshot['agents']> }
+export interface WorkSnapshot extends SceneTaskSnapshot { projects: WorkProject[]; goals?: import('./work').WorkGoal[]; items?: import('./work').WorkItem[]; removedItemRunIds?: string[]; hiddenProjectSessionIds?: string[]; results?: import('./work').WorkResultPage; agents?: { id: string; name: string; available: boolean; canExecute?: boolean; message?: string }[] }
+export interface SceneTask { executor?: string; nativeId?: string; id: string; workdir?: string; projectId?: string; parentTaskId?: string; userMessage?: string; session?: string; sceneId: string; status: "queued" | "running" | "done" | "failed" | "cancelled" | "interrupted" | "budget_exhausted" | "timeout"; createdAt: number; endedAt?: number; brief?: string; turns?: number; error?: string }
 export interface SceneTaskSnapshot { endpoint: string; tasks: SceneTask[]; subagentReady?: boolean; subagentConfigured?: boolean; subagentEnabled?: boolean }
 export interface SubagentStep {
   at: number;
+  requestId?: string;
   kind: 'started' | 'thinking' | 'tool' | 'tool-result' | 'message' | 'turn-end' | 'finished';
   callId?: string;
   name?: string;
@@ -73,7 +78,7 @@ export interface SubagentStep {
   output?: string;
   failed?: boolean;
 }
-export interface SubagentTaskDetail { taskId: string; steps: SubagentStep[] }
+export interface SubagentTaskDetail { records?: unknown[]; taskId: string; steps: SubagentStep[]; turns?: { task: SceneTask; steps: SubagentStep[] }[] }
 export interface SubagentConfig extends Omit<SubagentSetup, 'api_key'> {
   inherit_model: boolean;
   validated_at?: number;
@@ -172,7 +177,7 @@ export interface DesktopAPI {
   subagentConfig(): Promise<SubagentConfig>;
   subagentStatus?(): Promise<SubagentStatus>;
   connectionDefaults(input: Pick<SaveSettings, 'connectionLink'>): Promise<{ portalName: string; source?: string }>;
-  choose(kind: 'workspace'): Promise<string | null>;
+  choose(kind: 'workspace' | 'project'): Promise<string | null>;
   startPortal(): Promise<PortalState>;
   restartPortal(): Promise<PortalState>;
   forceStartPortal(): Promise<PortalState>;

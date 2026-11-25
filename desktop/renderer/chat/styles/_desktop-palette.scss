@@ -1,4 +1,6 @@
 @use '../../shared/styles/chat-palette';
+@use '../../shared/styles/chat-file-card';
+@use '../../shared/styles/chat-message';
 @use '../../shared/styles/chat-menu';
 @use '../../shared/styles/chat-icon-control';
 
@@ -128,50 +130,7 @@
 
   .message .content [data-slot='file-card'],
   .run-artifacts [data-slot='file-card'] {
-    --surface: var(--chat-file-surface);
-    --file-card-margin: 0;
-    --file-card-gap: 8px;
-    --file-card-height: var(--chat-file-height);
-    --file-card-padding: 8px 16px;
-
-    width: var(--chat-file-width);
-    max-width: 100%;
-    border: 0;
-    border-radius: var(--chat-file-radius);
-
-    &:has(> [data-slot='file-card-open'] + button) {
-      --file-card-padding: 8px 40px 8px 16px;
-    }
-
-    [data-slot='file-card-open'] {
-      color: var(--chat-file-text);
-
-      > :first-child {
-        width: var(--chat-icon-primary);
-        height: var(--chat-icon-primary);
-        background: transparent;
-        color: var(--chat-file-icon);
-      }
-
-      > span {
-        gap: 0;
-      }
-      > span > span {
-        color: var(--chat-file-meta);
-        font-size: 10px;
-        line-height: 14px;
-      }
-      svg {
-        width: 100%;
-        height: 100%;
-        stroke-width: calc(1.25 * 24 / 18);
-      }
-    }
-
-    > button:focus-visible {
-      outline-width: 1px;
-      outline-offset: -2px;
-    }
+    @include chat-file-card.surface;
   }
 
   #messages .message .message-bubble-body .content[data-delivered-files-only] {
@@ -855,34 +814,11 @@
 
   .message-bubble-body
     :is(.content:not(.attachment-message, .attachment-deferred), .attachment-message-copy) {
-    box-sizing: border-box;
-    width: fit-content;
-    min-width: 0;
-    min-height: 0;
-    color: var(--chat-ink);
-    padding: var(--chat-bubble-padding-block) var(--chat-bubble-padding-inline);
-    font-family: var(--chat-reading-font);
-    font-size: var(--chat-message-text-size);
-    font-weight: 400;
-    line-height: var(--chat-message-line-height);
-
-    > :first-child {
-      margin-top: 0;
-    }
-    > :last-child {
-      margin-bottom: 0;
-    }
+    @include chat-message.text;
   }
 
-  #messages
-    .message-bubble-body
-    .content:has(
-      > :is(h1, h2, h3, h4, h5, h6, blockquote, ul, ol, .table-wrap, .markdown-table, .code-block),
-      > .markdown-caption
-        > :is(h1, h2, h3, h4, h5, h6, blockquote, ul, ol, .table-wrap, .markdown-table, .code-block)
-    ) {
-    font-size: var(--chat-reading-text-size);
-    line-height: var(--chat-reading-line-height);
+  #messages .message-bubble-body .content {
+    @include chat-message.rich-size;
   }
 
   .message.user .message-bubble-body .attachment-message-copy {
@@ -915,67 +851,7 @@
   }
 
   .message .content {
-    :is(.code-block, .table-wrap) {
-      border-radius: var(--chat-content-card-radius);
-    }
-
-    > :is(p, ul, ol, blockquote, .code-block, .table-wrap, .markdown-table, .markdown-caption)
-      + :is(p, ul, ol, blockquote, .code-block, .table-wrap, .markdown-table, .markdown-caption) {
-      margin-block-start: 0.8em;
-    }
-
-    :is(h1, h2, h3, h4, h5, h6) {
-      margin-block: 1em 0.45em;
-      font-weight: 600;
-      line-height: 1.4;
-      letter-spacing: normal;
-    }
-
-    h1 {
-      font-size: 1.5em;
-      line-height: 1.2;
-      margin-block-start: 0.75em;
-    }
-    h2 {
-      font-size: 1.25em;
-      line-height: 1.25;
-      margin-block-start: 0.9em;
-    }
-    h3 {
-      font-size: 1.125em;
-    }
-    :is(h4, h5, h6) {
-      font-size: 1em;
-    }
-    :is(ul, ol) {
-      margin-block: 0.5em;
-    }
-    li {
-      margin-block: 0.125em;
-    }
-    li > :is(ul, ol) {
-      margin-block: 0.125em;
-    }
-    li p {
-      margin-block-end: 0;
-    }
-    .table-wrap table {
-      font-size: 0.875em;
-      font-variant-numeric: tabular-nums;
-    }
-    .table-wrap :is(th, td) {
-      overflow-wrap: anywhere;
-    }
-
-    pre[tabindex] {
-      min-inline-size: 0;
-      line-height: 1.55;
-    }
-
-    a:focus-visible {
-      outline: 1px solid currentcolor;
-      outline-offset: 2px;
-    }
+    @include chat-message.prose;
 
     .markdown-code-modes button {
       min-height: 26px;
@@ -1013,70 +889,7 @@
     }
   }
 
-  .markdown-table {
-    min-width: 0;
-
-    > .table-wrap {
-      margin-block: 0;
-    }
-  }
-
-  .markdown-table-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 4px;
-    margin-block-end: 4px;
-    color: var(--chat-secondary);
-  }
-
-  @media (hover: hover) and (pointer: fine) {
-    .markdown-table:not(:hover, :focus-within) .markdown-table-actions {
-      opacity: 0;
-      pointer-events: none;
-    }
-  }
-
-  .markdown-table-preview {
-    position: fixed;
-    inset: 0;
-    width: min(960px, calc(100% - 32px));
-    max-height: calc(100dvh - 128px);
-    margin: auto;
-    padding: 16px;
-    border: 1px solid var(--chat-edge);
-    border-radius: var(--radius-lg);
-    background: var(--chat-menu-surface);
-    color: var(--chat-ink);
-    overflow: hidden;
-
-    &[open] {
-      display: grid;
-      grid-template-rows: auto minmax(0, 1fr);
-      gap: 12px;
-    }
-    &::backdrop {
-      background: color-mix(in srgb, var(--chat-ink) 25%, transparent);
-    }
-    > header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 8px;
-    }
-    > .table-wrap {
-      overflow: auto;
-    }
-    table {
-      width: max-content;
-      min-width: 100%;
-      border-collapse: collapse;
-      font-size: 14px;
-    }
-    :is(th, td) {
-      padding: 8px 12px;
-      border-block-end: 1px solid var(--chat-edge);
-    }
-  }
+  @include chat-message.table-controls;
 
   .message.being .content {
     --syntax-text: var(--chat-ink);

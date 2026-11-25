@@ -26,6 +26,16 @@ export function createChatBridge(state: ChatState) {
   const waiting = new Map<string, () => void>();
   const edits = new Map<string, (ok: boolean) => void>();
   const subagentEnables = new Map<string, (ok: boolean) => void>();
+  let workTitles: Promise<Record<string, string>> | undefined;
+  let finishWorkTitles: ((titles: Record<string, string>) => void) | undefined;
+  function loadWorkTitles() {
+    if (!embedded || location.protocol !== 'beings:' || disposed) return Promise.resolve({});
+    return workTitles ??= new Promise(resolve => {
+      const timer = setTimeout(() => { finishWorkTitles?.({}); workTitles = undefined; }, 3000);
+      finishWorkTitles = titles => { clearTimeout(timer); finishWorkTitles = undefined; resolve(titles); };
+      send({ type: 'beings:work-titles-request' });
+    });
+  }
   function edit(command: ChatEditCommand): Promise<boolean> {
     if (!embedded || location.protocol !== "beings:") return Promise.resolve(document.execCommand(command));
     if (disposed) return Promise.resolve(false);
@@ -111,6 +121,7 @@ export function createChatBridge(state: ChatState) {
       scope(value: HistoryScope): void;
     },
   ) {
+    let selectingScene: Promise<void> | undefined;
     const refreshSbs = async () => {
       const request = ++sbsRequest;
       let enabled: boolean | undefined;
@@ -196,7 +207,8 @@ export function createChatBridge(state: ChatState) {
           const request = ++selectionRequest;
           const sceneId = data.scene.scene_id;
           const current = () => !disposed && request === selectionRequest && state.currentScene.sceneId === sceneId;
-          void runtime.selectScene({ sceneId, sceneLabel: data.scene.scene_meta.scene_label, strict: true }).then(async () => {
+          selectingScene = runtime.selectScene({ sceneId, sceneLabel: data.scene.scene_meta.scene_label, strict: true });
+          void selectingScene.then(async () => {
             if (!current()) return;
             ui.scope(data.scope === "all" ? "all" : "current");
             send({ type: "beings:history-scope-state", scope: state.historyScope });
@@ -293,16 +305,28 @@ export function createChatBridge(state: ChatState) {
             Date.now() > data.expiresAt
           )
             return;
-          const ok = !state.draft.trim() && !state.files.length && (data.sceneId === undefined || data.sceneId === state.currentScene.sceneId);
-          if (ok) {
-            state.draft = data.text;
-            draftPrefix = data.text.split("以下是引用内容：")[0];
-            state.changed();
-            ui.focus();
-          }
-          send({ type: "beings:scene-draft-result", id: data.id, ok });
+          const insert = () => {
+            if (disposed || Date.now() > data.expiresAt) return;
+            const append = data.reference === false && data.append === true;
+            const previous = append ? state.draft.trimEnd() : '';
+            const ok = (append || (!state.draft.trim() && !state.files.length)) && (data.sceneId === undefined || data.sceneId === state.currentScene.sceneId);
+            if (ok) {
+              state.draft = previous ? `${previous}\n\n${data.text}` : data.text;
+              if (!previous) draftPrefix = data.reference === false ? "" : data.text.split("以下是引用内容：")[0];
+              state.changed();
+              if (data.reference === false) requestAnimationFrame(() => ui.focus());
+              else ui.focus();
+            }
+            send({ type: "beings:scene-draft-result", id: data.id, ok, ...(ok && previous && { appended: true }) });
+          };
+          if (data.reference === false && data.sceneId !== state.currentScene.sceneId && selectingScene)
+            void selectingScene.then(insert, () => send({ type: "beings:scene-draft-result", id: data.id, ok: false }));
+          else insert();
           return;
         }
+        case 'beings:work-titles-result':
+          if (data.revision === revision && data.titles && typeof data.titles === 'object') finishWorkTitles?.(data.titles);
+          return;
         case "beings:town-reply": {
           if (
             typeof data.id !== "string" ||
@@ -348,12 +372,14 @@ export function createChatBridge(state: ChatState) {
     send,
     edit,
     copyText,
+    loadWorkTitles,
     enableSubagent,
     onSbs,
     beforeSend,
     start,
     dispose() {
       disposed = true;
+      finishWorkTitles?.({});
       activityCache?.close();
       unsubscribeActivity();
       removeListener();

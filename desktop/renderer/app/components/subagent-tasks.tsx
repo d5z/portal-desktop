@@ -38,10 +38,11 @@ export function SubagentTasks({ app }: { app: AppModel }) {
   }, [app, app.view, endpoint, ids, snapshot, retry]);
   const tasks = snapshot && snapshot.endpoint === endpoint ? snapshot.tasks.filter(task => ids.includes(task.id)) : [];
   return ids.length && app.view === 'chat' ? <SubagentTaskPanel key={`${ids.join(',')}:${app.subagentSelectedTaskId || ''}`} initialSelectedId={app.subagentSelectedTaskId} tasks={tasks} details={details} error={error}
-    onRetry={() => setRetry(value => value + 1)} onClose={app.closeSubagentTasks} /> : null;
+    onWork={id => app.openWork(id)} onRetry={() => setRetry(value => value + 1)} onClose={app.closeSubagentTasks} /> : null;
 }
 
-export function SubagentTaskPanel({ tasks, details, error, onRetry, onClose, initialSelectedId }: {
+export function SubagentTaskPanel({ tasks, details, error, onRetry, onClose, initialSelectedId, onWork }: {
+  onWork?: (id?: string) => void;
   initialSelectedId?: string;
   tasks: SceneTask[]; details: SubagentTaskDetail[]; error: string; onRetry: () => void; onClose: () => void;
 }) {
@@ -112,6 +113,7 @@ export function SubagentTaskPanel({ tasks, details, error, onRetry, onClose, ini
           <span>{elapsed(selected)}{selected.turns ? ` · ${selected.turns} 轮` : ''}</span>
         </div>
         <details className={styles.brief}><summary><span>任务说明</span><ActivityIcon name="chevron" /></summary><p>{steps.find(step => step.kind === 'started')?.input || selected.brief}</p></details>
+        {onWork && <button type="button" onClick={() => onWork(selected.id)}>在 Work 中继续对话</button>}
         {selected.error && <p className={styles.error} role="alert">{selected.error}</p>}
         <details className={styles.steps} aria-label="子智能体思考过程">
           <summary className={styles.processSummary}>

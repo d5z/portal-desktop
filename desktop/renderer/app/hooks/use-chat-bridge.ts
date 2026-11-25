@@ -4,6 +4,7 @@ import { validPlaceTarget } from "../../shared/lib/navigation";
 import { CHAT_SCENE_ACTIVITY_LABELS, type ChatSceneActivity } from "../../../shared/types";
 import { dshRuntime } from '../../plugins/dsh/runtime';
 import { CLIPBOARD_TEXT_MAX_LENGTH } from '../../../shared/clipboard';
+import type { WorkGoal, WorkItem } from '../../../shared/work';
 
 /** This is the only shell bridge into the separate, sandboxed Loom document. */
 export function useChatBridge(
@@ -86,6 +87,16 @@ export function useChatBridge(
       if (!message || typeof message !== "object") return;
       if (message.revision !== new URL(target.src).searchParams.get("revision"))
         return;
+      if (message.type === 'beings:work-titles-request' && app.work.endpoint) {
+        const source = target.src;
+        void Promise.all([app.work.workRequest<WorkItem[]>('items'), app.work.workRequest<WorkGoal[]>('goals')]).then(([items, goals]) => {
+          if (frame.current === target && target.src === source) app.post({
+            type: 'beings:work-titles-result', revision: message.revision,
+            titles: Object.fromEntries([...items, ...goals].map(({ id, title }) => [id, title])),
+          });
+        }).catch(() => {});
+        return;
+      }
       if (
         message.type === "beings:connection" &&
         [
@@ -132,7 +143,10 @@ export function useChatBridge(
       }
       if (message.type === 'beings:subagent-tasks-open') {
         if (Array.isArray(message.taskIds) && message.taskIds.length > 0 && message.taskIds.length <= 200 &&
-          message.taskIds.every((id: unknown) => typeof id === 'string' && id.length <= 256)) app.openSubagentTasks(message.taskIds, typeof message.selectedId === 'string' && message.taskIds.includes(message.selectedId) ? message.selectedId : undefined);
+          message.taskIds.every((id: unknown) => typeof id === 'string' && id.length <= 256)) {
+          if (typeof message.selectedId === 'string' && message.taskIds.includes(message.selectedId)) app.openWork(message.selectedId);
+          else app.openSubagentTasks(message.taskIds);
+        }
         return;
       }
       if (message.type === 'beings:subagent-enable' && typeof message.id === 'string' && message.id.length <= 64) {
@@ -267,7 +281,8 @@ export function useChatBridge(
         return;
       }
       if (message.type === "beings:open-place" && validPlaceTarget(message)) {
-        app.navigate(message.view, message.id);
+        if (message.view === 'work') app.openWork(message.id);
+        else app.navigate(message.view, message.id);
         return;
       }
       if (message.type === "beings:search-index") {

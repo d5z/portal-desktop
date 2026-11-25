@@ -1,3 +1,5 @@
+import { cleanContent } from '../../shared/lib/clean-content';
+import { workTaskReferences } from '../../shared/lib/navigation';
 import { CHAT_SCENE_ACTIVITY_LABELS, type ChatSceneActivity } from '../../../shared/types';
 import { ChatEventDecoder } from './sse';
 import { withComposerCommandContext, usesIntelligentUICommand } from './composer-command-context';
@@ -1011,56 +1013,6 @@ function createStreamRuntime(state: any, options: any): any {
     return role === "user" ? stripSceneTransition(stripClientMessageContext(text)).trim() : cleanContent(text);
   }
 
-  // Filter out DSML/tool_call raw content
-  function cleanContent(text: any, streaming = false) {
-    if (!text) return "";
-    const fences: any[] = [];
-    text = text.replace(streaming ? /```[\s\S]*?(?:```|$)/g : /```[\s\S]*?```/g, (block: any) => {
-      const key = `@@FENCE_${fences.length}@@`;
-      fences.push(block);
-      return key;
-    });
-    const trimmed = text.trim();
-    const rawToolJson =
-      /"name"\s*:\s*"(?:act|remember|learn)"\s*,\s*"args"\s*:/;
-    if (/^[\[{]/.test(trimmed) && rawToolJson.test(trimmed)) return "";
-    if (streaming) {
-      // A tool marker can begin with a delta containing only "<". Hold the
-      // ambiguous suffix until the next token identifies it as markup or prose.
-      text = text.replace(/<[^<\n]*$/, (tail: string) => {
-        const prefix = tail.toLowerCase().replaceAll("｜", "|").replace(/^<\//, "<");
-        return ["<|dsml|", "<||dsml||", "<tool_calls", "<tool_use", "<tool_result", "<system"]
-          .some(marker => marker.startsWith(prefix)) ? "" : tail;
-      });
-    }
-    // Remove DSML lines — both half-width | and full-width ｜
-    text = text.replace(/<\/?[|｜]+ *DSML *[|｜]+[^\n]*/g, "");
-    text = text.replace(/^.*[|｜] *DSML *[|｜].*$/gm, "");
-    // Remove raw tool_calls XML blocks (both formats)
-    text = text.replace(
-      /<tool_(?:calls|use|result)[\s\S]*?<\/tool_(?:calls|use|result)>/gi,
-      "",
-    );
-    text = text.replace(/<\/?tool_calls>/gm, "");
-    text = text.replace(/<[｜|][｜|]DSML[｜|][｜|]tool_calls>/gm, "");
-    // Remove </invoke> style closers
-    text = text.replace(/<\/[｜|][｜|]DSML[｜|][｜|]invoke>/gm, "");
-    // Remove single-line raw JSON tool calls that sometimes leak from the stream.
-    text = text.replace(
-      /^\s*\{.*"name"\s*:\s*"(?:act|remember|learn)".*"args"\s*:.*\}\s*,?\s*$/gm,
-      "",
-    );
-    // Remove explicit system wrapper noise without touching normal prose or code fences.
-    text = text.replace(/<system[\s\S]*?<\/system>/gi, "");
-    text = text.replace(
-      /^\s*(?:\[system\]|system:)\s*(?:internal|debug|tool|prompt|instruction).*/gim,
-      "",
-    );
-    text = text.replace(/@@FENCE_(\d+)@@/g, (_: any, i: any) => fences[Number(i)] || "");
-    // Clean up excessive blank lines left behind
-    text = text.replace(/\n{3,}/g, "\n\n").trim();
-    return text;
-  }
 
   // ---- Files ----
   function handleFiles(fileList: any) {
@@ -1952,6 +1904,18 @@ function createStreamRuntime(state: any, options: any): any {
     return queuedMessage;
   }
 
+  function hasWorkFollowup(sceneId: string | undefined) {
+    if (location.protocol !== 'beings:' || !sceneId) return false;
+    const items: ChatState['items'] = state.items;
+    for (let index = items.length - 1; index >= 0; index--) {
+      const item = items[index];
+      if (item.kind !== 'message' || item.sceneId !== sceneId || item.queued || item.streaming || item.interim) continue;
+      if (item.role === 'user') return false;
+      if (item.role === 'being') return workTaskReferences(item.text).length > 0;
+    }
+    return false;
+  }
+
   async function spliceSend(text: any, files = pendingFiles, sendOptions: any = {}) {
     const replyBaseline = new Set(state.items);
     const submittedAt = Date.now();
@@ -1960,7 +1924,7 @@ function createStreamRuntime(state: any, options: any): any {
     if (!spliceMsg && !files.length) return;
     timedOutReply = null;
     spliceMsg = options.prepareMessage?.(spliceMsg || `[${files.length} file(s)]`) ?? spliceMsg;
-    const requestMessage = stripLocalFileContext(withComposerCommandContext((sendOptions.requestMessage ?? spliceMsg) || `[${files.length} file(s)]`, !!sendOptions.uiAction || (!!state.intelligentUIEnabled && (sendOptions.intelligentUI ?? state.intelligentUIForMessage)), sendOptions.uiSnapshot ?? state.intelligentUISnapshots?.[state.currentScene.sceneId || 'global'], sendOptions.uiAction));
+    const requestMessage = stripLocalFileContext(withComposerCommandContext((sendOptions.requestMessage ?? spliceMsg) || `[${files.length} file(s)]`, !!sendOptions.uiAction || (!!state.intelligentUIEnabled && (sendOptions.intelligentUI ?? state.intelligentUIForMessage)), sendOptions.uiSnapshot ?? state.intelligentUISnapshots?.[state.currentScene.sceneId || 'global'], sendOptions.uiAction, state.currentScene.sceneId, sendOptions.workDispatch, hasWorkFollowup(state.currentScene.sceneId)));
     const localMessage = ensureUserMessage(sendOptions.queuedMessage, spliceMsg || `[${files.length} file(s)]`);
     noteLocalEcho("user", requestMessage, state.currentScene, localMessage, [spliceMsg]);
     if (!sendOptions.uiAction && !sendOptions.queuedMessage) clearComposer();
@@ -2068,7 +2032,7 @@ function createStreamRuntime(state: any, options: any): any {
     if (!msg && !filesToSend.length) return;
     if (!isManualRetry) msg = options.prepareMessage?.(msg || `[${filesToSend.length} file(s)]`) ?? msg;
     const requestMessage = stripLocalFileContext(isManualRetry && typeof sendOptions.requestMessage === "string" ? sendOptions.requestMessage : withComposerCommandContext(sendOptions.requestMessage ??
-      options.prepareRequestMessage?.(msg || `[${filesToSend.length} file(s)]`, sendingScene, sendOptions) ?? msg, !!sendOptions.uiAction || (!!state.intelligentUIEnabled && (sendOptions.intelligentUI ?? state.intelligentUIForMessage)), sendOptions.uiSnapshot ?? state.intelligentUISnapshots?.[state.currentScene.sceneId || 'global'], sendOptions.uiAction));
+      options.prepareRequestMessage?.(msg || `[${filesToSend.length} file(s)]`, sendingScene, sendOptions) ?? msg, !!sendOptions.uiAction || (!!state.intelligentUIEnabled && (sendOptions.intelligentUI ?? state.intelligentUIForMessage)), sendOptions.uiSnapshot ?? state.intelligentUISnapshots?.[state.currentScene.sceneId || 'global'], sendOptions.uiAction, sendingScene.sceneId, sendOptions.workDispatch, hasWorkFollowup(sendingScene.sceneId)));
     turnContext = sceneTransitionNotice(requestMessage);
     // Recovery identities belong to one request. A failed new POST (or reader
     // before its first meta event) must not probe the previous completed turn.
@@ -3845,7 +3809,7 @@ function createStreamRuntime(state: any, options: any): any {
         turnId: `turn-${options.nextId()}`, role: "user", text: msg || `[发送了 ${files.length} 个文件: ${files.map(f => f.name).join(", ")}]`,
         streaming: false, timestamp: formatTime(), createdAt: Date.now(), label: "you", consecutive: false, queued: true };
       state.items.push(message);
-      const entry = { text: msg, files, message, sendOptions: { intelligentUI: sendOptions.intelligentUI ?? (state.intelligentUIEnabled && state.intelligentUIForMessage), uiAction: sendOptions.uiAction, uiSnapshot: sendOptions.uiSnapshot ?? state.intelligentUISnapshots?.[state.currentScene.sceneId || 'global'] } };
+      const entry = { text: msg, files, message, sendOptions: { intelligentUI: sendOptions.intelligentUI ?? (state.intelligentUIEnabled && state.intelligentUIForMessage), uiAction: sendOptions.uiAction, uiSnapshot: sendOptions.uiSnapshot ?? state.intelligentUISnapshots?.[state.currentScene.sceneId || 'global'], workDispatch: sendOptions.workDispatch } };
       if (!Array.isArray(filesOverride)) clearComposer();
       return entry;
     },

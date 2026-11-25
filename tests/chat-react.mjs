@@ -530,6 +530,16 @@ try {
   assert.equal(await frame.locator('.run-activity.running').count(), 0);
   assert.equal(await frame.locator('.run-activity').last().getAttribute('data-outcome'), 'error');
   await pasteDraft('');
+  const workRequestCount = requests.length;
+  await post({ type: 'beings:scene-draft', id: 'work-draft', sceneId: 'desktop-fixture',
+    reference: false, text: '/work 帮我创建一个任务：', expiresAt: Date.now() + 10000 });
+  await frame.locator('#input [data-command="work"]').waitFor();
+  await frame.locator('#input').getByText('帮我创建一个任务：', { exact: false }).waitFor();
+  await child().waitForFunction(() => document.activeElement?.id === 'input');
+  await page.keyboard.insertText('生成一份可筛选的议程 HTML');
+  await frame.locator('#input').getByText('帮我创建一个任务：生成一份可筛选的议程 HTML', { exact: false }).waitFor();
+  assert.equal(requests.length, workRequestCount);
+  await pasteDraft('');
   const draft = { type: 'beings:scene-draft', id: 'draft1', text: '一起看：以下是引用内容：fixture', expiresAt: Date.now() + 10000 };
   await post(draft); await child().waitForFunction(() => (document.querySelector('#input').value ?? document.querySelector('#input').textContent).includes('fixture'));
   await post({ ...draft, id: 'draft2', text: '不得覆盖已有草稿' });

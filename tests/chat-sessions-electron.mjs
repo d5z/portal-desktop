@@ -57,6 +57,7 @@ try {
     import {ChatSessions, loadDesktopScene} from './desktop/main/chat/scene';
     import {ChatProxy} from './desktop/main/chat/proxy';
     import {registerLocalProtocol, configureLocalSession} from './desktop/main/app/protocol';
+    import {WorkNetwork} from './desktop/main/portal/work-network';
     app.setPath('userData', ${JSON.stringify(path.join(directory, 'profile'))});
     protocol.registerSchemesAsPrivileged([{scheme:'beings',privileges:{standard:true,secure:true,supportFetchAPI:true,stream:true}}]);
     app.whenReady().then(async () => {
@@ -84,7 +85,10 @@ try {
         if (route.endsWith('/health')) return new Response('OK');
         return Response.json({sbs_enabled:false,being_name:'同一个 Being'});
       }, () => sessions.current(connection.endpoint), id => sessions.list(connection.endpoint).find(scene => scene.scene_id === id));
-      registerLocalProtocol(${JSON.stringify(directory)},proxy); configureLocalSession();
+      const work = new WorkNetwork(() => 'beings://desktop/', () => ({directory:${JSON.stringify(directory)},endpoint:connection.endpoint}));
+      globalThis.fixture.work = work;
+      registerLocalProtocol(${JSON.stringify(directory)},proxy,undefined,undefined,undefined,undefined,undefined,undefined,undefined,work);
+      configureLocalSession();
       const snapshot = () => ({settings:{endpoint:connection.endpoint,being:'being',hasToken:true},portal:{phase:'stopped',logs:[]},chatScene:sessions.current(connection.endpoint),chatSessions:sessions.list(connection.endpoint)});
       ipcMain.handle('snapshot',snapshot);
       ipcMain.handle('session',async (_,operation,value,endpoint,sceneId) => { if(endpoint !== connection.endpoint) throw new Error('Wrong Being'); await sessions.change(endpoint,operation,value,sceneId); return snapshot(); });
@@ -457,6 +461,84 @@ try {
   await chat.getByText('SBS 全局测试消息',{exact:true}).waitFor();
   await page.waitForFunction(() => !window.fixtureApp.chatLoading && window.fixtureApp.chatSbsSceneId === window.fixtureApp.snapshot.chatScene.scene_id);
   assert.equal(await visibilityState('isChecked'),true, 'Scene SBS visibility survives a fresh chat frame');
+  // Real sandboxed chat -> source/revision checked shell -> exact Work selection.
+  const workIds = ['sub_894ccaa9-1d4e-4afe-a509-57d22523b7ff', 'agent_codex_01a207e5-52f1-7440-bc5c-b0b579e7620f', 'agent_deepseek_session-61285e6b-8b49-4306-9689-56c0b8ad59be'];
+  const itemIds = ['work_6e1769d9-3a48-4b98-8c5d-87bc3e3fd279', 'work_41811c01-9e3b-4420-8a6e-c94dc08e9042'];
+  const itemTitles = ['生成 [欢迎页] & 说明', '生成 HTML 使用指南'];
+  await application.evaluate(async (_, { ids, items, titles }) => {
+    await globalThis.fixture.work.items.update('https://fixture.test/being', data => {
+      data.items.push(...items.map((id, index) => ({id, title:titles[index], stage:'todo', runIds:[]})));
+    });
+    const history = globalThis.fixture.history;
+    history.push({seq:history.length+1,role:'being',scene_id:'feishu-shared',at:new Date().toISOString(),content:
+      'Work 跳转验收\n\n' + ids.map((id,i)=>'[链接'+['内置','Codex','DeepSeek'][i]+'会话](beings://work/'+id+')').join('\n\n') +
+      '\n\n行内 ID：`'+ids[1]+'`\n\n```json\n'+JSON.stringify({task_id:ids[2]})+'\n```\n\n' +
+      items.map(id => '[Work 任务](beings://work/'+id+')').join('\n\n')});
+  }, { ids: workIds, items: itemIds, titles: itemTitles });
+  const requestCount = (await application.evaluate(() => globalThis.fixture.requests)).length;
+  const titleReads = [];
+  page.on('response', response => {
+    if (response.url() === 'beings://desktop/api/work/items' && response.request().method() === 'GET') titleReads.push(response);
+  });
+  await page.evaluate(ids => {
+    const app = window.fixtureApp;
+    app.work.configure(app.snapshot.settings.endpoint);
+    const snapshot = {endpoint:app.work.endpoint,tasks:ids.map((id,i)=>({id,sceneId:'feishu-shared',createdAt:i,status:'done',brief:'会话 '+i}))};
+    app.work.snapshot = snapshot;
+    app.work.request = async path => path ? {taskId:path.slice(1),steps:[{kind:'message',at:1,output:'独立历史 '+path.slice(1)}]} : snapshot;
+    const revision = new URL(document.querySelector('iframe').src).searchParams.get('revision');
+    app.post({type:'beings:chat-refresh',id:'work-link-fixture',revision});
+  }, workIds);
+  await chat.getByText('Work 跳转验收',{exact:true}).waitFor();
+  for (const [index, title] of itemTitles.entries()) {
+    await chat.getByRole('button',{name:title,exact:true}).click();
+    await page.waitForFunction(id => window.fixtureApp.view==='work' && window.fixtureApp.work.itemId===id, itemIds[index]);
+  }
+  assert.equal(titleReads.length, 1);
+  assert.equal(titleReads[0].status(), 200);
+  assert.deepEqual((await titleReads[0].json()).map(({id,title}) => [id,title]), itemIds.map((id, i) => [id,itemTitles[i]]));
+  await chat.getByRole('button',{name:'链接内置会话',exact:true}).click();
+  await page.waitForFunction(id => window.fixtureApp.view==='work' && window.fixtureApp.work.selectedId===id && window.fixtureApp.work.details[0]?.taskId===id, workIds[0]);
+  await chat.getByRole('button',{name:'链接Codex会话',exact:true}).click();
+  await page.waitForFunction(id => window.fixtureApp.work.selectedId===id && window.fixtureApp.work.details[0]?.taskId===id, workIds[1]);
+  await chat.getByRole('button',{name:'链接DeepSeek会话',exact:true}).click();
+  await page.waitForFunction(id => window.fixtureApp.work.selectedId===id && window.fixtureApp.work.details[0]?.taskId===id, workIds[2]);
+  await chat.getByRole('button',{name:'打开 Work 会话 '+workIds[1],exact:true}).click();
+  await page.waitForFunction(id => window.fixtureApp.work.selectedId===id,workIds[1]);
+  await chat.getByRole('button',{name:'打开 Work 会话 '+workIds[2],exact:true}).click();
+  await page.waitForFunction(id => window.fixtureApp.work.selectedId===id,workIds[2]);
+  await page.evaluate(id => {
+    const revision = new URL(document.querySelector('iframe').src).searchParams.get('revision');
+    // This event originates in the shell, not the chat frame, and must be ignored.
+    window.postMessage({type:'beings:open-place',view:'work',id,revision},'*');
+  },workIds[0]);
+  await page.waitForTimeout(50);
+  assert.equal(await page.evaluate(()=>window.fixtureApp.work.selectedId),workIds[2]);
+  assert.equal((await application.evaluate(() => globalThis.fixture.requests)).length,requestCount,'Opening Work references must not send messages or dispatch tasks');
+  const arrangeText = `请安排 [${itemTitles[0]}](beings://work/${itemIds[0]}) 执行。`;
+  const compose = chat.locator('#input');
+  await compose.fill('已有的对话草稿');
+  await page.evaluate(text => window.fixtureApp.draftWorkMessage(text,window.fixtureApp.snapshot.chatScene.scene_id), arrangeText);
+  await compose.getByText('请安排',{exact:false}).waitFor();
+  const combinedDraft = await compose.evaluate(el => el.value ?? el.editor.getMarkdown());
+  assert(combinedDraft.startsWith('已有的对话草稿\n\n请安排 '));
+  assert(combinedDraft.includes(`beings://work/${itemIds[0]}`));
+  assert.equal((await application.evaluate(() => globalThis.fixture.requests)).length,requestCount);
+  await chat.locator('#send-btn').click();
+  const dispatchChip = chat.locator('.message.user').getByRole('button',{name:itemTitles[0],exact:true});
+  await dispatchChip.click();
+  await page.waitForFunction(id => window.fixtureApp.view==='work' && window.fixtureApp.work.itemId===id, itemIds[0]);
+  const resultScene = await page.evaluate(() => window.fixtureApp.snapshot.chatSessions.find(scene => scene.scene_id !== window.fixtureApp.snapshot.chatScene.scene_id).scene_id);
+  const resultText = '转发工作结果：HTML 的布局检查已通过。';
+  await page.evaluate(([text,scene]) => window.fixtureApp.draftWorkMessage(text,scene), [resultText,resultScene]);
+  await compose.getByText(resultText,{exact:false}).waitFor();
+  assert.equal((await application.evaluate((_electron,text)=>globalThis.fixture.requests.filter(row=>row.message.includes(text)),resultText)).length,0);
+  const sendResult = chat.locator('.message.being').getByText(resultText,{exact:false}).waitFor();
+  await chat.locator('#send-btn').click();
+  await sendResult;
+  const resultRequests = await application.evaluate((_electron,text) => globalThis.fixture.requests.filter(row => row.message.includes(text)), resultText);
+  assert.equal(resultRequests.length,1);
+  assert.equal(resultRequests[0].scene_id,resultScene);
   assert.deepEqual(errors,[]);
   console.log('PASS: same Being, create/switch/rename scenes through the actual UI, isolated history, per-scene SBS visibility and persistence, per-scene drafts, send identity, scene sidebar, collapse/reopen, FIFO scene queue, context-menu rename, confirmed deletion, last-scene replacement and reload.');
 } finally { await application?.close(); await rm(directory,{recursive:true,force:true}); }

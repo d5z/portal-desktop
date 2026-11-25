@@ -2,7 +2,7 @@ import { Icon } from '../../shared/icons/icon';
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { type GenerationSnapshot, type ImageGenerationJob, type ImageGenerationReceipt } from '../../../shared/image-generation';
 import { imageGenerationBlocks } from '../../../shared/image-generation-blocks';
-import { Markdown } from '../../shared/components/markdown';
+import { ChatMessageMarkdown } from '../../shared/components/markdown';
 import { MarkdownReferenceScope } from '../../shared/components/markdown-references';
 import { MessageAction } from '../../shared/components/message-action-slot';
 import { MessageImageGroup } from '../../shared/components/message-image-group';
@@ -197,7 +197,7 @@ export function ImageGenerationAnswer({text,streaming,endpoint,scope,enabled,chi
   const standalone = blocks.filter(block => block.kind === 'receipt' || block.text.trim()).length === 1;
   const seen = new Set<string>();
   return <MarkdownReferenceScope text={text}><div className="image-generation-answer">{blocks.map(block=>{
-    if(block.kind==='text') return block.text.trim() ? <div key={block.id} className="image-generation-prose">{typeof children==='function' ? children(block.text,block.id) : <Markdown content={block.text} className="content" chat/>}</div> : null;
+    if(block.kind==='text') return block.text.trim() ? <div key={block.id} className="image-generation-prose">{typeof children==='function' ? children(block.text,block.id) : <ChatMessageMarkdown content={block.text} className="content"/>}</div> : null;
     const receipt=block.receipt;
     if(streaming) return <div key={block.id} className="image-generation-message" role="status">正在确认图片任务…</div>;
     if(!receipt) return <div key={block.id} className="image-generation-message"><ChatStatusRow title="图片任务回执格式不正确" detail="请让 Being 仅修正回执，不要重新生成。" tone="error"><details><summary>查看原始回执</summary><pre>{block.text}</pre></details></ChatStatusRow></div>;

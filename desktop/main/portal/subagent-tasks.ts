@@ -10,7 +10,11 @@ export function publicSceneTasks(document: unknown, scenes: Set<string>): SceneT
   return tasks.filter(t => t && typeof t.task_id === 'string' &&
     (t.scene_id == null || t.scene_id === '' || typeof t.scene_id === 'string' && scenes.has(t.scene_id)) && statuses.has(t.status)
     && Number.isFinite(t.created_ms)).slice(-200).map(t => ({
-      id: t.task_id.slice(0, 256), sceneId: t.scene_id || '', status: t.status,
+      id: t.task_id.slice(0, 256),
+      ...(typeof t.workdir === 'string' ? { workdir: t.workdir } : {}),
+      ...(typeof t.parent_task_id === 'string' ? { parentTaskId: t.parent_task_id } : {}),
+      ...(typeof t.user_message === 'string' ? { userMessage: t.user_message } : {}),
+      ...(typeof t.session === 'string' ? { session: t.session } : {}), sceneId: t.scene_id || '', status: t.status,
       createdAt: t.created_ms, endedAt: Number.isFinite(t.ended_ms) ? t.ended_ms : undefined,
       ...(typeof t.brief_head === 'string' ? { brief: t.brief_head.slice(0, 200) } : {}),
       ...(Number.isSafeInteger(t.turns) && t.turns >= 0 ? { turns: t.turns } : {}),
@@ -44,8 +48,9 @@ export class SceneTaskObserver {
     if (generation !== this.generation) return;
     try {
       this.watcher = watch(directory, () => {
-        clearTimeout(this.timer);
+        if (this.timer) return;
         this.timer = setTimeout(async () => {
+          this.timer = undefined;
           if (generation !== this.generation) return;
           this.watcher?.close(); this.watcher = undefined;
           await this.arm();
@@ -62,5 +67,5 @@ export class SceneTaskObserver {
       return publicSceneTasks(JSON.parse(await readFile(this.file, 'utf8')), this.scenes());
     } catch { return []; }
   }
-  close() { this.generation++; clearTimeout(this.timer); this.watcher?.close(); this.watcher = undefined; }
+  close() { this.generation++; clearTimeout(this.timer); this.timer = undefined; this.watcher?.close(); this.watcher = undefined; }
 }

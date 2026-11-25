@@ -1,4 +1,4 @@
-export type SceneView = 'ui-examples' | 'chat' | 'town' | 'bonfire' | 'firesides' | 'mail' | 'seeds' | 'embers' | 'scrolls' | 'kits' | 'portal' | 'announcements' | 'contacts' | 'plugins';
+export type SceneView = 'work' | 'ui-examples' | 'chat' | 'town' | 'bonfire' | 'firesides' | 'mail' | 'seeds' | 'embers' | 'scrolls' | 'kits' | 'portal' | 'announcements' | 'contacts' | 'plugins';
 export const sceneExcerpt = (text: string) => text.length > 2000 ? text.slice(0, 2000) + '\n[仅引用前 2000 字符，完整内容见来源]' : text;
 export interface SceneResource { id: string; title: string; author?: string; revision?: string; excerpt: string; private: boolean }
 export interface SceneObservation {
@@ -11,7 +11,7 @@ export interface SceneEnvelope {
   schema: 'being.environment/v1'; messageId: string; source: { channel: 'portal-desktop'; instanceId: string };
   audience: string; capturedAt: string; environment: SceneObservation; delivery: 'local-only';
 }
-const titles: Record<SceneView, string> = { 'ui-examples': '智能交互示例', chat: '与你的 Being 交谈', town: '小镇广场', bonfire: '篝火', firesides: '围炉', mail: '私信', seeds: '种子花园', embers: '书架', scrolls: '卷轴', kits: '工具间', portal: 'Portal 设置', announcements: '公告', contacts: '通讯录', plugins: '客户端插件' };
+const titles: Record<SceneView, string> = { work: 'Work 工作', 'ui-examples': '智能交互示例', chat: '与你的 Being 交谈', town: '小镇广场', bonfire: '篝火', firesides: '围炉', mail: '私信', seeds: '种子花园', embers: '书架', scrolls: '卷轴', kits: '工具间', portal: 'Portal 设置', announcements: '公告', contacts: '通讯录', plugins: '客户端插件' };
 export class SceneStore extends EventTarget {
   readonly instanceId = crypto.randomUUID();
   current: SceneObservation = { sceneId: 'desktop:chat:unconnected', view: 'chat', title: titles.chat, identity: '', revision: 1, observedAt: new Date().toISOString(), status: 'loading', scope: '尚未连接', filters: {} };
@@ -40,7 +40,7 @@ export class SceneStore extends EventTarget {
     this.dispatchEvent(new Event('identity-reset')); this.notify();
   }
   enter(view: SceneView) {
-    const id = view === 'chat' ? `conversation:${this.endpoint || 'unconnected'}` : ['portal', 'ui-examples'].includes(view) ? `desktop:${this.instanceId}:${view}` : `town:https://beings.town:${view}`;
+    const id = view === 'chat' ? `conversation:${this.endpoint || 'unconnected'}` : ['portal', 'ui-examples', 'work'].includes(view) ? `desktop:${this.instanceId}:${view}` : `town:https://beings.town:${view}`;
     if (this.current.view === view && this.current.sceneId === id) return;
     this.update({ sceneId: id, view, title: titles[view], identity: view === 'chat' ? this.being : '', scope: '尚未读取', status: 'loading', filters: {}, selection: undefined, count: undefined });
     this.event('进入场景');

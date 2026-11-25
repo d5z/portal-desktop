@@ -1,10 +1,15 @@
-export const placeNames = { bonfire: '篝火', firesides: '围炉', mail: '私信', announcements: '公告', contacts: '通讯录', seeds: '种子花园', embers: '书架', scrolls: '卷轴', kits: '工具库', portal: 'Portal 设置' } as const;
+export const placeNames = { bonfire: '篝火', firesides: '围炉', mail: '私信', announcements: '公告', contacts: '通讯录', seeds: '种子花园', embers: '书架', scrolls: '卷轴', kits: '工具库', portal: 'Portal 设置', work: 'Work' } as const;
 export type PlaceView = keyof typeof placeNames;
 export interface PlaceTarget { view: PlaceView; id?: string }
+export function workTaskReferences(text: string) {
+  return [...text.matchAll(/(?<![a-zA-Z0-9_-])(?:goal_|work_|sub_|agent_codex_|agent_deepseek_session-)[0-9a-f]{8}-(?:[0-9a-f]{4}-){3}[0-9a-f]{12}(?![a-zA-Z0-9_-])/g)]
+    .map(match => ({ id: match[0], index: match.index }));
+}
 export function validPlaceTarget(value: unknown): value is PlaceTarget {
   if (!value || typeof value !== 'object') return false;
   const target = value as PlaceTarget;
   if (!Object.hasOwn(placeNames, target.view)) return false;
+  if (target.view === 'work') return typeof target.id === 'string' && workTaskReferences(target.id)[0]?.id === target.id;
   if (target.id === undefined) return true;
   if (typeof target.id !== 'string') return false;
   return target.view === 'firesides' ? /^\d{1,16}$/.test(target.id) :
@@ -12,6 +17,10 @@ export function validPlaceTarget(value: unknown): value is PlaceTarget {
 }
 // Only established Town read routes become desktop destinations. Other links stay links.
 export function placeFromURL(raw: string): PlaceTarget | null {
+  if (raw.startsWith('beings://work/')) {
+    const target = { view: 'work', id: raw.slice('beings://work/'.length) };
+    return validPlaceTarget(target) ? target : null;
+  }
   if (!raw.startsWith('https://beings.town/') && !/^\/(?:api\/)?(?:scrolls|embers|grove|bonfire|fireside|messages|seeds|announcements|contacts)(?:[/?#]|$)/.test(raw)) return null;
   try {
     const url = new URL(raw, 'https://beings.town');

@@ -134,7 +134,7 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
     setPins(next);
     try { localStorage.setItem(PINNED_NAVIGATION_KEY, JSON.stringify(next)); } catch { /* Keep the session preference. */ }
   };
-  const visibleKeys = ["chat", "search", ...pins.filter(key => entries.some(entry => entry.key === key))];
+  const visibleKeys = ["chat", "work", "search", ...pins.filter(key => entries.some(entry => entry.key === key))];
   const orderedKeys = [...new Set([...order.filter(key => visibleKeys.includes(key)), ...visibleKeys])];
   const sort = useNavigationSort(orderedKeys, next => {
     setOrder(next);
@@ -157,6 +157,7 @@ export function WorkspaceNavigation({ app }: { app: AppModel }) {
     <div className="rail-links" ref={railLinks} data-warm-tooltip-scope {...sort}>
       {orderedKeys.map(key => {
         if (key === "chat") return <RailButton key={key} navigationKey={key} id="rail-chat-trigger" tooltip={false} label="对话" shortcut={app.api.platform === 'darwin' ? '⌘1' : 'Ctrl 1'} active={app.view === "chat"} onClick={() => app.navigate("chat")}><NavigationIcon name="rail-chat" /></RailButton>;
+        if (key === "work") return <RailButton key={key} navigationKey={key} id="rail-work-trigger" label="Work · 工作" active={app.view === "work"} onClick={() => app.openWork()}><NavigationIcon name="rail-work" /></RailButton>;
         if (key === "search") return <RailButton key={key} navigationKey={key} id="toggle-chat-search" expanded={app.searchOpen} label="查找对话" shortcut={app.api.platform === 'darwin' ? '⌘F' : 'Ctrl F'} disabled={!app.snapshot?.settings.hasToken} onClick={() => app.openSearch()}><NavigationIcon name="rail-search" /></RailButton>;
         const entry = entries.find(entry => entry.key === key)!;
         return <RailButton key={key} navigationKey={key} label={entry.label} active={entry.active}

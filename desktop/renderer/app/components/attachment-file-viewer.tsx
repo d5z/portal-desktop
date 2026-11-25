@@ -5,7 +5,7 @@ import { homeRecentFiles } from '../models/home-recent-files';
 import { IconButton } from '../../shared/components/icon-button';
 import { Icon } from '../../shared/icons/icon';
 import { localFileReference } from '../../../shared/local-file';
-import { checkLocalFiles } from '../services/local-file-check';
+import { checkLocalFiles } from '../../shared/services/local-file-check';
 import { revealLocalFile } from '../services/local-file-reveal';
 import { FilePreviewPanel, FilePreviewModes } from './file-preview-panel';
 import {attachmentPreviewRequest} from '../services/attachment-preview-request';
@@ -24,6 +24,7 @@ export function AttachmentFileViewer({frame,children,scope}:{frame:RefObject<HTM
   const [localOpenerPort,setLocalOpenerPort]=useState<MessagePort>();
   const [revealError,setRevealError]=useState('');
   const sequence=useRef(0);
+  const localOpener=useRef<HTMLElement|null>(null);
   const loadLocal=useCallback(async(path:string, openerPort?: MessagePort)=>{
     const ticket=++sequence.current;
     const available=await checkLocalFiles(window.beings,[path]);
@@ -46,6 +47,10 @@ export function AttachmentFileViewer({frame,children,scope}:{frame:RefObject<HTM
     }catch{if(ticket===sequence.current)setError('文件已不存在、无法读取或不支持预览。');}
     finally{if(ticket===sequence.current)setBusy(false);}
   },[frame]);
+  const openLocal=useCallback((path:string)=>{
+    localOpener.current=document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    void loadLocal(path);
+  },[loadLocal]);
   useEffect(()=>{sequence.current++;setFile(null);setLocalPath(null);setBusy(false);setError('');},[scope]);
   useEffect(()=>()=>{sequence.current++;},[]);
   useEffect(()=>{if(!file?.path)return;const id=file.id;return()=>{void window.beings.releaseLocalFilePreview?.(id);};},[file?.id,file?.path]);
@@ -84,7 +89,7 @@ export function AttachmentFileViewer({frame,children,scope}:{frame:RefObject<HTM
     const message=await revealLocalFile(window.beings,file?.path || localPath);
     if(ticket===sequence.current)setRevealError(message);
   };
-  return <LocalFileAction.Provider value={loadLocal}><DrawerPresence open={!!(file || localPath)}>{(file || localPath) && <FilePreviewPanel key={localPath || file?.id} name={name} path={file?.path || localPath || undefined} onClose={close} openerPort={localPath ? localOpenerPort : file?.openerPort}
+  return <LocalFileAction.Provider value={openLocal}>{children}<DrawerPresence open={!!(file || localPath)}>{(file || localPath) && <FilePreviewPanel key={localPath || file?.id} name={name} path={file?.path || localPath || undefined} onClose={close} portal openerElement={localPath && !localOpenerPort ? localOpener.current : undefined} openerPort={localPath ? localOpenerPort : file?.openerPort}
     actions={localPath ? <>
       {html && <FilePreviewModes source={source} onChange={setSource} />}
       <IconButton className="file-preview-icon" label="刷新" disabled={busy} onClick={()=>void loadLocal(localPath,localOpenerPort)}><Icon name="refresh-library" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.5" /></IconButton>
@@ -98,5 +103,5 @@ export function AttachmentFileViewer({frame,children,scope}:{frame:RefObject<HTM
     {file && (html && !source ? <iframe key={file.id} title="HTML 文件预览" sandbox="allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-downloads" referrerPolicy="no-referrer" src={file.url}/> :
       file.blob?.type.startsWith('image/') ? <FileImage blob={file.blob} name={file.name}/> :
       file.extension==='xlsx'?<XlsxPreview key={file.id} blob={file.blob!}/>:file.extension==='pptx'?<PptxPreview key={file.id} blob={file.blob!}/>:file.extension==='pdf'?<PdfPreview key={file.id} blob={file.blob!}/>:<div className="client-file-body">{file.segments?file.segments.map((s,i)=><section key={i}>{s.label && <h3>{s.label}</h3>}<Markdown content={s.text} intelligentUI={false}/></section>):<TextFile extension={file.extension} text={file.text || ''}/>}</div>)}
-  </FilePreviewPanel>}</DrawerPresence>{children}</LocalFileAction.Provider>;
+  </FilePreviewPanel>}</DrawerPresence></LocalFileAction.Provider>;
 }

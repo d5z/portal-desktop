@@ -1,3 +1,4 @@
+import { WorkModel } from './work';
 import type {
   DesktopAPI,
   Snapshot,
@@ -30,6 +31,18 @@ export class AppModel extends Store {
   theme: "light" | "dark" = "light";
   startup: "loading" | "ready" | "error" = "loading";
   view = "chat";
+  readonly work = new WorkModel();
+  openWork = (taskId?: string) => {
+    if (this.view !== "work") this.chatSplitOpen = false;
+    this.work.configure(this.snapshot?.settings.endpoint || "");
+    if (taskId) {
+      this.work.projectId = ''; this.work.filter = 'all'; this.work.query = '';
+      this.work.select(taskId);
+      if (this.view === 'work') void this.work.refresh();
+    }
+    this.closeSubagentTasks();
+    this.navigate("work");
+  };
   openUIExamples = () => {
     this.chatSplitOpen = true;
     this.navigate('ui-examples');
@@ -212,6 +225,17 @@ export class AppModel extends Store {
   private defaultsTimer?: ReturnType<typeof setTimeout>;
   private toastTimer?: ReturnType<typeof setTimeout>;
   post: (data: unknown) => void = () => {};
+  async draftWorkMessage(text: string, originSceneId?: string) {
+    const source = this.chatSource;
+    const currentSceneId = this.snapshot?.chatScene?.scene_id;
+    const sceneId = originSceneId || this.snapshot?.chatSessions?.[0]?.scene_id || currentSceneId;
+    if (!sceneId || !source || this.chatLoading) throw new Error('Being 对话正在连接，请稍后再试。');
+    if (sceneId !== currentSceneId) await this.changeChatSession('select', sceneId);
+    if (source !== this.chatSource || sceneId !== this.snapshot?.chatScene?.scene_id)
+      throw new Error('Being 对话已切换，请重新加入草稿。');
+    this.navigate('chat');
+    this.workspace.compose({ text, sceneId, append: true });
+  }
   readonly workspace = new WorkspaceModel(
     (view) => this.navigate(view),
     (error) => this.toast(error),
@@ -371,6 +395,7 @@ export class AppModel extends Store {
     this.changed();
   };
   applySnapshot(next: Snapshot, reload = false) {
+    this.work.configure(next.settings.endpoint);
     const sameBeing = Boolean(this.chatSource &&
       this.snapshot?.settings.endpoint === next.settings.endpoint &&
       this.snapshot?.settings.being === next.settings.being);

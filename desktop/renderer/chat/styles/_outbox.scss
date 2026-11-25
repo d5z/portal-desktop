@@ -140,27 +140,3 @@
     }
   }
 }
-
-.chat-local-file-link {
-  display: inline;
-  border: 0;
-  padding: 0;
-  background: transparent;
-  color: var(--accent);
-  font: inherit;
-  text-align: inherit;
-  cursor: pointer;
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  overflow-wrap: anywhere;
-}
-
-.chat-local-file-link:hover {
-  opacity: 0.8;
-}
-
-.chat-local-file-link:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 3px;
-  border-radius: 3px;
-}

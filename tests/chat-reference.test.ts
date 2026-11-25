@@ -67,6 +67,40 @@ it('places a log quotation in the existing draft and never sends a chat request'
   expect(f.runtime.send).not.toHaveBeenCalled();
   f.bridge.dispose();
 });
+it('places a Work draft in the main chat only after the scene switch completes', async () => {
+  const f = fixture();
+  vi.stubGlobal('requestAnimationFrame', vi.fn());
+  let finish!: () => void;
+  Object.assign(f.runtime, { selectScene: () => new Promise<void>(resolve => { finish = resolve; }) });
+  f.state.currentScene.sceneId = 'secondary';
+  f.send({ type: 'beings:session-select', revision: 'fixture', scene: { scene_id: 'main', scene_meta: { scene_label: '主对话' } } });
+  const text = '/work 帮我创建一个任务：';
+  f.send({ sceneId: 'main', reference: false, text });
+  expect(f.state.draft).toBe('');
+  expect(f.results()).toEqual([]);
+  f.state.currentScene.sceneId = 'main';
+  finish();
+  await Promise.resolve();
+  expect(f.state.draft).toBe(text);
+  expect(f.results()[0]).toMatchObject({ ok: true });
+  expect(f.runtime.send).not.toHaveBeenCalled();
+  f.bridge.dispose();
+});
+it('appends Work updates to an existing draft and leaves sending to the composer', () => {
+  const f = fixture();
+  vi.stubGlobal('requestAnimationFrame', vi.fn());
+  f.state.currentScene.sceneId = 'main';
+  f.state.draft = '我写好的内容';
+  f.state.files = [{ name: 'note.txt', type: 'text/plain', base64: 'bm90ZQ==', size: 4 }];
+  f.send({ sceneId: 'main', reference: false, append: true, text: '请同步任务当前的待审核状态。' });
+  expect(f.state.draft).toBe('我写好的内容\n\n请同步任务当前的待审核状态。');
+  expect(f.state.files).toHaveLength(1);
+  expect(f.results()[0]).toMatchObject({ ok: true, appended: true });
+  f.send({ type: 'beings:work-dispatch' });
+  f.send({ type: 'beings:work-result' });
+  expect(f.runtime.send).not.toHaveBeenCalled();
+  f.bridge.dispose();
+});
 it.each(['draft', 'attachment'])('preserves an existing %s when a log reference is requested', kind => {
   const f = fixture();
   if (kind === 'draft') f.state.draft = 'existing draft';

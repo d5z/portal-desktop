@@ -13,7 +13,7 @@ export function FileCard({ path, name, size, title, disabled, localPath, classNa
   return <span className={`${styles.file} ${className}`} data-slot="file-card">
     <button type="button" className={styles.open} data-slot="file-card-open" disabled={disabled} data-local-file={localPath}
       aria-label={`预览文件：${name}`} title={title} onClick={onOpen}>
-      <FileTypeIcon path={path} glyph={document.documentElement.dataset.chatHost === 'desktop' ? 'chat-file' : undefined} />
+      <FileTypeIcon path={path} glyph={localPath || document.documentElement.dataset.chatHost === 'desktop' ? 'chat-file' : undefined} />
       <span className={styles.details}>
         <FileName name={name} />
         <span className={styles.metadata}>{extension}{size !== undefined && ` · ${formatBytes(size)}`}</span>

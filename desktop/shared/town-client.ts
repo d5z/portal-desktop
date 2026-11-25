@@ -231,6 +231,13 @@ export class TownClient {
       return tracedFailure({ ok: false, code: 'network', message: '未收到发送确认。消息可能已送达，请刷新内容核对后再决定是否重发。' }, id);
     }
   }
+  async contactDirectory(signal: AbortSignal) {
+    const { value } = await this.request(townRoute({ kind: 'contacts' }).route, {
+      method: 'GET', headers: { Accept: 'application/json' }, credentials: 'omit', redirect: 'error',
+      signal: AbortSignal.any([signal, AbortSignal.timeout(20000)]),
+    }, async response => response);
+    return value;
+  }
   async query(query: TownQuery, traceId?: string, signal?: AbortSignal): Promise<TownResult> {
     if (query?.kind === 'my-scrolls' && (!this.getToken() || !this.getBeingId())) return { ok: false, code: 'auth', message: '请先用 Being 名和配对码连接 Town，再查看我的卷轴。' };
     const route = townRoute(query, this.getBeingId());

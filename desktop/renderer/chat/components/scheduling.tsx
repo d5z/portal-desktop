@@ -3,17 +3,14 @@ import type { UIActions } from "../../shared/intelligent-ui/view";
 import type { ComponentProps } from 'react';
 import type { SceneTask } from '../../../shared/types';
 import { splitSchedulingHint } from '../models/scheduling';
-import { Markdown } from '../../shared/components/markdown';
+import { ChatMessageMarkdown } from '../../shared/components/markdown';
 import { CommandMessageMarkdown } from './command-message';
 
-export function ScheduledMessage({ text, streaming, chat, onPlace, intelligentUI = false, commandLabels = false, storageKey, onContinue, onSnapshot, onEdit, messageId }: UIActions & { text: string; streaming: boolean; messageId?: string; chat?: boolean; intelligentUI?: boolean; commandLabels?: boolean; onPlace?: ComponentProps<typeof Markdown>['onPlace'] }) {
+export function ScheduledMessage({ text, streaming, onPlace, intelligentUI = false, commandLabels = false, storageKey, onContinue, onSnapshot, onEdit, messageId }: UIActions & { text: string; streaming: boolean; messageId?: string; intelligentUI?: boolean; commandLabels?: boolean; onPlace?: ComponentProps<typeof ChatMessageMarkdown>['onPlace'] }) {
   const content = splitSchedulingHint(text);
   if (intelligentUI) return <IntelligentAnswer messageId={messageId} text={content.text} streaming={streaming} onPlace={onPlace} storageKey={storageKey} onContinue={onContinue} onSnapshot={onSnapshot} onEdit={onEdit} />;
-  if (commandLabels) return <CommandMessageMarkdown content={content.text} className="content" chat={chat} onPlace={onPlace} />;
-  return <>
-    <Markdown content={content.text} className={`content${streaming ? ' stream-cursor' : ''}`} chat={chat} onPlace={onPlace} intelligentUI={intelligentUI} streaming={streaming} />
-
-  </>;
+  if (commandLabels) return <CommandMessageMarkdown content={content.text} className="content" onPlace={onPlace} />;
+  return <ChatMessageMarkdown content={content.text} className={`content${streaming ? ' stream-cursor' : ''}`} onPlace={onPlace} streaming={streaming} />;
 }
 const labels: Record<SceneTask['status'], string> = { queued: '等待执行', running: '后台执行中', done: '执行完成', failed: '执行失败', cancelled: '已取消', interrupted: '已中断', budget_exhausted: '达到任务限额', timeout: '执行超时' };
 export function SceneScheduling({ tasks, hint }: { tasks: SceneTask[]; hint: string }) {

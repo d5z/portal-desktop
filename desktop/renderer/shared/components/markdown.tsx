@@ -17,15 +17,29 @@ import { localFileReference } from '../../../shared/local-file';
 import { IntelligentUI } from "../intelligent-ui/view";
 import hljs from "highlight.js/lib/common";
 import type { Emitter } from "highlight.js";
-import { Fragment, memo, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { detectStructuredText, formatJSON } from '../lib/structured-text';
+import { createContext, Fragment, memo, useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { detectStructuredText, formatJSON, hasStructuredTextSuffix } from '../lib/structured-text';
 import { marked, type Token, type Tokens } from "marked";
 import {
   placeFromURL,
   placeNames,
+  workTaskReferences,
   type PlaceTarget,
   type PlaceView,
 } from "../lib/navigation";
+
+export const WorkTaskTitles = createContext<(() => Promise<Record<string, string>>) | undefined>(undefined);
+
+function LegacyWorkTaskTitle({ id, fallback }: { id: string; fallback: ReactNode }) {
+  const loadTitles = useContext(WorkTaskTitles);
+  const [titles, setTitles] = useState<Record<string, string>>();
+  useEffect(() => {
+    let active = true;
+    void loadTitles?.().then(result => { if (active) setTitles(result); });
+    return () => { active = false; };
+  }, [loadTitles]);
+  return titles?.[id] || fallback;
+}
 
 const terms: Record<string, PlaceView> = {
   镇公所公告: "announcements",
@@ -137,6 +151,7 @@ interface MarkdownProps {
   className?: string;
   onPlace?: (target: PlaceTarget) => void;
   chat?: boolean;
+  message?: boolean;
   richCode?: boolean;
   renderText?: (text: string) => ReactNode;
   leadingContent?: ReactNode;
@@ -144,6 +159,17 @@ interface MarkdownProps {
   intelligentUI?: boolean;
   streaming?: boolean;
 }
+
+/** The message presentation is shared by Being conversations, Work and its result inbox. */
+export const ChatMessageMarkdown = memo(function ChatMessageMarkdown({
+  className, sent, ...props
+}: Omit<MarkdownProps, 'chat' | 'message'> & { sent?: boolean }) {
+  const body = className ? `chat-message-body ${className}` : 'chat-message-body';
+  if (sent && (detectStructuredText(props.content) || hasStructuredTextSuffix(props.content))) {
+    return <div className={body}>{props.leadingContent}{props.content}</div>;
+  }
+  return <Markdown {...props} chat message className={body} />;
+});
 
 /** File receipts replace their complete JSON range while surrounding prose stays Markdown. */
 export const Markdown = memo(function Markdown(props: MarkdownProps) {
@@ -163,6 +189,7 @@ const MarkdownText = memo(function MarkdownText({
   className = "reading-text",
   onPlace,
   chat = false,
+  message = false,
   richCode = chat,
   renderText,
   leadingContent,
@@ -219,28 +246,27 @@ const MarkdownText = memo(function MarkdownText({
   const streaming = receiving || content !== source;
   const previewLocalFile = useContext(LocalFileAction);
   const references = useContext(MarkdownReferences);
-  const parser = useMemo(() => new StreamingMarkdown((source) => {
+  const lex = useMemo(() => (source: string) => {
     const lexer = new marked.Lexer({ gfm: true, breaks: chat });
     lexer.tokens.links = { ...references };
     return lexer.lex(source);
-  }), [chat, references, streaming]);
+  }, [chat, references]);
+  const parser = useMemo(() => new StreamingMarkdown(lex), [lex, streaming]);
   const tokens = useMemo(() => {
     const language = richCode && detectStructuredText(content);
     if (language) return [{ type: 'code', raw: content, text: content, lang: language } as Tokens.Code];
     if (streaming) return parser.update(content);
-    const lexer = new marked.Lexer({ gfm: true, breaks: chat });
-    lexer.tokens.links = { ...references };
-    return lexer.lex(content);
-  }, [content, chat, richCode, references, streaming, parser]);
+    return lex(content);
+  }, [content, richCode, streaming, parser, lex]);
   // Frozen token identities retain their React elements. Include the rendering
   // vocabulary and streaming state so final code highlighting and action changes
   // always invalidate the cache. Weak keys release superseded tail tokens.
   const blockCache = useMemo(() => new WeakMap<Token, { before: string; after: PlaceView[]; node: ReactNode }>(),
-    [onPlace, renderText, leadingContent, chat, richCode, previewMarkdownCode, intelligentUI, streaming, previewLocalFile]);
+    [onPlace, renderText, leadingContent, chat, message, richCode, previewMarkdownCode, intelligentUI, streaming, previewLocalFile]);
   const linked = new Set<PlaceView>();
   const firstContentToken = tokens.find(token => token.type !== 'space');
-  const groupImages = chat && (withinFileReceipt || className?.split(/\s+/).includes('content'));
-  const captionToken = captionSlot && groupImages && (captionSlot.mixedMedia || tokens.some(imageParagraph))
+  const messageLayout = chat && (withinFileReceipt || message);
+  const captionToken = captionSlot && messageLayout && (captionSlot.mixedMedia || tokens.some(imageParagraph))
     ? tokens.filter(token => token.type !== 'space' && token.type !== 'def' && token.type !== 'hr' && !imageParagraph(token)).at(-1)
     : undefined;
   // Explicit links take precedence over automatic word links throughout the message.
@@ -263,9 +289,22 @@ const MarkdownText = memo(function MarkdownText({
     }
   }
   if (onPlace) collect(tokens);
+  function workWords(text: string, plain: (value: string) => ReactNode = value => value): ReactNode {
+    if (!onPlace) return plain(text);
+    const matches = workTaskReferences(text);
+    if (!matches.length) return plain(text);
+    let end = 0;
+    return <>{matches.map(({ id, index }) => {
+      const before = text.slice(end, index);
+      end = index + id.length;
+      const open = id.startsWith('goal_') ? '打开 Work 目标' : '打开 Work 会话';
+      return <Fragment key={index}>{plain(before)}<button type="button" className="chat-place-link" data-work-task={id}
+        title={open} aria-label={`${open} ${id}`} onClick={() => onPlace({ view: 'work', id })}>{id}</button></Fragment>;
+    })}{plain(text.slice(end))}</>;
+  }
   function words(value: string, decorate: boolean): ReactNode {
     const text = unescapeText(value);
-    const plain = (value: string) => decorate && renderText ? renderText(value) : value;
+    const plain = (value: string) => decorate ? workWords(value, renderText) : value;
     if (!onPlace || !decorate) return plain(text);
     const parts: ReactNode[] = [];
     let end = 0;
@@ -314,12 +353,12 @@ const MarkdownText = memo(function MarkdownText({
     ) : richCode && language !== undefined ? (
       <HighlightedCode text={value} language={language} />
     ) : (
-      value
+      language === undefined ? workWords(value) : value
     );
   }
   function render(list: Token[], decorate = true, topLevel = false): ReactNode {
     return list.flatMap((token, index) => {
-      if (topLevel && groupImages) {
+      if (topLevel && messageLayout) {
         const group = imageParagraph(token);
         const previous = imageParagraph(list[index - (list[index - 1]?.type === 'space' ? 2 : 1)]);
         if (group && previous) return [];
@@ -361,7 +400,7 @@ const MarkdownText = memo(function MarkdownText({
           node = null;
           break;
         case "paragraph":
-          node = <p className={topLevel && groupImages && !leadingContent && imageParagraph(token)?.length === 1 ? "markdown-image-only" : undefined}>{token === firstContentToken && leadingContent}{inner}</p>;
+          node = <p className={topLevel && messageLayout && !leadingContent && imageParagraph(token)?.length === 1 ? "markdown-image-only" : undefined}>{token === firstContentToken && leadingContent}{inner}</p>;
           break;
         case "text":
         case "escape":
@@ -417,6 +456,14 @@ const MarkdownText = memo(function MarkdownText({
               </pre>
             </div>
           );
+          const taskIds = onPlace ? [...new Set(workTaskReferences(block.text).map(reference => reference.id))] : [];
+          if (taskIds.length && lang.toLowerCase() !== 'intelligent-ui') node = <>{node}<div className="chat-work-references" data-markdown-copy="exclude">
+            {taskIds.map(id => {
+              const open = id.startsWith('goal_') ? '打开 Work 目标' : '打开 Work 会话';
+              return <button key={id} type="button" className="chat-place-link" data-work-task={id}
+                title={open} aria-label={`${open} ${id}`} onClick={() => onPlace!({ view: 'work', id })}>{open} · {id}</button>;
+            })}
+          </div></>;
           break;
         }
         case "link": {
@@ -425,7 +472,9 @@ const MarkdownText = memo(function MarkdownText({
             target = onPlace ? placeFromURL(link.href) : null;
           const local = previewLocalFile ? localFileReference(unescapeText(link.href), true) : undefined;
           const homeFile = homeFileReference(unescapeText(link.href));
-          node = homeFile ? <HomeFileLink path={homeFile.path}>{render(link.tokens, false)}</HomeFileLink> : local ? <LocalFileLink path={local} card>{render(link.tokens, false)}</LocalFileLink> : (
+          node = target?.view === 'work' ? <button type="button" className="chat-place-link" data-work-task={target.id}
+            title={target.id?.startsWith('goal_') ? '打开 Work 目标' : '打开 Work 会话'} onClick={() => onPlace!(target)}>{target.id && (link.text === 'Work 任务' && target.id.startsWith('work_') || link.text === 'Work 目标' && target.id.startsWith('goal_'))
+              ? <LegacyWorkTaskTitle id={target.id} fallback={link.text} /> : render(link.tokens, false)}</button> : homeFile ? <HomeFileLink path={homeFile.path}>{render(link.tokens, false)}</HomeFileLink> : local ? <LocalFileLink path={local} card>{render(link.tokens, false)}</LocalFileLink> : (
             <a
               href={href}
               title={
@@ -475,7 +524,7 @@ const MarkdownText = memo(function MarkdownText({
           const list = token as Tokens.List;
           const items = list.items.map((item, i) => {
             const content = render(item.tokens, decorate);
-            if (item.task && groupImages) return (
+            if (item.task && messageLayout) return (
               <li key={i} className="markdown-task">
                 <span className="markdown-task-marker" role="img"
                   aria-label={item.checked ? '已勾选' : '未勾选'} data-checked={!!item.checked} />
@@ -525,7 +574,7 @@ const MarkdownText = memo(function MarkdownText({
                 </tbody>
               </table>
           );
-          node = groupImages ? <MarkdownTableScroll text={table.raw.trim()}>{body}</MarkdownTableScroll>
+          node = messageLayout ? <MarkdownTableScroll text={table.raw.trim()}>{body}</MarkdownTableScroll>
             : <div className="table-wrap">{body}</div>;
           break;
         }
@@ -588,7 +637,7 @@ function MarkdownTableScroll({ children, text }: { children: ReactNode; text: st
     aria-label={overflow ? '表格，可横向滚动' : '表格'}>
     {children}
   </div>;
-  if (typeof document === 'undefined' || document.documentElement.dataset.chatHost !== 'desktop') return scroller;
+  if (typeof document === 'undefined' || (document.documentElement.dataset.chatHost !== 'desktop' && !window.beings)) return scroller;
   return <div className="markdown-table" data-copy-group>
     <div className="markdown-table-actions" data-markdown-copy="exclude">
       <CopyMessage appearance="chat" text={text} copy={copy} label="复制表格" />
@@ -638,7 +687,7 @@ function MarkdownCodeBlock({ text, language, streaming }: { text: string; langua
       <div id={panelId} role="region" aria-label={mode === "preview" ? "Markdown 预览" : "Markdown 源码"}>
         {mode === "preview" ? (
           // Code samples inside the document stay as source rather than opening nested previews.
-          <Markdown content={text} chat streaming={streaming} className="markdown-preview" previewMarkdownCode={false} />
+          <ChatMessageMarkdown content={text} streaming={streaming} className="markdown-preview" previewMarkdownCode={false} />
         ) : (
           <pre tabIndex={0} aria-label="Markdown 源码"><code className={`hljs lang-${language}`}>{streaming ? text : <HighlightedCode text={text} language={language} />}</code></pre>
         )}

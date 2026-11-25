@@ -1,4 +1,5 @@
 export const composerCommands = [
+  { id: 'work', label: 'Work 工作', description: '安排任务、设置交接和唤醒，或查询进度和结果', aliases: ['工作', '项目', '任务'] },
   { id: 'image', label: '出图', description: '根据描述生成或编辑图片', aliases: ['出图', '图片', 'imagegen'] },
   { id: 'ui', label: '智能 UI', description: '生成或修改可交互界面', aliases: ['智能UI', '智能ui', '界面'] },
   { id: 'doc', label: '生成文档', description: '生成 HTML 页面或 Markdown 文档', aliases: ['文档', 'html', 'md', 'markdown', 'document'] },

@@ -54,7 +54,7 @@ export function registerChatIpc(options: {
   portal.on('state', publishTasks);
   app.once('will-quit', () => { portal.off('state', publishTasks); sceneTasks.close(); });
   handle('beings:scene-tasks', taskSnapshot);
-  handle('beings:subagent-task-details', async (endpoint: string, taskIds: string[]) => {
+  const taskDetails = async (endpoint: string, taskIds: string[]) => {
     if (endpoint !== store.connection?.endpoint || !Array.isArray(taskIds) || taskIds.length > 200 ||
       !taskIds.every(id => typeof id === 'string' && /^sub_[a-zA-Z0-9_-]{1,100}$/.test(id))) throw new Error('无效的 subagent 任务请求。');
     const pid = portal.state.pid;
@@ -67,7 +67,8 @@ export function registerChatIpc(options: {
     const details = await Promise.all(taskIds.filter(id => allowed.has(id)).map(id =>
       readSubagentActivity(engine.state_dir, id, [connection?.token || '', connection?.relaySecret || ''])));
     return endpoint === store.connection?.endpoint && pid === portal.state.pid ? details : [];
-  });
+  };
+  handle('beings:subagent-task-details', taskDetails);
   const recentHistory = new RecentChatHistory(proxy, () => store.connection);
   handle('beings:recent-chat-history', (endpoint: string) => recentHistory.read(endpoint));
   handle('beings:subagent-config', () => readSubagentConfig(directory, store.settings));
@@ -75,5 +76,5 @@ export function registerChatIpc(options: {
     const [config, snapshot] = await Promise.all([readSubagentConfig(directory, store.settings), taskSnapshot()]);
     return subagentHealth(config, snapshot, portal.state.phase);
   });
-  return { taskSnapshot };
+  return { taskSnapshot, taskDetails };
 }

@@ -12,6 +12,7 @@ import { ChatSessions } from './scene';
 import { ToolApproval } from './tool-approval';
 
 export async function createDesktopCommands(options: {
+  workContext?(id: string, signal: AbortSignal, sceneId?: string): Promise<string>;
   directory: string; store: SettingsStore; plugins: PluginRegistry; chatSessions?: ChatSessions;
   errorLog: ClientErrorLog; shellURL(): string; window(): BrowserWindow | null;
 }) {
@@ -32,6 +33,8 @@ export async function createDesktopCommands(options: {
   const clientCommands = new ClientCommandServer(path.join(directory, '.portal-client.json'),
     () => store.connection?.endpoint, (request, signal) => request.verb === 'security-approve'
       ? toolApproval.request(request, signal)
+      : request.verb === 'work' && options.workContext
+        ? options.workContext(request.args.trim(), signal, request.sceneId)
       : request.verb === 'plugins'
         ? plugins.agentCommand(request.endpoint, request.args, request.sceneId)
         : clientContext.execute({ ...request, scenes: chatSessions?.list(request.endpoint) }));

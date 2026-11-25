@@ -5,7 +5,7 @@ import { ImageGenerationAnswer } from '../desktop/renderer/chat/components/image
 import { ScheduledMessage } from '../desktop/renderer/chat/components/scheduling';
 const src='https://beings.town/api/being-service/v1/assets/att_old/view?token=signature_3a&variant=original';
 const receipt=JSON.stringify({type:'being.image-generation',version:1,being_id:'alice',jobs:[{index:1,title:'新图',submission:'accepted',generation_id:'gen_new',client_request_id:'cat-new',error_code:null}]});
-const render=(text:string)=>renderToStaticMarkup(createElement(ImageGenerationAnswer,{text,streaming:false,enabled:true,scope:'room',endpoint:'https://echo.beings.town/alice',children:(part:string)=>createElement(ScheduledMessage,{text:part,streaming:false,intelligentUI:true,chat:true})}));
+const render=(text:string)=>renderToStaticMarkup(createElement(ImageGenerationAnswer,{text,streaming:false,enabled:true,scope:'room',endpoint:'https://echo.beings.town/alice',children:(part:string)=>createElement(ScheduledMessage,{text:part,streaming:false,intelligentUI:true})}));
 const assertImage=(html:string)=>{
   expect(html).toContain('aria-label="预览 旧图片"');
   expect(html).toContain(`src="${src.replace('&','&amp;')}"`);

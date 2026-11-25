@@ -8,6 +8,16 @@ import { createChatRuntime } from '../desktop/renderer/chat/services/runtime';
 import { SceneQueueStore } from '../desktop/renderer/chat/services/scene-queue';
 import { HistoryCache } from '../desktop/renderer/chat/services/history-cache';
 
+it('sends the Work handover instructions with the selected scene and keeps the visible message short', () => {
+  const text = '请接管这项 Work 任务。';
+  const request = withComposerCommandContext(text, false, undefined, undefined, 'dispatch-scene', { itemId: 'work_fixture', id: 'dispatch-fixture' });
+  expect(request).toContain('@work work_fixture');
+  expect(request).toContain('@work agents');
+  expect(request).toContain('@work run {"item_id":"work_fixture","dispatch_id":"dispatch-fixture","scene_id":"dispatch-scene"');
+  expect(request).toContain('收到各项启动回执后立即结束本轮');
+  expect(stripClientMessageContext(request)).toBe(text);
+});
+
 it('allows subagent commands without a separate client-side configuration gate', () => {
   const configure = vi.fn();
   for (const state of [{}, { subagentConfigured: false }, { subagentConfigured: true, subagentEnabled: false }]) {
@@ -17,6 +27,31 @@ it('allows subagent commands without a separate client-side configuration gate',
   expect(canUseComposerCommand('image', {}, configure)).toBe(true);
   expect(canUseComposerCommand('ui', {}, configure)).toBe(true);
   expect(configure).not.toHaveBeenCalled();
+});
+it('exposes Work and its client operations through slash commands without leaking instruction text into messages', () => {
+  const text = '/work 在 Project-A 生成一份测试 HTML';
+  expect(parseComposerCommands(text).commands).toEqual(['work']);
+  expect(matchingComposerCommands('项目').map(command => command.id)).toEqual(['work']);
+  const request = withComposerCommandContext(text, false);
+  for (const executor of ['内置 Subagent（internal）', 'Codex（codex）', 'DeepSeek（deepseek）']) expect(request).toContain(executor);
+  expect(request).toContain('@work agents');
+  expect(request).toContain('新任务默认待办，省略未指定的属性');
+  expect(request).toContain('只在用户要求开工时派发');
+  expect(request).toContain('收到各项启动回执后立即结束本轮');
+  expect(request).toContain('收到 starting 就回复「正在启动」');
+  expect(request).toContain('@work status <work_id> 查原派发');
+  expect(request).toContain('沿用原任务和派发请求');
+  expect(request).toContain('在同一 Being 对话');
+  expect(request).toContain('@work results <work_id> [<work_id> ...]');
+  expect(request).toContain('用户确认结案后');
+  expect(request).toContain('stage 改为 done');
+  expect(request).toContain('[任务标题](beings://work/<work_id>)');
+  for (const operation of ['@work create', '@work run', '@work add-project', '@work artifact', '@work update', '@work automate', '@work steer', '@work retry', 'children_done', 'task_done']) expect(request).toContain(operation);
+  expect(withComposerCommandContext(request, false)).toBe(request);
+  expect(stripClientMessageContext(request)).toBe(text);
+  const scoped = withComposerCommandContext(text, false, undefined, undefined, 'desktop-work-scene');
+  expect(scoped).toContain('"scene_id":"desktop-work-scene"');
+  expect(stripClientMessageContext(scoped)).toBe(text);
 });
 
 it('recognizes only explicit leading slash commands, including aliases and combinations', () => {
@@ -90,6 +125,36 @@ beforeEach(() => {
   vi.spyOn(SceneQueueStore.prototype, 'write').mockResolvedValue();
 });
 afterEach(() => { vi.restoreAllMocks(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+
+it.each(['a', 'b'])('only carries Work result guidance into the originating scene (reply scene: %s)', async replyScene => {
+  vi.stubGlobal('location', new URL('beings://chat/?scene_id=a'));
+  vi.stubGlobal('parent', {});
+  const received: string[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+    const route = new URL(url).pathname;
+    if (route === '/api/history') return Response.json({ messages: [{ seq: 1, role: 'assistant', scene_id: replyScene,
+      content: '已派发 [报名页](beings://work/work_5f99bc14-a1c8-41dc-89db-6c9e80df4371)' }] });
+    if (route === '/api/stream/active') return new Response(null, { status: 204 });
+    if (route === '/api/chat/stream') {
+      received.push(JSON.parse(String(init?.body)).message);
+      return new Response('event: content_block_delta\ndata: {"delta":{"text":"查到了"}}\n\nevent: message_stop\ndata: {}\n\n', { headers: { 'Content-Type': 'text/event-stream' } });
+    }
+    return Response.json({ sbs_enabled: false });
+  }));
+  const state = new ChatState(), runtime = createChatRuntime(state);
+  const question = '刚才的报名页做好了吗？';
+  try {
+    await runtime.start();
+    await runtime.send(question);
+    await vi.advanceTimersByTimeAsync(20);
+    expect(received).toHaveLength(1);
+    for (const command of ['@work results <work_id>', '@work artifact', '@work update']) {
+      expect(received[0].includes(command)).toBe(replyScene === 'a');
+    }
+    expect(stripClientMessageContext(received[0]).endsWith(question)).toBe(true);
+    expect(state.items.some(item => item.kind === 'message' && item.role === 'user' && item.text === question)).toBe(true);
+  } finally { runtime.dispose(); }
+});
 
 it.each([true, false])('expands direct, interrupted and queued sends and freezes context (has snapshot: %s)', async hasSnapshot => {
   const sends: string[] = [], history: any[] = [];

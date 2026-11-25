@@ -1,4 +1,4 @@
-import type { Attachment } from '../models/chat';
+import type { Attachment, ChatSendOptions } from '../models/chat';
 import type { MessageScene } from '../models/scenes';
 export interface SavedSceneSend {
   id: string;
@@ -12,7 +12,7 @@ export interface SavedSceneSend {
   phase: 'queued' | 'preparing' | 'sending' | 'failed';
   error?: string;
   attachment?: import('./attachments').AttachmentTransfer;
-  sendOptions?: { intelligentUI?: boolean; uiAction?: import('../../shared/intelligent-ui/surfaces').UIInteraction; uiSnapshot?: string };
+  sendOptions?: ChatSendOptions;
 }
 
 /** Separate from history: these messages have not been acknowledged by Heart. */

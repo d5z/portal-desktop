@@ -606,13 +606,12 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
         const prepared = typeof target.runtime.prepareSend === 'function'
           ? await target.runtime.prepareSend(args[1], sendSnapshot)
           : (await target.runtime.waitForPendingFiles(), true);
-        if (!prepared) return;
-        if (disposed) return;
+        if (!prepared || disposed) return;
         const othersBusy = [...sessions.values()].some(other => other !== target && busy(other));
         const files = Array.isArray(args[1]) ? args[1] : sendSnapshot?.files || [];
         const hasAttachments = desktopAttachments && files.length > 0;
         if (hasAttachments && !target.local.currentScene.sceneId) { void target.runtime.send(...args); return; }
-        if (hasAttachments || othersBusy || (args[2].mode !== 'interrupt' && (sendQueue.some(next => next.saved.phase !== 'failed') || busy(target)))) {
+        if (args[2].workDispatch || hasAttachments || othersBusy || (args[2].mode !== 'interrupt' && (sendQueue.some(next => next.saved.phase !== 'failed') || busy(target)))) {
           // Older/embedded runtimes may not expose the durable queue hook yet.
           // Keep sending functional while the host is being upgraded; the full
           // Desktop runtime supplies stageQueuedSend and persists the entry.

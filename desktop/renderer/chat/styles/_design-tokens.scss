@@ -1,8 +1,10 @@
+@use '../../shared/styles/chat-message';
+@use '../../shared/styles/chat-file-card';
+
 // Desktop conversation values consumed by the shared components and both layouts.
 :root[data-chat-host='desktop'] {
-  --chat-reading-font: system-ui, 'PingFang SC', 'Being Noto Sans SC', sans-serif;
-  --chat-message-line-height: 1.5;
-  --chat-reading-line-height: var(--lh-body);
+  @include chat-message.tokens;
+
   --chat-ui-text-size: 13px;
   --chat-ui-line-height: 20px;
   --chat-meta-text-size: 12px;
@@ -12,10 +14,6 @@
   --chat-icon-primary: 18px;
   --chat-icon-target: 24px;
   --chat-attachment-menu-target: 28px;
-  --chat-bubble-padding-inline: 16px;
-  --chat-bubble-padding-block: 10px;
-  --chat-text-bubble-radius: 22px;
-  --chat-text-bubble-max-width: 70%;
   --chat-attachment-width: 320px;
   --chat-recorded-audio-width: 279px;
   --chat-attachment-gap: 6px;
@@ -37,7 +35,6 @@
   --chat-generation-preview-ratio: 4 / 3;
   --chat-menu-inset: var(--space-xs);
   --chat-menu-row-radius: calc(var(--chat-menu-radius) - var(--chat-menu-inset));
-  --chat-content-card-radius: var(--radius-sm);
   --chat-table-divider-neutral: color-mix(in srgb, var(--chat-edge) 40%, transparent);
   --chat-table-divider-sent: rgb(255 255 255 / 20%);
   --chat-content-divider-width: 1px;
@@ -89,10 +86,7 @@
   --chat-layer-fixed-control: 15;
 
   .message.user {
-    --chat-file-surface: light-dark(#e9f4ff, #17304b);
-    --chat-file-text: light-dark(#16273c, #ecf5ff);
-    --chat-file-meta: light-dark(#466787, #b4cde6);
-    --chat-file-icon: light-dark(#086bc6, #87bfff);
+    @include chat-file-card.sent-colors;
   }
 
   @media (pointer: coarse) {

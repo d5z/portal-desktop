@@ -117,13 +117,14 @@ try {
   assert.equal(await page.locator('.client-file-viewer.maximized').count(),1);
   await page.getByRole('button', {name:'恢复对话',exact:true}).click();
   await page.getByRole('button', {name:'关闭文件预览',exact:true}).click();
+  await page.locator('.client-file-viewer').waitFor({state:'detached'});
   await card.click({button:'right'});
   await chat.getByRole('menuitem', {name:'预览文件'}).click();
   await preview.getByRole('heading', {name:'同一文件修改完成'}).waitFor();
   assert.equal(await chat.getByRole('button', {name:'预览文件：missing.html',exact:true}).count(),0);
   assert.equal(await chat.locator('[data-local-file]').count(),2);
   await chat.getByText('missing.html',{exact:true}).click({button:'right'});
-  assert.equal(await chat.getByRole('menuitem',{name:'预览文件'}).count(),0);
+  await chat.getByRole('menuitem',{name:'预览文件'}).waitFor({state:'hidden'});
   await page.keyboard.press('Escape');
   await page.getByRole('button', {name:'关闭文件预览',exact:true}).click();
   await rm(file);
@@ -131,12 +132,13 @@ try {
   // between native pointer-down/up; normal pointer activation is tested above.
   await card.dispatchEvent('click');
   await card.waitFor({state:'detached'});
-  assert.equal(await page.locator('iframe[title="HTML 文件预览"]').count(),0);
+  await page.locator('iframe[title="HTML 文件预览"]').waitFor({state:'detached'});
   await writeFile(path.join(workspace,'missing.html'),document('稍后生成的文件'));
   await chat.getByText('missing.html',{exact:true}).hover();
   await chat.getByRole('button',{name:'预览文件：missing.html',exact:true}).click();
   await preview.getByRole('heading',{name:'稍后生成的文件'}).waitFor();
   await page.getByRole('button', {name:'关闭文件预览',exact:true}).click();
+  await page.locator('.client-file-viewer').waitFor({state:'detached'});
   // Refocusing the chat while the click's async file check is pending must not cancel it.
   await chat.getByRole('button',{name:'预览文件：missing.html',exact:true}).evaluate(node=>{node.click();window.dispatchEvent(new Event('focus'));});
   await preview.getByRole('heading',{name:'稍后生成的文件'}).waitFor({timeout:3000});

@@ -1,5 +1,6 @@
+import { checkLocalFiles, type LocalFileAvailability as Availability } from './local-file-check';
+
 // Coalesce a rendered message's paths into bounded metadata-only requests.
-type Availability = boolean | null;
 const pending = new Map<string, Promise<Availability>>();
 const queue = new Map<string, (available: Availability) => void>();
 let scheduled = false;
@@ -16,6 +17,7 @@ export function checkLocalFile(path: string, fresh = false): Promise<Availabilit
 function flush() {
   scheduled = false;
   const entries = [...queue]; queue.clear();
+  const shell = window.parent === window ? window.beings : undefined;
   for (let start = 0; start < entries.length; start += 64) {
     let batch = entries.slice(start, start + 64);
     let id = '';
@@ -24,9 +26,11 @@ function flush() {
     let timeout: ReturnType<typeof setTimeout>;
     const send = () => {
       attempts++;
+      const paths = batch.map(([path]) => path);
+      if (shell) { void checkLocalFiles(shell, paths).then(finish); return; }
       id=crypto.randomUUID();
       timeout=setTimeout(()=>finish([]),5000);
-      window.parent.postMessage({ type: 'beings:local-files-check', id, revision, paths: batch.map(([path]) => path) }, '*');
+      window.parent.postMessage({ type: 'beings:local-files-check', id, revision, paths }, '*');
     };
     const finish = (values: Availability[]) => {
       clearTimeout(timeout);
@@ -44,7 +48,7 @@ function flush() {
       if (!id || event.source !== window.parent || data?.type !== 'beings:local-files-checked' || data.id !== id || data.revision !== revision) return;
       finish(Array.isArray(data.available) ? data.available : []);
     };
-    window.addEventListener('message', receive);
+    if (!shell) window.addEventListener('message', receive);
     send();
   }
 }

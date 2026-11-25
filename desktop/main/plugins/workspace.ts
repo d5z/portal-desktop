@@ -1,7 +1,7 @@
 import { PLUGIN_RESOURCE_KINDS, type PluginManifest, type PluginHostContext } from '../../shared/plugins';
 import type { PluginWorkspaceContext } from '../../../plugins/sdk';
 
-const views = ['chat', 'town', 'portal', 'plugins', ...PLUGIN_RESOURCE_KINDS];
+const views = ['chat', 'town', 'portal', 'plugins', 'work', ...PLUGIN_RESOURCE_KINDS];
 const bounded = (value: unknown, max: number): value is string => typeof value === 'string' && value.length <= max && !value.includes('\0');
 /** Host observations are ephemeral, scoped to the current connection/scene/Town generation. */
 export class PluginWorkspace {
