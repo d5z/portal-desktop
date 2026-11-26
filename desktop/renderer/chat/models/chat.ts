@@ -88,6 +88,8 @@ export interface ActivityEntry {
   outputTruncated?: boolean;
   totalOutputBytes?: number;
   artifactPath?: string;
+  workspaceFile?: import('../../../shared/connector-resources').ConnectorImportReceipt;
+  workspaceError?: string;
   done?: boolean;
   error?: boolean;
   duration?: number;

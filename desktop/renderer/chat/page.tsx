@@ -1,3 +1,5 @@
+import { ConnectorResourceAction } from '../shared/components/connector-workspace-file';
+import { chatConnectorResources } from '../shared/services/connector-resources';
 import { DndContext, KeyboardSensor, PointerSensor, closestCenter, useSensor, useSensors } from '@dnd-kit/core';
 import { attachmentProcessing } from './components/attachment-processing';
 import { restrictToFirstScrollableAncestor, restrictToVerticalAxis } from '@dnd-kit/modifiers';
@@ -511,7 +513,7 @@ export function ChatView({
     <SurfaceContext.Provider value={surfaceContext}>
     <ChatTooltipGroup>
     <CodeClipboard.Provider value={bridge.copyText}>
-    <HomeFileAction.Provider value={location.protocol === "beings:" && parent !== window ? requestHomeFilePreview : undefined}>
+    <ConnectorResourceAction.Provider value={location.protocol === "beings:" && parent !== window ? chatConnectorResources : undefined}><HomeFileAction.Provider value={location.protocol === "beings:" && parent !== window ? requestHomeFilePreview : undefined}>
     <LocalFileAction.Provider value={location.protocol === "beings:" && parent !== window ? requestLocalFilePreview : undefined}>
     <div
       className={`chat-root${parent === window ? " standalone-chat" : ""}${showIntelligentUI ? " has-ui-examples" : ""}`}
@@ -995,7 +997,7 @@ export function ChatView({
       </button>
     </div>
     </LocalFileAction.Provider>
-    </HomeFileAction.Provider>
+    </HomeFileAction.Provider></ConnectorResourceAction.Provider>
     </CodeClipboard.Provider>
     </ChatTooltipGroup>
     </SurfaceContext.Provider>

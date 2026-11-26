@@ -1758,6 +1758,11 @@ html[data-theme='dark'] .town-logo-light {
   padding-bottom: 4px;
 }
 
+#client-settings-dialog .connector-search.connector-tool-search {
+  max-width: none;
+  margin: 8px 0;
+}
+
 #client-settings-dialog .connector-tool {
   min-height: 38px;
   padding: 8px 0;

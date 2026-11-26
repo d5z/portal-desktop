@@ -3,12 +3,12 @@ import { createServer } from 'node:http';
 import { mkdir, readFile, writeFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import type { SecretStorage } from '../app/settings';
-import type { HomeOperation } from '../../shared/home';
-import { HOME_CALLBACK, HOME_CLIENT, HOME_ORIGIN, HOME_REQUIRED_SCOPE, HomeError, homeURL, verifyIdentityToken } from './protocol';
-interface Tokens { access: string; refresh: string; expires: number; subject: string }
+import { HOME_BASE_URL, HOME_DEV, HOME_PATH_PREFIX, type HomeOperation } from '../../shared/home';
+import { HOME_CALLBACK, HOME_CLIENT, HOME_REQUIRED_SCOPE, HomeError, homeURL, verifyIdentityToken } from './protocol';
+interface Tokens { access: string; refresh: string; expires: number; subject: string; scopes?: string[] }
 export interface PendingOperation { kind: 'ensure' | 'stop' | 'recreate'; key: string; operation?: HomeOperation }
 interface Saved { version: 1; tokens: Tokens; pending?: PendingOperation }
-interface OAuthTokens { access_token: string; refresh_token?: string; expires_in?: number; token_type: string; id_token?: string }
+interface OAuthTokens { access_token: string; refresh_token?: string; expires_in?: number; token_type: string; id_token?: string; scope?: string }
 /** Node fetch deliberately has no browser cookie jar or Origin header. */
 export class HomeClient {
   private saved?: Saved;
@@ -22,10 +22,12 @@ export class HomeClient {
   constructor(private directory: string, private storage: SecretStorage,
     private openExternal: (url: string) => Promise<void>, private fetcher: typeof fetch = fetch) {}
   get authenticated() { return !!this.saved; }
+  get scopes() { return this.saved?.tokens.scopes || []; }
+  get accountId() { return this.saved?.tokens.subject || ''; }
   get sessionVersion() { return this.generation; }
   get pending() { return this.saved?.pending; }
   get authenticating() { return !!this.cancelAuth; }
-  private get file() { return path.join(this.directory, 'home-session.json'); }
+  private get file() { return path.join(this.directory, HOME_DEV ? 'home-session-dev.json' : 'home-session.json'); }
   async load() {
     try {
       const raw = JSON.parse(await readFile(this.file, 'utf8'));
@@ -52,9 +54,9 @@ export class HomeClient {
     if (!this.saved) throw new HomeError(401, '');
     this.saved = { ...this.saved, pending }; await this.persist();
   }
-  async raw<T>(pathname: string, init: RequestInit = {}, read?: (response: Response, progress: () => void) => Promise<T>): Promise<T> {
+  async raw<T>(pathname: string, init: RequestInit = {}, read?: (response: Response, progress: () => void) => Promise<T>, timeoutMs = 20_000): Promise<T> {
     const timeout = new AbortController();
-    const timer = setTimeout(() => timeout.abort(new Error('Being Home 请求超时，请重试。')), 20_000);
+    const timer = setTimeout(() => timeout.abort(new Error('Being Home 请求超时，请重试。')), timeoutMs);
     const signal = init.signal ? AbortSignal.any([init.signal, timeout.signal]) : timeout.signal;
     try {
       let response: Response;
@@ -81,7 +83,7 @@ export class HomeClient {
         !Number.isFinite(response.expires_in) || response.expires_in! <= 0 || !(response.refresh_token || previousRefresh))
       throw new Error('Home 返回的登录有效期或凭据不完整，请重新连接。');
     return { access: response.access_token, refresh: response.refresh_token || previousRefresh,
-      expires: Date.now() + response.expires_in! * 1000, subject };
+      expires: Date.now() + response.expires_in! * 1000, subject, scopes: response.scope?.split(' ') || this.saved?.tokens.scopes || [] };
   }
   private async refreshToken(observed?: string) {
     if (observed && this.saved?.tokens.access !== observed) return;
@@ -104,7 +106,7 @@ export class HomeClient {
     this.refreshFlight = flight;
     try { await flight; } finally { if (this.refreshFlight === flight) this.refreshFlight = undefined; }
   }
-  async request<T>(pathname: string, init: RequestInit = {}, read?: (response: Response, progress: () => void) => Promise<T>): Promise<T> {
+  async request<T>(pathname: string, init: RequestInit = {}, read?: (response: Response, progress: () => void) => Promise<T>, timeoutMs = 20_000): Promise<T> {
     const generation = this.generation, requestGeneration = this.requestGeneration;
     if (!this.saved) throw new HomeError(401, '');
     if (this.saved.tokens.expires <= Date.now() + 60_000) await this.refreshToken();
@@ -112,7 +114,7 @@ export class HomeClient {
     if (!access || generation !== this.generation || requestGeneration !== this.requestGeneration) throw new HomeError(401, '');
     const request = new AbortController(); this.requests.add(request);
     const current = () => { if (generation !== this.generation || requestGeneration !== this.requestGeneration) throw new Error('请求已取消，请重试。'); };
-    const send = (token: string) => { current(); return this.raw<T>(pathname, { ...init, signal: request.signal, headers: { ...init.headers, Authorization: `Bearer ${token}` } }, read); };
+    const send = (token: string) => { current(); return this.raw<T>(pathname, { ...init, signal: init.signal ? AbortSignal.any([request.signal, init.signal]) : request.signal, headers: { ...init.headers, Authorization: `Bearer ${token}` } }, read, timeoutMs); };
     try {
       const result = await send(access);
       current();
@@ -159,15 +161,16 @@ export class HomeClient {
       if (config.client_id !== HOME_CLIENT || !Array.isArray(config.redirect_uris) || !config.redirect_uris.includes(HOME_CALLBACK) || !config.audience || typeof config.scope !== 'string' ||
           HOME_REQUIRED_SCOPE.split(' ').some(scope => !config.scope.split(' ').includes(scope))) throw new Error('Home 桌面客户端注册配置不匹配。');
       const url = homeURL(config.authorization_endpoint);
-      if (url.pathname !== '/oidc/oauth2/auth') throw new Error('Home 登录入口无效。');
+      if (url.pathname !== HOME_PATH_PREFIX + '/oidc/oauth2/auth') throw new Error('Home 登录入口无效。');
       url.search = new URLSearchParams({ client_id: HOME_CLIENT, response_type: 'code', redirect_uri: HOME_CALLBACK,
         scope: config.scope, audience: config.audience, state, nonce, code_challenge: createHash('sha256').update(verifier).digest('base64url'), code_challenge_method: 'S256' }).toString();
       if (generation !== this.generation) throw new Error('登录已取消。');
       await this.openExternal(url.href);
       const code = await callback;
       const result = await this.tokenRequest({ grant_type: 'authorization_code', code, redirect_uri: HOME_CALLBACK, code_verifier: verifier }, request.signal);
+      result.scope ??= config.scope;
       const discovery = await this.raw<{ issuer: string; jwks_uri: string }>('/oidc/.well-known/openid-configuration', { signal: request.signal });
-      if (discovery.issuer !== `${HOME_ORIGIN}/oidc/`) throw new Error('Home 登录签发方不匹配。');
+      if (discovery.issuer !== `${HOME_BASE_URL}/oidc/`) throw new Error('Home 登录签发方不匹配。');
       const keys = await this.raw<{ keys: JsonWebKey[] }>(homeURL(discovery.jwks_uri).href, { signal: request.signal });
       const subject = verifyIdentityToken(result.id_token || '', keys, nonce);
       if (generation !== this.generation) throw new Error('登录已取消。');
@@ -188,7 +191,7 @@ export class HomeClient {
     const results = await Promise.allSettled([['access_token', tokens.access], ['refresh_token', tokens.refresh]].map(async ([hint, token]) => {
       // Revoke may return either an empty 200 or 204.
       let response: Response;
-      try { response = await this.fetcher(HOME_ORIGIN + '/native/oauth/revoke', { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15_000),
+      try { response = await this.fetcher(homeURL('/native/oauth/revoke'), { method: 'POST', redirect: 'error', signal: AbortSignal.timeout(15_000),
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: HOME_CLIENT, token_type_hint: hint, token }).toString() }); }
       catch { throw new Error(); }
       if (!response.ok) throw new Error();

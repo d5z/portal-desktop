@@ -52,6 +52,16 @@ npm run build:portal
 
 `build:portal` 执行 `cargo build --release --locked -p heart-portal`，复制结果到 `resources/heart-portal`（Windows 为 `heart-portal.exe`）。
 
+### 本地切换 Home 环境
+
+`npm start` 默认使用生产 Home（`https://home.beings.town`）。需要联调 DEV 时，在仓库根目录创建 `.portal-home.local.json`，写入以下内容后重启客户端。
+
+```json
+{ "environment": "dev" }
+```
+
+这个文件已被 Git 忽略。删除文件、读取失败或 `environment` 不是 `dev` 时，客户端使用生产 Home。`npm run package` 和 `npm run make` 始终生成使用生产 Home 的安装包。
+
 ## 构建命令与产物
 
 在仓库根目录执行：

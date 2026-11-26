@@ -1,7 +1,10 @@
+import { homeConnectorResources } from '../../shared/services/home-connector-resources';
+import { ConnectorResourceAction } from '../../shared/components/connector-workspace-file';
+import { ConnectorWorkspaceImports } from '../../shared/components/connector-workspace-imports';
 import { IconButton } from '../../shared/components/icon-button';
 import { formatBytes } from '../../shared/lib/format-bytes';
 import { Icon, type IconName } from '../../shared/icons/icon';
-import { useContext, useEffect, useId, useLayoutEffect, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
+import { useContext, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
 import { createPortal } from 'react-dom';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import type { HomeAPI } from '../../../shared/home';
@@ -32,12 +35,18 @@ function LibraryListIcon({ name, directory }: { name: string; directory?: boolea
 }
 
 export function BeingLibrary({ api, onConnect, active = true }: { api?: HomeAPI; onConnect: () => void; active?: boolean }) {
+  const resources = useMemo(() => api?.connectorResources ? homeConnectorResources(api.connectorResources) : undefined, [api?.connectorResources]);
   if (!api?.files) return <p className="being-empty">当前客户端不支持云端资料库，请更新桌面客户端。</p>;
-  return <Library api={api} active={active} onConnect={onConnect} />;
+  return <ConnectorResourceAction.Provider value={resources}><Library api={api} active={active} onConnect={onConnect} /></ConnectorResourceAction.Provider>;
 }
 function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => void; active: boolean }) {
   const [store] = useState(() => new HomeLibrary(api.files!));
   const model = useModel(store);
+  useEffect(() => {
+    const changed = () => { if (active && store.loaded) void store.load(); };
+    window.addEventListener('beings:connector-workspace-changed', changed);
+    return () => window.removeEventListener('beings:connector-workspace-changed', changed);
+  }, [store, active]);
   const recent = useModel(homeRecentFiles);
   const openLocal = useContext(LocalFileAction);
   const [tab, setTab] = useState<'recent' | 'workspace'>('recent');
@@ -170,6 +179,7 @@ function Library({ api, onConnect, active }: { api: HomeAPI; onConnect: () => vo
       </motion.li>)}</ul>
     </section>
     <section role="tabpanel" id={`${tabId}-workspace`} aria-labelledby={`${tabId}-workspace-tab`} hidden={tab !== 'workspace'}>
+      {active && tab === 'workspace' && <ConnectorWorkspaceImports />}
     {parts.length > 0 && <div className={styles.heading}>
       <nav className={styles.breadcrumbs} aria-label="工作区路径">
         <button type="button" aria-label="工作区" aria-current={!parts.length ? 'location' : undefined} onClick={() => navigate('')}><Icon name="lucide-folder" /><span>工作区</span></button>

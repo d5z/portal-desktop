@@ -1,10 +1,11 @@
+import { resolveHomeResource } from '../../shared/home';
 import { randomUUID } from 'node:crypto';
 import type {
   HomeConnectorAPI, HomeConnectorBeingAccess, HomeConnectorCatalogPage, HomeConnectorDetail, HomeConnectorEnableState,
   HomeConnectorInstallation, HomeConnectorInstallationPage, HomeConnectorPreview, HomeConnectorTool, HomeLocalKitHistory, HomeLocalKitHistoryPage, HomeAppDetail,
 } from '../../shared/home';
 import type { HomeClient } from './client';
-import { HomeError, homeURL } from './protocol';
+import { HomeError } from './protocol';
 import { MAX_LOCAL_KIT_BUNDLE } from '../../shared/home';
 
 const json = (body: unknown): RequestInit => ({
@@ -35,7 +36,7 @@ export class HomeConnectors implements HomeConnectorAPI {
 
   private iconURL(value: string | null | undefined) {
     if (!value) return value ?? null;
-    try { return new URL(value, homeURL('/')).href; }
+    try { return resolveHomeResource(value).href; }
     catch { return null; }
   }
 

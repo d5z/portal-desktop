@@ -1,3 +1,4 @@
+import { connectorResourceMethods } from '../../shared/connector-resources';
 import type { DshPluginManager } from '../plugins/dsh/manager';
 import { app, dialog, protocol, session, shell } from 'electron';
 import type { LocalFilePreviews } from './local-file-preview';
@@ -45,7 +46,7 @@ export function registerLocalProtocol(assets: string, proxy: ChatProxy, plugins?
       return new Response(response.body, { status: response.status, statusText: response.statusText, headers: resultHeaders });
     }
     if (url.hostname === 'desktop' && subagent?.matches(url.pathname)) return subagent.handle(request);
-    if (url.hostname === 'desktop' && (url.pathname.startsWith('/api/v1/me/') || url.pathname.startsWith('/api/v1/local-kit-bundles/')) && connectors) return connectors.handle(request);
+    if (url.hostname === 'desktop' && (url.pathname.startsWith('/api/v1/me/') || url.pathname.startsWith('/api/v1/local-kit-bundles/') || connectorResourceMethods(url.pathname)) && connectors) return connectors.handle(request);
     if (url.hostname === 'desktop' && dshPlugins?.matches(url.pathname)) return dshPlugins.resource(request);
     if (url.hostname === 'chat' && url.pathname === '/api/remote-image') return remoteImage(request);
     if (url.hostname === 'preview' && url.pathname === '/runtime.html' && request.method === 'GET') return new Response(HTML_PREVIEW_RUNTIME, { headers: {

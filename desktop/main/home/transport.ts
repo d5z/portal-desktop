@@ -1,6 +1,6 @@
 import { net, type Session } from 'electron';
 import WebSocket from 'ws';
-import { HOME_ORIGIN } from './protocol';
+import { HOME_BASE_URL } from '../../shared/home';
 import type { BrowserInput, BrowserState, ViewerEvent } from '../../shared/home-viewer';
 const MAX_PACKET = 16 * 1024 * 1024;
 export type HomeViewerLog = (event: string, fields: Record<string, string | number | boolean | undefined>) => void;
@@ -49,14 +49,16 @@ export class HomeTransport {
   private queued = 0;
   private controls: Promise<unknown> = Promise.resolve();
   private base: string;
+  private origin: string;
   constructor(private jar: Session, id: string, private emit: (event: ViewerEvent) => void,
-    private expired: () => void, private origin = HOME_ORIGIN, private log: HomeViewerLog = () => {}) {
+    private expired: () => void, private homeBase = HOME_BASE_URL, private log: HomeViewerLog = () => {}) {
     if (!/^[\w-]+$/.test(id)) throw new Error('无效电脑标识。');
-    this.base = `${origin}/desktop/${id}/browser/`;
+    this.origin = new URL(homeBase).origin;
+    this.base = `${homeBase}/desktop/${id}/browser/`;
   }
   async exchange(url: string) {
     const target = new URL(url);
-    if (target.origin !== this.origin || target.pathname !== '/desktop/connect' || !target.searchParams.get('ticket')) throw new Error('无效票据地址。');
+    if (target.origin !== this.origin || target.pathname !== new URL(this.homeBase + '/desktop/connect').pathname || !target.searchParams.get('ticket')) throw new Error('无效票据地址。');
     // Electron fetch rejects a manually cancelled redirect. Consume only the
     // exchange headers with net.request; never follow it to remote HTML.
     const exchange = await new Promise<{ status: number; location: string }>((resolve, reject) => {
