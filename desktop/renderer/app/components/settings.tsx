@@ -575,7 +575,8 @@ export const ConnectionSettings = memo(function ConnectionSettings({ model, embe
                 }
               />
             </SettingsItem>
-            <section className="permission-settings-section"><div className="permission-section-heading"><strong>访问权限</strong><small>主助手与子代理共用</small></div>
+            <section className="permission-settings-section" aria-labelledby="portal-permissions-heading">
+              <h3 id="portal-permissions-heading" className="permission-section-heading">访问权限</h3>
               <PermissionPicker value={form?.permissionMode ?? 'supervised'} onChange={mode => app.editForm('permissionMode', mode)}/>
               <p className="permission-note">仅适用于 Portal 调用，主助手和子代理共用。</p>
             </section>

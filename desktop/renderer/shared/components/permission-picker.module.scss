@@ -10,8 +10,8 @@
   display: flex;
   align-items: center;
   width: 100%;
-  gap: 14px;
-  padding: 15px 16px;
+  gap: 10px;
+  padding: 11px 12px;
   border: 1px solid var(--line);
   border-radius: 13px;
   background: transparent;
@@ -39,8 +39,8 @@
 .icon {
   display: grid;
   place-items: center;
-  width: 34px;
-  height: 34px;
+  width: 26px;
+  height: 26px;
   flex: none;
   color: var(--secondary);
 }
@@ -52,8 +52,9 @@
 .copy {
   display: flex;
   flex: 1;
+  min-width: 0;
   flex-direction: column;
-  gap: 5px;
+  gap: 3px;
 }
 
 .title {
