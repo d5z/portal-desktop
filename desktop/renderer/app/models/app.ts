@@ -21,7 +21,7 @@ import { CHAT_HISTORY_LIMIT_KEY, DEFAULT_CHAT_HISTORY_LIMIT, chatHistoryLimit, v
 import { LocalHistoryReader } from './local-history';
 import { isWorkProjectId } from '../../shared/lib/navigation';
 
-type SettingsRoute = "" | "connection" | "town" | "model" | "portal" | "diagnostics" | "plugins" | "apps";
+type SettingsRoute = "" | "connection" | "town" | "model" | "portal" | "diagnostics" | "plugins" | "apps" | "work-agents";
 
 export class AppModel extends Store {
   permissionSettingsOpen = false;
@@ -609,6 +609,7 @@ export class AppModel extends Store {
   }
   openPluginSettings() { this.beginSettingsRoute("plugins"); }
   openAppSettings() { this.beginSettingsRoute("apps"); }
+  openWorkAgentSettings() { this.beginSettingsRoute("work-agents"); }
   openPortalSettings() {
     this.beginSettingsRoute("portal");
   }
@@ -648,6 +649,7 @@ export class AppModel extends Store {
     else if (route === "diagnostics") this.openDiagnostics();
     else if (route === "plugins") this.openPluginSettings();
     else if (route === "apps") this.openAppSettings();
+    else if (route === "work-agents") this.openWorkAgentSettings();
   };
   closeClientSettings = () => {
     this.closeSettings();

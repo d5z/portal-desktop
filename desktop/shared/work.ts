@@ -14,6 +14,10 @@ export const workPriorities = { none: '无', low: '低', medium: '中', high: '�
 
 export type WorkModelSelection = { model: string; provider?: string };
 
+export function workTitleFromMessage(message: string) {
+  return message.split(/\r?\n/, 1)[0].slice(0, 80).trimEnd();
+}
+
 export interface WorkGoalFields {
   title: string;
   outcome: string;

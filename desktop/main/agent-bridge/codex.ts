@@ -67,6 +67,7 @@ export function codexDetail(thread: Thread): SubagentTaskDetail {
 
 export class CodexAdapter implements AgentAdapter {
   allowExec: () => boolean = () => true;
+  executionEnabled: () => boolean = () => true;
   permissionMode: () => PermissionMode = () => 'supervised';
   readonly id = 'codex'; readonly name = 'Codex';
   private rpc = new JsonRpcProcess();
@@ -86,7 +87,7 @@ export class CodexAdapter implements AgentAdapter {
     };
     this.rpc.serverRequest = async (method) => {
       if (method === 'item/commandExecution/requestApproval' || method === 'item/fileChange/requestApproval') {
-        requireExternalExecution(this.permissionMode(), this.allowExec());
+        requireExternalExecution(this.permissionMode(), this.allowExec(), this.executionEnabled());
         return { decision: 'accept' };
       }
       throw new AgentError(`请在 Codex 中处理此交互：${method}`, 409);
@@ -99,6 +100,10 @@ export class CodexAdapter implements AgentAdapter {
     return { id: this.id, name: this.name, available: !!this.binary, canExecute: this.allowExec() && this.permissionMode() === 'full-access',
       capabilities: { attachments: 'image' as const, models: true, steer: true, steerAttachments: true },
       message: this.binary ? (!this.allowExec() ? externalExecNotice : this.permissionMode() === 'full-access' ? undefined : externalApprovalNotice) : '请安装 Codex CLI 或 Codex 客户端。' };
+  }
+  async probe() {
+    await this.connectRPC();
+    await this.rpc.request('model/list', { limit: 1 });
   }
   private async connectRPC() {
     if (!(await this.status()).available) throw new AgentError('Codex CLI 未安装。', 503);
@@ -120,8 +125,8 @@ export class CodexAdapter implements AgentAdapter {
     const allowed: Record<string, string[]> = { 'model/list': ['limit', 'cursor'], 'project/list': ['limit', 'cursor'], 'project/create': ['name', 'roots', 'idempotencyKey'], 'thread/start': ['cwd', 'projectId', 'ephemeral', 'approvalPolicy', 'sandbox', 'model'], 'thread/resume': ['threadId', 'approvalPolicy', 'sandbox'], 'turn/start': ['threadId', 'input', 'approvalPolicy', 'sandboxPolicy'], 'turn/steer': ['threadId', 'expectedTurnId', 'input'], 'turn/interrupt': ['threadId', 'turnId'], 'thread/backgroundTerminals/clean': ['threadId'] };
     if (!Object.hasOwn(allowed, method) || Object.keys(params).some(key => !allowed[method].includes(key))) throw new AgentError('Codex 请求无效。', 400);
     if ((method === 'thread/start' || method === 'thread/resume') && ((method === 'thread/start' && params.ephemeral !== false) || params.approvalPolicy !== 'never' || params.sandbox !== 'danger-full-access')) throw new AgentError('Codex 权限设置无效。', 400);
-    const executes = ['thread/start', 'thread/resume', 'turn/start', 'turn/steer'].includes(method);
-    if (executes) requireExternalExecution(this.permissionMode(), this.allowExec());
+    const executes = ['project/create', 'thread/start', 'thread/resume', 'turn/start', 'turn/steer'].includes(method);
+    if (executes) requireExternalExecution(this.permissionMode(), this.allowExec(), this.executionEnabled());
     if (method === 'turn/start' && (typeof params.threadId !== 'string' || !params.threadId || params.approvalPolicy !== 'never' ||
       JSON.stringify(params.sandboxPolicy) !== JSON.stringify({ type: 'dangerFullAccess' }))) throw new AgentError('Codex 启动参数无效。', 400);
     await this.connectRPC();
@@ -129,7 +134,7 @@ export class CodexAdapter implements AgentAdapter {
       const detail = await this.read(params.threadId);
       if (detail.turns?.at(-1)?.task.status === 'running') throw new AgentError('此会话正在执行。', 409);
     }
-    if (executes) requireExternalExecution(this.permissionMode(), this.allowExec());
+    if (executes) requireExternalExecution(this.permissionMode(), this.allowExec(), this.executionEnabled());
     if (method === 'turn/steer' && (!params.expectedTurnId || this.active.get(params.threadId) !== params.expectedTurnId)) throw new AgentError('此轮未在当前客户端运行。', 409);
     if (method === 'thread/backgroundTerminals/clean' || method === 'turn/interrupt') {
       const turn = this.active.get(params.threadId);
@@ -137,7 +142,7 @@ export class CodexAdapter implements AgentAdapter {
     }
     if (method === 'turn/start') {
       const submit = async () => {
-        requireExternalExecution(this.permissionMode(), this.allowExec());
+        requireExternalExecution(this.permissionMode(), this.allowExec(), this.executionEnabled());
         const id = params.threadId;
         if (this.active.has(id) || this.starting.has(id)) throw new AgentError('此会话正在执行，请等待完成。', 409);
         this.starting.add(id);
@@ -199,7 +204,7 @@ export class CodexAdapter implements AgentAdapter {
     return codexDetail({ ...thread, turns });
   }
   async start(directory: string, message: string, modelSelection?: WorkModelSelection, onCreated?: (nativeId: string) => Promise<void>) {
-    requireExternalExecution(this.permissionMode(), this.allowExec());
+    requireExternalExecution(this.permissionMode(), this.allowExec(), this.executionEnabled());
     await this.connectRPC();
     const snapshot = await this.list();
     let projectId = snapshot.projects.find(p => p.directory === directory)?.nativeId;
@@ -214,13 +219,13 @@ export class CodexAdapter implements AgentAdapter {
   }
   send(id: string, message: string) { return this.turn(id, message, true); }
   async steer(id: string, message: string) {
-    requireExternalExecution(this.permissionMode(), this.allowExec());
+    requireExternalExecution(this.permissionMode(), this.allowExec(), this.executionEnabled());
     const turn = this.active.get(id);
     if (!turn) throw new AgentError('此轮未在当前客户端运行。', 409);
     await this.rpc.request('turn/steer', { threadId: id, expectedTurnId: turn, input: [{ type: 'text', text: message }] });
   }
   private async turn(id: string, message: string, resume: boolean) {
-    requireExternalExecution(this.permissionMode(), this.allowExec());
+    requireExternalExecution(this.permissionMode(), this.allowExec(), this.executionEnabled());
     if (this.active.has(id) || this.starting.has(id)) throw new AgentError('此会话正在执行，请等待完成。', 409);
     this.starting.add(id);
     try {
@@ -230,7 +235,7 @@ export class CodexAdapter implements AgentAdapter {
         if (detail.turns?.at(-1)?.task.status === 'running') throw new AgentError('此会话正在原生客户端执行。', 409);
         await this.rpc.request('thread/resume', { threadId: id, approvalPolicy: 'never', sandbox: 'danger-full-access' });
       }
-      requireExternalExecution(this.permissionMode(), this.allowExec());
+      requireExternalExecution(this.permissionMode(), this.allowExec(), this.executionEnabled());
       const { turn } = await this.rpc.request<{ turn: Turn }>('turn/start', { threadId: id, input: [{ type: 'text', text: message }], approvalPolicy: 'never', sandboxPolicy: { type: 'dangerFullAccess' } });
       if (turn.status === 'inProgress') this.active.set(id, turn.id);
       return { turnId: turn.id };

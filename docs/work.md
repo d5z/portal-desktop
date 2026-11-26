@@ -135,6 +135,7 @@ Portal 记录并合并可见 `text_delta`，忽略模型私有 thinking；客户
 - Work 展开时定时刷新。外部启动要求启用命令执行和完整访问权限，续聊前重新应用当前设置。客户端设为「每次询问」时，额外执行器只同步历史，执行交给内置 Subagent。
 - Work 根据执行器声明的能力显示附件和模型入口。内置 Subagent 在新建独立会话或上一轮结束后支持图片，Portal 将 `{ name, mediaType, data }` 格式的 Base64 图片传给内置执行进程。Codex 使用 `turn/start` 或 `turn/steer` 的图片输入；DeepSeek Harness 通过 `session/uploadFileBinary` 上传图片或文件，由 `session/prompt` 携带上传回执。
 - 「导入 / 同步」可按执行器和项目勾选外部历史会话，选择按 Being 保存。Work 创建的原生会话自动保留，清空历史导入选择后仍可在 Work 中打开。
+- 「设置 → 执行器连接」集中诊断本机 Subagent、Codex 和 DeepSeek Harness。外部执行器可分别关闭 Work 执行，设置保存在客户端本机，历史同步和停止已运行任务仍可用。设置通过 `GET beings://desktop/api/work/agents` 查看诊断，`PATCH beings://desktop/api/work/agents/{id}` 保存 `{ "enabled": boolean }`，DeepSeek 的本机连接配置继续使用 `POST beings://desktop/api/work/agents/deepseek/connect`。同一 Codex 会话仍由单个客户端持有写入权。
 
 ### 执行器架构
 

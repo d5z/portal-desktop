@@ -14,6 +14,7 @@ export interface AgentAdapter {
   readonly id: string;
   readonly name: string;
   status(): Promise<AgentDescriptor>;
+  probe?(): Promise<void>;
   list(selectedIds?: Set<string>): Promise<AgentSnapshot>;
   read(id: string): Promise<SubagentTaskDetail>;
   start(directory: string, message: string, modelSelection?: WorkModelSelection, onCreated?: (nativeId: string) => Promise<void>): Promise<string>;

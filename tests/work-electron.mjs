@@ -80,6 +80,12 @@ const server=createServer(async(req,res)=>{
       tasks.push(task);details[task.id]={taskId:task.id,steps:[{kind:'started',at:task.createdAt,input:input.brief},{kind:'message',at:task.endedAt,output:`[打开开放日议程](<${html}>)`}]};
       res.setHeader('Content-Type','application/json');res.end(JSON.stringify({task_id:task.id}));return;
     }
+    if (input.brief.startsWith('检查项目任务入口')) {
+      const task={id:'sub_project_composer',sceneId:input.scene_id,workdir:input.workdir,brief:input.brief,
+        session:`work-${req.headers['x-work-launch']}`,createdAt:Date.now(),status:'running'};
+      tasks.push(task);details[task.id]={taskId:task.id,steps:[{kind:'started',at:task.createdAt,input:input.brief}]};
+      res.setHeader('Content-Type','application/json');res.end(JSON.stringify({task_id:task.id,status:'running'}));return;
+    }
     if (input.brief.startsWith('未接收恢复验收')) {
       if (!missedDispatch || req.headers['x-work-launch'] === missedDispatch) {
         missedDispatch ??= req.headers['x-work-launch'];
@@ -271,6 +277,44 @@ try {
   assert.equal(await page.locator('#view-title').evaluate(el=>getComputedStyle(el).getPropertyValue('-webkit-app-region')),'drag');
   assert.equal(await header.getByRole('button',{name:'新建任务',exact:true}).evaluate(el=>getComputedStyle(el).getPropertyValue('-webkit-app-region')),'no-drag');
   assert.equal(await page.evaluate(()=>window.workApp.chatSplitOpen),false);
+  await more.click();
+  await page.getByRole('dialog',{name:'更多工作操作',exact:true}).getByRole('button',{name:'执行器连接',exact:true}).click();
+  const connectionSettings=page.getByRole('tabpanel',{name:'执行器连接',exact:true});
+  const connections=connectionSettings.getByRole('group',{name:'执行器列表'});
+  await connections.getByRole('button',{name:/内置 Subagent.*可执行/}).waitFor();
+  await connections.getByRole('button',{name:/Codex.*可执行/}).click();
+  await connections.getByRole('button',{name:/DeepSeek Harness.*可执行/}).waitFor();
+  const allowCodex=connectionSettings.getByRole('switch',{name:'允许执行',exact:true});
+  const setCodex=async enabled=>{
+    const [response]=await Promise.all([
+      page.waitForResponse(response=>response.url()==='beings://desktop/api/work/agents/codex'&&response.request().method()==='PATCH'),
+      allowCodex.click(),
+    ]);
+    assert.equal(response.status(),200);
+    assert.match(response.headers()['content-type'],/^application\/json/);
+    assert.deepEqual(response.request().postDataJSON(),{enabled});
+    assert.deepEqual(await response.json(),{id:'codex',enabled});
+    await page.waitForFunction(allowed=>window.workApp.work.executorChoices.some(agent=>agent.id==='codex')===allowed,enabled);
+  };
+  await setCodex(false);
+  await connections.getByRole('button',{name:/Codex.*已关闭执行/}).waitFor();
+  const diagnoseButton=connectionSettings.getByRole('button',{name:'重新诊断',exact:true});
+  await diagnoseButton.waitFor();
+  const [diagnosis]=await Promise.all([
+    page.waitForResponse(response=>response.url()==='beings://desktop/api/work/agents'&&response.request().method()==='GET'),
+    diagnoseButton.click(),
+  ]);
+  assert.equal(diagnosis.status(),200);
+  const diagnosed=await diagnosis.json();
+  assert.deepEqual(diagnosed.map(agent=>[agent.id, agent.available && agent.canExecute!==false]),[['internal',true],['codex',false],['deepseek',true]]);
+  await page.screenshot({path:path.join(output,'agent-connections-wide.png')});
+  await page.setViewportSize({width:520,height:690});
+  assert(await connectionSettings.evaluate(el=>el.scrollWidth===el.clientWidth));
+  await page.screenshot({path:path.join(output,'agent-connections-narrow.png')});
+  await setCodex(true);
+  await page.setViewportSize({width:1280,height:900});
+  await page.getByRole('button',{name:'关闭客户端设置',exact:true}).click();
+  await connectionSettings.waitFor({state:'hidden'});
   assert(await sidebar.getByRole('button',{name:'添加项目目录',exact:true}).evaluate(button=>{
     const {width,height}=button.getBoundingClientRect();
     return width===height && getComputedStyle(button).borderTopWidth==='1px';
@@ -1078,10 +1122,56 @@ try {
   await projectMenu.getByRole('menuitem',{name:'复制项目路径',exact:true}).click();
   await page.getByText('项目路径已复制',{exact:true}).waitFor();
   assert.equal(await app.evaluate(()=>globalThis.workCopied),projectDirectory);
+  await page.evaluate(()=>window.workApp.toast(''));
   await projectRow.press('Shift+F10');
   await projectMenu.getByRole('menuitem',{name:'新建任务',exact:true}).click();
-  assert.equal(await editor.getByLabel('项目',{exact:true}).locator('option:checked').textContent(),'Town-Client');
-  await editor.getByRole('button',{name:'取消',exact:true}).click();
+  await header.getByRole('heading',{name:'新建任务',exact:true}).waitFor();
+  assert.equal(await page.getByLabel('会话项目',{exact:true}).locator('option:checked').textContent(),'Town-Client');
+  assert.equal(await editor.count(),0);
+  await header.getByRole('button',{name:'返回工作列表',exact:true}).click();
+  await header.getByRole('heading',{name:'Town-Client',exact:true}).waitFor();
+  const creationCount=network.filter(row=>row.url==='beings://desktop/api/work/items'&&row.status===201).length;
+  await sidebar.getByRole('button',{name:'在 Town-Client 中新建任务',exact:true}).click();
+  const projectComposer=page.getByRole('textbox',{name:'发送消息开始工作',exact:true});
+  const projectExecutor=page.getByLabel('执行器',{exact:true});
+  const projectSend=page.getByRole('button',{name:'发送',exact:true});
+  await projectComposer.waitFor();
+  assert.equal(await projectComposer.evaluate(el=>document.activeElement===el),true);
+  assert.equal(await projectSend.isEnabled(),false);
+  await projectExecutor.selectOption('codex');
+  await page.getByRole('region',{name:'工作对话',exact:true}).getByLabel('模型',{exact:true}).waitFor();
+  await page.screenshot({path:path.join(output,'project-task-compose-light.png')});
+  await page.evaluate(()=>{window.workApp.theme='dark';window.workApp.changed()});
+  await page.setViewportSize({width:520,height:430});
+  const composerBounds=await projectComposer.boundingBox();
+  const sendBounds=await projectSend.boundingBox();
+  assert(composerBounds.x>=0 && composerBounds.x+composerBounds.width<=520);
+  assert(sendBounds.x>=0 && sendBounds.x+sendBounds.width<=520 && sendBounds.y+sendBounds.height<=430);
+  await page.screenshot({path:path.join(output,'project-task-compose-narrow-dark.png')});
+  await page.evaluate(()=>{window.workApp.theme='light';window.workApp.changed()});
+  await page.setViewportSize({width:1500,height:900});
+  await projectExecutor.selectOption('internal');
+  const firstProjectLine='检查项目任务入口，确认用第一行生成标题。'+'标题过长时保留完整消息。'.repeat(7);
+  const firstProjectMessage=`${firstProjectLine}\n\n确认只发送我输入的内容。`;
+  await projectComposer.fill(`${firstProjectLine}\n确认只发送我输入的内容。`);
+  assert.equal(network.filter(row=>row.url==='beings://desktop/api/work/items'&&row.status===201).length,creationCount);
+  const [createdProjectTask,projectReceipt]=await Promise.all([
+    page.waitForResponse(response=>response.url()==='beings://desktop/api/work/items'&&response.request().method()==='POST'),
+    page.waitForResponse(response=>response.url().endsWith('/runs')),
+    projectComposer.press('Enter'),
+  ]);
+  assert.equal(createdProjectTask.status(),201);
+  const projectTaskItem=await createdProjectTask.json();
+  assert.equal(projectTaskItem.title,firstProjectLine.slice(0,80));
+  assert.equal(projectTaskItem.description,firstProjectMessage);
+  assert.equal(projectTaskItem.executor,'internal');
+  assert.equal(projectReceipt.url(),`beings://desktop/api/work/items/${projectTaskItem.id}/runs`);
+  assert.equal(projectReceipt.status(),200);
+  assert.deepEqual(JSON.parse(received.find(row=>row.path==='/api/subagent/tasks'&&row.body.includes('检查项目任务入口')).body),
+    {brief:firstProjectMessage,workdir:projectDirectory,scene_id:'scene-main'});
+  await page.getByRole('textbox',{name:'继续与子智能体对话',exact:true}).waitFor();
+  await header.getByRole('button',{name:'返回工作列表',exact:true}).click();
+  await board.getByRole('button',{name:/检查项目任务入口/}).waitFor();
   const sessionMenu=page.getByRole('menu',{name:'会话操作',exact:true});
   await reportLink.click({button:'right'});
   await sessionMenu.getByRole('menuitem',{name:'复制链接',exact:true}).click();
@@ -1110,7 +1200,7 @@ try {
   await reportLink.waitFor();
   await page.setViewportSize({width:1500,height:900});
   await projectRow.click();
-  await header.getByRole('button',{name:'新建任务',exact:true}).click();
+  await todo.getByRole('button',{name:'在「待办」新建任务',exact:true}).click();
   await editor.getByLabel('标题',{exact:true}).fill('超时恢复验收');
   await editor.getByLabel('规格',{exact:true}).fill('交付可运行的 HTML 看板');
   await editor.getByLabel('执行器',{exact:true}).selectOption('internal');
@@ -1147,7 +1237,7 @@ try {
   assert.equal(replay.task_id,'sub_recovered');
   assert.equal(received.filter(row=>row.path==='/api/subagent/tasks'&&row.body.includes('超时恢复验收')).length,1);
   await projectRow.click();
-  await header.getByRole('button',{name:'新建任务',exact:true}).click();
+  await todo.getByRole('button',{name:'在「待办」新建任务',exact:true}).click();
   await editor.getByLabel('标题',{exact:true}).fill('未接收恢复验收');
   await editor.getByLabel('规格',{exact:true}).fill('交付可运行的 HTML 看板');
   await editor.getByLabel('执行器',{exact:true}).selectOption('internal');
@@ -1500,12 +1590,13 @@ try {
   assert.equal(await page.getByLabel('发送消息开始工作',{exact:true}).innerText(),'执行器断线后保留这条草稿');
   await sidebar.getByRole('button',{name:'Town-Client',exact:true}).click();
   await header.getByRole('button',{name:'新建任务',exact:true}).click();
-  const taskExecutor=editor.getByLabel('执行器',{exact:true});
+  const taskExecutor=page.getByLabel('执行器',{exact:true});
   assert.deepEqual(await taskExecutor.locator('option').evaluateAll(options=>options.map(option=>option.value)),['','internal']);
   await app.evaluate(()=>globalThis.setWorkTestReadiness({}));
   await page.evaluate(()=>window.workApp.work.refresh());
-  assert.deepEqual(await taskExecutor.locator('option').evaluateAll(options=>options.map(option=>option.value)),['','internal','codex','deepseek']);
-  await editor.getByRole('button',{name:'取消',exact:true}).click();
+  assert.deepEqual(await taskExecutor.locator('option').evaluateAll(options=>options.map(option=>option.value)),['internal','codex','deepseek']);
+  assert.equal(await taskExecutor.inputValue(),'codex');
+  await header.getByRole('button',{name:'返回工作列表',exact:true}).click();
   await sidebar.getByRole('button',{name:'Codex Product',exact:true}).click();
   const projectBoard=page.getByRole('group',{name:'任务状态看板',exact:true});
   const completedColumn=projectBoard.getByRole('region',{name:'已完成',exact:true});

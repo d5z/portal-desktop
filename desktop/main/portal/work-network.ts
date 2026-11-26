@@ -3,8 +3,9 @@ import { readFile, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { SceneTask, SceneTaskSnapshot, SubagentStep, SubagentTaskDetail, WorkSnapshot } from '../../shared/types';
 import { localFileReference } from '../../shared/local-file';
+import type { WorkAgentConnection } from '../../shared/work-executor';
 import { normalizeTownDisplay, validTownIdentity } from '../../shared/town-identity';
-import { workDispatchReply, workGoalRevision, workPlanVersionHeader, workPlanVersionToken, workStages, workTaskRequirements, type WorkGoal, type WorkGoalRevision, type WorkItem, type WorkLaunch, type WorkProjectRules, type WorkResult, type WorkResultPage, type WorkRule, type WorkStage, type WorkWakeupTrigger } from '../../shared/work';
+import { workDispatchReply, workGoalRevision, workPlanVersionHeader, workPlanVersionToken, workStages, workTaskRequirements, workTitleFromMessage, type WorkGoal, type WorkGoalRevision, type WorkItem, type WorkLaunch, type WorkProjectRules, type WorkResult, type WorkResultPage, type WorkRule, type WorkStage, type WorkWakeupTrigger } from '../../shared/work';
 import { WorkProjects, directoryProject } from './work-projects';
 import { WorkImports } from './work-imports';
 import { managedNativeSessions, nativeSourceScenes, WorkItems, workItemFields, workModelSelection, workPlanVersion, type PendingWorkResult } from './work-items';
@@ -52,6 +53,7 @@ function rootTaskId(taskId: string, tasks: Map<string, SceneTask>) {
 const workSessionPath = /^\/api\/work\/sessions\/((?:sub_|agent_)[a-zA-Z0-9_-]{1,160})$/;
 const workGoalPath = /^\/api\/work\/goals(?:\/(goal_[0-9a-f-]{36}))?$/;
 const workProjectPath = /^\/api\/subagent\/projects(?:\/[a-zA-Z0-9_-]{1,160})?$/;
+const workAgentPath = /^\/api\/work\/agents(?:\/([a-z][a-z0-9-]*)(\/connect)?)?$/;
 
 function workCommandPayload(raw: string) {
   const json = raw.trim();
@@ -107,7 +109,7 @@ export class WorkNetwork {
     this.imports = new WorkImports(path.join(projectDirectory, 'imports'));
     this.items = new WorkItems(path.join(projectDirectory, 'items'));
   }
-  matches(pathname: string) { return pathname === '/api/work/imports' || pathname === '/api/work/agents' || workSessionPath.test(pathname) || workGoalPath.test(pathname) || workProjectPath.test(pathname) || /^\/api\/work\/agents\/[a-z][a-z0-9-]*\/connect$/.test(pathname) || /^\/api\/work\/(?:items(?:\/(?:batch|order)|\/work_[0-9a-f-]+(?:\/(?:dispatch|runs|notes|artifacts|automation|assignee))?)?|results(?:\/read)?)$/.test(pathname) || /^\/api\/subagent\/tasks(?:\/(?:sub_|agent_)[a-zA-Z0-9_-]{1,160}(?:\/(?:messages|cancel|steer|retry))?)?$/.test(pathname); }
+  matches(pathname: string) { return pathname === '/api/work/imports' || workAgentPath.test(pathname) || workSessionPath.test(pathname) || workGoalPath.test(pathname) || workProjectPath.test(pathname) || /^\/api\/work\/(?:items(?:\/(?:batch|order)|\/work_[0-9a-f-]+(?:\/(?:dispatch|runs|notes|artifacts|automation|assignee))?)?|results(?:\/read)?)$/.test(pathname) || /^\/api\/subagent\/tasks(?:\/(?:sub_|agent_)[a-zA-Z0-9_-]{1,160}(?:\/(?:messages|cancel|steer|retry))?)?$/.test(pathname); }
   async snapshot(): Promise<WorkSnapshot> {
     const snapshot = await this.readTasks();
     const [selection, data] = await Promise.all([this.imports.read(snapshot.endpoint), this.items.read(snapshot.endpoint)]);
@@ -735,7 +737,7 @@ export class WorkNetwork {
       const planVersion = current.planHistory?.at(-1)?.version || 1;
       const goal = snapshot.goals?.find(row => row.id === project.goalId);
       const goalRevision = workGoalRevision(goal);
-      const descriptionIncludesTitle = current.description === current.title || current.description.startsWith(current.title + '\n');
+      const descriptionIncludesTitle = current.description === current.title || current.description.startsWith(current.title + '\n') || workTitleFromMessage(current.description) === current.title;
       const requirements = workTaskRequirements(current);
       let brief = [!descriptionIncludesTitle && current.title, current.description, requirements, selection?.instruction].filter(Boolean).join('\n\n');
       if (automatic) {
@@ -1124,8 +1126,31 @@ export class WorkNetwork {
     const url = new URL(request.url);
     if (!this.matches(url.pathname)) return new Response(null, { status: 404, headers });
     const runtime = this.runtime();
-    if (!runtime.endpoint || request.headers.get('X-Being-Endpoint') !== runtime.endpoint) return Response.json({ error: 'Being 连接已变化，请重新打开 Work。' }, { status: 409, headers });
+    const agent = workAgentPath.exec(url.pathname);
+    if ((!runtime.endpoint && !agent) || request.headers.get('X-Being-Endpoint') !== runtime.endpoint) return Response.json({ error: 'Being 连接已变化，请重新打开 Work。' }, { status: 409, headers });
     try {
+      if (agent) {
+        const [, id, connect] = agent;
+        if (!id && request.method === 'GET') {
+          this.bridge?.invalidate();
+          const [snapshot, external] = await Promise.all([this.readTasks(), this.bridge?.connections()]);
+          const ready = !!snapshot.subagentReady;
+          const internal: WorkAgentConnection = { id: 'internal', name: '内置 Subagent', available: ready, canExecute: ready,
+            ...(ready ? {} : { diagnostic: 'unavailable', message: '请在模型设置中检查 Subagent 配置和 Portal 运行状态。' }) };
+          return Response.json([internal, ...(external || [])], { headers });
+        }
+        if (!this.bridge) throw new AgentError('执行器连接服务尚未就绪。', 503);
+        if (id && connect && request.method === 'POST') {
+          await this.bridge.connect(id);
+          return Response.json({ restartRequired: true }, { headers });
+        }
+        if (id && !connect && request.method === 'PATCH') {
+          const body = await request.json().catch(() => null);
+          if (typeof body?.enabled !== 'boolean') throw new AgentError('请选择是否允许此执行器在 Work 中执行。', 400);
+          return Response.json(await this.bridge.setExecutionEnabled(id, body.enabled), { headers });
+        }
+        return new Response(null, { status: 405, headers });
+      }
       const goal = workGoalPath.exec(url.pathname);
       if (goal) return await this.goalRequest(request, runtime.endpoint, goal[1], headers);
       if (url.pathname.startsWith('/api/work/items')) return await this.itemRequest(request, url.pathname, runtime.endpoint, headers);
@@ -1196,8 +1221,6 @@ export class WorkNetwork {
         return Response.json({ ...selection, taskIds, projects: external?.projects || [],
           tasks: external?.tasks.filter(task => !managed.has(task.id)) || [], agents: external?.agents || [] }, { headers });
       }
-      if (url.pathname === '/api/work/agents' && request.method === 'GET') return Response.json((await this.snapshot()).agents, { headers });
-      if (url.pathname.startsWith('/api/work/agents/') && request.method === 'POST') { await this.bridge!.connect(url.pathname.split('/')[4]); return Response.json({ restartRequired: true }, { headers }); }
       if (url.pathname === '/api/subagent/projects') {
         if (request.method === 'GET') return Response.json(await this.projects.registered(runtime.endpoint), { headers });
         const input = await request.json();

@@ -188,11 +188,14 @@ export function createDesktopApplication(options: DesktopOptions) {
       });
     }
     const workNetwork = new WorkNetwork(shellURL, () => ({ directory: portal.state.runtimePath || directory, pid: portal.state.pid, endpoint: store.connection?.endpoint || '' }), (url, init) => net.fetch(url as string, init), path.join(directory, 'work-projects'));
-    const codexBridge = new CodexAdapter();
-    const deepseekBridge = new DeepSeekAdapter();
-    codexBridge.permissionMode = deepseekBridge.permissionMode = () => permissionMode(store.settings.permissionMode);
-    codexBridge.allowExec = deepseekBridge.allowExec = () => store.settings.allowExec;
-    const agentBridge = new AgentBridge([codexBridge, deepseekBridge]);
+    const adapters = [new CodexAdapter(), new DeepSeekAdapter()];
+    const agentBridge = new AgentBridge(adapters, path.join(directory, 'work-agent-connections.json'));
+    await agentBridge.loadSettings().catch(error => errorLog.report('work-agent-connections', error));
+    for (const adapter of adapters) {
+      adapter.permissionMode = () => permissionMode(store.settings.permissionMode);
+      adapter.allowExec = () => store.settings.allowExec;
+      adapter.executionEnabled = () => agentBridge.executionEnabled(adapter.id);
+    }
     workNetwork.bridge = agentBridge;
     app.once('will-quit', () => agentBridge.close());
     workNetwork.sceneIds = () => chatSessions?.list(store.connection?.endpoint).map(scene => scene.scene_id) || [];

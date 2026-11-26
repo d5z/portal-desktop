@@ -16,10 +16,12 @@ import { PluginCard } from '../../plugins/page';
 import { useManagerFocus } from '../../plugins/dsh/use-manager-focus';
 import { useModel } from '../../shared/hooks/use-model';
 import { ConnectorSettings } from './connectors';
+import { WorkAgentSettings } from './work-agent-settings';
 const baseSettingsTabs = [
   { id: "being", label: "Being", group: "connection", icon: "settings-being" as const },
   { id: "portal", label: "Portal", group: "connection", icon: "settings-portal" as const },
   { id: "town", label: "Town", group: "connection", icon: "settings-town" as const },
+  { id: "work-agents", label: "执行器连接", group: "connection", icon: "lucide-sliders-horizontal" as const },
   { id: "models", label: "模型", group: "workspace", icon: "settings-models" as const },
   { id: "appearance", label: "外观与阅读", group: "workspace", icon: "settings-appearance" as const },
   { id: "general", label: "通用", group: "workspace", icon: "menu-settings" as const },
@@ -246,6 +248,9 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
             {open && <div className="dsh-settings-host" ref={dshRuntime.setSettingsHost} />}
           </div>
 
+        </div>
+        <div id="settings-panel-work-agents" role="tabpanel" aria-labelledby="settings-tab-work-agents" hidden={activeTab !== 'work-agents'}>
+          {open && activeTab === 'work-agents' && <WorkAgentSettings app={app} endpoint={app.snapshot?.settings.hasToken ? app.snapshot.settings.endpoint : ''} />}
         </div>
         <div id="settings-panel-being" role="tabpanel" aria-labelledby="settings-tab-being" hidden={activeTab !== 'being'}>
           {open && activeTab === 'being' && <>

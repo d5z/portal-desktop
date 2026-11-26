@@ -1,7 +1,7 @@
 import { workExecutors, workPromptImages } from './work-executors';
 import type { DesktopAPI, SceneTask, WorkSnapshot, WorkProject, WorkImportCatalog, WorkImportSelection, SubagentTaskDetail } from '../../../shared/types';
 import { Store } from '../../shared/models/store';
-import { legacyWorkPlanPrompt, workContinuationContext, workDeliveryInstruction, workPlanVersionHeader, workPlanVersionToken, type WorkGoal, type WorkGoalFields, type WorkItem, type WorkItemFields, type WorkModelSelection, type WorkStage } from '../../../shared/work';
+import { legacyWorkPlanPrompt, workContinuationContext, workDeliveryInstruction, workPlanVersionHeader, workPlanVersionToken, workTitleFromMessage, type WorkGoal, type WorkGoalFields, type WorkItem, type WorkItemFields, type WorkModelSelection, type WorkStage } from '../../../shared/work';
 import { LEGACY_WEB_ATTACHMENT_BYTES, MAX_ATTACHMENT_BYTES } from '../../../shared/attachment-limits';
 import { workImageMime } from '../../../shared/work-attachments';
 
@@ -59,6 +59,7 @@ export class WorkModel extends Store {
   projectId = '';
   addingProject = false;
   creating = false;
+  newWorkKind: 'session' | 'task' = 'session';
   newProjectId = '';
   newDraft = '';
   drafts: Record<string, string> = {};
@@ -94,8 +95,9 @@ export class WorkModel extends Store {
     return this.executorChoices.some(agent => agent.id === this.executor) ? this.executor : '';
   }
   get currentAgent() { return this.agents.find(agent => agent.id === this.currentExecutor); }
+  get createsItem() { return this.newWorkKind === 'task' || !!this.projects.find(project => project.id === this.newProjectId)?.goalId; }
   get attachmentMode() {
-    if (this.creating && this.projects.find(project => project.id === this.newProjectId)?.goalId) return;
+    if (this.creating && this.createsItem) return;
     const capabilities = this.currentAgent?.capabilities;
     if (this.selected?.tasks.at(-1)?.status === 'running' && !capabilities?.steerAttachments) return;
     return capabilities?.attachments;
@@ -173,7 +175,7 @@ export class WorkModel extends Store {
     this.panel = 'items'; this.itemId = ''; this.goalId = ''; this.itemEditor = undefined;
     this.overview = { panel: 'items', projectId: '' };
     this.filter = 'all'; this.query = ''; this.projectId = ''; this.addingProject = false; this.loading = false; this.refreshingSession = false; this.detailLoading = false;
-    this.creating = false; this.newProjectId = ''; this.newDraft = '';
+    this.creating = false; this.newWorkKind = 'session'; this.newProjectId = ''; this.newDraft = '';
     this.newModel = null;
     this.changed();
   }
@@ -238,7 +240,10 @@ export class WorkModel extends Store {
         : await this.request<WorkProject>('', { directory }, 'projects');
       if (endpoint !== this.endpoint) return;
       await this.refresh();
-      if (endpoint === this.endpoint && !goalId) { this.selectProject(project.id); if (wasCreating) this.startNew(); }
+      if (endpoint === this.endpoint && !goalId) {
+        if (wasCreating) this.selectDraftProject(project.id);
+        else this.selectProject(project.id);
+      }
     } catch (error) { if (endpoint === this.endpoint) throw error; }
     finally { if (endpoint === this.endpoint) { this.addingProject = false; this.changed(); } }
   }
@@ -297,7 +302,6 @@ export class WorkModel extends Store {
   back() {
     if (this.importing) { this.importing = false; this.changed(); return; }
     if (this.panel === 'goals') { this.openGoals(); return; }
-    if (this.creating) { this.openPanel('sessions'); return; }
     this.projectId = this.overview.projectId;
     this.openPanel(this.overview.panel);
   }
@@ -348,40 +352,47 @@ export class WorkModel extends Store {
     await this.workRequest('items/batch', 'POST', { ids, stage });
     if (endpoint === this.endpoint) await this.refresh();
   }
-  startNew(projectId = this.project?.id) {
+  startNew(projectId = this.project?.id, kind: WorkModel['newWorkKind'] = 'session') {
+    this.overview = kind === 'task' && projectId ? { panel: 'items', projectId }
+      : { panel: this.panel, projectId: this.projectId };
     this.openPanel('sessions');
-    this.newProjectId = projectId || this.projects.find(project => project.id === this.newProjectId)?.id || this.projects[0]?.id || '';
-    this.creating = true; this.changed();
+    this.newWorkKind = kind;
+    this.creating = true;
+    this.selectDraftProject(projectId || this.projects.find(project => project.id === this.newProjectId)?.id || this.projects[0]?.id || '');
+  }
+  selectDraftProject(projectId: string) {
+    this.newProjectId = projectId;
+    const preferred = this.projects.find(project => project.id === projectId)?.rules?.executor;
+    if (this.newWorkKind === 'task' && preferred && this.canExecute(preferred) && preferred !== this.executor) {
+      this.executor = preferred;
+      this.newModel = null;
+    }
+    this.changed();
   }
   async createTask(sceneId: string) {
     const project = this.projects.find(project => project.id === this.newProjectId);
     const draft = this.newDraft;
+    const message = draft.trim();
     const files = this.draftAttachments;
     const attachmentKey = this.attachmentKey;
-    if (this.sending || !this.ready || !project || (!draft.trim() && !files.length) || !sceneId) return;
+    if (this.sending || !this.ready || !project || (!message && !files.length) || !sceneId) return;
     if (files.length && !this.attachmentMode) throw new Error('此会话暂时无法发送附件。');
     const endpoint = this.endpoint;
+    const kind = this.newWorkKind;
+    const creatingHere = () => this.creating && this.newWorkKind === kind && this.newProjectId === project.id;
     this.sending = true; this.error = ''; this.changed();
     let itemId = '';
+    let runId: string | undefined;
     try {
-      if (project.goalId) {
-        const message = draft.trim();
-        const title = message.split('\n')[0].slice(0, 80);
+      if (this.createsItem) {
+        const title = workTitleFromMessage(message);
         const item = await this.workRequest<WorkItem>('items', 'POST', {
           title, description: message === title ? '' : message, projectId: project.id, executor: this.executor,
           modelSelection: this.newModel, stage: 'todo', priority: 'none', labels: [], dueDate: '', parentId: '',
         });
         if (endpoint !== this.endpoint) return;
         itemId = item.id;
-        if (this.newDraft === draft) this.newDraft = '';
-        this.newModel = null;
-        this.projectId = project.id;
-        this.overview = { panel: 'items', projectId: project.id };
-        this.select(item.id);
-        const receipt = await this.workRequest<{ task_id?: string }>(`items/${item.id}/runs`, 'POST', { scene_id: sceneId });
-        if (endpoint !== this.endpoint) return;
-        await this.refresh();
-        if (receipt.task_id && this.itemId === item.id && this.threads.some(thread => thread.id === receipt.task_id)) this.select(receipt.task_id);
+        ({ task_id: runId } = await this.workRequest<{ task_id?: string }>(`items/${item.id}/runs`, 'POST', { scene_id: sceneId }));
         return;
       }
       const external = workExecutors(endpoint, sceneId)[this.executor];
@@ -397,12 +408,22 @@ export class WorkModel extends Store {
       this.newModel = null;
       this.creating = false; this.projectId = project.id; this.filter = 'all'; this.query = ''; this.selectedId = receipt.task_id;
       await this.refresh();
-    } catch (error) {
-      if (endpoint !== this.endpoint) return;
-      if (itemId) await this.refresh();
-      if (endpoint === this.endpoint) throw error;
+    } catch (error) { if (endpoint === this.endpoint) throw error; }
+    finally {
+      if (endpoint === this.endpoint && itemId) {
+        await this.refresh();
+        if (endpoint === this.endpoint && creatingHere()) {
+          this.projectId = project.id;
+          this.overview = { panel: 'items', projectId: project.id };
+          this.select(runId && this.threads.some(thread => thread.id === runId) ? runId : itemId);
+        }
+      }
+      if (endpoint === this.endpoint) {
+        if (itemId && this.newDraft === draft) this.newDraft = '';
+        if (itemId) this.newModel = null;
+        this.sending = false; this.changed();
+      }
     }
-    finally { if (endpoint === this.endpoint) { this.sending = false; this.changed(); } }
   }
   async loadDetails(fresh = false) {
     const revision = ++this.selectionRevision;

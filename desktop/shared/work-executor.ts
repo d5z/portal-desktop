@@ -14,3 +14,8 @@ export type WorkAgentDescriptor = {
   message?: string;
   capabilities?: WorkExecutorCapabilities;
 };
+
+export type WorkAgentConnection = WorkAgentDescriptor & {
+  enabled?: boolean;
+  diagnostic?: 'unavailable' | 'error';
+};

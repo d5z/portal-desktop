@@ -50,6 +50,7 @@ export function deepseekDetail(id: string, records: RecordEntry[]): SubagentTask
 /** Connects to the existing native Harness host, never through the Codex adapter. */
 export class DeepSeekAdapter implements AgentAdapter {
   allowExec: () => boolean = () => true;
+  executionEnabled: () => boolean = () => true;
   permissionMode: () => PermissionMode = () => 'supervised';
   readonly id = 'deepseek'; readonly name = 'DeepSeek Harness';
   private auth?: { pid: number; origin: string; cookie: string };
@@ -68,6 +69,7 @@ export class DeepSeekAdapter implements AgentAdapter {
       message: available ? (!this.allowExec() ? externalExecNotice : this.permissionMode() === 'full-access' ? undefined : externalApprovalNotice) : '连接后重启 DeepSeek Harness，再选择需要导入的项目和会话。' };
   }
   async connect() { await installDeepSeekDiscovery(this.home); }
+  async probe() { await this.call('session/modelCatalog'); }
   private async connection() {
     const discovery = JSON.parse(await readFile(path.join(this.home, 'town-bridge/host.json'), 'utf8'));
     const url = new URL(discovery.url);
@@ -86,9 +88,9 @@ export class DeepSeekAdapter implements AgentAdapter {
   async native(request: Request, lifecycle?: AgentNativeLifecycle) {
     const url = new URL(request.url);
     if (url.pathname === deepseekUploadPath) {
-      requireExternalExecution(this.permissionMode(), this.allowExec());
+      requireExternalExecution(this.permissionMode(), this.allowExec(), this.executionEnabled());
       const auth = await this.connection();
-      requireExternalExecution(this.permissionMode(), this.allowExec());
+      requireExternalExecution(this.permissionMode(), this.allowExec(), this.executionEnabled());
       const upload: RequestInit & { duplex: 'half' } = {
         method: 'POST', body: request.body, duplex: 'half', signal: request.signal, redirect: 'error',
         headers: { 'Content-Type': request.headers.get('Content-Type') || '', Cookie: auth.cookie },
@@ -105,13 +107,13 @@ export class DeepSeekAdapter implements AgentAdapter {
     if (!Object.hasOwn(keys, method) || input.method !== method || input.type !== 'client-request' || !args || (!command && !catalog && !args.request)) throw new AgentError('DeepSeek 请求无效。', 400);
     const value = command || catalog ? args : args.request;
     if (Object.keys(value).some(key => !keys[method].includes(key))) throw new AgentError('DeepSeek 请求字段无效。', 400);
-    if (!readOnly && method !== 'session/cancel') requireExternalExecution(this.permissionMode(), this.allowExec());
+    if (!readOnly && method !== 'session/cancel') requireExternalExecution(this.permissionMode(), this.allowExec(), this.executionEnabled());
     if (command && (typeof value.agentId !== 'string' || value.line !== '/permission danger-full-access' || !Array.isArray(value.submittedAttachments) || value.submittedAttachments.length)) throw new AgentError('DeepSeek 权限请求无效。', 400);
     if (method === 'session/prompt' && (typeof value.sessionId !== 'string' || !value.sessionId || typeof value.requestId !== 'string' || !value.requestId))
       throw new AgentError('DeepSeek 续聊参数无效。', 400);
     const submit = async () => {
       const auth = await this.connection();
-      if (!readOnly && method !== 'session/cancel') requireExternalExecution(this.permissionMode(), this.allowExec());
+      if (!readOnly && method !== 'session/cancel') requireExternalExecution(this.permissionMode(), this.allowExec(), this.executionEnabled());
       if (method === 'session/prompt' && !this.prepared.delete(value.sessionId)) throw new AgentError('请先同步客户端权限后重新发送。', 409);
       const response = await fetch(`${auth.origin}/api/${method}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: auth.cookie }, body: JSON.stringify(input), signal: request.signal, redirect: 'error' });
       if (!response.ok || (!command && method !== 'session/create' && method !== 'session/prompt')) return { response };
@@ -126,7 +128,7 @@ export class DeepSeekAdapter implements AgentAdapter {
     return method === 'session/prompt' && value.mode === 'queue' && lifecycle ? lifecycle.turn(value.sessionId, submit) : (await submit()).response;
   }
 
-  async call<T>(method: string, request: object): Promise<T> {
+  async call<T>(method: string, request?: object): Promise<T> {
     const auth = await this.connection();
     const response = await fetch(`${auth.origin}/api/${method}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: auth.cookie },
       body: JSON.stringify({ type: 'client-request', rpcId: randomUUID(), method, payload: { args: method === 'commands/execute' ? request : method === 'session/list' ? { _request: request } : { request } } }), signal: AbortSignal.timeout(30000) });
@@ -187,7 +189,7 @@ export class DeepSeekAdapter implements AgentAdapter {
     return deepseekDetail(id, records);
   }
   async start(directory: string, message: string, modelSelection?: WorkModelSelection, onCreated?: (nativeId: string) => Promise<void>) {
-    requireExternalExecution(this.permissionMode(), this.allowExec());
+    requireExternalExecution(this.permissionMode(), this.allowExec(), this.executionEnabled());
     const { workspace } = await this.call<{ workspace: Workspace }>('workspace/create', { path: directory });
     const { sessionId } = await this.call<{ sessionId: string }>('session/create', { workspaceId: workspace.workspaceId });
     if (modelSelection) await this.call('session/selectModel', { sessionId, ...modelSelection });
@@ -197,13 +199,13 @@ export class DeepSeekAdapter implements AgentAdapter {
   }
   async steer(id: string, message: string) { await this.send(id, message, 'steer'); }
   async send(id: string, message: string, mode: 'queue' | 'steer' = 'queue') {
-    requireExternalExecution(this.permissionMode(), this.allowExec());
+    requireExternalExecution(this.permissionMode(), this.allowExec(), this.executionEnabled());
     if (this.starting.has(id)) throw new AgentError('消息正在提交。', 409);
     this.starting.add(id);
     try {
       const permission = await this.call<{ result: { kind: string; text?: string } } | null>('commands/execute', { agentId: id, line: '/permission danger-full-access', submittedAttachments: [] });
       if (permission?.result.kind !== 'success') throw new AgentError(permission?.result.text || 'DeepSeek 无法同步客户端权限。', 409);
-      requireExternalExecution(this.permissionMode(), this.allowExec());
+      requireExternalExecution(this.permissionMode(), this.allowExec(), this.executionEnabled());
       const requestId = randomUUID();
       await this.call('session/prompt', { sessionId: id, requestId, mode, content: [{ type: 'text', text: message }] });
       return { requestId };

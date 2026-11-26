@@ -2,6 +2,7 @@ import { expect, it, vi } from 'vitest';
 import { createServer } from 'node:http';
 import { chmod, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
 import path from 'node:path';
+import os from 'node:os';
 import { WebSocketServer } from 'ws';
 import { AgentBridge, mergeProjects } from '../desktop/main/agent-bridge/registry';
 import { AgentError, type AgentAdapter } from '../desktop/main/agent-bridge/types';
@@ -32,6 +33,44 @@ it('keeps one failed adapter from hiding healthy sources', async () => {
   expect(result.agents.map(a => a.available)).toEqual([false, true]);
   a.status = async () => { throw new AgentError('Discovery failed'); };
   expect((await new AgentBridge([a, b]).snapshot()).agents).toMatchObject([{ available: false, message: 'Discovery failed' }, { available: true }]);
+});
+it('diagnoses local connections independently and persists read-only execution policy', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'work-agent-settings-'));
+  const file = path.join(directory, 'connections.json');
+  const codex = new CodexAdapter([process.execPath]);
+  const deepseek = adapter('deepseek');
+  const probe = vi.fn(async () => { throw new Error('private transport details'); });
+  codex.probe = async () => {};
+  codex.permissionMode = () => 'full-access';
+  deepseek.probe = probe;
+  const bridge = new AgentBridge([codex, deepseek], file);
+  codex.executionEnabled = () => bridge.executionEnabled('codex');
+  const network = new WorkNetwork(() => 'beings://desktop/', () => ({ directory, endpoint: '' }));
+  network.bridge = bridge;
+  network.readTasks = async () => ({ endpoint: '', tasks: [] });
+  const request = (resource = '', method = 'GET', body?: object, origin = 'beings://desktop') => network.handle(new Request(`beings://desktop/api/work/agents${resource}`, {
+    method, headers: { Origin: origin, 'X-Being-Endpoint': '', 'Content-Type': 'application/json' }, body: body && JSON.stringify(body),
+  }));
+  try {
+    const response = await request();
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject([
+      { id: 'internal', diagnostic: 'unavailable' }, { id: 'codex', available: true, enabled: true }, { id: 'deepseek', diagnostic: 'error' },
+    ]);
+    expect(probe).toHaveBeenCalledTimes(1);
+    expect((await request('/codex', 'PATCH', { enabled: false }, 'https://foreign.test')).status).toBe(403);
+    expect((await request('/codex', 'PATCH', { enabled: 'false' })).status).toBe(400);
+    const saved = await request('/codex', 'PATCH', { enabled: false });
+    expect(saved.status).toBe(200);
+    expect(await saved.json()).toEqual({ id: 'codex', enabled: false });
+    await expect(bridge.start('codex', '/project', 'task')).rejects.toMatchObject({ status: 403 });
+    await expect(codex.native(new Request('beings://codex/project/create', { method: 'POST', body: JSON.stringify({ name: 'Blocked' }) }))).rejects.toMatchObject({ status: 403 });
+    const reopened = new AgentBridge([codex, deepseek], file);
+    await reopened.loadSettings();
+    expect(reopened.executionEnabled('codex')).toBe(false);
+    expect(reopened.executionEnabled('deepseek')).toBe(true);
+    expect((await request()).headers.get('Content-Type')).toMatch(/^application\/json/);
+  } finally { await rm(directory, { recursive: true, force: true }); }
 });
 it('merges the same project directory while preserving the local registration', () => {
   const p = { id: 'local', name: 'A', directory: '/A', createdAt: 1 };

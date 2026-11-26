@@ -318,7 +318,7 @@ export function Work({ app }: { app: AppModel }) {
   const unread = work.snapshot?.results?.unread || 0;
   const inDetail = !!(work.selectedId || work.itemId || work.creating || work.importing || (goalView && work.goalId));
   const paneTitle = work.importing ? '导入 / 同步' : selectedItem || selected ? title
-    : work.creating ? '新建执行会话' : goalView ? work.goal?.title || '目标' : work.panel === 'results' ? '工作结果'
+    : work.creating ? (work.newWorkKind === 'task' ? '新建任务' : '新建执行会话') : goalView ? work.goal?.title || '目标' : work.panel === 'results' ? '工作结果'
     : work.itemId ? '任务详情' : work.selectedId ? '执行会话'
     : taskOverview ? project?.name || (work.projectId === 'unassigned' ? '未分配项目' : '全部任务') : filterLabel;
   const linkedItem = !selectedItem && selected ? work.snapshot?.items?.find(item => item.runIds.includes(selected.id)) : undefined;
@@ -328,7 +328,7 @@ export function Work({ app }: { app: AppModel }) {
   const attachmentInput = useRef<HTMLInputElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const followBottom = useRef(true);
-  const conversationKey = work.creating ? 'new' : selected?.id;
+  const conversationKey = work.creating ? `new:${work.newWorkKind}` : selected?.id;
   const [historyWindow, setHistoryWindow] = useState<{ id?: string; count: number }>({ count: 20 });
   const historyAnchor = useRef<{ height: number; top: number } | undefined>(undefined);
   const focusedResult = useRef('');
@@ -407,10 +407,9 @@ export function Work({ app }: { app: AppModel }) {
   const sendResult = (result: WorkResult, title: string) => app.draftWorkMessage(
     `一起看看 ${workDraftLink(title, result.taskId, { kind: 'result', value: result.id })} 的${result.deliveryVersion ? `第 ${result.deliveryVersion} 版结果` : '结果'}。`, result.sceneId,
   );
-  const sessionChat = (selected || work.creating) ? <div className={styles.sessionChat}>
-    <div className={styles.conversation} ref={scrollRef} onScroll={event => { const el = event.currentTarget; followBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
+  const sessionChat = (selected || work.creating) ? <div className={styles.sessionChat} data-composing={work.creating || undefined}>
+    {!work.creating && <div className={styles.conversation} ref={scrollRef} onScroll={event => { const el = event.currentTarget; followBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80; }}>
       <div className={styles.document}>
-        {work.creating && !work.sending && <div className={styles.newConversation}><h2>开始新对话</h2><p>{currentProject ? `在 ${currentProject.name} 中开始工作` : '选择项目，开始工作'}</p></div>}
         {work.detailLoading && <p role="status" className={styles.hint}>正在读取对话…</p>}
         {historyStart > 0 && !work.resultTurnId && <button className={styles.loadHistory} onClick={() => {
           const el = scrollRef.current;
@@ -428,11 +427,12 @@ export function Work({ app }: { app: AppModel }) {
         }}>返回最近轮次</button>}
         {work.sending && (draft || draftAttachments.length > 0) && (!latest || !workActive(latest)) && <div className={styles.turn}>{draft && <div className={styles.userMessage}><ChatMessageMarkdown sent content={draft} className={styles.bubble} onPlace={openPlace} /></div>}<div className={styles.progress} role="status"><StatusMark status="running" size={14} color="currentColor" fillOpacity={0} /><span>正在发送…</span></div></div>}
       </div>
-    </div>
+    </div>}
     <div className={styles.composerDock}>
+      {work.creating && <h2 className={styles.newConversation}>{work.newWorkKind === 'task' ? '这次要做什么？' : '开始新对话'}</h2>}
       <div className={styles.composerContext}>
         <Icon name="lucide-folder" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" />
-        {work.creating && work.projects.length > 0 ? <select aria-label="会话项目" value={work.newProjectId} disabled={work.sending} onChange={event => { work.newProjectId = event.target.value; work.projectId = event.target.value; work.changed(); }}>{work.projects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
+        {work.creating && work.projects.length > 0 ? <select aria-label="会话项目" value={work.newProjectId} disabled={work.sending} onChange={event => work.selectDraftProject(event.target.value)}>{work.projects.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}</select>
           : <span title={currentProject?.directory || latest?.workdir}>{currentProject?.name || (work.creating ? '尚未选择项目' : '未分配项目')}</span>}
         {work.creating && <IconButton label="添加项目目录" disabled={work.addingProject || work.sending} onClick={() => void work.addProject(app.api).catch(app.toastError)}><Icon name="chat-plus" width="15" height="15" /></IconButton>}
       </div>
@@ -455,7 +455,7 @@ export function Work({ app }: { app: AppModel }) {
           {draftAttachments.map((source, index) => <WorkAttachmentTile key={index} source={source} endpoint={endpoint} disabled={work.sending}
             remove={() => work.removeDraftAttachment(index)} />)}
         </div>}
-        <RichComposer key={conversationKey} textareaRef={composerRef} id="work-message" aria-label={work.creating ? '发送消息开始工作' : '继续与子智能体对话'} placeholder={steering ? '向本轮追加要求' : work.creating ? '描述要执行的工作' : '继续这项工作…'} value={draft} disabled={work.sending} onChange={value => { if (work.creating) work.newDraft = value; else if (selected) work.drafts[selected.id] = value; work.changed(); }} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.closest('form')?.requestSubmit(); } }} />
+        <RichComposer key={conversationKey} textareaRef={composerRef} id="work-message" aria-label={work.creating ? '发送消息开始工作' : '继续与子智能体对话'} placeholder={steering ? '向本轮追加要求' : work.creating ? '描述你想完成的工作…' : '继续这项工作…'} value={draft} disabled={work.sending} onChange={value => { if (work.creating) work.newDraft = value; else if (selected) work.drafts[selected.id] = value; work.changed(); }} onKeyDown={event => { if (event.key === 'Enter' && !event.shiftKey && !event.nativeEvent.isComposing) { event.preventDefault(); event.currentTarget.closest('form')?.requestSubmit(); } }} />
         <div className={styles.composerActions}>{work.creating ? <div className={styles.composerSelectors}>
           <select aria-label="执行器" value={work.currentExecutor} disabled={work.sending} onChange={event => { work.executor = event.target.value; work.newModel = null; work.changed(); }}>
             {!work.currentExecutor && <option value="" disabled hidden>选择可用执行器</option>}
@@ -479,6 +479,7 @@ export function Work({ app }: { app: AppModel }) {
           {(!latest || !workActive(latest) || steering) && <IconButton className={`${styles.send} ${styles.primaryButton}`} type="submit" label={work.sending ? '正在发送' : steering ? '追加指令' : '发送'} disabled={!canSubmit}><Icon name="chat-send" width="17" height="17" /></IconButton>}
         </div></div>
       </form>
+      {work.creating && work.sending && <p role="status" className={styles.hint}>正在发送…</p>}
       {archiving && <p role="status" className={styles.hint}>正在收集上一轮交付，完成后可继续。</p>}
       {!work.ready && <p className={styles.hint}>{work.currentAgent?.message || '执行器尚未就绪。'}{work.currentExecutor === 'internal' && <button type="button" onClick={() => app.openSubagentSettings()}>查看配置</button>}{work.currentAgent?.capabilities?.connect && !work.currentAgent.available && <button type="button" onClick={() => void work.connectAgent(work.currentExecutor)}>连接 {work.currentAgent.name}</button>}</p>}
       {work.connectionNotice && <p role="status" className={styles.hint}>{work.connectionNotice}</p>}
@@ -527,7 +528,8 @@ export function Work({ app }: { app: AppModel }) {
           {taskOverview && project && <IconButton label="新建执行会话" className={styles.newSession} onClick={() => work.startNew(project.id)}>
             <Icon name="rail-chat" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" /><span>新建会话</span>
           </IconButton>}
-          <IconButton label="新建任务" className={`${styles.newTask} ${styles.primaryButton}`} aria-haspopup="dialog" onClick={() => work.createItem()}>
+          <IconButton label="新建任务" className={`${styles.newTask} ${styles.primaryButton}`} aria-haspopup={project ? undefined : 'dialog'}
+            onClick={() => project ? work.startNew(project.id, 'task') : work.createItem()}>
             <Icon name="chat-plus" width="16" height="16" /><span>新建任务</span>
           </IconButton>
         </div>}
@@ -555,6 +557,7 @@ export function Work({ app }: { app: AppModel }) {
             {(overview || (taskOverview && project)) && <button type="button" className={overview ? undefined : styles.compactAction}
               onClick={() => work.startNew(project?.id)}><Icon name="chat-plus" width="16" height="16" />新建执行会话</button>}
             <button type="button" disabled={work.importLoading || work.importSaving} onClick={() => void work.openImports()}><Icon name="chat-download" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" />导入 / 同步</button>
+            <button type="button" onClick={() => app.openWorkAgentSettings()}><Icon name="lucide-sliders-horizontal" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" />执行器连接</button>
             {work.panel !== 'results' && <button type="button" onClick={() => work.openPanel('results')}><Icon name="rail-mail" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" />工作结果{unread > 0 && <small>{unread} 未读</small>}</button>}
           </div>
         </>}
@@ -606,7 +609,10 @@ export function Work({ app }: { app: AppModel }) {
               const expanded = !!work.query || (expandedProjects[item.id] ?? (item.id === (selectedProjectId || work.projectId) || (item.id === 'unassigned' && !work.projects.length)));
               const toggleProject = () => setExpandedProjects(current => ({ ...current, [item.id]: !expanded }));
               const openProject = () => navigateSidebar(() => { setExpandedProjects(current => ({ ...current, [item.id]: true })); work.selectProject(item.id); });
-              const newProjectTask = () => navigateSidebar(() => { work.selectProject(item.id); work.createItem(); });
+              const newProjectTask = () => navigateSidebar(() => {
+                if (item.directory) work.startNew(item.id, 'task');
+                else { work.selectProject(item.id); work.createItem(); }
+              });
               const entries = [
                 ...item.items.filter(row => row.title.toLowerCase().includes(work.query.toLowerCase())).map(row => ({
                   id: row.id, title: row.title, status: workStages[row.stage], executor: row.executor,
@@ -636,7 +642,7 @@ export function Work({ app }: { app: AppModel }) {
                     <Icon name="lucide-folder" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" /><span>{item.name}</span>
                   </button>
                   <small className={styles.projectCount}>{entries.length}</small>
-                  <IconButton className={styles.projectNew} label={`在 ${item.name} 中新建任务`} aria-haspopup="dialog" onClick={newProjectTask}><Icon name="chat-plus" width="14" height="14" /></IconButton>
+                  <IconButton className={styles.projectNew} label={`在 ${item.name} 中新建任务`} aria-haspopup={item.directory ? undefined : 'dialog'} onClick={newProjectTask}><Icon name="chat-plus" width="14" height="14" /></IconButton>
                 </div>
                 <div id={`work-project-${item.id}`} className={styles.projectSessions} hidden={!expanded}>
                   {shown.map(entry => <button className={styles.taskLink} key={entry.id} {...(entry.item ? taskMenuProps(entry.item) : sessionMenuProps(entry.id, entry.title))}
