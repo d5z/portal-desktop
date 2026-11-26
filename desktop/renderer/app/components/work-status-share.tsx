@@ -86,8 +86,8 @@ export function WorkStatusShareDialog({ item, self, close, prepare }: {
       <footer className="dialog-footer">
         {error && <p className={styles.itemError} role="alert">{error}</p>}
         <div className={styles.itemActions}>
-          <button type="button" disabled={busy} onClick={close}>取消</button>
-          <button className={styles.saveTask} type="submit" disabled={busy || !canPrepare}>{busy ? '正在准备…' : '准备私信'}</button>
+          <button type="button" className={styles.secondaryButton} disabled={busy} onClick={close}>取消</button>
+          <button className={styles.primaryButton} type="submit" disabled={busy || !canPrepare}>{busy ? '正在准备…' : '准备私信'}</button>
         </div>
       </footer>
     </form>

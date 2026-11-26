@@ -116,7 +116,8 @@ export function createPluginServices(options: {
       if (snapshot.endpoint !== endpoint) throw new Error('任务所属 Being 已切换。');
       const result: PluginTaskSnapshot = { scopeId: createHash('sha256').update(endpoint).digest('hex'), sceneId: being.sceneId,
         ready: snapshot.subagentReady === true, configured: snapshot.subagentConfigured === true, enabled: snapshot.subagentEnabled === true,
-        tasks: snapshot.tasks.filter(task => task.sceneId === being.sceneId).slice(-200).map(task => ({ id: task.id, status: task.status, createdAt: task.createdAt, ...(task.endedAt === undefined ? {} : { endedAt: task.endedAt }) })) };
+        tasks: snapshot.tasks.filter(task => task.sceneId === being.sceneId).slice(-200).flatMap(task => task.status === 'unknown' ? [] :
+          [{ id: task.id, status: task.status, createdAt: task.createdAt, ...(task.endedAt === undefined ? {} : { endedAt: task.endedAt }) }]) };
       return result;
     }
     if (method === 'being.compose') return { text: boundedText(value, 16000), sceneId: being.sceneId, plugin: context.manifest.name };

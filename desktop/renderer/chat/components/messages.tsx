@@ -4,7 +4,7 @@ import { Icon } from '../../shared/icons/icon';
 import { SceneScheduling } from './scheduling';
 import { LocalFileLink } from '../../shared/components/local-file-link';
 import { useEffect, useMemo, useState } from "react";
-import type { ActivityEntry, ChatItem, Message, Run } from "../models/chat";
+import type { ActivityEntry, ChatItem, Message, ReplyWaitDiagnostics, Run } from "../models/chat";
 import { CHAT_SCENE_ACTIVITY_LABELS } from "../../../shared/types";
 import { ChatStatusRow } from './status-row';
 const duration = (seconds: number) =>
@@ -92,8 +92,9 @@ export function ChatActivity({ run, sceneLabel, showDetails = true, showProgress
       <span className="run-label">用时 {duration(Math.max(0, Math.floor((run.end - run.start) / 1000)))}</span>
     </div></div></div>;
   }
-  if (showDetails || (onOpenSubagents && run.scheduling?.tasks.length) || (!supersededNotice && run.end && run.entries.some(entry => entry.type === 'tool' && entry.error))) {
-    return <DetailedChatActivity run={run} sceneLabel={sceneLabel} repeatError={repeatError} superseded={supersededNotice} onOpenSubagents={onOpenSubagents} showTrace={showDetails} />;
+  const replyWait = run.replyWait && !supersededNotice && (status === 'timeout' || (run.waitingForReply && showProgress)) ? run.replyWait : undefined;
+  if (showDetails || replyWait || (onOpenSubagents && run.scheduling?.tasks.length) || (!supersededNotice && run.end && run.entries.some(entry => entry.type === 'tool' && entry.error))) {
+    return <DetailedChatActivity run={run} sceneLabel={sceneLabel} repeatError={repeatError} superseded={supersededNotice} onOpenSubagents={onOpenSubagents} showTrace={showDetails} replyWait={replyWait} />;
   }
   const attention = !superseded && !repeatError && ["error", "timeout", "stopped"].includes(status);
   const artifacts = [...new Set(run.entries.flatMap(entry => entry.artifactPath ? [entry.artifactPath] : []))];
@@ -117,6 +118,20 @@ export function ChatActivity({ run, sceneLabel, showDetails = true, showProgress
   </div>;
 }
 
+const replyBoundaryLabels = {
+  'message-stop': '已收到阶段结束事件，最终回复待确认。',
+  'sse-eof': '已读到 SSE 响应末尾，最终回复待确认。',
+  'stream-finished': '服务端事件流已结束，最终回复待确认。',
+  'history-recovery': '已转为查询历史记录，最终回复待确认。',
+};
+const replyEventLabels: Record<string, string> = {
+  thinking: '思考', reasoning: '思考', tool_use: '开始调用工具', tool_result: '收到工具结果', content_block_delta: '收到回复片段',
+};
+const activeStreamLabels = {
+  idle: '服务端未报告活动流', running: '服务端报告有活动流', finished: '服务端报告事件流已结束', unavailable: '暂时无法确认服务端活动',
+};
+const replyCheckTime = (at: number) => new Date(at).toLocaleTimeString();
+
 function DetailedChatActivity({
   run,
   sceneLabel,
@@ -124,12 +139,14 @@ function DetailedChatActivity({
   superseded,
   onOpenSubagents,
   showTrace = true,
+  replyWait,
 }: {
   run: Run;
   sceneLabel?: string;
   repeatError: boolean;
   superseded: boolean;
   showTrace?: boolean;
+  replyWait?: ReplyWaitDiagnostics;
   onOpenSubagents?: (taskIds: string[], selectedId?: string) => void;
 }) {
   const [open, setOpen] = useState(false),
@@ -152,6 +169,12 @@ function DetailedChatActivity({
   const artifacts = [...new Set(tools.flatMap(entry => entry.artifactPath ? [entry.artifactPath] : []))];
   const activeTool = tools.filter(entry => !entry.done && !entry.error).at(-1);
   const activeLabel = activeTool?.label?.trim();
+  const boundary = replyWait?.boundary ? replyBoundaryLabels[replyWait.boundary] : undefined;
+  const waitSummary = boundary || (run.end ? '最终回复仍待确认。' : replyWait?.httpStatus === 202
+    ? '服务端已接收消息，正在等待处理或回复。' : '正在查询服务端活动和历史回复。');
+  const lastEvent = replyWait?.lastEvent;
+  const active = replyWait?.active;
+  const history = replyWait?.history;
   const summary = settledSummary ? `用时 ${duration(Math.max(0, Math.floor((run.end! - run.start) / 1000)))}`
     : repeatError ? '执行过程'
     : status === 'working' && activeLabel ? activeLabel
@@ -162,6 +185,7 @@ function DetailedChatActivity({
       className={`run-activity${run.end || passive ? "" : " running"}`}
       data-outcome={run.outcome}
       data-status={status}
+      data-reply-wait={replyWait ? '' : undefined}
       data-autonomous-origin={run.autonomousOrigin}
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
@@ -181,7 +205,7 @@ function DetailedChatActivity({
         </span>}
         <span className="run-caption">
           <span className={settledSummary ? "run-label run-elapsed" : "run-label"} title={settledSummary ? summary : run.hint || run.arg || summary}>
-            {settledSummary || showTrace ? summary : run.end ? '思考过程' : run.label}
+            {settledSummary || showTrace || replyWait ? summary : run.end ? '思考过程' : run.label}
           </span>
           {!settledSummary && showElapsed && <span className="run-elapsed">{`· ${duration(Math.max(0, Math.floor(((run.end || now) - run.start) / 1000)))}`}</span>}
           {run.autonomousOrigin
@@ -189,12 +213,26 @@ function DetailedChatActivity({
             : sceneLabel && <span className="message-scene" title={run.sceneId}>{sceneLabel}</span>}
         </span>
         {!superseded && failed > 0 && <span className="run-failures">{failed} 次工具调用失败</span>}
-        {showTrace && run.end && unconfirmed > 0 && <span>{unconfirmed} 次结果未确认</span>}
+        {(showTrace || replyWait) && run.end && unconfirmed > 0 && <span>{unconfirmed} 次结果未确认</span>}
         <span className="run-chevron" aria-hidden="true">
           <Icon name="chat-chevron-right" />
         </span>
       </summary>
       <div className="run-body">
+        {open && replyWait && <>
+          <p className="run-hint">{waitSummary}</p>
+          {showHint && <p className="run-hint">{run.hint}</p>}
+          <dl className="run-wait-details">
+            {replyWait.httpStatus !== undefined && <><dt>发送请求</dt><dd>HTTP {replyWait.httpStatus}</dd></>}
+            <dt>最近一次进展</dt>
+            <dd>{lastEvent ? `${replyEventLabels[lastEvent.type]} · ${lastEvent.source === 'sse' ? 'SSE' : '事件回放'} · ${replyCheckTime(lastEvent.at)}` : '尚未收到正文或执行进展'}</dd>
+            <dt>活动流查询</dt>
+            <dd>{active ? [activeStreamLabels[active.state], active.status !== undefined ? `HTTP ${active.status}` : undefined,
+              replyCheckTime(active.at)].filter(Boolean).join(' · ') : '等待查询结果'}</dd>
+            <dt>历史查询</dt>
+            <dd>{history ? `${history.failed ? '查询失败' : '未找到本轮最终回复'} · ${replyCheckTime(history.at)}` : '等待查询结果'}</dd>
+          </dl>
+        </>}
         <SubagentActivity tasks={run.scheduling?.tasks} onOpen={onOpenSubagents} />
         {open && !showTrace && failed > 0 && <div className="run-list">
           {failedTools.map((entry, i) => <ActivityStep key={entry.id || entry.toolCallId || i}
@@ -206,7 +244,7 @@ function DetailedChatActivity({
           {failed > 0 && <span className="run-failures">{failed} 次失败</span>}
           {unconfirmed > 0 && <span>{unconfirmed} 次{run.end ? '结果未确认' : '进行中'}</span>}
         </div>}
-        {showHint && <p className="run-hint">{run.hint}</p>}
+        {showHint && !replyWait && <p className="run-hint">{run.hint}</p>}
         {!run.end && run.context && <p className="run-hint">{run.context}</p>}
         {run.scheduling && !onOpenSubagents && <SceneScheduling {...run.scheduling} />}
         <div className="run-list">
@@ -221,6 +259,7 @@ function DetailedChatActivity({
         </>}
       </div>
     </details>
+    {replyWait && !open && <p role="status" className="run-hint run-wait-summary">{waitSummary}{status === 'timeout' ? ' 请刷新会话。' : ''}</p>}
     {artifacts.length > 0 && <div className="run-artifacts" aria-label="生成的文件">
       {artifacts.map(path => <LocalFileLink key={path} path={path} card>{path.split(/[\\/]/).pop() || path}</LocalFileLink>)}
     </div>}

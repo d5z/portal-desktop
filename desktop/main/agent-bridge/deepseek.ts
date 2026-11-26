@@ -7,7 +7,8 @@ import { randomUUID } from 'node:crypto';
 import WebSocket from 'ws';
 import type { SceneTask, SubagentTaskDetail } from '../../shared/types';
 import type { WorkModelSelection } from '../../shared/work';
-import { AgentError, agentTaskId, type AgentAdapter } from './types';
+import { deepseekUploadPath, type DeepSeekImageRef, type WorkAttachment } from '../../shared/work-attachments';
+import { AgentError, agentTaskId, type AgentAdapter, type AgentNativeLifecycle } from './types';
 import { installDeepSeekDiscovery } from './deepseek-discovery';
 
 type Workspace = { workspaceId: string; title: string; path: string; createdAt: string; sessionIds: string[] };
@@ -24,8 +25,14 @@ export function deepseekDetail(id: string, records: RecordEntry[]): SubagentTask
     const text = (content: { type: string; text?: string }[] = []) => content.filter(c => c.type === 'text').map(c => c.text || '').join('\n');
     if (type === 'user/message' && data.source?.kind === 'user') {
       const input = text(data.content);
+      const content: { type: string; attachment?: DeepSeekImageRef }[] = data.content || [];
+      const attachments = content.flatMap<WorkAttachment>(part => {
+        if (part.type === 'image' && part.attachment) return [{ type: 'executorImage', reference: part.attachment, name: part.attachment.name || '图片' }];
+        if (part.type === 'file' && part.attachment?.name) return [{ type: 'file', name: part.attachment.name }];
+        return [];
+      });
       turn.task.userMessage = [turn.task.userMessage, input].filter(Boolean).join('\n');
-      turn.steps.push({ at, kind: 'started', input, requestId: data.source.rpcId });
+      turn.steps.push({ at, kind: 'started', input, requestId: data.source.rpcId, ...(attachments.length ? { attachments } : {}) });
     }
     if (type === 'assistant/message') {
       for (const part of data.message.content) {
@@ -56,7 +63,9 @@ export class DeepSeekAdapter implements AgentAdapter {
   constructor(readonly home = process.env.DSH_HOME || path.join(os.homedir(), '.dsh')) {}
   async status() {
     const available = await access(path.join(this.home, 'town-bridge/host.json')).then(() => true, () => false);
-    return { id: this.id, name: this.name, available, canExecute: this.allowExec() && this.permissionMode() === 'full-access', message: available ? (!this.allowExec() ? externalExecNotice : this.permissionMode() === 'full-access' ? undefined : externalApprovalNotice) : '连接后重启 DeepSeek Harness，再选择需要导入的项目和会话。' };
+    return { id: this.id, name: this.name, available, canExecute: this.allowExec() && this.permissionMode() === 'full-access',
+      capabilities: { attachments: 'file' as const, models: true, steer: true, steerAttachments: true, connect: true },
+      message: available ? (!this.allowExec() ? externalExecNotice : this.permissionMode() === 'full-access' ? undefined : externalApprovalNotice) : '连接后重启 DeepSeek Harness，再选择需要导入的项目和会话。' };
   }
   async connect() { await installDeepSeekDiscovery(this.home); }
   private async connection() {
@@ -64,36 +73,57 @@ export class DeepSeekAdapter implements AgentAdapter {
     const url = new URL(discovery.url);
     if (discovery.version !== 1 || !Number.isInteger(discovery.pid) || !['127.0.0.1', 'localhost', '[::1]'].includes(url.hostname) || url.protocol !== 'http:') throw new AgentError('DeepSeek 本机连接信息无效。', 503);
     process.kill(discovery.pid, 0);
-    if (this.auth?.pid !== discovery.pid) {
+    if (!this.auth || this.auth.pid !== discovery.pid || this.auth.origin !== url.origin) {
       const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(10000) });
       const cookie = response.headers.get('set-cookie')?.split(';', 1)[0];
       if (response.status !== 303 || !cookie) throw new AgentError('DeepSeek 本机认证失败。', response.status, await response.text(), response.headers.get('content-type') || 'text/plain');
       this.socket?.close(); this.opening = undefined;
+      this.prepared.clear(); this.summaries.clear();
       this.auth = { pid: discovery.pid, origin: url.origin, cookie };
     }
     return this.auth!;
   }
-  async native(request: Request) {
-    const method = new URL(request.url).pathname.slice('/api/'.length);
+  async native(request: Request, lifecycle?: AgentNativeLifecycle) {
+    const url = new URL(request.url);
+    if (url.pathname === deepseekUploadPath) {
+      requireExternalExecution(this.permissionMode(), this.allowExec());
+      const auth = await this.connection();
+      requireExternalExecution(this.permissionMode(), this.allowExec());
+      const upload: RequestInit & { duplex: 'half' } = {
+        method: 'POST', body: request.body, duplex: 'half', signal: request.signal, redirect: 'error',
+        headers: { 'Content-Type': request.headers.get('Content-Type') || '', Cookie: auth.cookie },
+      };
+      return fetch(auth.origin + url.pathname + url.search, upload);
+    }
+    const method = url.pathname.slice('/api/'.length);
     const input = await request.json();
     const command = method === 'commands/execute';
     const catalog = method === 'session/modelCatalog';
+    const readOnly = catalog || method === 'session/attachment';
     const args = input.payload?.args;
-    const keys: Record<string, string[]> = { 'workspace/create': ['path'], 'session/create': ['workspaceId'], 'session/modelCatalog': [], 'session/selectModel': ['sessionId', 'provider', 'model'], 'session/prompt': ['sessionId', 'requestId', 'mode', 'content'], 'session/cancel': ['sessionId'], 'commands/execute': ['agentId', 'line', 'submittedAttachments'] };
+    const keys: Record<string, string[]> = { 'workspace/create': ['path'], 'session/create': ['workspaceId'], 'session/modelCatalog': [], 'session/selectModel': ['sessionId', 'provider', 'model'], 'session/prompt': ['sessionId', 'requestId', 'mode', 'content'], 'session/attachment': ['sessionId', 'attachment'], 'session/cancel': ['sessionId'], 'commands/execute': ['agentId', 'line', 'submittedAttachments'] };
     if (!Object.hasOwn(keys, method) || input.method !== method || input.type !== 'client-request' || !args || (!command && !catalog && !args.request)) throw new AgentError('DeepSeek 请求无效。', 400);
     const value = command || catalog ? args : args.request;
     if (Object.keys(value).some(key => !keys[method].includes(key))) throw new AgentError('DeepSeek 请求字段无效。', 400);
-    if (!catalog && method !== 'session/cancel') requireExternalExecution(this.permissionMode(), this.allowExec());
+    if (!readOnly && method !== 'session/cancel') requireExternalExecution(this.permissionMode(), this.allowExec());
     if (command && (typeof value.agentId !== 'string' || value.line !== '/permission danger-full-access' || !Array.isArray(value.submittedAttachments) || value.submittedAttachments.length)) throw new AgentError('DeepSeek 权限请求无效。', 400);
-    if (method === 'session/prompt' && !this.prepared.delete(value.sessionId)) throw new AgentError('请先同步客户端权限后重新发送。', 409);
-    const auth = await this.connection();
-    if (!catalog && method !== 'session/cancel') requireExternalExecution(this.permissionMode(), this.allowExec());
-    const response = await fetch(`${auth.origin}/api/${method}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: auth.cookie }, body: JSON.stringify(input), signal: request.signal, redirect: 'error' });
-    if (command && response.ok) {
-      const result = await response.clone().json();
-      if (result.result?.ok && result.result.value?.result.kind === 'success') this.prepared.add(value.agentId);
-    }
-    return response;
+    if (method === 'session/prompt' && (typeof value.sessionId !== 'string' || !value.sessionId || typeof value.requestId !== 'string' || !value.requestId))
+      throw new AgentError('DeepSeek 续聊参数无效。', 400);
+    const submit = async () => {
+      const auth = await this.connection();
+      if (!readOnly && method !== 'session/cancel') requireExternalExecution(this.permissionMode(), this.allowExec());
+      if (method === 'session/prompt' && !this.prepared.delete(value.sessionId)) throw new AgentError('请先同步客户端权限后重新发送。', 409);
+      const response = await fetch(`${auth.origin}/api/${method}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Cookie: auth.cookie }, body: JSON.stringify(input), signal: request.signal, redirect: 'error' });
+      if (!response.ok || (!command && method !== 'session/create' && method !== 'session/prompt')) return { response };
+      const { result } = await response.clone().json();
+      if (result?.ok) {
+        if (command && this.auth === auth && result.value?.result?.kind === 'success') this.prepared.add(value.agentId);
+        if (method === 'session/create' && result.value?.sessionId) await lifecycle?.created(result.value.sessionId);
+        if (method === 'session/prompt') return { response, receipt: { requestId: value.requestId } };
+      }
+      return { response };
+    };
+    return method === 'session/prompt' && value.mode === 'queue' && lifecycle ? lifecycle.turn(value.sessionId, submit) : (await submit()).response;
   }
 
   async call<T>(method: string, request: object): Promise<T> {
@@ -122,7 +152,11 @@ export class DeepSeekAdapter implements AgentAdapter {
         if (frame.type === 'archived') this.archived = frame.archivedSessionIds;
       });
       socket.on('error', error => { clearTimeout(timer); reject(error); });
-      socket.on('close', () => { clearTimeout(timer); this.opening = undefined; reject(new AgentError('DeepSeek 连接已断开。', 503)); });
+      socket.on('close', () => {
+        clearTimeout(timer);
+        if (this.socket === socket) { this.socket = undefined; this.opening = undefined; }
+        reject(new AgentError('DeepSeek 连接已断开。', 503));
+      });
     });
   }
   async list(selectedIds = new Set<string>()) {

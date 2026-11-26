@@ -14,6 +14,37 @@ const rootTask: SceneTask = { id: 'sub_root', sceneId: 'scene-main', createdAt: 
 const childTask: SceneTask = { ...rootTask, id: 'sub_child', parentTaskId: 'sub_root', userMessage: 'Follow up', createdAt: 3 };
 afterEach(() => vi.unstubAllGlobals());
 
+it('collects a receipt for a completed native turn while a later turn is running', async () => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), 'work-native-receipt-'));
+  const endpoint = 'one';
+  const session: SceneTask = { ...rootTask, id: 'agent_codex_session', nativeId: 'session', executor: 'codex', status: 'running', activeTurnId: 'agent_codex_session:first' };
+  const submittedAt = Date.now();
+  const work = new WorkNetwork(() => 'beings://desktop/', () => ({ directory, endpoint }));
+  work.readTasks = async () => ({ endpoint, tasks: [] });
+  const bridge = work.bridge = new AgentBridge([{
+    id: 'codex', name: 'Codex', status: async () => ({ id: 'codex', name: 'Codex', available: true }),
+    list: async () => ({ tasks: [session], projects: [] }),
+    read: async () => ({ taskId: session.id, steps: [], turns: [
+      { task: { ...session, id: `${session.id}:first`, status: 'done' }, steps: [{ kind: 'message', at: submittedAt, output: 'First delivery' }] },
+      { task: { ...session, id: `${session.id}:second` }, steps: [] },
+    ] }),
+    start: async () => 'session', send: async () => {}, cancel: async () => {}, close: () => {},
+  }]);
+  try {
+    const ledgerDirectory = path.join(directory, 'work-projects', 'items');
+    const ledger = new WorkItems(ledgerDirectory);
+    await ledger.rememberNative(endpoint, session.id, { sceneId: 'scene-main', submittedAt, message: '', expectedTurn: `${session.id}:first` });
+    await work.collectResults();
+    expect((await new WorkItems(ledgerDirectory).read(endpoint)).results).toEqual([]);
+    session.activeTurnId = `${session.id}:second`;
+    bridge.invalidate();
+    await work.collectResults();
+    const { pending, results } = await new WorkItems(ledgerDirectory).read(endpoint);
+    expect(pending).toEqual([]);
+    expect(results).toEqual([expect.objectContaining({ id: `${session.id}:first`, status: 'done', summary: 'First delivery' })]);
+  } finally { await rm(directory, { recursive: true, force: true }); }
+});
+
 it('keeps Being and Work sessions after clearing manual imports, without crossing Being profiles', async () => {
   const directory = await realpath(await mkdtemp(path.join(os.tmpdir(), 'work-parallel-import-')));
   let endpoint = 'one';
@@ -25,7 +56,11 @@ it('keeps Being and Work sessions after clearing manual imports, without crossin
     list: async () => ({ projects: [], tasks: [...tasks] }),
     read: async id => ({ taskId: `agent_codex_${id}`, steps: [] }),
     start: async (_dir, id) => { add(id); return id; },
-    native: async () => { add('work-ui'); return Response.json({ thread: { id: 'work-ui' } }); },
+    native: async (_request, lifecycle) => {
+      add('work-ui');
+      await lifecycle.created('work-ui');
+      return Response.json({ thread: { id: 'work-ui' } });
+    },
     send: async () => {}, cancel: async () => {}, close: () => {},
   }]);
   const open = () => {
@@ -94,7 +129,11 @@ it('persists only chosen imports per Being, keeps native history independent of 
     expect((await request('subagent/tasks/agent_codex_b')).status).toBe(404);
     expect((await request('work/imports', { projectIds: [], taskIds: [42] })).status).toBe(400);
     const restored = new WorkNetwork(() => 'beings://desktop/', () => ({ directory, endpoint }));
+    restored.bridge = network.bridge;
+    restored.bridge.invalidate();
+    restored.readTasks = network.readTasks;
     expect((await (await restored.handle(new Request('beings://desktop/api/work/imports', { headers: { 'X-Being-Endpoint': endpoint } }))).json()).taskIds).toEqual(['agent_codex_a']);
+    expect((await restored.snapshot()).tasks.map(task => [task.id, task.projectId])).toEqual([['sub_root', undefined], ['agent_codex_a', 'native-project']]);
     endpoint = 'two';
     expect((await network.snapshot()).tasks.map(task => task.id)).toEqual(['sub_root']);
   } finally { await rm(directory, { recursive: true, force: true }); }
@@ -124,6 +163,26 @@ it('shows cached histories immediately, deduplicates opening requests, and fetch
   finish(Response.json({ taskId: childTask.id, steps: [] })); await followup;
   expect(work.details[0]).toBe(cached);
   expect(work.details).toHaveLength(2);
+});
+
+it('rereads history on manual refresh while an older read is pending', async () => {
+  const work = new WorkModel(); work.configure('one');
+  work.snapshot = { endpoint: 'one', tasks: [rootTask] };
+  const pending: ((response: Response) => void)[] = [];
+  const fetcher = vi.fn<typeof fetch>(() => new Promise(resolve => pending.push(resolve)));
+  vi.stubGlobal('fetch', fetcher);
+  work.select(rootTask.id);
+  const olderRead = work.loadDetails();
+  const refreshedRead = work.loadDetails(true);
+  expect(fetcher).toHaveBeenCalledTimes(2);
+  expect(fetcher.mock.calls[1][1]?.headers).toMatchObject({ 'Cache-Control': 'no-cache' });
+  const latest = { taskId: rootTask.id, steps: [{ kind: 'message', at: 1, output: 'Latest reply' }] };
+  pending[1](Response.json(latest));
+  await refreshedRead;
+  pending[0](Response.json({ taskId: rootTask.id, steps: [] }));
+  await olderRead;
+  work.select(''); work.select(rootTask.id);
+  expect(work.details).toEqual([latest]);
 });
 
 it('ignores delayed history and import responses when switching Being', async () => {
@@ -166,9 +225,9 @@ it('retains a failed follow-up draft and ignores old connection responses', asyn
   const work = new WorkModel();
   work.configure('one'); work.snapshot = { endpoint: 'one', tasks: [rootTask] }; work.selectedId = rootTask.id; work.drafts[rootTask.id] = 'Keep this draft';
   vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('denied', { status: 409 })));
-  await work.send();
+  await expect(work.send()).rejects.toThrow('409');
   expect(work.drafts[rootTask.id]).toBe('Keep this draft');
-  expect(work.error).toContain('409');
+  expect(work.error).toBe('');
   let finish!: (value: Response) => void;
   vi.stubGlobal('fetch', vi.fn(() => new Promise(resolve => { finish = resolve; })));
   const pending = work.refresh();
@@ -188,7 +247,12 @@ it('relays real HTTP path, message, status and error body without exposing the P
     let endpoint = 'one';
     const network = new WorkNetwork(() => 'beings://desktop/', () => ({ directory, pid: 123, endpoint }), upstream);
     network.readTasks = async () => ({ endpoint, tasks: [rootTask, childTask] });
-    network.readDetails = async (_endpoint, ids) => ids.map(taskId => ({ taskId, steps: [{ at: 1, kind: 'message', output: `${taskId} result` }] }));
+    network.readDetails = async (_endpoint, ids) => ids.map(taskId => ({
+      taskId,
+      records: [{ native: 'private record' }],
+      steps: [{ at: 1, kind: 'message', output: `${taskId} result`,
+        attachments: [{ type: 'image', name: 'shot.png', src: 'data:image/png;base64,fixture' }] }],
+    }));
     const request = (target = rootTask.id, selectedEndpoint = endpoint, origin = 'beings://desktop') => new Request(`beings://desktop/api/subagent/tasks/${target}/messages`, {
       method: 'POST', headers: { Origin: origin, 'Content-Type': 'application/json', 'X-Being-Endpoint': selectedEndpoint }, body: JSON.stringify({ message: 'Continue this work' }),
     });
@@ -204,6 +268,8 @@ it('relays real HTTP path, message, status and error body without exposing the P
     const context = JSON.parse(await network.context(childTask.id));
     expect(context.conversation.map((turn: { taskId: string }) => turn.taskId)).toEqual([rootTask.id, childTask.id]);
     expect(context.conversation[1].request).toBe('Follow up');
+    expect(context.conversation[0]).not.toHaveProperty('records');
+    expect(context.conversation[0].steps[0].attachments).toEqual([{ type: 'image', name: 'shot.png' }]);
     await writeFile(path.join(directory, '.portal-work.json'), JSON.stringify({ pid: 122, nonce: 'old', port: 39001, token: 'secret' }));
     expect((await network.handle(request())).status).toBe(503);
   } finally { await rm(directory, { recursive: true, force: true }); }
@@ -235,6 +301,14 @@ it('persists projects per Being and assigns work to the closest actual directory
     expect(await projects.list('two')).toEqual([]);
     expect(directoryProject([project, nested], path.join(projectDirectory, 'client', 'src'))?.id).toBe(nested.id);
     expect(directoryProject([project], path.join(root, 'product-other'))).toBeUndefined();
+    const imported = { id: 'codex_project_native_0', nativeId: 'native', executor: 'codex', name: 'Native project', directory: path.join(root, 'product-other'), createdAt: 1 };
+    const linked = await projects.setGoal('one', imported, 'goal_one');
+    expect(await new WorkProjects(path.join(root, 'records')).list('one')).toContainEqual({ ...imported, goalId: 'goal_one' });
+    expect(await projects.registered('one')).toEqual([project, nested]);
+    await expect(projects.setGoal('one', imported, 'goal_two')).rejects.toMatchObject({ status: 409 });
+    const registered = await projects.add('one', { directory: imported.directory });
+    expect(registered).toMatchObject({ id: linked.id, goalId: linked.goalId });
+    expect(await projects.registered('one')).toEqual([project, nested, registered]);
     await writeFile(path.join(root, 'file.txt'), 'not a directory');
     await expect(projects.add('one', { directory: path.join(root, 'file.txt') })).rejects.toThrow('文件夹');
     await expect(projects.add('one', { directory: 'relative/path' })).rejects.toThrow('项目目录');

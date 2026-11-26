@@ -13,7 +13,7 @@ import { createSceneRuntime } from "./scene-runtime";
 import { HistoryCache, normalizeHistoryRows } from "./history-cache";
 import { chatHistoryLimit } from '../../../shared/chat-history';
 import { inCurrentScene, messageScene, sceneItems, sceneTransitionNotice, stripSceneTransition, type MessageScene } from "../models/scenes";
-import type { ChatRuntime, ChatState, Message, RuntimeOptions } from "../models/chat";
+import type { ActivityEntry, ChatRuntime, ChatState, Message, ReplyWaitDiagnostics, RuntimeOptions } from "../models/chat";
 
 /**
  * Loom's streaming, replay and history protocol, independent of rendering.
@@ -237,7 +237,7 @@ function createStreamRuntime(state: any, options: any): any {
     }
   }
   let currentRun: any = null;
-  type PendingReply = { baseline: Set<any>; submittedAt: number; phase: "queued" | "processing" | "reply"; waitDeadline?: number; autonomousOrigin?: string; interrupted?: boolean; idleSince?: number; idleObservedAt?: number };
+  type PendingReply = { baseline: Set<any>; submittedAt: number; phase: "queued" | "processing" | "reply"; diagnostics: ReplyWaitDiagnostics; waitDeadline?: number; autonomousOrigin?: string; interrupted?: boolean; idleSince?: number; idleObservedAt?: number; terminalObservedAt?: number };
   let pendingReply: PendingReply | null = null;
   // A local timeout releases the queue; it does not prove the reply was lost.
   let timedOutReply: { reply: PendingReply; run: any } | null = null;
@@ -357,6 +357,7 @@ function createStreamRuntime(state: any, options: any): any {
       .reverse()
       .find((entry) => entry.type === "tool" && !entry.done && !entry.error);
     run.waitingForReply = !!pendingReply && waiting;
+    run.replyWait = waiting ? pendingReply?.diagnostics : undefined;
     run.arg = tuiCurrentArg;
     run.hint = tuiHintText;
     if (finished || (!isStreaming && !waiting)) {
@@ -1284,7 +1285,7 @@ function createStreamRuntime(state: any, options: any): any {
     clearTuiHint();
   }
 
-  function markProgress(type: any, data: any) {
+  function markProgress(type: string, data: any, source: 'sse' | 'replay') {
     if (type === "meta" && (data.continuation === true ||
         (data.stream_id && data.stream_id !== currentStreamId))) lastServerError = undefined;
     if (type === "meta") showContinuationMarker(data);
@@ -1318,11 +1319,20 @@ function createStreamRuntime(state: any, options: any): any {
         tuiCurrentArg = "";
       }
       replyRunSettled = false;
-      if (pendingReply && pendingReply.phase !== "processing") {
-        logReplyWait("progress");
-        pendingReply.phase = "processing";
-        pendingReply.waitDeadline = undefined;
-        stopCatchUpWatcher();
+      if (pendingReply) {
+        pendingReply.terminalObservedAt = undefined;
+        if (pendingReply.diagnostics.lastEvent?.type !== type || pendingReply.diagnostics.lastEvent.source !== source)
+          pendingReply.diagnostics.lastEvent = {type, at: Date.now(), source};
+        else pendingReply.diagnostics.lastEvent.at = Date.now();
+        if (pendingReply.phase !== "processing") {
+          logReplyWait("progress");
+          pendingReply.phase = "processing";
+          pendingReply.waitDeadline = undefined;
+          pendingReply.diagnostics.boundary = undefined;
+          pendingReply.diagnostics.history = undefined;
+          pendingReply.diagnostics.active = undefined;
+          stopCatchUpWatcher();
+        }
       }
     }
     lastTransportProgressTime = lastProgressTime = Date.now();
@@ -1459,9 +1469,9 @@ function createStreamRuntime(state: any, options: any): any {
     pollActiveStream(streamId, fromSeq);
   }
 
-  // 流已经从服务端消失（10s 清理）或被别的 tab 覆盖 → 回落到 /api/history 拿落盘内容。
-  // assistant moment 先落盘后发 Done，所以这条路一定能拿到完整回复。
-  async function recoverViaHistory() {
+  // A vanished stream may have a persisted reply. Preserve visible partial
+  // text while waiting for history to confirm the final reply.
+  async function recoverViaHistory(historyChecked = false) {
     if (activeStreamPollTimer) {
       clearTimeout(activeStreamPollTimer);
       activeStreamPollTimer = null;
@@ -1487,15 +1497,17 @@ function createStreamRuntime(state: any, options: any): any {
     pendingRecovery = null;
     removeThinkingIndicator();
 
-    const previousItems = new Set(state.items);
-    await reconcileHistory();
+    const previousItems = historyChecked ? null : new Set(state.items);
+    if (!historyChecked) await reconcileHistory();
     if (disposed || writerEpoch !== recoveryEpoch || chatRequestRevision !== recoveryRequest) return false;
-    const recovered = state.items.some((item: any) => item.kind === "message" && item.role === "being"
-      && !previousItems.has(item) && inCurrentScene(item, partialMessage || state.activeScene));
+    const finalReply = findPendingReply();
+    const recovered = !!finalReply || !!previousItems && state.items.some((item: Message) => item.kind === "message" && item.role === "being"
+      && !item.interim && !previousItems.has(item) && inCurrentScene(item, partialMessage || state.activeScene));
     if (recovered) {
       // 历史里已有权威版本 → 扔掉屏幕上的半截内容，避免重复
-      removeMessage(partialMessage);
+      if (partialMessage !== finalReply) removeMessage(partialMessage);
     } else if (partialMessage) {
+      partialMessage.interim = partialMessage.persistedFrom !== 'final';
       setMessageStreaming(partialMessage, false);
       const visible = cleanContent(partialText);
       if (visible) updateMessage(partialMessage, visible);
@@ -1505,7 +1517,7 @@ function createStreamRuntime(state: any, options: any): any {
     setStatus("connected");
     tuiDone();
     clearTuiHint();
-    settleReplyBoundary();
+    settleReplyBoundary('history-recovery');
     updateSendButton();
     return recovered;
   }
@@ -1696,11 +1708,11 @@ function createStreamRuntime(state: any, options: any): any {
 
             if (myEpoch !== writerEpoch) continue;
             traceStreamEvent('sse', eventType, data, liveSeq);
-            if (options.routeEvent?.(eventType, data)) continue;
+            if (options.routeEvent?.(eventType, data, false, 'sse')) continue;
             // Ignore a repeated terminal error before it moves the run again.
             if (eventType === "error" && repeatedServerError(data)) continue;
             splitStreamProgress(eventType, data);
-            markProgress(eventType, data);
+            markProgress(eventType, data, 'sse');
             if (["content_block_delta", "thinking", "reasoning", "tool_use", "tool_result", "message_stop", "error"].includes(eventType)) sawSceneEvent = true;
 
             if (eventType === "meta") {
@@ -1757,7 +1769,7 @@ function createStreamRuntime(state: any, options: any): any {
               removeThinkingIndicator();
               finalizePartialBubble(true);
               noteStreamEcho();
-              settleReplyBoundary();
+              settleReplyBoundary('message-stop');
               streamMessage = null;
               streamText = "";
               if (data.session_id) sessionId = data.session_id;
@@ -1780,17 +1792,9 @@ function createStreamRuntime(state: any, options: any): any {
               tuiClear();
               actionLogClear();
             }
-          } catch (parseErr: any) {
-            // data 行以 { 或 [ 开头说明是真的 JSON 格式错误，值得记录
-            if (rawData.startsWith("{") || rawData.startsWith("[")) {
-              console.error(
-                "SSE JSON parse error:",
-                parseErr.message,
-                "| raw:",
-                rawData.slice(0, 200),
-              );
-            }
-            // 其他情况（空行、keepalive 等）静默忽略
+          } catch (error: any) {
+            if (rawData.startsWith('{') || rawData.startsWith('['))
+              traceNetwork('sse-event-error', {kind: error?.name, streamId: currentStreamId, seq: liveSeq});
           }
         }
       }
@@ -1814,9 +1818,11 @@ function createStreamRuntime(state: any, options: any): any {
       // 走到这里我可能已经被 cutover 接管了（abort 和"字节流刚好读完"赛跑，
       // reader 有可能不抛 AbortError 就正常结束）。这种情况下收尾归新写者管，
       // 绝不能让 finalizeSendCleanup 把 isStreaming 打回 false —— 那会顺手杀掉 poller。
-      if (myEpoch === writerEpoch && pendingReplyArrived()) finishPendingReply();
+      if (myEpoch === writerEpoch && findPendingReply()) finishPendingReply();
       const staleWriter = myEpoch !== writerEpoch;
       if (staleWriter) externalCutover = null;
+      if (!staleWriter) traceNetwork('sse-exit', {reason: 'eof', streamId: currentStreamId || lastStreamId,
+        seq: liveSeq, sawSceneEvent, awaitingReply: !!pendingReply});
       return {
         outcome: sawServerError ? "server_error" : "done",
         empty: !sawSceneEvent,
@@ -1826,6 +1832,8 @@ function createStreamRuntime(state: any, options: any): any {
       };
     } catch (e: any) {
       if (readerEpoch !== writerEpoch) return {outcome: 'done', handled: true, empty: false};
+      traceNetwork('sse-exit', {reason: watchdogAborted ? 'watchdog' : 'reader-error', kind: e?.name,
+        streamId: currentStreamId || lastStreamId, seq: liveSeq, sawSceneEvent, awaitingReply: !!pendingReply});
       // F1: cutoverToReplay 从外部（重连 probe / 超时按钮）把我 abort 掉了。
       // 那边已经起好 poller 并把 isStreaming 置 true，这里只需要安静退场：
       // handled:true 让 driveChatStream 跳过 finalizeSendCleanup。
@@ -1963,7 +1971,7 @@ function createStreamRuntime(state: any, options: any): any {
       if (currentRun?.end) actionLogClear();
       replyRunSettled = false;
       pendingReply = { baseline: replyBaseline, submittedAt, phase: res.status === 202 ? "queued" : "processing",
-        autonomousOrigin: interruptedOrigin, interrupted: true };
+        diagnostics: {httpStatus: res.status}, autonomousOrigin: interruptedOrigin, interrupted: true };
     }
     if (res.status === 202) {
       // Heart accepted this input for splice/yield. The Being decides whether
@@ -2042,7 +2050,7 @@ function createStreamRuntime(state: any, options: any): any {
     lastServerError = undefined;
     replyRunSettled = false;
     resetLiveProgress();
-    pendingReply = { baseline: replyBaseline, submittedAt, phase: "processing" };
+    pendingReply = { baseline: replyBaseline, submittedAt, phase: "processing", diagnostics: {} };
     timedOutReply = null;
     autonomousStream = false;
     autonomousOrigin = undefined;
@@ -2114,7 +2122,7 @@ function createStreamRuntime(state: any, options: any): any {
     if (res.status === 202) {
       try { await res.json(); } catch (_: any) {}
       // Accepted is not completed: release the POST reader, retain this scene's run.
-      pendingReply = { baseline: replyBaseline, submittedAt, phase: "queued", autonomousOrigin: interruptedOrigin };
+      pendingReply = { baseline: replyBaseline, submittedAt, phase: "queued", diagnostics: {httpStatus: res.status}, autonomousOrigin: interruptedOrigin };
       removeThinkingIndicator();
       tuiClear();
       finalizeSendCleanup();
@@ -2134,6 +2142,7 @@ function createStreamRuntime(state: any, options: any): any {
       return;
     }
 
+    if (pendingReply) pendingReply.diagnostics.httpStatus = res.status;
     await driveChatStream(res, msg, filesToSend, requestMessage, !!sendOptions.attachmentDelivery, localMessage);
   }
 
@@ -2147,7 +2156,7 @@ function createStreamRuntime(state: any, options: any): any {
         // Reasoning/tool events are not a final reply. Every unresolved EOF
         // needs a bounded wait, retaining any newer splice request's baseline.
         removeThinkingIndicator();
-        settleReplyBoundary();
+        settleReplyBoundary('sse-eof');
       }
       if (result.outcome === "switch_to_replay") {
         // watchdog probe 判定服务端仍在推进：SSE 管道死了但 breath 活着。
@@ -3160,11 +3169,12 @@ function createStreamRuntime(state: any, options: any): any {
   const CATCH_UP_ABSOLUTE_MAX_MS = 5 * 60 * 1000;
   let catchUpTimer: any = null;
   let catchUpGeneration = 0;
-  function logReplyWait(event: string) {
+  function logReplyWait(event: string, reply = pendingReply, timeoutReason?: 'server-idle' | 'deadline') {
     console.info("[chat-reply-wait]", JSON.stringify({ event, at: new Date().toISOString(),
       sceneId: state.currentScene.sceneId, streamId: currentStreamId || lastStreamId,
-      runId: currentRun?.id, phase: pendingReply?.phase, lastProgressAt: lastProgressTime, waitDeadline: pendingReply?.waitDeadline,
-      toolCount: actionLog.filter(entry => entry.type === "tool").length }));
+      runId: currentRun?.id, phase: reply?.phase, submittedAt: reply?.submittedAt,
+      lastProgressAt: lastProgressTime, waitDeadline: reply?.waitDeadline, timeoutReason,
+      ...reply?.diagnostics, toolCount: currentRun?.entries.filter((entry: ActivityEntry) => entry.type === 'tool').length ?? 0 }));
   }
   function stopCatchUpWatcher() {
     // Invalidate history reads already in flight, not just scheduled ticks.
@@ -3174,9 +3184,10 @@ function createStreamRuntime(state: any, options: any): any {
       catchUpTimer = null;
     }
   }
-  function settleReplyBoundary() {
+  function settleReplyBoundary(boundary: NonNullable<ReplyWaitDiagnostics['boundary']>) {
     if (!pendingReply) return;
-    if (pendingReplyArrived()) { finishPendingReply(); return; }
+    if (pendingReply.phase !== 'queued') pendingReply.diagnostics.boundary = boundary;
+    if (findPendingReply()) { finishPendingReply(); return; }
     // Heart can end a breath during a scene switch without emitting a reply.
     // Keep the submitted request unresolved instead of showing a success check.
     pendingReply.phase = "reply";
@@ -3185,7 +3196,7 @@ function createStreamRuntime(state: any, options: any): any {
   }
   function finishPendingReply(failed = false, idle = false) {
     if (!pendingReply) return;
-    logReplyWait(failed ? "timeout" : "replied");
+    logReplyWait(failed ? "timeout" : "replied", pendingReply, failed ? idle ? 'server-idle' : 'deadline' : undefined);
     timedOutReply = failed && currentRun ? {reply: pendingReply, run: currentRun} : null;
     pendingReply = null;
     stopCatchUpWatcher();
@@ -3194,20 +3205,21 @@ function createStreamRuntime(state: any, options: any): any {
       currentRun.entries = actionLog.map(entry => ({ ...entry }));
       currentRun.end = Date.now();
       currentRun.waitingForReply = false;
+      currentRun.replyWait = failed ? timedOutReply?.reply.diagnostics : undefined;
       currentRun.replyConfirmed = !failed;
       currentRun.outcome = failed ? "timeout" : "done";
       currentRun.status = currentRun.outcome;
       currentRun.label = failed ? "等待超时，结果待确认" : "已回复";
-      currentRun.hint = idle ? "服务端持续空闲 60 秒，仍未收到这条已接收消息的回复。已释放本地等待状态，可重试；未自动重发或停止后台任务。" : failed ? "连续等待 5 分钟仍未确认最终回复。后台任务可能仍在运行，本次等待超时未发送停止指令；可刷新查看最新结果。" : "";
+      currentRun.hint = idle ? "服务端持续空闲 60 秒，仍未收到这条已接收消息的回复。已释放本地等待状态，未自动重发或停止后台任务。请刷新会话。" : failed ? "连续等待 5 分钟仍未确认最终回复。后台任务可能仍在运行，本次等待超时未发送停止指令。请刷新会话。" : "";
     }
     replyRunSettled = true;
     changed();
   }
-  function pendingReplyArrived(reply = pendingReply) {
-    return reply && state.items.some((item: any) => item.kind === "message" && item.role === "being"
+  function findPendingReply(reply = pendingReply): Message | undefined {
+    return reply ? state.items.find((item: Message) => item.kind === "message" && item.role === "being"
       && inCurrentScene(item, state.currentScene) && !item.streaming && !item.interim && !reply.baseline.has(item)
       && !options.restoredHistory?.has(item)
-      && (!Number.isFinite(item.createdAt) || item.createdAt >= Math.floor(reply.submittedAt / 1000) * 1000));
+      && (!Number.isFinite(item.createdAt) || item.createdAt! >= Math.floor(reply.submittedAt / 1000) * 1000)) : undefined;
   }
   function startCatchUpWatcher() {
     stopCatchUpWatcher();
@@ -3225,9 +3237,12 @@ function createStreamRuntime(state: any, options: any): any {
       await reconcileHistory({ preserve: true });
       // Progress, cancellation, or a new wait may arrive while history loads.
       if (generation !== catchUpGeneration || pendingReply !== reply) return;
-      if (pendingReplyArrived()) { finishPendingReply(); return; }
-      await checkActiveStream();
+      reply.diagnostics.history = {at: Date.now(), failed: !!state.historyLoadFailed};
+      if (findPendingReply()) { finishPendingReply(); return; }
+      const active = await checkActiveStream();
       if (generation !== catchUpGeneration || pendingReply !== reply) return;
+      reply.diagnostics.active = active;
+      changed();
       if (!pendingReply || catchUpTimer) return;
       if (Date.now() >= deadline) { finishPendingReply(true); return; }
       // A live stream may belong to an earlier turn; keep watching queued work.
@@ -3238,8 +3253,9 @@ function createStreamRuntime(state: any, options: any): any {
     void checkActiveStream();
   }
 
-  async function checkActiveStream() {
+  async function checkActiveStream(): Promise<NonNullable<ReplyWaitDiagnostics['active']>> {
     const epoch = writerEpoch;
+    let status: number | undefined;
     try {
       const prefetched = await takePrefetch("active");
       const res = prefetched ||
@@ -3247,22 +3263,30 @@ function createStreamRuntime(state: any, options: any): any {
           cache: "no-store",
           signal: timeoutSignal(8000),
         }));
-      if (!res || res.status === 204 || !res.ok) return;
+      status = res?.status;
+      if (status === 204) return {at: Date.now(), status, state: 'idle'};
+      if (!res?.ok) return {at: Date.now(), status, state: 'unavailable'};
       let data = await res.json();
       // Startup loads history after requesting this snapshot. A reply can finish
       // between the two responses: replaying that older buffer would briefly
       // duplicate the answer already restored from history.
-      if (prefetched && !data.finished && state.items.some((item: any) => item.kind === 'message' && item.role === 'being' && item.historySeq)) {
+      if (prefetched && data && !data.finished && state.items.some((item: any) => item.kind === 'message' && item.role === 'being' && item.historySeq)) {
         const fresh = await fetch(apiUrl('/api/stream/active'), {cache: 'no-store', signal: timeoutSignal(8000)});
-        if (fresh.status === 204) return;
+        status = fresh.status;
+        if (status === 204) return {at: Date.now(), status, state: 'idle'};
         if (fresh.ok) data = await fresh.json();
       }
       // A local send or another recovery may have taken ownership while the
       // discovery request was in flight. Do not replace that newer transport.
-      if (disposed || epoch !== writerEpoch || isStreaming) return;
-      discoverActiveStream(data);
+      if (!data || typeof data.stream_id !== 'string' || !data.stream_id || typeof data.finished !== 'boolean')
+        return {at: Date.now(), status, state: 'unavailable'};
+      if (!disposed && epoch === writerEpoch && !isStreaming) discoverActiveStream(data);
+      if (status !== undefined && status >= 300) return {at: Date.now(), status, state: 'unavailable'};
+      return {at: Date.now(), status, state: data.finished ? 'finished' : 'running',
+        streamId: data.stream_id, sceneId: messageScene(data).sceneId};
     } catch (e: any) {
-      console.warn("checkActiveStream failed:", e);
+      if (!disposed) traceNetwork('active-check-error', {status, kind: e?.name});
+      return {at: Date.now(), status, state: 'unavailable'};
     }
   }
 
@@ -3281,18 +3305,29 @@ function createStreamRuntime(state: any, options: any): any {
     return {epoch: writerEpoch, request: chatRequestRevision, reply: pendingReply, seq: liveSeq,
       progress: lastProgressTime, streamId: currentStreamId, busy: chatRequestsInFlight > 0};
   }
-  async function reconcileActivity(data: any, snapshot: ReturnType<typeof captureActivity>) {
+  const STALE_STREAM_GRACE_MS = 30000;
+  async function reconcileActivity(data: any, snapshot: ReturnType<typeof captureActivity>, status: number) {
     // An old idle response must never reset a newer POST, reader or live event.
-    if (disposed || snapshot.busy || chatRequestsInFlight || snapshot.epoch !== writerEpoch ||
-        snapshot.request !== chatRequestRevision || snapshot.reply !== pendingReply ||
-        snapshot.streamId !== currentStreamId || snapshot.seq !== liveSeq || snapshot.progress !== lastProgressTime) return;
+    const isCurrent = () => !disposed && !snapshot.busy && !chatRequestsInFlight && snapshot.epoch === writerEpoch &&
+      snapshot.request === chatRequestRevision && snapshot.reply === pendingReply &&
+      snapshot.streamId === currentStreamId && snapshot.seq === liveSeq && snapshot.progress === lastProgressTime;
+    if (!isCurrent()) return;
     const id = currentStreamId || pendingRecovery?.streamId;
     const terminal = !data || data.finished === true || (id && data.stream_id !== id);
+    if (!terminal && pendingReply) pendingReply.terminalObservedAt = undefined;
     if (terminal && (isStreaming || pendingRecovery) &&
-        (id || (routedStreaming && Date.now() - lastProgressTime >= 30000))) {
+        (id || (routedStreaming && Date.now() - lastProgressTime >= STALE_STREAM_GRACE_MS))) {
+      // Start the grace period at the first terminal snapshot, even if the
+      // preceding tool ran silently for longer. New SSE progress restarts it.
+      const terminalAt = currentAbortController && pendingReply ? pendingReply.terminalObservedAt ??= Date.now() : undefined;
+      const drainingReader = terminalAt !== undefined && Date.now() - terminalAt < STALE_STREAM_GRACE_MS;
+      if (drainingReader && !findPendingReply()) {
+        await reconcileHistory({preserve: true});
+        if (!isCurrent() || !findPendingReply()) return;
+      }
       traceNetwork('reset-stale-stream', {streamId: id || null, reason: !data ? 'gone' : data.finished ? 'finished' : 'superseded'});
-      await recoverViaHistory();
-    } else if (pendingReplyArrived()) {
+      await recoverViaHistory(drainingReader);
+    } else if (findPendingReply()) {
       finishPendingReply();
     }
     const reply = pendingReply;
@@ -3307,7 +3342,10 @@ function createStreamRuntime(state: any, options: any): any {
     await reconcileHistory({preserve: true});
     if (disposed || pendingReply !== reply || writerEpoch !== snapshot.epoch ||
         chatRequestRevision !== snapshot.request || isStreaming || chatRequestsInFlight) return;
-    if (pendingReplyArrived()) { finishPendingReply(); return; }
+    reply.diagnostics.history = {at: Date.now(), failed: !!state.historyLoadFailed};
+    reply.diagnostics.active = {at: now, status, state: data ? 'finished' : 'idle',
+      streamId: data?.stream_id, sceneId: data ? messageScene(data).sceneId : undefined};
+    if (findPendingReply()) { finishPendingReply(); return; }
     traceNetwork('reset-orphaned-wait', {reason: 'server-idle-without-reply', idleMs: now - reply.idleSince!});
     finishPendingReply(true, true);
     updateSendButton();
@@ -3552,16 +3590,16 @@ function createStreamRuntime(state: any, options: any): any {
       persistedFrom: data.persisted?.from, continuation: data.continuation === true,
       ...(type === 'content_block_delta' ? {textLength: typeof data.delta?.text === 'string' ? data.delta.text.length : 0} : {})});
   }
-  function processReplayEvent(eventType: any, eventData: any, seq?: number, settled = false) {
+  function processReplayEvent(eventType: any, eventData: any, seq?: number, settled = false, source: 'sse' | 'replay' = 'replay') {
     const previous = replayingSettledReply;
     replayingSettledReply = settled;
-    try { applyReplayEvent(eventType, eventData, seq); }
+    try { applyReplayEvent(eventType, eventData, seq, source); }
     finally { replayingSettledReply = previous; }
   }
-  function applyReplayEvent(eventType: any, eventData: any, seq?: number) {
+  function applyReplayEvent(eventType: any, eventData: any, seq: number | undefined, source: 'sse' | 'replay') {
     if (PROGRESS_EVENTS.has(eventType)) lastTransportProgressTime = Date.now();
     traceStreamEvent(seq === undefined ? 'routed' : 'replay', eventType, eventData, seq);
-    if (options.routeEvent?.(eventType, eventData, replayingSettledReply)) {
+    if (options.routeEvent?.(eventType, eventData, replayingSettledReply, source)) {
       // SBS may hand the same transport to a room. Close the previous activity
       // segment without stopping the shared reader or the room's pending reply.
       if (autonomousStream && !autonomousHandedOff && PROGRESS_EVENTS.has(eventType) && eventType !== 'message_stop' && eventType !== 'error' &&
@@ -3589,7 +3627,7 @@ function createStreamRuntime(state: any, options: any): any {
     if (eventType === "error" && repeatedServerError(eventData)) return;
     splitStreamProgress(eventType, eventData);
     if (replayingSettledReply && ['thinking', 'reasoning', 'tool_use', 'tool_result'].includes(eventType)) return;
-    if (!replayingSettledReply) markProgress(eventType, eventData);
+    if (!replayingSettledReply) markProgress(eventType, eventData, source);
     switch (eventType) {
       case "meta":
         acceptPersisted(eventData);
@@ -3663,7 +3701,7 @@ function createStreamRuntime(state: any, options: any): any {
       renderTimer = null;
     }
     finalizePartialBubble(true);
-    if (!replayingSettledReply) settleReplyBoundary();
+    if (!replayingSettledReply) settleReplyBoundary('message-stop');
     if (!pendingReply && !replayingSettledReply) {
       updateRun(true);
       replyRunSettled = true;
@@ -3686,7 +3724,7 @@ function createStreamRuntime(state: any, options: any): any {
     // 先把 streamText 固化为正式消息（如果还没渲染）
     finalizePartialBubble(true);
     noteStreamEcho();
-    settleReplyBoundary();
+    settleReplyBoundary('stream-finished');
 
     isStreaming = false;
     if (currentStreamId) lastStreamId = currentStreamId;
@@ -3781,8 +3819,8 @@ function createStreamRuntime(state: any, options: any): any {
     activeAutonomousOrigin: () => isStreaming && !autonomousHandedOff ? autonomousOrigin : undefined,
     autonomousPhase: () => livePhase === "tool" ? "working" : livePhase === "text" ? "replying" : "thinking",
     settleHistoryReply: () => {
-      if (pendingReplyArrived()) finishPendingReply();
-      else if (!pendingReply && timedOutReply && currentRun === timedOutReply.run && currentRun.outcome === 'timeout' && pendingReplyArrived(timedOutReply.reply)) {
+      if (findPendingReply()) finishPendingReply();
+      else if (!pendingReply && timedOutReply && currentRun === timedOutReply.run && currentRun.outcome === 'timeout' && findPendingReply(timedOutReply.reply)) {
         // Only reconcile the latest unresolved request. A newer send clears
         // this reference, so its answer cannot retroactively finish this run.
         currentRun.end = Date.now();
@@ -3790,7 +3828,8 @@ function createStreamRuntime(state: any, options: any): any {
         currentRun.replyConfirmed = true;
         currentRun.label = '已回复';
         currentRun.hint = '';
-        logReplyWait('late-reply');
+        currentRun.replyWait = undefined;
+        logReplyWait('late-reply', timedOutReply.reply);
         timedOutReply = null;
         changed();
       }
@@ -3875,7 +3914,7 @@ function createStreamRuntime(state: any, options: any): any {
     recoverConnection: onReconnected,
     syncConnection: (next: any) => { connState = next; applyDotClass(); },
     acceptReplay: replayStream,
-    acceptSceneEvent: (type: any, data: any, settled = false) => {
+    acceptSceneEvent: (type: any, data: any, settled: boolean, source: 'sse' | 'replay') => {
       if (type === "meta" && !data.persisted) { lastServerError = undefined; return; }
       if (type === "usage") return;
       // A boundary is not the start of another run. Shared streams may replay
@@ -3886,7 +3925,7 @@ function createStreamRuntime(state: any, options: any): any {
         updateSendButton();
       }
       if (type === "message_stop" && data.session_id) sessionId = data.session_id;
-      processReplayEvent(type, data, undefined, settled);
+      processReplayEvent(type, data, undefined, settled, source);
       if (!settled && routedStreaming && (type === "message_stop" || type === "error")) {
         routedStreaming = false;
         isStreaming = false;

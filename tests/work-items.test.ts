@@ -79,7 +79,7 @@ it.each(['internal', 'codex', 'deepseek'])('reconciles an accepted %s launch and
     expect(launch.status).toBe(504);
     if (executor === 'internal') expect(await launch.text()).toBe('accepted then gateway timed out');
     const launchedPrompt = executor === 'internal' ? JSON.parse(String(fetcher.mock.calls[0][1]?.body)).brief : nativeStart.mock.calls[0][1];
-    expect(launchedPrompt).toContain('所属长期目标（v1）：筹备社区开放日');
+    expect(launchedPrompt).toBe('会议议程\n\n任务目标：离线浏览议程\n\n规格：带分类筛选\n\n验收标准：\n- 有空态');
     const changedGoal = { ...goalFields, goal_id: goal.id, expectedVersion: 1, outcome: '增加无障碍筛选提示' };
     expect(JSON.parse(await network.context(`update-goal ${JSON.stringify(changedGoal)}`))).toMatchObject({ version: 2 });
     expect((await request(`work/goals/${goal.id}`, 'PATCH', changedGoal)).status).toBe(409);
@@ -122,10 +122,7 @@ it.each(['internal', 'codex', 'deepseek'])('reconciles an accepted %s launch and
     expect(stale.status).toBe(409);
     expect(followUp).toBe('');
     await network.context(`send ${JSON.stringify({ task_id: root, message: '增加标题搜索' })}`, undefined, 'scene');
-    expect(followUp).toContain('规格：加搜索');
-    expect(followUp).toContain('所属长期目标（v2）：筹备社区开放日');
-    expect(followUp).toContain('增加无障碍筛选提示');
-    expect(followUp.match(/当前任务要求/g)).toHaveLength(1);
+    expect(followUp).toBe('增加标题搜索');
     expect((await request('work/items/batch', 'POST', { ids: [item.id], stage: 'done' })).status).toBe(409);
     await finish('<h1>新版议程</h1><input type="search">', true);
     const delivered: WorkItem = await (await request(`work/items/${item.id}`)).json();

@@ -40,7 +40,7 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
       if (disposed) return;
       for (const [session, snapshot] of snapshots) {
         if (disposed) return;
-        if (snapshot) await session.runtime.reconcileActivity(active, snapshot);
+        if (snapshot) await session.runtime.reconcileActivity(active, snapshot, response.status);
       }
       if (disposed) return;
       if (active) owner.runtime.discoverActiveStream?.(active);
@@ -511,14 +511,14 @@ export function createSceneRuntime(state: ChatState, options: RuntimeOptions, cr
       onStopMarker(marker: any) {
         for (const target of sessions.values()) target.runtime?.acceptStopMarker?.(marker);
       },
-      routeEvent(type: any, data: any, settled = false) {
+      routeEvent(type: string, data: any, settled: boolean, source: 'sse' | 'replay') {
         if (!Object.hasOwn(data, "scene_id")) return false;
         const scene = messageScene(data);
         if (scene.sceneId === local.currentScene.sceneId ||
             (scene.sceneId && local.currentScene.legacySceneId && inCurrentScene(scene, local.currentScene))) return false;
         const target = sessionFor(scene);
         routed.add(target);
-        target.runtime.acceptSceneEvent(type, data, settled);
+        target.runtime.acceptSceneEvent(type, data, settled, source);
         return true;
       },
       finishRoutes() {

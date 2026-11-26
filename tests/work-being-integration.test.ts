@@ -77,8 +77,9 @@ it('lets Being discover projects, launch independent executors, continue, cancel
     const { modelSelection: _selection, ...legacyFields } = planned[0];
     await command(`update ${JSON.stringify({ ...legacyFields, item_id: planned[0].id })}`);
     expect(starts).toHaveLength(0);
+    const extraInstruction = '志愿者需要离线查看。完成后请用 Markdown 链接列出交付文件。';
     const receipts = await Promise.all(['codex', 'deepseek'].map((executor, index) => {
-      const payload = JSON.stringify({ item_id: planned[index].id, executor, ...(index && { request_id: 'after-prior-run' }) });
+      const payload = JSON.stringify({ item_id: planned[index].id, executor, ...(index && { request_id: 'after-prior-run', instruction: extraInstruction }) });
       return command(`run ${index ? `'${payload}'` : payload}`);
     }));
     const ids = receipts.map(receipt => JSON.parse(receipt.text!).task_id as string);
@@ -87,7 +88,8 @@ it('lets Being discover projects, launch independent executors, continue, cancel
     expect(starts).toHaveLength(2);
     expect(starts.find(start => start.executor === 'codex')?.directory).toBe(directories[0]);
     expect(starts.find(start => start.executor === 'deepseek')?.directory).toBe(directories[1]);
-    expect(starts.find(start => start.executor === 'deepseek')?.message).toContain('所属长期目标（v1）：线下活动工具包');
+    expect(starts.find(start => start.executor === 'codex')?.message).toBe('生成欢迎页\n\n生成带分类筛选、计数与空态的自包含 HTML 页面。');
+    expect(starts.find(start => start.executor === 'deepseek')?.message).toBe(`生成说明页\n\n生成带分类筛选、计数与空态的自包含 HTML 页面。\n\n${extraInstruction}`);
     expect(['codex', 'deepseek'].map(executor => starts.find(start => start.executor === executor)?.modelSelection)).toEqual(models);
     const snapshot = await network.snapshot();
     expect(ids.map(id => snapshot.tasks.find(task => task.id === id)?.projectId)).toEqual(projects.map((project: { id: string }) => project.id));

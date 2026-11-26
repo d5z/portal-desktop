@@ -351,6 +351,45 @@
   color: var(--text-muted);
 }
 
+.run-activity[data-reply-wait] {
+  margin-bottom: 0;
+
+  > summary,
+  .run-caption {
+    flex-wrap: wrap;
+    row-gap: 0;
+  }
+
+  > summary > .run-icon {
+    top: 7px;
+  }
+
+  .run-label {
+    white-space: normal;
+  }
+}
+
+.run-wait-summary {
+  margin: 0 0 12px var(--chat-bubble-padding-inline, 16px);
+}
+
+.run-wait-details {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 4px 0 8px 24px;
+  font-size: 12px;
+
+  dt {
+    color: var(--text-muted);
+  }
+
+  dd {
+    margin: 0;
+    overflow-wrap: anywhere;
+  }
+}
+
 @keyframes run-spin {
   to {
     transform: rotate(360deg);

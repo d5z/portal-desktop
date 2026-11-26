@@ -112,6 +112,10 @@ it.each(['queued', 'empty'] as const)('reports an unconfirmed result after a gen
     expect(f.runs()[0].status).toBe(initial === 'queued' ? 'queued' : 'waiting');
     await vi.advanceTimersByTimeAsync(300100);
     expect(f.runs()[0]).toMatchObject({status: 'timeout', outcome: 'timeout', label: '等待超时，结果待确认'});
+    expect(f.runs()[0].replyWait).toMatchObject({httpStatus: initial === 'queued' ? 202 : 200,
+      active: {status: 204, state: 'idle'}, history: {failed: false}});
+    expect(f.runs()[0].replyWait?.boundary).toBe(initial === 'empty' ? 'sse-eof' : undefined);
+    expect(f.runs()[0].replyWait?.lastEvent).toBeUndefined();
     expect(f.activity.mock.lastCall?.[0]['desktop-test']).toBe('timeout');
     expect(f.fetcher.mock.calls.some(([url]) => new URL(url).pathname === '/api/stop')).toBe(false);
   } finally { f.close(); }
@@ -132,9 +136,40 @@ it('does not let another scene or empty deltas extend the current wait, and pres
       await vi.advanceTimersByTimeAsync(30000);
     }
     expect(f.runs()[0].status).toBe('timeout');
+    expect(f.runs()[0].replyWait).toMatchObject({boundary: 'message-stop', lastEvent: {type: 'tool_use', source: 'sse'}});
     const html = renderToStaticMarkup(createElement(ChatActivity, {run: f.runs()[0]}));
     expect(html).toContain('1 次结果未确认');
     expect(html).not.toContain('class="run-entry"');
+  } finally { f.close(); }
+});
+
+it('reports the last tool result, EOF and failed recovery checks for the same reply without logging content', async () => {
+  const f = await fixture();
+  try {
+    f.setActive(() => new Response('upstream busy', {status: 503}));
+    f.setHistory(async () => new Response('history unavailable', {status: 502}));
+    f.emit('meta', {stream_id: 'fixture-stream'});
+    f.emit('reasoning', {text: 'private reasoning text'});
+    f.emit('tool_use', {id: 'tool-1', name: 'portal_exec', input: {command: 'private tool argument'}});
+    f.emit('tool_result', {tool_use_id: 'tool-1', is_error: true, content: 'private tool result'});
+    f.finishStream();
+    await vi.advanceTimersByTimeAsync(2100);
+    const run = f.runs()[0];
+    const expected = {httpStatus: 200, boundary: 'sse-eof', lastEvent: {type: 'tool_result', source: 'sse'},
+      active: {status: 503, state: 'unavailable'}, history: {failed: true}};
+    expect(run).toMatchObject({status: 'waiting', replyWait: expected});
+    const waiting = renderToStaticMarkup(createElement(ChatActivity, {run, showDetails: false}));
+    expect(waiting).toContain('已读到 SSE 响应末尾，最终回复待确认。');
+    expect(waiting).not.toContain('请刷新会话。');
+    await vi.advanceTimersByTimeAsync(298000);
+    expect(run).toMatchObject({status: 'timeout', replyWait: expected});
+    expect(run.hint).toContain('请刷新会话。');
+    expect(renderToStaticMarkup(createElement(ChatActivity, {run, showDetails: false}))).toContain('请刷新会话。');
+    const logs = vi.mocked(console.info).mock.calls;
+    const wait = logs.filter(([tag]) => tag === '[chat-reply-wait]').map(([, line]) => JSON.parse(line));
+    expect(wait.at(-1)).toMatchObject({...expected, event: 'timeout', timeoutReason: 'deadline',
+      sceneId: 'desktop-test', streamId: 'fixture-stream', runId: run.id, toolCount: 1});
+    expect(JSON.stringify(logs)).not.toMatch(/private |upstream busy|history unavailable/);
   } finally { f.close(); }
 });
 

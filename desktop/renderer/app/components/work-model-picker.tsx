@@ -6,7 +6,7 @@ const optionKey = ({ provider, model }: WorkModelSelection) => JSON.stringify([p
 
 export function WorkModelPicker({ endpoint, executor, value, onChange, disabled }: {
   endpoint: string;
-  executor: 'codex' | 'deepseek';
+  executor: string;
   value?: WorkModelSelection | null;
   onChange: (value: WorkModelSelection | null) => void;
   disabled?: boolean;

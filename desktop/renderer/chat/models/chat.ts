@@ -93,6 +93,13 @@ export interface ActivityEntry {
   duration?: number;
   ts?: number;
 }
+export interface ReplyWaitDiagnostics {
+  httpStatus?: number;
+  boundary?: 'message-stop' | 'sse-eof' | 'stream-finished' | 'history-recovery';
+  lastEvent?: { type: string; at: number; source: 'sse' | 'replay' };
+  history?: { at: number; failed: boolean };
+  active?: { at: number; status?: number; state: 'idle' | 'running' | 'finished' | 'unavailable'; streamId?: string; sceneId?: string };
+}
 export interface Run extends MessageScene {
   kind: "run";
   /** Explicit autonomous origin; a missing scene alone is not evidence of SBS. */
@@ -107,6 +114,7 @@ export interface Run extends MessageScene {
   context?: string;
   arg: string;
   waitingForReply?: boolean;
+  replyWait?: ReplyWaitDiagnostics;
   /** A final reply was observed, independently of the display label. */
   replyConfirmed?: boolean;
   status?: import("../../../shared/types").ChatSceneActivity;

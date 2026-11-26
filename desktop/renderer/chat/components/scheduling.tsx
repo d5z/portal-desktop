@@ -12,7 +12,7 @@ export function ScheduledMessage({ text, streaming, onPlace, intelligentUI = fal
   if (commandLabels) return <CommandMessageMarkdown content={content.text} className="content" onPlace={onPlace} />;
   return <ChatMessageMarkdown content={content.text} className={`content${streaming ? ' stream-cursor' : ''}`} onPlace={onPlace} streaming={streaming} />;
 }
-const labels: Record<SceneTask['status'], string> = { queued: '等待执行', running: '后台执行中', done: '执行完成', failed: '执行失败', cancelled: '已取消', interrupted: '已中断', budget_exhausted: '达到任务限额', timeout: '执行超时' };
+const labels: Record<SceneTask['status'], string> = { queued: '等待执行', running: '后台执行中', done: '执行完成', failed: '执行失败', cancelled: '已取消', interrupted: '已中断', unknown: '状态同步中', budget_exhausted: '达到任务限额', timeout: '执行超时' };
 export function SceneScheduling({ tasks, hint }: { tasks: SceneTask[]; hint: string }) {
   if (!tasks.length && !hint) return null;
   const active = tasks.filter(t => t.status === 'running' || t.status === 'queued').length;

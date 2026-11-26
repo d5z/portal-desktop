@@ -8,7 +8,12 @@ export class AgentBridge {
   private cached?: Promise<AgentSnapshot & { agents: AgentDescriptor[] }>;
   private refreshedAt = 0;
   private selectionKey = '';
-  constructor(adapters: AgentAdapter[]) { for (const adapter of adapters) this.adapters.set(adapter.id, adapter); }
+  constructor(adapters: AgentAdapter[]) { for (const adapter of adapters) this.register(adapter); }
+  register(adapter: AgentAdapter) {
+    if (this.adapters.has(adapter.id)) throw new Error(`执行器 ID 已注册：${adapter.id}`);
+    this.adapters.set(adapter.id, adapter);
+    this.invalidate();
+  }
   adapter(id: string) { const adapter = this.adapters.get(id); if (!adapter) throw new AgentError('未知的执行器。', 400); return adapter; }
   hasNative(id: string) { return !!this.adapters.get(id)?.native; }
   invalidate() { this.cached = undefined; }
@@ -19,10 +24,15 @@ export class AgentBridge {
     this.refreshedAt = Date.now();
     return this.cached = (async () => {
       const rows = await Promise.all([...this.adapters.values()].map(async adapter => {
-        const descriptor = await adapter.status();
-        if (!descriptor.available) return { descriptor, projects: [], tasks: [] };
-        try { return { descriptor, ...await adapter.list(new Set(taskIds.filter(id => id.startsWith(`agent_${adapter.id}_`)).map(id => id.slice(`agent_${adapter.id}_`.length)))) }; }
-        catch (error) { return { descriptor: { ...descriptor, available: false, message: (error as Error).message }, projects: [], tasks: [] }; }
+        let descriptor: AgentDescriptor = { id: adapter.id, name: adapter.name, available: false };
+        try {
+          descriptor = await adapter.status();
+          if (!descriptor.available) return { descriptor, projects: [], tasks: [] };
+          const prefix = `agent_${adapter.id}_`;
+          return { descriptor, ...await adapter.list(new Set(taskIds.filter(id => id.startsWith(prefix)).map(id => id.slice(prefix.length)))) };
+        } catch (error) {
+          return { descriptor: { ...descriptor, available: false, message: (error as Error).message }, projects: [], tasks: [] };
+        }
       }));
       return { agents: rows.map(row => row.descriptor), projects: rows.flatMap(row => row.projects), tasks: rows.flatMap(row => row.tasks) };
     })();

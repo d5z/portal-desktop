@@ -41,6 +41,10 @@ export function registerShellIpc(options: {
   handle('beings:quit', () => { setImmediate(() => app.quit()); });
   handle('beings:browser-state', () => getBrowser()?.state);
   handle('beings:browser-open', (url?: string) => getBrowser()?.open(url));
+  handle('beings:open-codex-thread', (id: unknown) => {
+    if (typeof id !== 'string' || !/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i.test(id)) throw new Error('Codex 会话 ID 无效。');
+    return shell.openExternal(`codex://threads/${id}`);
+  });
   handle('beings:chat-edit', (command: import('../../shared/types').ChatEditCommand) => editChat(getWindow(), command));
   handle('beings:selection-edit', (command: import('../../shared/types').ChatEditCommand) => editChat(getWindow(), command, 'shell'));
   handle('beings:clipboard-copy', (text: string) => {

@@ -65,8 +65,8 @@ export const CHAT_SCENE_ACTIVITY_ACTIONS: Partial<Record<ChatSceneActivity, stri
 export interface WorkProject { executor?: string; nativeId?: string; id: string; name: string; directory: string; createdAt: number; goalId?: string; rules?: import('./work').WorkProjectRules }
 export interface WorkImportSelection { projectIds: string[]; taskIds: string[] }
 export interface WorkImportCatalog extends WorkImportSelection { projects: WorkProject[]; tasks: SceneTask[]; agents: NonNullable<WorkSnapshot['agents']> }
-export interface WorkSnapshot extends SceneTaskSnapshot { projects: WorkProject[]; goals?: import('./work').WorkGoal[]; items?: import('./work').WorkItem[]; removedItemRunIds?: string[]; hiddenProjectSessionIds?: string[]; results?: import('./work').WorkResultPage; agents?: { id: string; name: string; available: boolean; canExecute?: boolean; message?: string }[] }
-export interface SceneTask { executor?: string; nativeId?: string; id: string; workdir?: string; projectId?: string; parentTaskId?: string; userMessage?: string; session?: string; sceneId: string; status: "queued" | "running" | "done" | "failed" | "cancelled" | "interrupted" | "budget_exhausted" | "timeout"; createdAt: number; endedAt?: number; brief?: string; turns?: number; error?: string }
+export interface WorkSnapshot extends SceneTaskSnapshot { projects: WorkProject[]; goals?: import('./work').WorkGoal[]; items?: import('./work').WorkItem[]; removedItemRunIds?: string[]; hiddenProjectSessionIds?: string[]; results?: import('./work').WorkResultPage; agents?: import('./work-executor').WorkAgentDescriptor[] }
+export interface SceneTask { executor?: string; nativeId?: string; activeTurnId?: string; id: string; workdir?: string; projectId?: string; parentTaskId?: string; userMessage?: string; session?: string; sceneId: string; status: "queued" | "running" | "done" | "failed" | "cancelled" | "interrupted" | "unknown" | "budget_exhausted" | "timeout"; createdAt: number; endedAt?: number; brief?: string; turns?: number; error?: string }
 export interface SceneTaskSnapshot { endpoint: string; tasks: SceneTask[]; subagentReady?: boolean; subagentConfigured?: boolean; subagentEnabled?: boolean }
 export interface SubagentStep {
   at: number;
@@ -75,6 +75,7 @@ export interface SubagentStep {
   callId?: string;
   name?: string;
   input?: string;
+  attachments?: import('./work-attachments').WorkAttachment[];
   output?: string;
   failed?: boolean;
 }
@@ -136,6 +137,7 @@ export interface DesktopAPI {
   quit(): Promise<void>;
   browserState(): Promise<BrowserState>;
   openBrowser(url?: string): Promise<void>;
+  openCodexThread(id: string): Promise<void>;
   copyText(text: string): Promise<void>;
   copyImage(data: ArrayBuffer, mime: string): Promise<void>;
   editChat(command: ChatEditCommand): Promise<boolean>;

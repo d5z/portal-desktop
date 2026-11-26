@@ -7,7 +7,7 @@ Work 默认打开「全部任务」看板。顶栏显示当前位置，左侧按
 ## 长期目标
 
 - 在 Work 的「目标」视图创建目标，填写预期结果和验收条件，再添加项目目录或关联已有项目。一个目标可包含多个项目，每个项目可关联一个所属目标。
-- 在目标详情可以查看项目和任务进度，并在对应项目下新建执行会话。派发与续聊自动带入项目当前的目标和验收条件，交付记录保留当轮采用的目标版本。
+- 在目标详情可以查看项目和任务进度，并在对应项目下新建执行会话。项目目标及其版本用于 Work 的任务关联和交付记录。手动派发只发送当前任务填写的内容，包括标题、描述和显式填写的规格或验收条件。
 - 也可以直接添加项目目录，再从项目看板新建执行会话。以后需要纳入长期目标时，可以在目标详情关联已有项目，已有执行记录保留原先的版本信息。
 
 ## 项目目录
@@ -42,7 +42,7 @@ Work 草稿、选择及筛选在本次客户端会话中保留；切换 Being �
 - 待规划可让 Being 梳理需求，进行中可查看实际进度，已阻塞可排查并建议恢复方式，已完成可总结结案交付，已取消可回顾取消前的进展。
 - 在 Being 对话输入 `@` 可按标题选择 Work 任务。标签会随草稿保存，发送后可点击打开对应任务。
 - 看板拖拽开工时，缺少项目或执行器会打开编辑框，补齐后点击「保存并执行」。项目默认执行器可以使用。收到启动确认后看板才进入「进行中」。
-- Being 可用 `@work create` 创建待办，`@work run {"item_id":"work_…"}` 显式派发，`@work update` 修改字段，`@work note` 和 `@work artifact` 登记补充。启动较慢时先返回 `starting`，通过 `@work status <work_id>` 查询同一条派发和实际运行 ID。重复首轮派发或重发相同接管 ID 会复用原回执。通过 `@work <work_id>` 获取任务属性及关联运行，通过 `[任务标题](beings://work/<work_id>)` 打开任务。
+- Being 可用 `@work create` 创建待办，`@work run {"item_id":"work_…"}` 显式派发，`@work update` 修改字段，`@work note` 和 `@work artifact` 登记补充。Being 可以在派发时用可选的 `instruction` 字段补充本轮需要的目标背景或交付格式。启动较慢时先返回 `starting`，通过 `@work status <work_id>` 查询同一条派发和实际运行 ID。重复首轮派发或重发相同接管 ID 会复用原回执。通过 `@work <work_id>` 获取任务属性及关联运行，通过 `[任务标题](beings://work/<work_id>)` 打开任务。
 - 任务详情的「自动化」或 Being 的 `@work automate` 可配置一次性审核交接和自动唤醒。交接在任务进入待审核时启动审核执行器，附上上一轮结果。唤醒在待办或阻塞任务的指定时间到达、同项目指定任务完成，或所有子任务完成后发起。触发记录保留执行器、状态和运行 ID。
 - `@work automate` 接收 `item_id`、`scene_id` 以及 `handoff` 或 `wakeup`。两个规则都需要 `executor` 和 `instruction`。唤醒另需 `kind`（`at` 需 Unix 毫秒 `at`，`task_done` 需 `itemId`，`children_done` 无额外参数）。将某个规则设为 `null` 可移除。当前场景由 `/work` 上下文提供，Portal 已提供场景时优先使用。
 - 选择已注册的项目后，可在「项目规则」设置默认执行器和审核交接。默认执行器供 Being 选择时参考，任务指定的执行器优先。默认审核在任务首次成功后触发一次，任务可覆盖或跳过该规则。
@@ -73,7 +73,7 @@ Portal 记录并合并可见 `text_delta`，忽略模型私有 thinking；客户
 - `@work <task_id>` 读取完整会话：从首轮或任意续聊 ID 均可读取首轮及所有后续轮次，保留用户补充、公开回复、工具参数、结果和错误。原生会话附其接口公开的对话记录（不包含运行时注入的配置提示）。超过 12000 字符时返回固定快照的 JSON 文本分页，按 offset 拼接 content，并跟随 next 读取至 null；无最近六轮或单条截断。每个快照保留 10 分钟、最多保留 8 个，过期明确报错并要求重读。重启后可重新读取原生持久历史。
 - `portal_subagent_control` 新增 `action: "continue"`，参数为 `task_id` 和 `message`。Being 和 Work 页面使用同一续聊实现。
 - 续聊继承原任务 scene、session、工作目录和现有权限；执行器接受续聊后，关联任务回到「进行中」，本轮成功后进入「待审核」，失败进入「已阻塞」，取消进入「已取消」。保留原来的 `steer`、`follow_up` 和 `cancel` 行为。
-- Work 和 Being 的续聊都会携带当前任务要求，并记录发送时采用的版本。重试一次失败的执行沿用该次指令和版本。派发或交付还未确认时，结案请求会被拒绝。
+- Work 续聊发送本轮填写的消息和附件，Being 可以在 `@work send` 的 `message` 字段中明确补充本轮信息。Work 记录发送时关联的任务要求和目标版本。重试一次失败的执行沿用该次指令和版本。派发或交付还未确认时，结案请求会被拒绝。
 - 每轮关联 `parent_task_id` 与 `user_message`，在启动任务时与 ledger 一起写入，不根据相同 session 名称把无关任务合并。
 - 对于无持久会话的运行模式，显式携带任务说明与各轮最后回复，历史预算为 44000 字节，较早内容可能截断。工具明细仍可在 Work 查看，文件继续保留在原工作目录。完成通知继续走原 Heart callback。
 
@@ -95,12 +95,14 @@ Portal 记录并合并可见 `text_delta`，忽略模型私有 thinking；客户
 | POST | `beings://desktop/api/work/items/{item_id}/runs` | 按任务要求启动执行，使用当前 `scene_id`，可传 `executor` 和 `request_id` |
 | GET / POST / PATCH | `beings://desktop/api/work/items/{item_id}/dispatch` | 查原派发、创建接管请求或记录对话接收及派发失败 |
 | GET | `beings://desktop/api/subagent/tasks` | 现有 ledger 快照与可用状态 |
-| POST | `beings://desktop/api/subagent/tasks` | 创建独立任务，正文包含 `brief`、`workdir`、`scene_id`，可选 `executor` 和 `modelSelection` |
+| POST | `beings://desktop/api/subagent/tasks` | 创建独立任务，正文包含 `brief`、`workdir`、`scene_id`，可选 `executor`、`modelSelection`。内置 Subagent 支持可选 `attachments` |
 | GET | `beings://desktop/api/subagent/tasks/{task_id}` | 现有脱敏执行记录 |
-| POST | `beings://desktop/api/subagent/tasks/{task_id}/messages` | 正文仅 `{ "message": "..." }`，续聊 |
+| POST | `beings://desktop/api/subagent/tasks/{task_id}/messages` | 正文包含 `message`，内置 Subagent 支持可选 `attachments` |
 | POST | `beings://desktop/api/subagent/tasks/{task_id}/cancel` | 停止执行 |
 
 写请求保留 Portal HTTP 路径、状态码、Content-Type 和错误正文。主进程检查当前 Being、可见任务、运行时 PID 与启动 nonce，只连接选定 Portal 的 loopback API；真实访问凭据只在主进程与 Portal 之间传递。Portal API 再调用原 ToolHost 与 SubagentManager，子工具权限和回调保持原有机制。
+
+内置 Subagent 的附图由 stdio 传输处理，单条消息的图片合计上限为 10 MB。运行中的内置任务可以在该轮结束后通过续聊发送附图。
 
 此改动包含 `heart-portal` 子模块源码。更新后需要使用新构建的 Portal，并重启客户端/Portal。旧引擎仍可读取任务，但续聊请求会返回 503，提示更新或重启。
 
@@ -128,8 +130,18 @@ Portal 记录并合并可见 `text_delta`，忽略模型私有 thinking；客户
 - `@work agents` 查看执行器的连接和可执行状态。没有关联长期目标的项目可用 `@work start` 创建独立会话。需要任务看板、目标继承和交付版本时，使用 `@work create` 和 `@work run`。
 - 新会话选择执行器；已有会话保持其原生执行器。项目下展示 session，历史轮次与工具活动复用主对话的折叠执行组件。
 - Renderer 的外部执行操作使用原生资源路径：`beings://codex/project/create`、`thread/start`、`thread/resume`、`turn/start`、`turn/interrupt`；`beings://deepseek/api/workspace/create`、`session/create`、`commands/execute`（仅权限同步）、`session/prompt`、`session/cancel`。请求体保留原生协议；主进程管理凭据，保留 HTTP 状态及原始错误正文。Work 聚合读取沿用本地任务 API。
-- Codex 优先连接已有 app-server control socket，也可启动独立 app-server 读取原生持久历史。完成后解除订阅，续聊时恢复原会话并应用当前客户端权限。
+- Codex 优先通过本机私有 control socket 连接共享 App Server。同一 App Server 上的 Codex 客户端会收到新会话及项目事件。独立 App Server 创建的会话也会保存到 Codex 本机历史，可以在 Work 会话菜单点「在 Codex 打开」加载同一个会话 ID。完成后解除订阅，续聊时恢复原会话并应用当前客户端权限。
 - DeepSeek 的“连接”安装一个只有发现职责的 Cordis 插件到 `DSH_HOME/town-bridge`，在 desktop profile 的 `cordis.patch.yml` 中追加 `town-work-discovery`。重启 Harness 后，它以 0600 文件发布当前宿主的官方本机认证 URL；Town 交换为主进程内 cookie。业务仍走官方 session/workspace API，不直接改写原生会话文件。关闭原生宿主会断开连接。
 - Work 展开时定时刷新。外部启动要求启用命令执行和完整访问权限，续聊前重新应用当前设置。客户端设为「每次询问」时，额外执行器只同步历史，执行交给内置 Subagent。
-- 接入新 agent：实现 `AgentAdapter`，在 bootstrap 注册；有原生页面操作时添加 `work-executors.ts` 的协议传输适配器及限定路径校验。协议特殊处理仅留在对应适配器；不得通过通用任意 URL/命令代理扩展。
+- Work 根据执行器声明的能力显示附件和模型入口。内置 Subagent 在新建独立会话或上一轮结束后支持图片，Portal 将 `{ name, mediaType, data }` 格式的 Base64 图片传给内置执行进程。Codex 使用 `turn/start` 或 `turn/steer` 的图片输入；DeepSeek Harness 通过 `session/uploadFileBinary` 上传图片或文件，由 `session/prompt` 携带上传回执。
 - 「导入 / 同步」可按执行器和项目勾选外部历史会话，选择按 Being 保存。Work 创建的原生会话自动保留，清空历史导入选择后仍可在 Work 中打开。
+
+### 执行器架构
+
+| 层 | 职责 |
+| --- | --- |
+| Work | 展示任务、会话和附件，根据 `WorkAgentDescriptor.capabilities` 提供操作，保存原始执行器与 Work 任务的关联。 |
+| 客户端主进程 | `AgentBridge` 注册并选择 `AgentAdapter`，隔离单个执行器的发现故障。`WorkNetwork` 转发 DevTools 可见的原生请求，并通过 `AgentNativeLifecycle` 接收会话创建和开工回执。 |
+| 执行器适配器 | 使用 `AgentAdapter` 实现项目和会话发现、历史、启动、追加和取消。通过 `WorkExecutorTransport` 提交原生请求并把附件投影为 Work 能展示的类型。 |
+
+这套分层参考了 Codex Host 的 [Adapter 工厂](https://github.com/BytePioneer-AI/codex-host/blob/466d54c8fbafb57c01e97ab64ec850fefcba862d/packages/harness-adapter/src/plugin.ts)和[适配器加载器](https://github.com/BytePioneer-AI/codex-host/blob/466d54c8fbafb57c01e97ab64ec850fefcba862d/packages/host-runtime/src/harness-plugin-loader.ts)。本版由客户端启动代码注册执行器。未来 Kit 的清单可以声明执行器与协议版本，Kit 的工厂向同一注册表提供适配器。具备原生接口的执行器由自己的适配器接入，支持 ACP 的执行器可以共用 ACP 适配器。

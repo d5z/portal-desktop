@@ -417,6 +417,26 @@ it('clears a stale open reader after server completion, reconciles the reply and
   } finally {f.runtime.dispose();}
 });
 
+it.each([null, {stream_id:'human-1', finished:true}])('keeps reading live SSE when the active snapshot gets ahead of the final reply (%j)', async active => {
+  const f = await fixture();
+  try {
+    await f.runtime.send('wait for the final frame');
+    await vi.advanceTimersByTimeAsync(20);
+    f.emit('tool_use', {scene_id:'room',id:'tool-1',name:'read'});
+    f.emit('tool_result', {scene_id:'room',tool_use_id:'tool-1',content:'done'});
+    await vi.advanceTimersByTimeAsync(60000);
+    f.setActive(active);
+    await vi.advanceTimersByTimeAsync(10020);
+    expect(f.state.streaming).toBe(true);
+    f.emit('content_block_delta', {scene_id:'room',delta:{text:'the delayed final reply'}});
+    f.emit('message_stop', {scene_id:'room'});
+    f.closeStream();
+    await vi.advanceTimersByTimeAsync(20);
+    expect(f.state.items.find(i=>i.kind==='run' && i.sceneId==='room')).toMatchObject({outcome:'done',replyConfirmed:true});
+    expect(f.state.items.filter(i=>i.kind==='message' && i.text==='the delayed final reply')).toHaveLength(1);
+  } finally {f.runtime.dispose();}
+});
+
 it.each(['', '/being/alice'])('ignores an idle response captured before a new send (API prefix: %s)', async apiPrefix => {
   const f = await fixture(apiPrefix);
   let resolve!: (response:Response)=>void;
@@ -450,11 +470,13 @@ it('releases a vanished stream with no reply after its bounded wait so another s
   const f = await fixture();
   try {
     await f.runtime.send('lost response'); await vi.advanceTimersByTimeAsync(20);
+    f.emit('content_block_delta',{scene_id:'room',delta:{text:'unfinished fragment'}});
     f.setActive(null);
-    await vi.advanceTimersByTimeAsync(311000);
+    await vi.advanceTimersByTimeAsync(341000);
     expect(f.state.streaming).toBe(false);
     expect(f.state.thinking).toBe(false);
     expect(f.state.items.find(i=>i.kind==='run' && i.sceneId==='room')).toMatchObject({outcome:'timeout',waitingForReply:false});
+    expect(f.state.items.find(i=>i.kind==='message' && i.text==='unfinished fragment')).toMatchObject({streaming:false,interim:true});
     await f.runtime.selectScene({sceneId:'other',strict:true});
     await f.runtime.send('next request');
     await vi.advanceTimersByTimeAsync(20);
@@ -493,7 +515,8 @@ it.each([null, {stream_id:'completed', finished:true}])('releases a 202 orphan a
     expect(f.posts).toHaveLength(1);
     await vi.advanceTimersByTimeAsync(22000);
     expect(f.posts).toHaveLength(2);
-    expect(f.state.items.find(i=>i.kind==='run' && i.sceneId==='room')).toMatchObject({outcome:'timeout',waitingForReply:false});
+    expect(f.state.items.find(i=>i.kind==='run' && i.sceneId==='room')).toMatchObject({outcome:'timeout',waitingForReply:false,
+      replyWait:{httpStatus:202, active:{status:active ? 200 : 204, state:active ? 'finished' : 'idle'},history:{failed:false}}});
     expect(f.fetcher.mock.calls.some(([url])=>new URL(url).pathname==='/api/stop')).toBe(false);
   } finally {f.runtime.dispose();}
 });

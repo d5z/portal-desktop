@@ -154,6 +154,7 @@ interface MarkdownProps {
   message?: boolean;
   richCode?: boolean;
   renderText?: (text: string) => ReactNode;
+  renderLocalImage?: (path: string, alt: string) => ReactNode;
   leadingContent?: ReactNode;
   previewMarkdownCode?: boolean;
   intelligentUI?: boolean;
@@ -193,6 +194,7 @@ const MarkdownText = memo(function MarkdownText({
   richCode = chat,
   renderText,
   leadingContent,
+  renderLocalImage,
   previewMarkdownCode = true,
   intelligentUI = false,
   streaming: receiving = false,
@@ -262,7 +264,7 @@ const MarkdownText = memo(function MarkdownText({
   // vocabulary and streaming state so final code highlighting and action changes
   // always invalidate the cache. Weak keys release superseded tail tokens.
   const blockCache = useMemo(() => new WeakMap<Token, { before: string; after: PlaceView[]; node: ReactNode }>(),
-    [onPlace, renderText, leadingContent, chat, message, richCode, previewMarkdownCode, intelligentUI, streaming, previewLocalFile]);
+    [onPlace, renderText, renderLocalImage, leadingContent, chat, message, richCode, previewMarkdownCode, intelligentUI, streaming, previewLocalFile]);
   const linked = new Set<PlaceView>();
   const firstContentToken = tokens.find(token => token.type !== 'space');
   const messageLayout = chat && (withinFileReceipt || message);
@@ -505,19 +507,13 @@ const MarkdownText = memo(function MarkdownText({
           break;
         }
         case "image": {
-          const image = token as Tokens.Image,
-            href = safeLink(unescapeText(image.href));
-          node =
-            chat && href ? (
-              <RemoteImage
-                showUnavailable
-                src={href}
-                name={unescapeText(image.text)}
-                title={image.title || undefined}
-              />
-            ) : (
-              image.text
-            );
+          const image = token as Tokens.Image;
+          const source = unescapeText(image.href);
+          const name = unescapeText(image.text);
+          const href = safeLink(source);
+          const local = chat && renderLocalImage && !href ? localFileReference(source, true) : undefined;
+          node = chat && href ? <RemoteImage showUnavailable src={href} name={name} title={image.title || undefined} />
+            : local ? renderLocalImage?.(local, name) : image.text;
           break;
         }
         case "list": {

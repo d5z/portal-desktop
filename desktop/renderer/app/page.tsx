@@ -207,7 +207,7 @@ export function App({ model }: { model: AppModel }) {
       <KitDelete model={app.town} />
       <PermissionSettings app={app}/>
       <ToolApprovalDialog app={app}/>
-      <Toast message={app.toastMessage} copied={app.toastCopied} />
+      <Toast message={app.toastMessage} copied={app.toastCopied} tone={app.toastTone} />
       <EditContextMenu edit={app.api.editSelection} rootSelector="#client-main, dialog[open]"
         selectionSelector=".reading-text, .chat-message-body, .dialog-body pre" />
       </AttachmentFileViewer>

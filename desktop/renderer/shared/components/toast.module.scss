@@ -23,3 +23,9 @@
 .root:not(:popover-open) {
   display: none;
 }
+
+.root[data-tone='error'] {
+  border-color: color-mix(in srgb, var(--error) 35%, var(--bg));
+  background: color-mix(in srgb, var(--error) 9%, var(--bg));
+  color: var(--error);
+}

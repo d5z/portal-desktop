@@ -1,4 +1,8 @@
 import { expect, it, vi } from 'vitest';
+import { createServer } from 'node:http';
+import { chmod, mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
+import path from 'node:path';
+import { WebSocketServer } from 'ws';
 import { AgentBridge, mergeProjects } from '../desktop/main/agent-bridge/registry';
 import { AgentError, type AgentAdapter } from '../desktop/main/agent-bridge/types';
 import { CodexAdapter, codexDetail } from '../desktop/main/agent-bridge/codex';
@@ -26,6 +30,8 @@ it('keeps one failed adapter from hiding healthy sources', async () => {
   a.list = async () => { throw new AgentError('Disconnected'); };
   const result = await new AgentBridge([a, b]).snapshot();
   expect(result.agents.map(a => a.available)).toEqual([false, true]);
+  a.status = async () => { throw new AgentError('Discovery failed'); };
+  expect((await new AgentBridge([a, b]).snapshot()).agents).toMatchObject([{ available: false, message: 'Discovery failed' }, { available: true }]);
 });
 it('merges the same project directory while preserving the local registration', () => {
   const p = { id: 'local', name: 'A', directory: '/A', createdAt: 1 };
@@ -39,6 +45,18 @@ it('converts Codex history into independent turns with tool details and errors',
   expect(result.turns?.map(t => t.task.status)).toEqual(['done', 'failed']);
   expect(result.turns?.[0].steps.map(s => s.kind)).toEqual(['started', 'tool', 'tool-result', 'message']);
   expect(result.turns?.[1].task.error).toBe('Quota');
+});
+it('does not report a detached Codex turn as interrupted without a recorded end', () => {
+  const thread = { id: 'native', name: null, preview: '', cwd: '/a', projectId: null, createdAt: 1, updatedAt: 2,
+    status: { type: 'notLoaded' }, turns: [
+      { id: 'one', status: 'interrupted', startedAt: 1, completedAt: 2, items: [] },
+      { id: 'two', status: 'interrupted', startedAt: 3, completedAt: null, items: [] },
+    ] };
+  expect(codexDetail(thread).turns?.map(t => t.task.status)).toEqual(['interrupted', 'unknown']);
+  expect(codexDetail({ ...thread, status: { type: 'active' } }).turns?.map(t => t.task.status)).toEqual(['interrupted', 'running']);
+  thread.turns[1].status = 'completed';
+  thread.turns[1].completedAt = 4;
+  expect(codexDetail(thread).turns?.map(t => t.task.status)).toEqual(['interrupted', 'done']);
 });
 it('retains DeepSeek user messages, tool calls and native terminal status', () => {
   const events = [ ['turn/start', { turn: 1 }], ['user/message', { source: { kind: 'user' }, content: [{ type: 'text', text: 'B' }] }], ['tool/call', { callId: 't', name: 'write', arguments: '{}' }], ['tool/result', { message: { toolCallId: 't', content: [{ type: 'text', text: 'B' }], isError: false } }], ['assistant/message', { message: { content: [{ type: 'text', text: 'Done B' }] } }], ['turn/end', { reason: { kind: 'completed' } }]];
@@ -88,17 +106,22 @@ it('cleans the stopped Codex session terminals before interrupt releases the thr
   const calls: { url: string; body: any }[] = [];
   vi.stubGlobal('fetch', vi.fn(async (url, init) => { calls.push({ url, body: JSON.parse(init.body) }); return Response.json({}); }));
   const start = vi.spyOn(JsonRpcProcess.prototype, 'start').mockImplementation(function (this: JsonRpcProcess) {
-    this.notification('turn/started', { threadId: 'native', turn: { id: 'turn' } });
+    this.notification('turn/started', { threadId: 'other', turn: { id: 'background' } });
   });
-  const request = vi.spyOn(JsonRpcProcess.prototype, 'request').mockResolvedValue({});
+  const request = vi.spyOn(JsonRpcProcess.prototype, 'request').mockImplementation(async method =>
+    method === 'turn/start' ? { turn: { id: 'turn', status: 'inProgress' } } as never : {} as never);
   const notify = vi.spyOn(JsonRpcProcess.prototype, 'notify').mockImplementation(() => {});
   const adapter = new CodexAdapter([process.execPath]);
+  adapter.permissionMode = () => 'full-access';
   try {
     await workExecutors('being').codex.cancel('native', 'turn');
     expect(calls).toEqual([
       { url: 'beings://codex/thread/backgroundTerminals/clean', body: { threadId: 'native' } },
       { url: 'beings://codex/turn/interrupt', body: { threadId: 'native', turnId: 'turn' } },
     ]);
+    await adapter.native(new Request('beings://codex/turn/start', { method: 'POST', body: JSON.stringify({
+      threadId: 'native', input: [{ type: 'text', text: 'work' }], approvalPolicy: 'never', sandboxPolicy: { type: 'dangerFullAccess' },
+    }) }));
     await adapter.cancel('native');
     expect(request.mock.calls.slice(-2)).toEqual([
       ['thread/backgroundTerminals/clean', { threadId: 'native' }],
@@ -107,7 +130,48 @@ it('cleans the stopped Codex session terminals before interrupt releases the thr
     request.mockRejectedValueOnce(new AgentError('native cleanup failure', 502, 'original error'));
     await expect(adapter.native(new Request('beings://codex/thread/backgroundTerminals/clean', { method: 'POST', body: JSON.stringify({ threadId: 'native' }) }))).rejects.toMatchObject({ body: 'original error' });
     await expect(adapter.native(new Request('beings://codex/thread/backgroundTerminals/clean', { method: 'POST', body: JSON.stringify({ threadId: 'native', command: 'untrusted' }) }))).rejects.toMatchObject({ status: 400 });
+    await expect(adapter.native(new Request('beings://codex/turn/interrupt', { method: 'POST', body: JSON.stringify({ threadId: 'native', turnId: 'previous-turn' }) }))).rejects.toMatchObject({ status: 409 });
+    await expect(adapter.native(new Request('beings://codex/thread/backgroundTerminals/clean', { method: 'POST', body: JSON.stringify({ threadId: 'other' }) }))).rejects.toMatchObject({ status: 409 });
   } finally { adapter.close(); start.mockRestore(); request.mockRestore(); notify.mockRestore(); vi.unstubAllGlobals(); }
+});
+
+it.skipIf(process.platform === 'win32')('starts persistent Codex threads in the project on the shared control socket', async () => {
+  const home = await mkdtemp('/tmp/town-codex-rpc-');
+  const socket = path.join(home, 'app-server-control/app-server-control.sock');
+  const target = path.join(home, 'rpc.sock');
+  await mkdir(path.dirname(socket));
+  const server = createServer();
+  const wss = new WebSocketServer({ server });
+  const calls: { method: string; params: Record<string, unknown> }[] = [];
+  const replies: Record<string, object> = {
+    initialize: {},
+    'project/list': { data: [{ id: 'native-project', roots: [{ path: '/work' }] }], nextCursor: null },
+    'thread/list': { data: [], nextCursor: null },
+    'thread/start': { thread: { id: 'native-thread', projectId: 'native-project' } },
+    'turn/start': { turn: { id: 'turn', status: 'inProgress' } },
+  };
+  wss.on('connection', client => client.on('message', bytes => {
+    const request = JSON.parse(bytes.toString());
+    if (request.id === undefined) return;
+    calls.push(request);
+    client.send(JSON.stringify({ id: request.id, result: replies[request.method] }));
+  }));
+  await new Promise<void>(resolve => server.listen(target, resolve));
+  await chmod(target, 0o600);
+  await symlink(target, socket);
+  vi.stubEnv('CODEX_HOME', home);
+  const adapter = new CodexAdapter([process.execPath]);
+  adapter.permissionMode = () => 'full-access';
+  try {
+    await expect(adapter.start('/work', 'Run this')).resolves.toBe('native-thread');
+    expect(calls.find(call => call.method === 'thread/start')?.params).toMatchObject({ cwd: '/work', projectId: 'native-project', ephemeral: false });
+    expect(calls.find(call => call.method === 'turn/start')?.params.threadId).toBe('native-thread');
+  } finally {
+    adapter.close(); vi.unstubAllEnvs();
+    await new Promise<void>(resolve => server.close(() => resolve()));
+    wss.close();
+    await rm(home, { recursive: true, force: true });
+  }
 });
 it('excludes Harness runtime context from user-visible conversation', () => {
   const records = [

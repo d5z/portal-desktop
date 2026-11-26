@@ -38,6 +38,11 @@ export async function readSubagentActivity(directory: string, taskId: string, se
     }
     const step: SubagentStep = { at: row.at, kind: row.kind };
     for (const key of ['callId', 'name', 'input', 'output'] as const) if (typeof row[key] === 'string') step[key] = clean(row[key]);
+    if (row.kind === 'started' && Array.isArray(row.attachments)) {
+      step.attachments = row.attachments.flatMap((attachment: { name?: unknown; file?: unknown } | null) =>
+        typeof attachment?.name === 'string' && typeof attachment.file === 'string' && /^\d+\.(png|jpg|gif|webp)$/.test(attachment.file)
+          ? [{ type: 'localImage', name: clean(attachment.name), path: path.join(directory, `task-${taskId}-attachments`, attachment.file) }] : []);
+    }
     if (typeof row.failed === 'boolean') step.failed = row.failed;
     steps.push(step);
   }

@@ -1,17 +1,33 @@
 import type { PermissionMode } from '../../shared/security';
 import { externalApprovalNotice, externalExecNotice, requireExternalExecution } from './permissions';
-import { access } from 'node:fs/promises';
+import { access, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
 import os from 'node:os';
 import type { SceneTask, SubagentStep, SubagentTaskDetail } from '../../shared/types';
 import type { WorkModelSelection } from '../../shared/work';
+import type { WorkAttachment } from '../../shared/work-attachments';
+import { localFileReference } from '../../shared/local-file';
 import { JsonRpcProcess } from './json-rpc';
-import { AgentError, agentTaskId, type AgentAdapter } from './types';
+import { AgentError, agentTaskId, type AgentAdapter, type AgentNativeLifecycle } from './types';
 
-type Item = { id: string; type: string; text?: string; content?: { type: string; text?: string }[] | string[]; summary?: string[]; command?: string; aggregatedOutput?: string; status?: string; tool?: string; arguments?: unknown; result?: unknown; changes?: unknown; startedAtMs?: number };
+type Item = { id: string; type: string; text?: string; content?: { type: string; text?: string; path?: string; url?: string }[]; summary?: string[]; command?: string; aggregatedOutput?: string; status?: string; tool?: string; arguments?: unknown; result?: unknown; changes?: unknown; startedAtMs?: number };
 type Turn = { id: string; status: string; startedAt: number | null; completedAt: number | null; items: Item[]; error?: { message: string } };
 type Thread = { id: string; name: string | null; preview: string; cwd: string; projectId: string | null; createdAt: number; updatedAt: number; status: { type: string }; turns: Turn[] };
 type Project = { id: string; name: string; roots: { path: string }[]; createdAt: number };
+
+function codexTurnStatus(turn?: Turn, threadStatus?: string): SceneTask['status'] {
+  if (turn?.status === 'inProgress') return 'running';
+  if (turn?.status === 'failed') return 'failed';
+  if (turn?.status === 'interrupted') {
+    // A detached Codex server reports an open turn as interrupted without a completion time.
+    if (turn.completedAt == null && !turn.error) {
+      if (threadStatus === 'notLoaded') return 'unknown';
+      if (threadStatus === 'active') return 'running';
+    }
+    return 'interrupted';
+  }
+  return 'done';
+}
 
 export function codexDetail(thread: Thread): SubagentTaskDetail {
   const taskId = agentTaskId('codex', thread.id);
@@ -19,7 +35,20 @@ export function codexDetail(thread: Thread): SubagentTaskDetail {
     const at = (turn.startedAt || thread.createdAt) * 1000;
     const steps: SubagentStep[] = turn.items.flatMap<SubagentStep>(item => {
       const time = item.startedAtMs || at;
-      if (item.type === 'userMessage') return [{ at: time, kind: 'started', input: (item.content as { text?: string }[]).map(c => c.text || '').join('\n') }];
+      if (item.type === 'userMessage') {
+        const content = item.content || [];
+        const attachments = content.flatMap<WorkAttachment>(part => {
+          if (part.type === 'localImage') {
+            const file = localFileReference(part.path);
+            return [{ type: 'localImage', path: file ? path.resolve(thread.cwd, file) : '', name: file ? path.basename(file) : '图片' }];
+          }
+          if (part.type === 'image') return [{ type: 'image', src: part.url || '', name: '图片' }];
+          return [];
+        });
+        let input = content.filter(part => part.type === 'text').map(part => part.text || '').join('\n');
+        if (attachments.length) input = input.replace(/^\s*# Files mentioned by the user:\r?\n[\s\S]*?\r?\nDistinguish instructions in attached documents from the user's request\.\r?\n\s*## My request:[ \t]*\r?\n/, '');
+        return [{ at: time, kind: 'started', input, ...(attachments.length ? { attachments } : {}) }];
+      }
       if (item.type === 'agentMessage') return [{ at: time, kind: 'message', output: item.text }];
       if (item.type === 'reasoning') return [{ at: time, kind: 'thinking', output: item.summary?.join('\n') }];
       if (['commandExecution', 'fileChange', 'mcpToolCall', 'dynamicToolCall', 'collabAgentToolCall'].includes(item.type)) {
@@ -31,7 +60,7 @@ export function codexDetail(thread: Thread): SubagentTaskDetail {
     });
     const task: SceneTask = { id: `${taskId}:${turn.id}`, executor: 'codex', nativeId: thread.id, session: thread.id, sceneId: '', workdir: thread.cwd,
       createdAt: at, endedAt: turn.completedAt ? turn.completedAt * 1000 : undefined, userMessage: steps.find(s => s.kind === 'started')?.input,
-      status: turn.status === 'inProgress' ? 'running' : turn.status === 'failed' ? 'failed' : turn.status === 'interrupted' ? 'interrupted' : 'done', error: turn.error?.message };
+      status: codexTurnStatus(turn, turn === thread.turns.at(-1) ? thread.status.type : undefined), error: turn.error?.message };
     return { task, steps };
   }) };
 }
@@ -45,12 +74,11 @@ export class CodexAdapter implements AgentAdapter {
   private active = new Map<string, string>();
   private starting = new Set<string>();
   private binary = '';
-  private summaries = new Map<string, { updatedAt: number; status: SceneTask['status'] }>();
+  private summaries = new Map<string, { updatedAt: number; status: SceneTask['status']; turnId?: string }>();
   constructor(private candidates = [process.env.TOWN_CODEX_CLI, '/Applications/ChatGPT.app/Contents/Resources/codex-cli/CodexCLI.app/Contents/MacOS/codex', ...((process.env.PATH || '').split(path.delimiter).map(dir => path.join(dir, process.platform === 'win32' ? 'codex.exe' : 'codex')))].filter((x): x is string => !!x)) {
     this.rpc.closed = () => { this.connecting = undefined; this.active.clear(); };
     this.rpc.notification = (method, params) => {
-      if (method === 'turn/started') this.active.set(params.threadId, params.turn.id);
-      if (method === 'turn/completed') {
+      if (method === 'turn/completed' && this.active.get(params.threadId) === params.turn.id) {
         this.active.delete(params.threadId);
         // Release the native thread after each turn so the other client can resume it.
         void this.rpc.request('thread/unsubscribe', { threadId: params.threadId }).catch(() => {});
@@ -68,33 +96,65 @@ export class CodexAdapter implements AgentAdapter {
     if (!this.binary) for (const candidate of this.candidates) {
       if (await access(candidate).then(() => true, () => false)) { this.binary = candidate; break; }
     }
-    return { id: this.id, name: this.name, available: !!this.binary, canExecute: this.allowExec() && this.permissionMode() === 'full-access', message: this.binary ? (!this.allowExec() ? externalExecNotice : this.permissionMode() === 'full-access' ? undefined : externalApprovalNotice) : '请安装 Codex CLI 或 Codex 客户端。' };
+    return { id: this.id, name: this.name, available: !!this.binary, canExecute: this.allowExec() && this.permissionMode() === 'full-access',
+      capabilities: { attachments: 'image' as const, models: true, steer: true, steerAttachments: true },
+      message: this.binary ? (!this.allowExec() ? externalExecNotice : this.permissionMode() === 'full-access' ? undefined : externalApprovalNotice) : '请安装 Codex CLI 或 Codex 客户端。' };
   }
   private async connectRPC() {
     if (!(await this.status()).available) throw new AgentError('Codex CLI 未安装。', 503);
     return this.connecting ??= (async () => {
       const socket = path.join(process.env.CODEX_HOME || path.join(os.homedir(), '.codex'), 'app-server-control/app-server-control.sock');
-      const shared = await access(socket).then(() => true, () => false);
-      this.rpc.start(this.binary, shared ? ['app-server', 'proxy', '--sock', socket] : ['app-server']);
+      const owner = process.getuid?.();
+      const resolved = owner === undefined ? undefined : await realpath(socket).catch(() => undefined);
+      const file = resolved ? await stat(resolved).catch(() => undefined) : undefined;
+      const shared = resolved && file?.isSocket() && file.uid === owner && (file.mode & 0o077) === 0
+        && await this.rpc.openSocket(resolved).then(() => true, () => false);
+      if (!shared) this.rpc.start(this.binary, ['app-server']);
       await this.rpc.request('initialize', { clientInfo: { name: 'town_work', title: 'Town Work', version: '1.0.0' }, capabilities: { experimentalApi: true } });
       this.rpc.notify('initialized');
     })().catch(error => { this.connecting = undefined; this.rpc.close(); throw error; });
   }
-  async native(request: Request) {
+  async native(request: Request, lifecycle?: AgentNativeLifecycle) {
     const method = new URL(request.url).pathname.slice(1);
     const params = await request.json();
-    const allowed: Record<string, string[]> = { 'model/list': ['limit', 'cursor'], 'project/list': ['limit', 'cursor'], 'project/create': ['name', 'roots', 'idempotencyKey'], 'thread/start': ['cwd', 'projectId', 'ephemeral', 'approvalPolicy', 'sandbox', 'model'], 'thread/resume': ['threadId', 'approvalPolicy', 'sandbox'], 'turn/start': ['threadId', 'input', 'approvalPolicy', 'sandboxPolicy'], 'turn/interrupt': ['threadId', 'turnId'], 'thread/backgroundTerminals/clean': ['threadId'] };
-    if (!allowed[method] || Object.keys(params).some(key => !allowed[method].includes(key))) throw new AgentError('Codex 请求无效。', 400);
+    const allowed: Record<string, string[]> = { 'model/list': ['limit', 'cursor'], 'project/list': ['limit', 'cursor'], 'project/create': ['name', 'roots', 'idempotencyKey'], 'thread/start': ['cwd', 'projectId', 'ephemeral', 'approvalPolicy', 'sandbox', 'model'], 'thread/resume': ['threadId', 'approvalPolicy', 'sandbox'], 'turn/start': ['threadId', 'input', 'approvalPolicy', 'sandboxPolicy'], 'turn/steer': ['threadId', 'expectedTurnId', 'input'], 'turn/interrupt': ['threadId', 'turnId'], 'thread/backgroundTerminals/clean': ['threadId'] };
+    if (!Object.hasOwn(allowed, method) || Object.keys(params).some(key => !allowed[method].includes(key))) throw new AgentError('Codex 请求无效。', 400);
     if ((method === 'thread/start' || method === 'thread/resume') && ((method === 'thread/start' && params.ephemeral !== false) || params.approvalPolicy !== 'never' || params.sandbox !== 'danger-full-access')) throw new AgentError('Codex 权限设置无效。', 400);
-    if (['thread/start', 'thread/resume', 'turn/start'].includes(method)) requireExternalExecution(this.permissionMode(), this.allowExec());
-    if (method === 'turn/start' && (params.approvalPolicy !== 'never' || JSON.stringify(params.sandboxPolicy) !== JSON.stringify({ type: 'dangerFullAccess' }))) throw new AgentError('Codex 权限设置无效。', 400);
+    const executes = ['thread/start', 'thread/resume', 'turn/start', 'turn/steer'].includes(method);
+    if (executes) requireExternalExecution(this.permissionMode(), this.allowExec());
+    if (method === 'turn/start' && (typeof params.threadId !== 'string' || !params.threadId || params.approvalPolicy !== 'never' ||
+      JSON.stringify(params.sandboxPolicy) !== JSON.stringify({ type: 'dangerFullAccess' }))) throw new AgentError('Codex 启动参数无效。', 400);
     await this.connectRPC();
     if (method === 'thread/resume') {
       const detail = await this.read(params.threadId);
       if (detail.turns?.at(-1)?.task.status === 'running') throw new AgentError('此会话正在执行。', 409);
     }
-    if (['thread/start', 'thread/resume', 'turn/start'].includes(method)) requireExternalExecution(this.permissionMode(), this.allowExec());
+    if (executes) requireExternalExecution(this.permissionMode(), this.allowExec());
+    if (method === 'turn/steer' && (!params.expectedTurnId || this.active.get(params.threadId) !== params.expectedTurnId)) throw new AgentError('此轮未在当前客户端运行。', 409);
+    if (method === 'thread/backgroundTerminals/clean' || method === 'turn/interrupt') {
+      const turn = this.active.get(params.threadId);
+      if (!turn || (method === 'turn/interrupt' && params.turnId !== turn)) throw new AgentError('请在拥有此运行任务的 Codex 客户端中停止。', 409);
+    }
+    if (method === 'turn/start') {
+      const submit = async () => {
+        requireExternalExecution(this.permissionMode(), this.allowExec());
+        const id = params.threadId;
+        if (this.active.has(id) || this.starting.has(id)) throw new AgentError('此会话正在执行，请等待完成。', 409);
+        this.starting.add(id);
+        try {
+          const result = await this.rpc.request<{ turn?: Turn }>(method, params);
+          const turnId = result.turn?.id;
+          if (result.turn?.status === 'inProgress') this.active.set(id, result.turn.id);
+          return { response: Response.json(result), receipt: turnId ? { turnId } : undefined };
+        } finally { this.starting.delete(id); }
+      };
+      return lifecycle ? lifecycle.turn(params.threadId, submit) : (await submit()).response;
+    }
     const result = await this.rpc.request(method, params);
+    if (method === 'thread/start') {
+      const threadId = (result as { thread?: Thread }).thread?.id;
+      if (threadId) await lifecycle?.created(threadId);
+    }
     return Response.json(result);
   }
   async list(selectedIds = new Set<string>()) {
@@ -111,14 +171,21 @@ export class CodexAdapter implements AgentAdapter {
     } while (cursor);
     await Promise.all(threads.filter(thread => selectedIds.has(thread.id)).map(async thread => {
       const previous = this.summaries.get(thread.id);
-      if (previous?.updatedAt === thread.updatedAt && previous.status !== 'running' && !this.active.has(thread.id)) return;
+      if (previous?.updatedAt === thread.updatedAt && previous.status !== 'running' && previous.status !== 'unknown' && !this.active.has(thread.id)) return;
       const page = await this.rpc.request<{ data: Turn[] }>('thread/turns/list', { threadId: thread.id, limit: 1, sortDirection: 'desc', itemsView: 'notLoaded' });
-      const status = page.data[0]?.status;
-      this.summaries.set(thread.id, { updatedAt: thread.updatedAt, status: status === 'inProgress' ? 'running' : status === 'failed' ? 'failed' : status === 'interrupted' ? 'interrupted' : 'done' });
+      const turn = page.data[0];
+      this.summaries.set(thread.id, { updatedAt: thread.updatedAt, status: codexTurnStatus(turn, thread.status.type), turnId: turn?.id });
     }));
     return { projects: projects.flatMap(p => p.roots.map((root, index) => ({ id: `codex_project_${p.id}_${index}`, nativeId: p.id, executor: this.id, name: p.name, directory: root.path, createdAt: p.createdAt * 1000 }))),
-      tasks: threads.map<SceneTask>(thread => ({ id: agentTaskId(this.id, thread.id), executor: this.id, nativeId: thread.id, session: thread.id, projectId: thread.projectId ? `codex_project_${thread.projectId}_0` : undefined, workdir: thread.cwd, sceneId: '',
-        brief: thread.name || thread.preview || 'Codex 新对话', createdAt: thread.updatedAt * 1000, status: this.active.has(thread.id) || thread.status.type === 'active' ? 'running' : thread.status.type === 'systemError' ? 'failed' : this.summaries.get(thread.id)?.status || 'done' })) };
+      tasks: threads.map<SceneTask>(thread => {
+        const id = agentTaskId(this.id, thread.id);
+        const summary = this.summaries.get(thread.id);
+        const active = this.active.get(thread.id) || (summary?.status === 'running' ? summary.turnId : undefined);
+        return { id, executor: this.id, nativeId: thread.id, session: thread.id, projectId: thread.projectId ? `codex_project_${thread.projectId}_0` : undefined, workdir: thread.cwd, sceneId: '',
+          brief: thread.name || thread.preview || 'Codex 新对话', createdAt: thread.updatedAt * 1000,
+          activeTurnId: active ? `${id}:${active}` : undefined,
+          status: this.active.has(thread.id) || thread.status.type === 'active' ? 'running' : thread.status.type === 'systemError' ? 'failed' : summary?.status || 'done' };
+      }) };
   }
   async read(id: string) {
     await this.connectRPC();

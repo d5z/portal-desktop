@@ -13,7 +13,7 @@ export function directoryProject<T extends Pick<WorkProject, 'directory'>>(proje
   }).sort((a, b) => b.directory.length - a.directory.length)[0];
 }
 
-/** Local projects belong to one Being and grant subagents access only to their directories. */
+/** Work projects belong to one Being. Imported project metadata carries no directory permission. */
 export class WorkProjects {
   private writing: Promise<unknown> = Promise.resolve();
   constructor(private directory: string) {}
@@ -25,6 +25,7 @@ export class WorkProjects {
       return value;
     } catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return []; throw error; }
   }
+  async registered(endpoint: string) { return (await this.list(endpoint)).filter(project => !project.executor); }
   async add(endpoint: string, input: unknown, goalId?: string) {
     const value = input as { directory?: unknown } | null;
     if (!value || typeof value.directory !== 'string' || !path.isAbsolute(value.directory)) throw new Error('请选择项目目录。');
@@ -35,6 +36,8 @@ export class WorkProjects {
       if (existing) {
         if (goalId && existing.goalId && existing.goalId !== goalId) throw new AgentError('该项目已关联其他目标。', 409);
         if (goalId) existing.goalId = goalId;
+        delete existing.executor;
+        delete existing.nativeId;
         return existing;
       }
       const project = { id: `proj_${randomUUID()}`, name: path.basename(directory) || directory, directory, createdAt: Date.now(), goalId };
@@ -42,20 +45,26 @@ export class WorkProjects {
       return project;
     });
   }
-  setGoal(endpoint: string, id: string, goalId: string, expectedGoalId?: string) {
+  setGoal(endpoint: string, project: WorkProject, goalId: string, expectedGoalId?: string) {
     return this.update(endpoint, projects => {
-      const project = projects.find(row => row.id === id);
-      if (!project) throw new AgentError('请先将目录添加为 Work 项目。', 404);
-      if (project.goalId && project.goalId !== goalId && project.goalId !== expectedGoalId)
+      const existing = projects.find(row => row.directory === project.directory);
+      if (existing?.goalId && existing.goalId !== goalId && existing.goalId !== expectedGoalId)
         throw new AgentError('该项目已关联其他目标。', 409);
-      project.goalId = goalId || undefined;
-      return project;
+      if (existing) {
+        existing.goalId = goalId || undefined;
+        return existing;
+      }
+      if (!path.isAbsolute(project.directory) || !Number.isFinite(project.createdAt))
+        throw new AgentError('同步的项目目录信息无效。', 400);
+      const linked = { ...project, goalId: goalId || undefined };
+      if (goalId) projects.push(linked);
+      return linked;
     });
   }
   setRules(endpoint: string, id: string, rules: WorkProjectRules) {
     return this.update(endpoint, projects => {
       const project = projects.find(row => row.id === id);
-      if (!project) throw new AgentError('请先将目录添加为 Work 项目。', 404);
+      if (!project || project.executor) throw new AgentError('请先将目录添加为 Work 项目。', 404);
       project.rules = rules;
       return project;
     });

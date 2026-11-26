@@ -140,18 +140,20 @@ export interface WorkResult {
   files?: WorkDeliveryFile[];
 }
 
-export function workPlanPrompt(item: WorkPlanFields, goal?: WorkGoal) {
-  const sections = [goal && [`所属长期目标（v${goal.version}）：${goal.title}`, goal.outcome,
-    goal.acceptanceCriteria.length && `长期目标的验收条件：\n${goal.acceptanceCriteria.map(value => `- ${value}`).join('\n')}`].filter(Boolean).join('\n'),
-    item.goal && `任务目标：${item.goal}`, item.specification && `规格：${item.specification}`,
-    item.acceptanceCriteria?.length && `验收标准：\n${item.acceptanceCriteria.map(value => `- ${value}`).join('\n')}`].filter(Boolean);
-  if (!sections.length) return '';
-  return [...sections, '在最终回复中，用 Markdown 文件链接列出本轮实际交付的文件。路径含空格或括号时用尖括号包裹；引用其他任务的文件时只写文件名。'].join('\n\n');
+export const workDeliveryInstruction = '在最终回复中，用 Markdown 文件链接列出本轮实际交付的文件。路径含空格或括号时用尖括号包裹；引用其他任务的文件时只写文件名。';
+export const workContinuationContext = '\n\n当前任务要求（仅作本轮工作背景）\n';
+
+export function workTaskRequirements(item: WorkPlanFields) {
+  return [item.goal && `任务目标：${item.goal}`, item.specification && `规格：${item.specification}`,
+    item.acceptanceCriteria?.length && `验收标准：\n${item.acceptanceCriteria.map(value => `- ${value}`).join('\n')}`].filter(Boolean).join('\n\n');
 }
 
-export function workContinuationPrompt(message: string, item: WorkPlanFields, goal?: WorkGoal) {
-  const plan = workPlanPrompt(item, goal);
-  return plan ? `${message}\n\n当前任务要求（仅作本轮工作背景）\n${plan}` : message;
+// The full text for runs originally sent before Work stopped appending project context.
+export function legacyWorkPlanPrompt(item: WorkPlanFields, goal?: Pick<WorkGoal, 'version' | 'title' | 'outcome' | 'acceptanceCriteria'>) {
+  const context = [goal && [`所属长期目标（v${goal.version}）：${goal.title}`, goal.outcome,
+    goal.acceptanceCriteria.length && `长期目标的验收条件：\n${goal.acceptanceCriteria.map(value => `- ${value}`).join('\n')}`].filter(Boolean).join('\n'),
+    workTaskRequirements(item)].filter(Boolean);
+  return context.length ? [...context, workDeliveryInstruction].join('\n\n') : '';
 }
 
 export const workPlanVersionHeader = 'X-Work-Plan-Version';

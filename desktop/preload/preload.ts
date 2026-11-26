@@ -154,6 +154,7 @@ const api: DesktopAPI = {
   quit: () => ipcRenderer.invoke('beings:quit'),
   browserState: () => ipcRenderer.invoke('beings:browser-state'),
   openBrowser: url => ipcRenderer.invoke('beings:browser-open', url),
+  openCodexThread: id => ipcRenderer.invoke('beings:open-codex-thread', id),
   copyText: text => ipcRenderer.invoke('beings:clipboard-copy', text),
   copyImage: (data, mime) => ipcRenderer.invoke('beings:clipboard-image', data, mime),
   editChat: command => ipcRenderer.invoke('beings:chat-edit', command),

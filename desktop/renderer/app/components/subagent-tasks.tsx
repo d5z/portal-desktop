@@ -10,7 +10,7 @@ import styles from './subagent-tasks.module.scss';
 
 const labels: Record<SceneTask['status'], string> = {
   queued: '排队中', running: '执行中', done: '已完成', failed: '执行失败',
-  cancelled: '已取消', interrupted: '已中断', budget_exhausted: '已达限额', timeout: '已超时',
+  cancelled: '已取消', interrupted: '已中断', unknown: '状态同步中', budget_exhausted: '已达限额', timeout: '已超时',
 };
 const activeStatuses = new Set<SceneTask['status']>(['running', 'queued']);
 

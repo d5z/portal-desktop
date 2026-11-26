@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps,
 import { createPortal } from 'react-dom';
 import { DndContext, DragOverlay, PointerSensor, pointerWithin, useDraggable, useDroppable, useSensor, useSensors, type CollisionDetection, type DragMoveEvent } from '@dnd-kit/core';
 import { workPriorities, workStages, type WorkItem, type WorkItemFields, type WorkPlanFields, type WorkResult, type WorkResultPage, type WorkStage } from '../../../shared/work';
+import type { SceneTask } from '../../../shared/types';
 import { workActive, workStatus, type WorkModel } from '../models/work';
 import { Icon } from '../../shared/icons/icon';
 import { IconButton } from '../../shared/components/icon-button';
@@ -16,6 +17,11 @@ import { WorkModelPicker } from './work-model-picker';
 import styles from './work.module.scss';
 
 const stages = Object.keys(workStages) as WorkStage[];
+const sessionStages: Record<SceneTask['status'], WorkStage> = {
+  queued: 'todo', running: 'in_progress', unknown: 'in_progress', done: 'done', cancelled: 'cancelled',
+  failed: 'blocked', interrupted: 'blocked', budget_exhausted: 'blocked', timeout: 'blocked',
+};
+type ProjectSession = { id: string; title: string; executor: string; projectId: string; priority: 'none'; status: SceneTask['status']; stage: WorkStage };
 const priorities = Object.keys(workPriorities) as WorkItemFields['priority'][];
 const date = (value: number) => new Date(value).toLocaleString('zh-CN', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 const cardFields = { project: '项目', executor: '执行器', priority: '优先级', due: '截止日期', labels: '标签', children: '子任务进度' } as const;
@@ -72,7 +78,7 @@ function WorkBoardCard({ item, lane, disabled, before, open, menu, children }: {
     className={styles.itemCard} onClick={open}>{children}</button>;
 }
 
-export function WorkItemsPanel({ work, sceneId, openArtifact, shareStatus, beingAction, inConversation, showDetails, closeDetails, onPlace, sendResult, taskMenuProps, openProjectTask }: {
+export function WorkItemsPanel({ work, sceneId, openArtifact, shareStatus, beingAction, inConversation, showDetails, closeDetails, onPlace, sendResult, taskMenuProps, openProjectTask, projectThreads, sessionMenuProps }: {
   work: WorkModel; sceneId: string; openArtifact: (url: string) => void;
   shareStatus: (item: WorkItem) => void;
   beingAction?: { label: string; open: () => Promise<void> };
@@ -81,6 +87,8 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, shareStatus, being
   sendResult: (result: WorkResult, title: string) => Promise<unknown>;
   taskMenuProps: (item: WorkItem) => TaskMenuProps;
   openProjectTask: (item: WorkItem) => void;
+  projectThreads?: WorkModel['threads'];
+  sessionMenuProps: (id: string, title: string) => TaskMenuProps;
 }) {
   const items = work.snapshot?.items || [];
   const item = work.item;
@@ -120,7 +128,7 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, shareStatus, being
   });
   const [view, setView] = useState(defaultView);
   const [viewName, setViewName] = useState('');
-  const projectRule = work.project?.id.startsWith('proj_') ? work.project : undefined;
+  const projectRule = work.project?.executor ? undefined : work.project;
   const threads = work.threads;
   const runs = item?.runIds.map(id => ({ id, task: threads.find(thread => thread.id === id)?.tasks.at(-1) }));
   const [earlierResults, setEarlierResults] = useState<WorkResultPage>();
@@ -135,11 +143,13 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, shareStatus, being
   const editingGoal = work.goalForProject(editing?.projectId);
   const editingProject = work.projects.find(project => project.id === editing?.projectId);
   const preparingExecution = !!editor?.startAfterSave;
+  const editingAgent = work.executorChoices.find(agent => agent.id === editing?.executor);
+  const defaultExecutorReady = work.canExecute(editingProject?.rules?.executor);
   const canPrepareExecution = (fields: WorkItemFields) => {
     const project = work.projects.find(row => row.id === fields.projectId);
-    return !!project && !!(fields.executor || project.rules?.executor);
+    return !!project && work.canExecute(fields.executor || project.rules?.executor);
   };
-  const ready = item && work.agents.some(agent => agent.id === (item.executor || itemProject?.rules?.executor) && agent.available && agent.canExecute !== false);
+  const ready = item && work.canExecute(item.executor || itemProject?.rules?.executor);
   const showDirectStart = item && (item.stage === 'todo' || item.stage === 'blocked' || (item.stage === 'in_progress' && !item.runIds.length));
   const canStart = showDirectStart && !busy && !arranging(item) && item.launches?.at(-1)?.status !== 'unconfirmed' &&
     sceneId && itemProject && !runs?.some(row => row.task && workActive(row.task));
@@ -169,6 +179,16 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, shareStatus, being
       return view.sort === 'manual' ? 0 : b.updatedAt - a.updatedAt;
     });
   }, [items, pendingMove, project, query, view]);
+  const sessions = useMemo(() => {
+    if (!project || !projectThreads?.length) return [];
+    return projectThreads.flatMap((thread): ProjectSession[] => {
+      const status = thread.tasks.at(-1)!.status;
+      const executor = thread.tasks[0].executor || 'internal';
+      const stage = sessionStages[status];
+      if ((view.executor && view.executor !== executor) || (view.stage && view.stage !== stage)) return [];
+      return [{ id: thread.id, title: thread.tasks[0].brief?.split('\n')[0] || '子智能体工作', executor, projectId: project, priority: 'none', status, stage }];
+    });
+  }, [project, projectThreads, view.executor, view.stage]);
   const rowSelection = rows.filter(row => checked.includes(row.id)).map(row => row.id);
 
   async function perform(operation: () => Promise<unknown>) {
@@ -285,7 +305,7 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, shareStatus, being
   };
   const visibleFields = view.fields || (Object.keys(cardFields) as CardField[]);
   const activeCard = rows.find(row => row.id === draggedId);
-  const renderBoard = (cards: WorkItem[], lane = '', defaults: Partial<WorkItemFields> = {}) => <div className={styles.itemsBoard} role="group" aria-label="任务状态看板"
+  const renderBoard = (cards: WorkItem[], conversations: ProjectSession[], lane = '', defaults: Partial<WorkItemFields> = {}) => <div className={styles.itemsBoard} role="group" aria-label="任务状态看板"
     onPointerUpCapture={event => drop(event, lane)}
     onPointerDown={event => {
       activeDrag.current = '';
@@ -298,9 +318,10 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, shareStatus, being
     }} onLostPointerCapture={() => { pan.current = undefined; }}>
     {stages.filter(stage => view.stage ? stage === view.stage : !(view.hidden || ['cancelled']).includes(stage)).map(stage => {
       const column = cards.filter(row => row.stage === stage);
+      const sessionColumn = conversations.filter(row => row.stage === stage);
       const active = dropPosition?.stage === stage && dropPosition.lane === lane;
       return <WorkBoardColumn key={stage} stage={stage} lane={lane} active={active}>
-        <header><span className={styles.itemStageMark} aria-hidden="true" /><h3>{workStages[stage]} <span>{column.length}</span></h3>
+        <header><span className={styles.itemStageMark} aria-hidden="true" /><h3>{workStages[stage]} <span>{column.length + sessionColumn.length}</span></h3>
           <IconButton label={`在「${workStages[stage]}」新建任务`} aria-haspopup="dialog" onClick={() => work.createItem({ stage, ...defaults })}>
             <Icon name="chat-plus" width="16" height="16" />
           </IconButton>
@@ -308,20 +329,26 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, shareStatus, being
         {column.map(row => {
           const children = visibleFields.includes('children') ? items.filter(candidate => candidate.parentId === row.id) : [];
           const run = row.runIds.map(id => liveRuns.get(id)).find(Boolean);
+          const metadata = [
+            visibleFields.includes('project') && work.projects.find(project => project.id === row.projectId)?.name,
+            visibleFields.includes('priority') && row.priority !== 'none' && workPriorities[row.priority] + '优先级',
+            visibleFields.includes('due') && row.dueDate,
+            ...(visibleFields.includes('labels') ? row.labels : []),
+            children.length && `子任务 ${children.filter(child => child.stage === 'done').length}/${children.length}`,
+          ].filter(Boolean).join(' · ');
+          const notice = dispatchStatus(row);
           return <WorkBoardCard key={row.id} item={row} lane={lane} disabled={busy} before={active && dropPosition?.before === row.id} open={() => openItem(row, true)} menu={taskMenuProps(row)}>
             <strong className={styles.executorTitle}>{visibleFields.includes('executor') && <WorkExecutorMark executor={row.executor} />}<span>{row.title}</span></strong>
             {run && <span className={styles.activeRun}>{workStatus[run.status]}</span>}
-            {dispatchStatus(row) && <span className={row.dispatch?.error ? styles.itemError : undefined}>{dispatchStatus(row)}</span>}
-            <span>{[
-              visibleFields.includes('project') && work.projects.find(project => project.id === row.projectId)?.name,
-              visibleFields.includes('priority') && row.priority !== 'none' && workPriorities[row.priority] + '优先级',
-              visibleFields.includes('due') && row.dueDate,
-              ...(visibleFields.includes('labels') ? row.labels : []),
-              children.length && `子任务 ${children.filter(child => child.stage === 'done').length}/${children.length}`,
-            ].filter(Boolean).join(' · ')}</span>
+            {notice && <span className={row.dispatch?.error ? styles.itemError : undefined}>{notice}</span>}
+            {metadata && <span>{metadata}</span>}
           </WorkBoardCard>;
         })}
-        {!column.length && <p className={styles.columnEmpty}>暂无任务</p>}
+        {sessionColumn.map(row => <button key={row.id} type="button" className={`${styles.itemCard} ${styles.sessionCard}`} {...sessionMenuProps(row.id, row.title)} onClick={() => work.select(row.id)}>
+          <strong className={styles.executorTitle}>{visibleFields.includes('executor') && <WorkExecutorMark executor={row.executor} />}<span>{row.title}</span></strong>
+          <span>执行会话 · {workStatus[row.status]}</span>
+        </button>)}
+        {!column.length && !sessionColumn.length && <p className={styles.columnEmpty}>暂无任务</p>}
         {active && !dropPosition?.before && <div className={styles.itemDropLine} />}
       </WorkBoardColumn>;
     })}
@@ -356,7 +383,7 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, shareStatus, being
             {expanded && <>
               <div className={styles.resultActions}>
                 <button type="button" disabled={busy} onClick={() => openResult(result)}>打开执行会话</button>
-                <button className={styles.sendResult} type="button" disabled={busy} title="将结果填入 Being 对话，确认后发送"
+                <button className={styles.primaryButton} type="button" disabled={busy} title="将结果填入 Being 对话，确认后发送"
                   onClick={() => void perform(() => sendResult(result, title))}>
                   <Icon name="rail-chat" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.5" />与 Being 一起看
                 </button>
@@ -373,17 +400,16 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, shareStatus, being
         setEarlierResults(previous => ({ ...page, entries: [...(previous?.entries || []), ...page.entries] }));
       })}>加载更早的结果</button>}
     </div> : <>
-      {!item && <div className={styles.itemsOverview}>
-
+      {!item && <>
         {created && <div className={styles.itemReceipt} role="status"><span>已创建「{created.title}」</span>
           <button type="button" onClick={() => { openItem(created); setCreated(undefined); }}>查看任务</button>
           <IconButton label="关闭创建提示" onClick={() => setCreated(undefined)}><Icon name="chat-close" width="14" height="14" /></IconButton>
         </div>}
         {work.itemId && !item && !work.loading && <p role="alert" className={styles.itemError}>此任务不存在或属于其他 Being。</p>}
         <div className={styles.boardToolbar}>
-          <label className={styles.boardSearch}>
+          <label className={styles.searchField}>
             <Icon name="rail-search" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" />
-            <input type="search" aria-label="搜索任务" placeholder="搜索任务" value={query} onChange={event => { work.query = event.target.value; work.changed(); }} />
+            <input type="search" aria-label="搜索任务" placeholder={project ? '搜索任务或会话' : '搜索任务'} value={query} onChange={event => { work.query = event.target.value; work.changed(); }} />
           </label>
           <IconButton label="筛选与排序" className={styles.filterTrigger} popoverTarget="work-board-filters" aria-haspopup="dialog">
             <Icon name="menu-settings" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.5" />
@@ -438,24 +464,27 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, shareStatus, being
           activeDrag.current = String(event.active.data.current?.itemId || '');
           setDraggedId(activeDrag.current);
         }} onDragMove={dragOver} onDragOver={dragOver} onDragEnd={clearDrag} onDragCancel={clearDrag}>
-          {view.mode === 'board' ? renderBoard(rows) : !rows.length ? <p className={styles.hint}>暂无符合条件的任务。</p> :
-            [...new Set(rows.map(row => row[groupKey]))].map(id => <section className={styles.swimlane} key={id}>
+          {view.mode === 'board' ? renderBoard(rows, sessions) : !(rows.length || sessions.length) ? <p className={styles.hint}>暂无符合条件的任务。</p> :
+            [...new Set([...rows, ...sessions].map(row => row[groupKey]))].map(id => <section className={styles.swimlane} key={id}>
               <h3>{groupKey === 'executor' ? work.agents.find(agent => agent.id === id)?.name || '未分配执行器' : groupKey === 'priority'
                 ? workPriorities[id as keyof typeof workPriorities] : work.projects.find(row => row.id === id)?.name || '未分配项目'}</h3>
-              {renderBoard(rows.filter(row => row[groupKey] === id), id, { [groupKey]: id })}
+              {renderBoard(rows.filter(row => row[groupKey] === id), sessions.filter(row => row[groupKey] === id), id, { [groupKey]: id })}
             </section>)}
           {createPortal(<DragOverlay dropAnimation={null} style={{ pointerEvents: 'none' }}>{activeCard && <div className={styles.dragPreview}>{activeCard.title}</div>}</DragOverlay>, document.body)}
-        </DndContext> : !rows.length ? <p className={styles.hint}>暂无符合条件的任务。</p> : <>
+        </DndContext> : !(rows.length || sessions.length) ? <p className={styles.hint}>暂无符合条件的任务。</p> : <>
             {rowSelection.length > 0 && <div className={styles.itemActions}><span>已选 {rowSelection.length} 项</span>
               <select aria-label="批量状态" value={batch} onChange={event => setBatch(event.target.value as WorkStage)}>{stages.map(stage => <option key={stage} value={stage}>{workStages[stage]}</option>)}</select>
               <button type="button" disabled={busy} onClick={() => void perform(async () => { await work.moveItems(rowSelection, batch); setChecked([]); })}>批量更新</button></div>}
-            <div className={styles.itemsTable}><table><thead><tr><th><input type="checkbox" aria-label="全选当前任务" checked={rowSelection.length === rows.length} onChange={event => setChecked(event.target.checked ? rows.map(row => row.id) : [])} /></th>
+            <div className={styles.itemsTable}><table><thead><tr><th>{!!rows.length && <input type="checkbox" aria-label="全选当前任务" checked={rowSelection.length === rows.length} onChange={event => setChecked(event.target.checked ? rows.map(row => row.id) : [])} />}</th>
               <th>标题</th><th>状态</th><th>优先级</th><th>截止日期</th></tr></thead><tbody>{rows.map(row => <tr key={row.id}>
                 <td><input type="checkbox" aria-label={`选择 ${row.title}`} checked={checked.includes(row.id)} onChange={event => setChecked(current => event.target.checked ? [...current, row.id] : current.filter(id => id !== row.id))} /></td>
                 <td><button type="button" {...taskMenuProps(row)} onClick={() => openItem(row, true)}><span className={styles.executorTitle}><WorkExecutorMark executor={row.executor} /><span>{row.title}</span></span></button></td><td>{workStages[row.stage]}</td><td>{workPriorities[row.priority]}</td><td>{row.dueDate || '—'}</td>
+              </tr>)}{sessions.map(row => <tr key={row.id}>
+                <td /><td><button type="button" {...sessionMenuProps(row.id, row.title)} onClick={() => work.select(row.id)}><span className={styles.executorTitle}><WorkExecutorMark executor={row.executor} /><span>{row.title}</span></span></button></td>
+                <td>{workStatus[row.status]}</td><td>—</td><td>—</td>
               </tr>)}</tbody></table></div>
           </>}
-      </div>}
+      </>}
       {item && <div id="work-item-details" className={styles.itemDetail} role="region" aria-label="任务详情">
         <header className={styles.itemDetailHeader}>
           <div>
@@ -478,7 +507,7 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, shareStatus, being
             }}>{stages.map(stage => <option key={stage} value={stage}>{workStages[stage]}</option>)}</select>
           </label>
           <div className={styles.itemDetailActions}>
-            {beingAction && <button className={styles.beingTaskAction} type="button" disabled={busy} title="加入 Being 对话草稿" onClick={() => void perform(beingAction.open)}>{beingAction.label}</button>}
+            {beingAction && <button className={styles.primaryButton} type="button" disabled={busy} title="加入 Being 对话草稿" onClick={() => void perform(beingAction.open)}>{beingAction.label}</button>}
             {showDirectStart && <button type="button" disabled={!canStart || !ready} onClick={() => void perform(() => start(item))}>
               {item.runIds.length ? '重新执行' : '开始执行'}
             </button>}
@@ -602,10 +631,11 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, shareStatus, being
               <label>项目<select aria-label="项目" value={editing.projectId} required={preparingExecution} autoFocus={preparingExecution && !editingProject}
                 disabled={!!(editor?.id && items.find(row => row.id === editor.id)?.runIds.length) || !!editing.parentId} onChange={event => update({ projectId: event.target.value })}>
                 <option value="">未分配项目</option>{work.projects.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label>
-              <label>执行器<select aria-label="执行器" value={editing.executor} required={preparingExecution && !editingProject?.rules?.executor}
-                autoFocus={preparingExecution && !!editingProject && !editing.executor} onChange={event => update({ executor: event.target.value, modelSelection: null })}>
-                <option value="">{preparingExecution && editingProject?.rules?.executor ? '使用项目默认执行器' : '未分配'}</option>{work.agents.map(agent => <option key={agent.id} value={agent.id}>{agent.name}</option>)}</select></label>
-              {(editing.executor === 'codex' || editing.executor === 'deepseek') && <label>模型
+              <label>执行器<select aria-label="执行器" value={editing.executor && !editingAgent ? '__unavailable' : editing.executor} required={preparingExecution && !defaultExecutorReady}
+                autoFocus={preparingExecution && !!editingProject && !editingAgent} onChange={event => update({ executor: event.target.value, modelSelection: null })}>
+                {editing.executor && !editingAgent && <option value="__unavailable" disabled hidden>当前执行器不可用</option>}
+                <option value="">{preparingExecution && defaultExecutorReady ? '使用项目默认执行器' : '未分配'}</option>{work.executorChoices.map(agent => <option key={agent.id} value={agent.id}>{agent.name}</option>)}</select></label>
+              {editingAgent?.capabilities?.models && <label>模型
                 <WorkModelPicker key={editing.executor} endpoint={work.endpoint} executor={editing.executor} value={editing.modelSelection}
                   disabled={busy} onChange={modelSelection => update({ modelSelection })} />
               </label>}
@@ -628,8 +658,8 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, shareStatus, being
           <footer className="dialog-footer">
             {error && <p role="alert" className={styles.itemError}>{error}</p>}
             <div className={styles.itemActions}>
-              <button type="button" onClick={closeEditor} disabled={busy}>取消</button>
-              <button type="submit" className={styles.saveTask} disabled={busy || !editing.title.trim() || (preparingExecution && !canPrepareExecution(editing))}>
+              <button type="button" className={styles.secondaryButton} onClick={closeEditor} disabled={busy}>取消</button>
+              <button type="submit" className={styles.primaryButton} disabled={busy || !editing.title.trim() || (preparingExecution && !canPrepareExecution(editing))}>
                 {preparingExecution ? '保存并执行' : editor?.id ? '保存修改' : '创建任务'}
               </button>
             </div>
@@ -640,5 +670,6 @@ export function WorkItemsPanel({ work, sceneId, openArtifact, shareStatus, being
   </>;
   if (inConversation) return <WorkspaceDrawer as="section" className={styles.itemsPanel} aria-label="工作任务" aria-busy={busy}
     data-conversation="true" open={showDetails}>{content}</WorkspaceDrawer>;
-  return <section className={styles.itemsPanel} aria-label={work.panel === 'results' ? '工作结果' : '工作任务'} aria-busy={busy}>{content}</section>;
+  return <section className={styles.itemsPanel} aria-label={work.panel === 'results' ? '工作结果' : '工作任务'} aria-busy={busy}
+    data-layout={work.panel === 'items' && !item ? view.mode : undefined}>{content}</section>;
 }

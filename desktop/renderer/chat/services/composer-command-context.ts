@@ -8,6 +8,7 @@ import type { ChatSendOptions } from '../models/chat';
 
 const start = '\n\n[客户端斜杠功能上下文]\n';
 const end = '\n[/客户端斜杠功能上下文]';
+const workSupplementInstructions = '如本轮确实需要补充目标、验收条件或交付格式，读取相关记录后，把需要的内容写入 @work run 的可选 instruction 字段。';
 const workLaunchInstructions = `${workDispatchReply}收到 starting 就回复「正在启动」。派发超时先用 @work status <work_id> 查原派发；未确认时报告当前状态，确认未接收后可以重试。重试沿用原任务和派发请求（有 dispatch_id 就复用），避免重复派发。`;
 const workResultInstructions = [
   '在同一 Being 对话按标题或派发记录定位任务，用 @work results <work_id> [<work_id> ...] 读取最新状态和回执。用户说「这几项」时，只查刚才开工回执中的对应任务。用户要查全部或对话里没有可定位的任务时，再用 @work results。',
@@ -89,7 +90,7 @@ export function withComposerCommandContext(text: string, uiEnabled: boolean, sna
   );
   if (commands.includes('work')) context.push(
     '通过本机 Portal 的 portal_exec 调用 @work。直接在命令名后放 JSON 对象。只发 /work 时，简短说明用法并给出自然语言示例。',
-    '用户想直接在项目开工时，选择或添加项目即可，goal_id 可省略。用户要按目标管理时，用 @work goals 查找已有目标，或用 @work create-goal {"title":"标题","outcome":"预期结果","acceptanceCriteria":["目标验收条件"],"status":"active"} 新建。用 @work link-project {"project_id":"项目 ID","goal_id":"目标 ID"} 关联已有项目，或添加目录时传入 goal_id。项目内执行自动继承目标。',
+    '用户想直接在项目开工时，选择或添加项目即可，goal_id 可省略。用户要按目标管理时，用 @work goals 查找已有目标，或用 @work create-goal {"title":"标题","outcome":"预期结果","acceptanceCriteria":["目标验收条件"],"status":"active"} 新建。用 @work link-project {"project_id":"项目 ID","goal_id":"目标 ID"} 关联已有项目，或添加目录时传入 goal_id。',
     '1. 建待办。用 @work projects 找项目，用 @work project <project_id> 找已有任务。新建用 @work create {"title":"标题","description":"背景","specification":"规格","acceptanceCriteria":["本次交付的验收条件"],"projectId":"项目 ID"}。新任务默认待办，省略未指定的属性。用户指定执行器时加 executor，子任务用 parentId 指向同项目父任务。只在用户要求开工时派发。',
     '用户明确指定状态时，按 Work 栏目保存：待规划 backlog、待办 todo、进行中 in_progress、待审核 review、已阻塞 blocked、已完成 done、已取消 cancelled。真正开工后由执行回执更新状态。',
     '2. 选执行器。三个通道是内置 Subagent（internal）、Codex（codex）、DeepSeek（deepseek）。保留已指定执行器；未指定时，从 @work agents 中选择 available 且 canExecute 的执行器，优先项目默认。',
@@ -105,6 +106,7 @@ export function withComposerCommandContext(text: string, uiEnabled: boolean, sna
     workCloseInstructions,
     `用户要求开工时，用 @work run 派发原任务。${workLaunchInstructions}`,
   );
+  if (commands.includes('work') || dispatch || workFollowup || scopedWork.some(instruction => instruction.includes('@work run'))) context.push(workSupplementInstructions);
   if ((commands.includes('work') || scopedWork.length || workFollowup) && sceneId) context.push(`启动、派发、自动规则和续聊使用当前场景 "scene_id":${JSON.stringify(sceneId)}。`);
   if (commands.includes('work') || scopedWork.length || dispatch || workFollowup) context.push(workReplyInstructions);
   if (commands.includes('computer')) context.push('用户通过 /computer 请求使用云电脑。请先读取 https://beings.town/seeds/8U2i97peLWZSSLJf-QqDg，作为本次任务的参考上下文。');

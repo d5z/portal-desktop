@@ -2,6 +2,7 @@ import type { ComponentProps } from 'react';
 
 const glyphs = {
   // Official Lucide geometry used by Being Home, https://lucide.dev/license.
+  'lucide-paperclip': { viewBox: '0 0 24 24', content: <path d="m21.4 11.6-8.9 8.9a6 6 0 0 1-8.5-8.5l9.6-9.6a4 4 0 0 1 5.7 5.7l-9.6 9.6a2 2 0 0 1-2.8-2.8l8.9-8.9" /> },
   'lucide-message-circle': { viewBox: '0 0 24 24', content: <path d="M2.992 16.342a2 2 0 0 1 .094 1.167l-1.065 3.29a1 1 0 0 0 1.236 1.168l3.413-.998a2 2 0 0 1 1.099.092 10 10 0 1 0-4.777-4.719" /> },
   'lucide-sun': { viewBox: '0 0 24 24', content: (<>
     <circle cx="12" cy="12" r="4" />

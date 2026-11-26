@@ -1,10 +1,10 @@
 import { createHash, randomUUID } from 'node:crypto';
 import { readFile, realpath, stat } from 'node:fs/promises';
 import path from 'node:path';
-import type { SceneTask, SceneTaskSnapshot, SubagentTaskDetail, WorkSnapshot } from '../../shared/types';
+import type { SceneTask, SceneTaskSnapshot, SubagentStep, SubagentTaskDetail, WorkSnapshot } from '../../shared/types';
 import { localFileReference } from '../../shared/local-file';
 import { normalizeTownDisplay, validTownIdentity } from '../../shared/town-identity';
-import { workContinuationPrompt, workDispatchReply, workGoalRevision, workPlanPrompt, workPlanVersionHeader, workPlanVersionToken, workStages, type WorkGoal, type WorkGoalRevision, type WorkItem, type WorkLaunch, type WorkProjectRules, type WorkResult, type WorkResultPage, type WorkRule, type WorkStage, type WorkWakeupTrigger } from '../../shared/work';
+import { workDispatchReply, workGoalRevision, workPlanVersionHeader, workPlanVersionToken, workStages, workTaskRequirements, type WorkGoal, type WorkGoalRevision, type WorkItem, type WorkLaunch, type WorkProjectRules, type WorkResult, type WorkResultPage, type WorkRule, type WorkStage, type WorkWakeupTrigger } from '../../shared/work';
 import { WorkProjects, directoryProject } from './work-projects';
 import { WorkImports } from './work-imports';
 import { managedNativeSessions, nativeSourceScenes, WorkItems, workItemFields, workModelSelection, workPlanVersion, type PendingWorkResult } from './work-items';
@@ -51,6 +51,7 @@ function rootTaskId(taskId: string, tasks: Map<string, SceneTask>) {
 
 const workSessionPath = /^\/api\/work\/sessions\/((?:sub_|agent_)[a-zA-Z0-9_-]{1,160})$/;
 const workGoalPath = /^\/api\/work\/goals(?:\/(goal_[0-9a-f-]{36}))?$/;
+const workProjectPath = /^\/api\/subagent\/projects(?:\/[a-zA-Z0-9_-]{1,160})?$/;
 
 function workCommandPayload(raw: string) {
   const json = raw.trim();
@@ -106,7 +107,7 @@ export class WorkNetwork {
     this.imports = new WorkImports(path.join(projectDirectory, 'imports'));
     this.items = new WorkItems(path.join(projectDirectory, 'items'));
   }
-  matches(pathname: string) { return pathname === '/api/work/imports' || pathname === '/api/work/agents' || workSessionPath.test(pathname) || workGoalPath.test(pathname) || /^\/api\/work\/agents\/[a-z][a-z0-9-]*\/connect$/.test(pathname) || /^\/api\/work\/(?:items(?:\/(?:batch|order)|\/work_[0-9a-f-]+(?:\/(?:dispatch|runs|notes|artifacts|automation|assignee))?)?|results(?:\/read)?)$/.test(pathname) || /^\/api\/subagent\/projects(?:\/proj_[0-9a-f-]+)?$/.test(pathname) || /^\/api\/subagent\/tasks(?:\/(?:sub_|agent_)[a-zA-Z0-9_-]{1,160}(?:\/(?:messages|cancel|steer|retry))?)?$/.test(pathname); }
+  matches(pathname: string) { return pathname === '/api/work/imports' || pathname === '/api/work/agents' || workSessionPath.test(pathname) || workGoalPath.test(pathname) || workProjectPath.test(pathname) || /^\/api\/work\/agents\/[a-z][a-z0-9-]*\/connect$/.test(pathname) || /^\/api\/work\/(?:items(?:\/(?:batch|order)|\/work_[0-9a-f-]+(?:\/(?:dispatch|runs|notes|artifacts|automation|assignee))?)?|results(?:\/read)?)$/.test(pathname) || /^\/api\/subagent\/tasks(?:\/(?:sub_|agent_)[a-zA-Z0-9_-]{1,160}(?:\/(?:messages|cancel|steer|retry))?)?$/.test(pathname); }
   async snapshot(): Promise<WorkSnapshot> {
     const snapshot = await this.readTasks();
     const [selection, data] = await Promise.all([this.imports.read(snapshot.endpoint), this.items.read(snapshot.endpoint)]);
@@ -124,8 +125,11 @@ export class WorkNetwork {
         ? { ...item, launches: [...item.launches!.slice(0, -1), { ...launch, status: 'unconfirmed' as const }] } : item;
     });
     const internalReady = !!snapshot.subagentReady;
+    const runtime = this.runtime();
+    const workCapability = internalReady && snapshot.endpoint === runtime.endpoint ? await this.portalCapability(runtime).catch(() => undefined) : undefined;
     return { ...snapshot, items, goals: data.goals || [], removedItemRunIds: data.removedItemRunIds, hiddenProjectSessionIds: data.hiddenProjectSessionIds, results: this.resultPage(data.results),
-      agents: [{ id: 'internal', name: '内置 Subagent', available: internalReady, canExecute: internalReady }, ...(external?.agents || [])], projects,
+      agents: [{ id: 'internal', name: '内置 Subagent', available: internalReady, canExecute: internalReady,
+        ...(workCapability?.images === true ? { capabilities: { attachments: 'image' as const } } : {}) }, ...(external?.agents || [])], projects,
       tasks: [...snapshot.tasks, ...tasks].map(task => ({ ...task, sceneId: task.sceneId || associated.get(task.id) || '',
         projectId: projects.find(project => project.directory === external?.projects.find(native => native.id === task.projectId)?.directory)?.id || (task.workdir ? directoryProject(projects, task.workdir)?.id : undefined) })) };
   }
@@ -164,16 +168,17 @@ export class WorkNetwork {
     const nativeSubmissions = new Map<string, number>();
     for (const pending of data.pending) {
       const task = visibleNative.find(row => row.id === pending.taskId);
-      if (!task || task.status === 'running' || task.status === 'queued') continue;
+      // The running turn may be newer than the receipt we need to collect.
+      if (!task || (!this.resultStatus(task.status) && (!pending.expectedTurn || task.activeTurnId === pending.expectedTurn))) continue;
       const detail = await this.detail(task, endpoint).catch(() => undefined);
       const turn = detail?.turns?.slice().reverse().find(({ task: run, steps }) => pending.expectedTurn
         ? run.id === pending.expectedTurn
         : steps.some(step => step.kind === 'started' && (pending.requestId
           ? step.requestId === pending.requestId
           : step.at >= pending.submittedAt - 1000 && step.input === pending.message)));
-      if (!turn || turn.task.status === 'running' || turn.task.status === 'queued') continue;
+      if (!turn || !this.resultStatus(turn.task.status)) continue;
       finished.add(pending.taskId + ':' + pending.submittedAt);
-      if (known.has(turn.task.id) || !this.resultStatus(turn.task.status)) continue;
+      if (known.has(turn.task.id)) continue;
       known.add(turn.task.id);
       nativeSubmissions.set(turn.task.id, pending.submittedAt);
       results.push({ id: turn.task.id, taskId: task.id, sceneId: pending.sceneId, executor: task.executor!, planVersion: pending.planVersion, goalRevision: pending.goalRevision,
@@ -243,7 +248,7 @@ export class WorkNetwork {
     });
   }
   private resultStatus(status: SceneTask['status']): status is WorkResult['status'] {
-    return status !== 'queued' && status !== 'running';
+    return status !== 'queued' && status !== 'running' && status !== 'unknown';
   }
 
   private async recordContinuation(endpoint: string, root: string, taskId: string, { planVersion, goalRevision }: RunVersions, pending?: PendingWorkResult) {
@@ -312,12 +317,11 @@ export class WorkNetwork {
   private async continueNative(endpoint: string, task: SceneTask, sceneId: string, message: string, request: Request, retry = false) {
     await this.withContinuation(endpoint, task.id, async (owner, goal) => {
       const versions = retry ? owner?.executions?.filter(run => run.taskId === task.id).at(-1) || {} : this.continuationVersions(owner, goal, request);
-      const brief = !retry && owner && !request.headers.has(workPlanVersionHeader) ? workContinuationPrompt(message, owner, goal) : message;
-      if (Buffer.byteLength(brief) > 16000) throw new AgentError('续聊内容与任务要求合计过长，请缩短后重试。', 400);
+      if (Buffer.byteLength(message) > 16000) throw new AgentError('续聊内容过长，请缩短后重试。', 400);
       const submittedAt = Date.now();
-      const turn: AgentTurn | void = await this.bridge!.send(task, brief);
+      const turn: AgentTurn | void = await this.bridge!.send(task, message);
       const pending = {
-        taskId: task.id, sceneId, message: brief, submittedAt,
+        taskId: task.id, sceneId, message, submittedAt,
         ...(turn && ('turnId' in turn ? { expectedTurn: task.id + ':' + turn.turnId } : { requestId: turn.requestId })),
       };
       await this.recordContinuation(endpoint, task.id, task.id, versions, pending);
@@ -417,12 +421,15 @@ export class WorkNetwork {
       }
     }
   }
-  private async portalRequest(runtime: ReturnType<WorkNetwork['runtime']>, pathname: string, input: object, signal: AbortSignal, headers: Record<string, string>, launch?: LaunchTransport) {
+  private async portalCapability(runtime: ReturnType<WorkNetwork['runtime']>) {
     const [ready, capability] = await Promise.all(['.portal-ready.json', '.portal-work.json'].map(file => readFile(path.join(runtime.directory, file), 'utf8').then(JSON.parse)));
     if (!runtime.pid || ready.pid !== runtime.pid || capability.pid !== runtime.pid || !ready.nonce || capability.nonce !== ready.nonce ||
-        !Number.isInteger(capability.port) || capability.port < 1 || capability.port > 65535 || typeof capability.token !== 'string') {
-      return Response.json({ error: '当前 Portal 未提供 Work 接口，请重启 Portal。' }, { status: 503, headers });
-    }
+        !Number.isInteger(capability.port) || capability.port < 1 || capability.port > 65535 || typeof capability.token !== 'string') return;
+    return capability;
+  }
+  private async portalRequest(runtime: ReturnType<WorkNetwork['runtime']>, pathname: string, input: object, signal: AbortSignal, headers: Record<string, string>, launch?: LaunchTransport) {
+    const capability = await this.portalCapability(runtime);
+    if (!capability) return Response.json({ error: '当前 Portal 未提供 Work 接口，请重启 Portal。' }, { status: 503, headers });
     const current = this.runtime();
     if (current.endpoint !== runtime.endpoint || current.pid !== runtime.pid) return Response.json({ error: 'Portal 已切换，请重试。' }, { status: 409, headers });
     if (launch?.onPortalSend) await launch.onPortalSend(typeof capability.launchAdmission === 'string' && capability.launchAdmission || undefined);
@@ -666,18 +673,19 @@ export class WorkNetwork {
       });
       return Response.json(dispatch, { status: 201, headers });
     }
-    const { dispatch_id, executor, request_id } = input;
+    const { dispatch_id, executor, request_id, instruction } = input;
     if (dispatch_id !== undefined && (typeof dispatch_id !== 'string' || executor === undefined))
       throw new AgentError('请提供接管请求 ID 和执行器。', 400);
     if (executor !== undefined && (typeof executor !== 'string' || !executor))
       throw new AgentError('请选择有效的执行器。', 400);
     if (request_id !== undefined && (dispatch_id !== undefined || typeof request_id !== 'string' || !/^[a-zA-Z0-9-]{1,80}$/.test(request_id)))
       throw new AgentError('运行请求 ID 无效。', 400);
+    if (instruction !== undefined && typeof instruction !== 'string') throw new AgentError('补充指令必须是文本。', 400);
     return this.startItem(endpoint, id, input.scene_id, request.signal, headers, undefined,
-      { dispatchId: dispatch_id, requestId: request_id, executor });
+      { dispatchId: dispatch_id, requestId: request_id, executor, instruction: instruction?.trim() });
   }
 
-  private async startItem(endpoint: string, id: string, sceneId: string, signal: AbortSignal, headers: Record<string, string>, automatic?: { key: 'handoff' | 'wakeup'; rule: WorkRule; context: string }, selection?: { dispatchId?: string; requestId?: string; executor?: string }) {
+  private async startItem(endpoint: string, id: string, sceneId: string, signal: AbortSignal, headers: Record<string, string>, automatic?: { key: 'handoff' | 'wakeup'; rule: WorkRule; context: string }, selection?: { dispatchId?: string; requestId?: string; executor?: string; instruction?: string }) {
     const dispatchId = selection?.dispatchId;
     const key = endpoint + ':' + id;
     const launchId = automatic ? undefined : dispatchId || selection?.requestId || 'initial';
@@ -727,7 +735,9 @@ export class WorkNetwork {
       const planVersion = current.planHistory?.at(-1)?.version || 1;
       const goal = snapshot.goals?.find(row => row.id === project.goalId);
       const goalRevision = workGoalRevision(goal);
-      let brief = [current.title, current.description, workPlanPrompt(current, goal)].filter(Boolean).join('\n\n');
+      const descriptionIncludesTitle = current.description === current.title || current.description.startsWith(current.title + '\n');
+      const requirements = workTaskRequirements(current);
+      let brief = [!descriptionIncludesTitle && current.title, current.description, requirements, selection?.instruction].filter(Boolean).join('\n\n');
       if (automatic) {
         await this.items.update(endpoint, state => {
           const item = state.items.find(row => row.id === id);
@@ -741,11 +751,11 @@ export class WorkNetwork {
           current.title, automatic.rule.instruction,
           '以下原始任务和触发记录仅作背景。请按本轮指令执行。',
           current.description.slice(0, 1300),
-          workPlanPrompt(current, goal),
+          requirements,
           automatic.context,
         ].filter(Boolean).join('\n\n');
       }
-      if (Buffer.byteLength(brief) > 16000) throw new AgentError('任务说明与规格合计过长，请缩短后重新派发。', 400);
+      if (Buffer.byteLength(brief) > 16000) throw new AgentError('执行指令超过 16000 字节，请缩短后重新派发。', 400);
       const recovery = launch && { key: randomUUID(), executor, submittedAt: Date.now(), planVersion, goalRevision,
         promptHash: createHash('sha256').update(brief).digest('hex') };
       if (launch) {
@@ -945,7 +955,7 @@ export class WorkNetwork {
       const operation = this.handle(new Request('beings://desktop' + resource + target + suffix, {
         method, headers: { 'Content-Type': 'application/json', 'X-Being-Endpoint': endpoint, ...(sceneId ? { 'X-Work-Scene': sceneId } : {}) },
         body: JSON.stringify(command === 'automate' || command === 'decline' ? { ...input, scene_id: sourceScene } : command === 'run'
-          ? { scene_id: sourceScene, dispatch_id: input.dispatch_id, request_id: input.request_id, executor: input.executor } : command === 'steer' ? { message: input.message }
+          ? { scene_id: sourceScene, dispatch_id: input.dispatch_id, request_id: input.request_id, executor: input.executor, instruction: input.instruction } : command === 'steer' ? { message: input.message }
             : command === 'link-project' ? { goalId: input.goal_id, expectedGoalId: input.expectedGoalId } : input),
         signal,
       }));
@@ -1011,7 +1021,7 @@ export class WorkNetwork {
       const directory: unknown = JSON.parse(id.slice('directory '.length));
       if (typeof directory !== 'string' || !path.isAbsolute(directory)) throw new Error('项目目录无效。');
       const resolved = await realpath(directory);
-      return JSON.stringify({ allowed: !!directoryProject(await this.projects.list(endpoint), resolved) });
+      return JSON.stringify({ allowed: !!directoryProject(await this.projects.registered(endpoint), resolved) });
     }
     if (/^(start|send|cancel) /.test(id)) {
       const operation = id.slice(0, id.indexOf(' '));
@@ -1027,7 +1037,7 @@ export class WorkNetwork {
     }
     const snapshot = await this.snapshot();
     if (id === 'agents') return JSON.stringify(snapshot.agents);
-    const usage = `${workDispatchReply} ` + '@work agents lists executors and readiness. @work start {"executor":"codex|deepseek|internal","workdir":"absolute project directory","brief":"task"} starts an independent session for work without a goal. For a goal-linked project use @work create and @work run to inherit the goal. Dispatch independent tasks in parallel. @work send {"task_id":"id","message":"follow-up"} continues the same native session; @work cancel {"task_id":"id"} stops it. Codex and DeepSeek are independent native gateways. When reporting a specific session, link its title as [task title](beings://work/<complete task_id>); use the actual returned ID. @work goals lists Work goals. @work goal <goal_id> reads the goal, projects, and progress. Use @work create-goal {title,outcome,acceptanceCriteria,status:"active"}, @work update-goal {goal_id,title,outcome,acceptanceCriteria,status,expectedVersion?}, and @work link-project {project_id,goal_id}. @work add-project {"directory":"absolute path","goal_id":"optional"} opens a folder chooser; projects can work without a goal. @work projects lists local projects; @work project <project_id> reads a project and its tasks. @work <task_id> reads the full session, including every follow-up, tool input/output, errors and native conversation records. In a later user message in the same Being chat, use @work results <work_id> [<work_id> ...] for the latest result and stage of each selected task, or @work results for recent outcomes. Use @work <work_id> for the plan and linked runs. Use @work <task_id> for the latest follow-up and artifacts. If a launch times out, use @work status <work_id> to recover the original dispatch. Reuse its request when repeating a command. Desktop-submitted native runs publish results through Portal callbacks. @work create accepts {title,description,specification,acceptanceCriteria,projectId,executor,stage,priority,labels,dueDate,parentId}; @work update accepts the same fields plus item_id and optional expectedVersion. @work run {item_id,executor?} starts a task and returns a launch receipt immediately. If the task has no executor, choose an available project default or an available suitable executor, and pass its ID to run. @work note or @work artifact accepts {item_id,value}; register the source project file for an artifact. @work <work_id> reads requirements history and linked executions. Each latest result can include goalRevision, planVersion, deliveryVersion and archived files[].path. @work steer {task_id,message} supplements supported running sessions; @work retry {task_id} retries the latest failed run. Verify internal Portal completion callbacks by task_id in the actual inbox; if a source filter only returns old items, recheck without that filter before declaring delivery failed. Ledger callback=sent alone is not proof of receipt. Large histories return an immutable JSON text page; follow next until null, concatenate content by offset to obtain the full context (do not treat the first page as the complete history); portal_subagent_control action=continue continues a finished task in its original directory.';
+    const usage = `${workDispatchReply} ` + '@work agents lists executors and readiness. @work start {"executor":"codex|deepseek|internal","workdir":"absolute project directory","brief":"task"} starts an independent session for work without a goal. For a goal-linked project use @work create and @work run to link the execution to the goal in Work. Dispatch independent tasks in parallel. @work send {"task_id":"id","message":"follow-up"} continues the same native session; @work cancel {"task_id":"id"} stops it. Codex and DeepSeek are independent native gateways. When reporting a specific session, link its title as [task title](beings://work/<complete task_id>); use the actual returned ID. @work goals lists Work goals. @work goal <goal_id> reads the goal, projects, and progress. Use @work create-goal {title,outcome,acceptanceCriteria,status:"active"}, @work update-goal {goal_id,title,outcome,acceptanceCriteria,status,expectedVersion?}, and @work link-project {project_id,goal_id}. @work add-project {"directory":"absolute path","goal_id":"optional"} opens a folder chooser; projects can work without a goal. @work projects lists local projects; @work project <project_id> reads a project and its tasks. @work <task_id> reads the full session, including every follow-up, tool input/output, errors and native conversation records. In a later user message in the same Being chat, use @work results <work_id> [<work_id> ...] for the latest result and stage of each selected task, or @work results for recent outcomes. Use @work <work_id> for the plan and linked runs. Use @work <task_id> for the latest follow-up and artifacts. If a launch times out, use @work status <work_id> to recover the original dispatch. Reuse its request when repeating a command. Desktop-submitted native runs publish results through Portal callbacks. @work create accepts {title,description,specification,acceptanceCriteria,projectId,executor,stage,priority,labels,dueDate,parentId}; @work update accepts the same fields plus item_id and optional expectedVersion. @work run {item_id,executor?,instruction?} starts a task and returns a launch receipt immediately. Work sends the filled task fields. Include relevant goal context or delivery format in instruction when needed for this run. If the task has no executor, choose an available project default or an available suitable executor, and pass its ID to run. @work note or @work artifact accepts {item_id,value}; register the source project file for an artifact. @work <work_id> reads requirements history and linked executions. Each latest result can include goalRevision, planVersion, deliveryVersion and archived files[].path. @work steer {task_id,message} supplements supported running sessions; @work retry {task_id} retries the latest failed run. Verify internal Portal completion callbacks by task_id in the actual inbox; if a source filter only returns old items, recheck without that filter before declaring delivery failed. Ledger callback=sent alone is not proof of receipt. Large histories return an immutable JSON text page; follow next until null, concatenate content by offset to obtain the full context (do not treat the first page as the complete history); portal_subagent_control action=continue continues a finished task in its original directory.';
     if (!id || id === 'projects') return JSON.stringify({ agents: snapshot.agents, projects: snapshot.projects, items: id ? undefined : snapshot.items, tasks: id ? undefined : snapshot.tasks.map(({ userMessage: _message, ...task }) => task), usage });
     if (id.startsWith('project ')) {
       const project = snapshot.projects.find(project => project.id === id.slice('project '.length));
@@ -1051,7 +1061,13 @@ export class WorkNetwork {
     }).sort((a, b) => a.createdAt - b.createdAt);
     const details = await Promise.all(chain.map(task => this.detail(task, snapshot.endpoint)));
     if (signal?.aborted || this.runtime().endpoint !== endpoint) throw new Error('上下文读取已取消或 Being 已切换。');
-    const text = JSON.stringify({ item, tasks: chain, conversation: details.map((detail, index) => ({ ...detail, request: chain[index].userMessage || chain[index].brief })) });
+    const summarize = (steps: SubagentStep[]) => steps.map(({ attachments, ...step }) => attachments?.length
+      ? { ...step, attachments: attachments.map(({ type, name }) => ({ type, name })) } : step);
+    const conversation = details.map(({ taskId, steps, turns }, index) => ({
+      taskId, steps: summarize(steps), turns: turns?.map(turn => ({ task: turn.task, steps: summarize(turn.steps) })),
+      request: chain[index].userMessage || chain[index].brief,
+    }));
+    const text = JSON.stringify({ item, tasks: chain, conversation });
     if (text.length <= 12000) return text;
     for (const [key, saved] of this.contexts) if (saved.expires < Date.now() || saved.endpoint !== endpoint) this.contexts.delete(key);
     if (this.contexts.size >= 8) this.contexts.delete(this.contexts.keys().next().value!);
@@ -1073,31 +1089,24 @@ export class WorkNetwork {
     try {
       const url = new URL(request.url);
       const sceneId = request.headers.get('X-Work-Scene');
-      const tracked = sceneId && this.sceneIds().includes(sceneId) && ['/turn/start', '/api/session/prompt'].includes(url.pathname);
-      const input = tracked ? await request.clone().json() : undefined;
-      const prompt = tracked && url.hostname === 'deepseek' ? input?.payload?.args?.request : undefined;
-      const root = tracked && (url.hostname === 'codex' ? 'agent_codex_' + input.threadId
-        : prompt?.mode === 'queue' ? 'agent_deepseek_' + prompt.sessionId : undefined);
       const adapter = this.bridge!.adapter(url.hostname);
-      const response = root && sceneId ? await this.withContinuation(endpoint, root, async (owner, goal) => {
-        const versions = request.headers.has(workPlanVersionHeader) ? this.continuationVersions(owner, goal, request) : {};
-        const submittedAt = Date.now();
-        const reply = await adapter.native!(request);
-        if (reply.ok) {
-          const result = await reply.clone().json();
-          const turn = url.hostname === 'codex' ? result.turn?.id && { expectedTurn: root + ':' + result.turn.id }
-            : result.result?.ok && { requestId: prompt.requestId };
-          if (turn) await this.recordContinuation(endpoint, root, root, versions, { taskId: root, sceneId, submittedAt, message: '', ...turn });
-        }
-        return reply;
-      }) : await adapter.native!(request);
-      if (response.ok && (url.pathname === '/thread/start' || url.pathname === '/api/session/create')) {
-        const result = await response.clone().json();
-        const nativeId = url.hostname === 'codex' ? result.thread?.id : result.result?.value?.sessionId;
-        if (nativeId) {
-          await this.items.rememberNative(endpoint, `agent_${url.hostname}_${nativeId}`);
-        }
-      }
+      const response = await adapter.native!(request, {
+        created: async nativeId => { await this.items.rememberNative(endpoint, agentTaskId(adapter.id, nativeId)); },
+        turn: async (nativeId, submit) => {
+          if (!sceneId || !this.sceneIds().includes(sceneId)) return (await submit()).response;
+          const root = agentTaskId(adapter.id, nativeId);
+          return this.withContinuation(endpoint, root, async (owner, goal) => {
+            const versions = request.headers.has(workPlanVersionHeader) ? this.continuationVersions(owner, goal, request) : {};
+            const submittedAt = Date.now();
+            const { response, receipt } = await submit();
+            if (receipt && response.ok) {
+              const turn = 'turnId' in receipt ? { expectedTurn: root + ':' + receipt.turnId } : receipt;
+              await this.recordContinuation(endpoint, root, root, versions, { taskId: root, sceneId, submittedAt, message: '', ...turn });
+            }
+            return response;
+          });
+        },
+      });
       this.bridge!.invalidate();
       return new Response(response.body, { status: response.status, statusText: response.statusText, headers: { ...headers, 'Content-Type': response.headers.get('content-type') || 'application/json' } });
     } catch (error) {
@@ -1111,7 +1120,7 @@ export class WorkNetwork {
     const source = request.headers.get('Origin');
     if (source && source !== origin) return new Response(null, { status: 403 });
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: { ...headers,
-      'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE', 'Access-Control-Allow-Headers': `Content-Type, X-Being-Endpoint, X-Work-Scene, ${workPlanVersionHeader}` } });
+      'Access-Control-Allow-Methods': 'GET, POST, PATCH, DELETE', 'Access-Control-Allow-Headers': `Cache-Control, Content-Type, X-Being-Endpoint, X-Work-Scene, ${workPlanVersionHeader}` } });
     const url = new URL(request.url);
     if (!this.matches(url.pathname)) return new Response(null, { status: 404, headers });
     const runtime = this.runtime();
@@ -1140,19 +1149,23 @@ export class WorkNetwork {
       }
       if (url.pathname.startsWith('/api/subagent/projects/')) {
         if (request.method !== 'PATCH') return new Response(null, { status: 405, headers });
+        const id = url.pathname.split('/').at(-1)!;
         const rules = (await request.json()) as (WorkProjectRules & { goalId?: unknown; expectedGoalId?: unknown }) | null;
         if (rules && Object.hasOwn(rules, 'goalId')) {
           if (typeof rules.goalId !== 'string' || (rules.expectedGoalId !== undefined && typeof rules.expectedGoalId !== 'string'))
             throw new AgentError('请选择有效的所属目标。', 400);
           const goalId = await this.projectGoal(runtime.endpoint, rules.goalId);
-          return Response.json(await this.projects.setGoal(runtime.endpoint, url.pathname.split('/').at(-1)!, goalId || '', rules.expectedGoalId), { headers });
+          const project = (await this.projects.list(runtime.endpoint)).find(row => row.id === id)
+            || (await this.snapshot()).projects.find(row => row.id === id);
+          if (!project) throw new AgentError('此项目尚未同步到 Work。', 404);
+          return Response.json(await this.projects.setGoal(runtime.endpoint, project, goalId || '', rules.expectedGoalId), { headers });
         }
         const { agents } = await this.snapshot();
         if (!rules || typeof rules.executor !== 'string' || (rules.executor && !agents?.some(agent => agent.id === rules.executor)) ||
           (rules.handoff !== undefined && (!rules.handoff || !agents?.some(agent => agent.id === rules.handoff?.executor) ||
             typeof rules.handoff.instruction !== 'string' || !rules.handoff.instruction.trim() || rules.handoff.instruction.length > 1000)))
           throw new AgentError('请选择可用的项目执行器，并填写审核指令。', 400);
-        const saved = await this.projects.setRules(runtime.endpoint, url.pathname.split('/').at(-1)!, {
+        const saved = await this.projects.setRules(runtime.endpoint, id, {
           executor: rules.executor, handoff: rules.handoff && { executor: rules.handoff.executor, instruction: rules.handoff.instruction.trim() },
         });
         return Response.json(saved, { headers });
@@ -1186,7 +1199,7 @@ export class WorkNetwork {
       if (url.pathname === '/api/work/agents' && request.method === 'GET') return Response.json((await this.snapshot()).agents, { headers });
       if (url.pathname.startsWith('/api/work/agents/') && request.method === 'POST') { await this.bridge!.connect(url.pathname.split('/')[4]); return Response.json({ restartRequired: true }, { headers }); }
       if (url.pathname === '/api/subagent/projects') {
-        if (request.method === 'GET') return Response.json(await this.projects.list(runtime.endpoint), { headers });
+        if (request.method === 'GET') return Response.json(await this.projects.registered(runtime.endpoint), { headers });
         const input = await request.json();
         const goalId = await this.projectGoal(runtime.endpoint, input?.goalId);
         try { return Response.json(await this.projects.add(runtime.endpoint, input, goalId), { status: 201, headers }); }
@@ -1208,16 +1221,18 @@ export class WorkNetwork {
         if (!internal.tasks.some(task => task.id === id)) return Response.json({ error: '任务不存在。' }, { status: 404, headers });
         return Response.json((await this.readDetails(runtime.endpoint, [id]))[0], { headers });
       }
+      if (!id && request.method === 'GET' && request.headers.get('Cache-Control') === 'no-cache') this.bridge?.invalidate();
       const snapshot = await this.snapshot();
       if (!id && request.method === 'GET') return Response.json(snapshot, { headers });
       if (!id && request.method === 'POST') {
         const input = await request.clone().json();
-        if (!input || typeof input.brief !== 'string' || !input.brief.trim() || input.brief.length > 16000 || typeof input.workdir !== 'string' || !path.isAbsolute(input.workdir) || typeof input.scene_id !== 'string' || !this.sceneIds().includes(input.scene_id) || Object.keys(input).some(key => !['brief', 'workdir', 'scene_id', 'executor', 'modelSelection'].includes(key))) return Response.json({ error: '请提供任务说明、项目目录和当前客户端对话。' }, { status: 400, headers });
+        if (!input || typeof input.brief !== 'string' || !input.brief.trim() || input.brief.length > 16000 || typeof input.workdir !== 'string' || !path.isAbsolute(input.workdir) || typeof input.scene_id !== 'string' || !this.sceneIds().includes(input.scene_id) || Object.keys(input).some(key => !['brief', 'workdir', 'scene_id', 'executor', 'modelSelection', 'attachments'].includes(key))) return Response.json({ error: '请提供任务说明、项目目录和当前客户端对话。' }, { status: 400, headers });
         if (input.executor !== undefined && typeof input.executor !== 'string') return Response.json({ error: '执行器无效。' }, { status: 400, headers });
         const modelSelection = workModelSelection(input.modelSelection, input.executor);
         const workdir = await realpath(input.workdir);
         if (!directoryProject(snapshot.projects, workdir)) return Response.json({ error: '请先添加此项目目录。' }, { status: 403, headers });
         if (input.executor && input.executor !== 'internal') {
+          if (input.attachments !== undefined) return Response.json({ error: '请使用该执行器的原生接口发送附件。' }, { status: 400, headers });
           const submittedAt = Date.now();
           const receipt = await this.bridge!.start(input.executor, workdir, input.brief, modelSelection ?? undefined, launch?.onCreated);
           await this.items.rememberNative(runtime.endpoint, receipt.task_id, { sceneId: input.scene_id, submittedAt, message: input.brief,
@@ -1264,10 +1279,8 @@ export class WorkNetwork {
       return await this.withContinuation(runtime.endpoint, continuing, async (owner, goal) => {
         const versions = action === 'retry' ? { planVersion: owner?.runPlans?.[task!.id], goalRevision: owner?.runGoals?.[task!.id] }
           : this.continuationVersions(owner, goal, request);
-        if (action === 'messages' && typeof input.message === 'string') {
-          if (owner && !request.headers.has(workPlanVersionHeader)) input.message = workContinuationPrompt(input.message, owner, goal);
-          if (Buffer.byteLength(input.message) > 16000) throw new AgentError('续聊内容与任务要求合计过长，请缩短后重试。', 400);
-        }
+        if (action === 'messages' && typeof input.message === 'string' && Buffer.byteLength(input.message) > 16000)
+          throw new AgentError('续聊内容过长，请缩短后重试。', 400);
         const response = await this.portalRequest(runtime, url.pathname, input, request.signal, headers);
         if (!response.ok) return response;
         const receipt = await response.clone().json();

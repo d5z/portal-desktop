@@ -95,6 +95,7 @@ export class AppModel extends Store {
   sbsKnown = false;
   toastMessage = "";
   toastCopied = false;
+  toastTone?: 'error';
   settingsOpen = false;
   subagentSettingsOpen = false;
   subagentTaskIds: string[] = [];
@@ -362,8 +363,9 @@ export class AppModel extends Store {
     }
     this.changed();
   }
-  toast = (error: unknown, copied = false) => {
+  toast = (error: unknown, copied = false, tone?: 'error') => {
     this.toastCopied = copied;
+    this.toastTone = tone;
     this.toastMessage = error === '' ? '' : errorText(error);
     this.changed();
     clearTimeout(this.toastTimer);
@@ -373,6 +375,7 @@ export class AppModel extends Store {
       this.changed();
     }, 6000);
   };
+  toastError = (error: unknown) => this.toast(error, false, 'error');
   run = async (operation: () => Promise<unknown>) => {
     try {
       await operation();

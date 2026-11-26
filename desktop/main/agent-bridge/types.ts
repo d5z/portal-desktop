@@ -1,9 +1,14 @@
 import type { SceneTask, SubagentTaskDetail, WorkProject } from '../../shared/types';
 import type { WorkModelSelection } from '../../shared/work';
+import type { WorkAgentDescriptor } from '../../shared/work-executor';
 
-export interface AgentDescriptor { id: string; name: string; available: boolean; canExecute?: boolean; message?: string }
+export type AgentDescriptor = WorkAgentDescriptor;
 export interface AgentSnapshot { projects: WorkProject[]; tasks: SceneTask[] }
 export type AgentTurn = { turnId: string } | { requestId: string };
+export interface AgentNativeLifecycle {
+  created(nativeId: string): Promise<void>;
+  turn(nativeId: string, submit: () => Promise<{ response: Response; receipt?: AgentTurn }>): Promise<Response>;
+}
 /** Native IDs are adapter-owned; the bridge only namespaces them and routes operations. */
 export interface AgentAdapter {
   readonly id: string;
@@ -16,7 +21,7 @@ export interface AgentAdapter {
   steer?(id: string, message: string): Promise<void>;
   cancel(id: string): Promise<void>;
   connect?(): Promise<void>;
-  native?(request: Request): Promise<Response>;
+  native?(request: Request, lifecycle: AgentNativeLifecycle): Promise<Response>;
   close(): void;
 }
 export class AgentError extends Error {
