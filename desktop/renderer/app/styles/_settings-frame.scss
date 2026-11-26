@@ -1977,6 +1977,24 @@ html[data-theme='dark'] .town-logo-light {
   font-size: 12px;
 }
 
+#client-settings-dialog .general-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0;
+}
+
+#client-settings-dialog .general-settings-actions .form-error {
+  margin: 0;
+}
+
+#client-settings-dialog .general-settings-actions > button {
+  min-height: 32px;
+  margin-inline-start: auto;
+  padding: 5px 12px;
+}
+
 #client-settings-dialog .settings-nav-search > svg {
   width: 18px;
   height: 18px;
