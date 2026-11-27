@@ -11,7 +11,7 @@ import { createSceneRuntime } from "./scene-runtime";
 import { HistoryCache, normalizeHistoryRows } from "./history-cache";
 import { chatHistoryLimit } from '../../../shared/chat-history';
 import { inCurrentScene, messageScene, sceneItems, sceneTransitionNotice, stripSceneTransition, type MessageScene } from "../models/scenes";
-import type { ChatRuntime, ChatState, Message, RuntimeOptions } from "../models/chat";
+import type { ChatItem, ChatRuntime, ChatState, Message, RuntimeOptions } from "../models/chat";
 
 /**
  * Loom's streaming, replay and history protocol, independent of rendering.
@@ -2846,20 +2846,33 @@ function createStreamRuntime(state: any, options: any): any {
     }
     orderHistoryItem(message);
   }
-  // Durable seq is the ordering authority. Only move a confirmed item when its
-  // neighbours contradict that order; preserve live objects and tool runs.
-  function orderHistoryItem(message: any) {
-    const index = state.items.indexOf(message);
+  function orderHistoryItem(message: ChatItem & { historySeq?: number }) {
+    const items: (ChatItem & { historySeq?: number })[] = state.items;
+    let index = items.indexOf(message);
     if (index < 0 || !message.historySeq) return;
-    const misplaced = state.items.some((item: any, i: number) => item.historySeq &&
-      (i < index ? item.historySeq > message.historySeq : i > index && item.historySeq < message.historySeq));
-    if (!misplaced) return;
-    state.items.splice(index, 1);
-    const next = state.items.findIndex((item: any) => item.historySeq > message.historySeq);
-    if (next >= 0) state.items.splice(next, 0, message);
-    else {
-      const previous = state.items.findLastIndex((item: any) => item.historySeq < message.historySeq);
-      state.items.splice(previous + 1, 0, message);
+    const seq = message.historySeq;
+    // History seq remains authoritative for persisted items.
+    const misplaced = items.some((item, i) => item.historySeq &&
+      (i < index ? item.historySeq > seq : i > index && item.historySeq < seq));
+    if (misplaced) {
+      items.splice(index, 1);
+      const next = items.findIndex(item => item.historySeq && item.historySeq > seq);
+      index = next >= 0 ? next : items.findLastIndex(item => item.historySeq && item.historySeq < seq) + 1;
+      items.splice(index, 0, message);
+    }
+
+    // Weixin uses a scene per inbound turn. Live activity for that scene can
+    // arrive before its user history row, even after the run has finished.
+    if (message.kind === "message" && message.role === "user" && message.sceneId?.startsWith("wx-turn-")) {
+      const activity = items.findIndex((item, i) => i < index && item.sceneId === message.sceneId &&
+        (item.kind === "run" || (item.kind === "message" && item.role === "being")));
+      if (activity < 0) return;
+      const previous = items.findLastIndex((item, i) => i < index && item.historySeq && item.historySeq < seq);
+      const target = Math.max(activity, previous + 1);
+      if (target < index) {
+        items.splice(index, 1);
+        items.splice(target, 0, message);
+      }
     }
   }
   function consumeLocalEcho(role: any, text: any, scene: any, history: any) {

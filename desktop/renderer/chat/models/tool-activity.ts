@@ -61,7 +61,7 @@ export function completeToolActivity(entries: ActivityEntry[], data: Payload): A
   const statusCommand = actCommand.match(/^connector_workspace_import_status\s+import_id="([a-zA-Z0-9_-]+)"$/);
   const statusCall = name === 'connector_workspace_import_status' || statusCommand !== null;
   const homeAct = !!actCommand && homeActSuccess.test(detail);
-  const output = jsonObject(homeAct ? detail.replace(homeActSuccess, '') : detail);
+  const output = jsonObject(actCommand ? detail.replace(/^\[being-home(?:-dev)?\] \[act [^\]\r\n]+\]\s+/, '') : detail);
   const workspaceError = metadata.workspace_error ?? structured.workspace_error ?? output.workspace_error;
   const workspaceCode = typeof workspaceError === 'string' ? workspaceError : object(workspaceError).error_code || object(workspaceError).code;
   if (workspaceError) entry.workspaceError = typeof workspaceCode === 'string' && /^[a-zA-Z0-9_.-]{1,160}$/.test(workspaceCode) ? workspaceCode : '转存登记未完成，请查看工具返回详情';
@@ -78,6 +78,9 @@ export function completeToolActivity(entries: ActivityEntry[], data: Payload): A
   const errorCode = metadata.error_code || object(metadata.error).code || structured.error_code || object(structured.error).code || output.error_code || object(output.error).code;
   if (errorCode === 'weixin_cursor_reset_required') {
     entry.error = true; entry.nextAction = '微信连接已更新。请重新发现工具，清除旧游标，首次不带 cursor 读取，再原样使用新的 nextCursor。不要自动重发消息。';
+  }
+  if ([errorCode, metadata.error, structured.error, output.error].includes('weixin_auto_receive_enabled')) {
+    entry.error = true; entry.nextAction = '消息由自动收发服务管理。请停止手动读取，避免争用消息游标。';
   }
   if (errorCode === 'connection_reauth_required') {
     entry.error = true; entry.nextAction = '微信授权已失效，请到应用设置重新连接所选账户，再刷新工具。不要自动重发消息。';

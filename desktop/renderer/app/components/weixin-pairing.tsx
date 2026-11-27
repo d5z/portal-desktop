@@ -152,11 +152,13 @@ export function WeixinPairing({ resources, releaseId, initialPreview, onReady, o
       {!qr && !error && !requiresConfirmation && <p role="status">正在获取二维码…</p>}
       {requiresConfirmation && <p>接管后，此账号的旧工具入口会停用。</p>}
       {qr && <p role="status">{labels[qr.state]}</p>}
+      {preview && <p>当前环境支持自动收发时，连接后会自动接收微信消息并回复，可在应用详情随时停止。</p>}
       {image && <img className="connector-weixin-qr" src={image} alt="微信 Bot 配对二维码" />}
       {preview && <details className="connector-weixin-permissions" open={requiresConfirmation || undefined}>
         <summary>权限与工具范围</summary>
         <p>初始只读工具：{preview.read_actions.join('、') || '无'}</p>
-        <p>需要明确开启的写工具：{preview.write_actions.join('、') || '无'}</p>
+        <p>自动收发开启时，Home 会启用取消息和文字回复。</p>
+        <p>其他需单独开启的写工具：{preview.write_actions.filter(action => action !== 'weixin_bot.send_message').join('、') || '无'}</p>
         <p>第三方授权范围：{preview.scopes.join('、') || '无额外声明'}</p>
         {preview.permission_notes.map(note => <p key={note}>{note}</p>)}
       </details>}

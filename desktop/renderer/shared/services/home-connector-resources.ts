@@ -1,11 +1,11 @@
 import { rememberConnectorImport } from './connector-workspace-store';
-import { connectorImport, connectorResourceMethods, type ConnectorAccess, type ConnectorContext, type ConnectorResources, type WeixinQR } from '../../../shared/connector-resources';
+import { connectorImport, connectorResourceMethods, isWeixinAutoChannelPath, weixinAutoChannelStates, type ConnectorAccess, type ConnectorContext, type ConnectorResourceMethod, type ConnectorResources, type WeixinAutoChannel, type WeixinQR } from '../../../shared/connector-resources';
 
 const importReads = new Map<string, Promise<unknown>>();
 
 /** IPC supplies local access credentials; business requests stay visible in Network. */
 export function homeConnectorResources(access: ConnectorAccess): ConnectorResources {
-  async function request<T>(context: ConnectorContext, path: string, method: 'GET' | 'POST' | 'DELETE' = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
+  async function request<T>(context: ConnectorContext, path: string, method: ConnectorResourceMethod = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
     if (!connectorResourceMethods(path)?.includes(method)) throw new Error('不支持的 Connector 资源。');
     const key = await access.access();
     const response = await fetch(`beings://desktop${path}`, { method, signal, credentials: 'omit', cache: 'no-store',
@@ -20,13 +20,20 @@ export function homeConnectorResources(access: ConnectorAccess): ConnectorResour
       const message = path.includes('/weixin-qr')
         ? `HTTP ${response.status}${code && /^[a-zA-Z0-9_.-]{1,80}$/.test(code) ? ` · ${code}` : ''}`
         : code || `请求失败（HTTP ${response.status}）`;
-      throw Object.assign(new Error(message), { status: response.status });
+      throw Object.assign(new Error(message), { status: response.status, code });
     }
     if (method === 'GET' && path.startsWith('/v1/me/connector-imports/')) {
       const parsed = connectorImport(value);
       if (!parsed || parsed.import_id !== decodeURIComponent(path.split('/').at(-1)!)) throw new Error('工作区保存状态响应无效。');
       rememberConnectorImport(context, parsed);
       return parsed as unknown as T;
+    }
+    if (isWeixinAutoChannelPath(path)) {
+      if (typeof value?.enabled !== 'boolean' || !weixinAutoChannelStates.includes(value.state) || value.binding_id != null && typeof value.binding_id !== 'string')
+        throw new Error('Home 返回了无效的自动收发状态。');
+      const channel: WeixinAutoChannel = { enabled: value.enabled, state: value.state, binding_id: value.binding_id || null,
+        error_code: typeof value.error_code === 'string' && /^[a-zA-Z0-9_.-]{1,160}$/.test(value.error_code) ? value.error_code : undefined };
+      return channel as T;
     }
     if (path.includes('/weixin-qr') && method !== 'DELETE') {
       if (!value || !['waiting', 'scanned', 'needs_verification', 'connecting', 'ready', 'expired', 'cancelled', 'failed'].includes(value.state) ||
@@ -47,7 +54,7 @@ export function homeConnectorResources(access: ConnectorAccess): ConnectorResour
   }
   return {
     context: () => access.context(),
-    request<T>(context: ConnectorContext, path: string, method: 'GET' | 'POST' | 'DELETE' = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
+    request<T>(context: ConnectorContext, path: string, method: ConnectorResourceMethod = 'GET', body?: unknown, signal?: AbortSignal): Promise<T> {
       if (method !== 'GET' || !path.startsWith('/v1/me/connector-imports/') || signal) return request<T>(context, path, method, body, signal);
       const key = JSON.stringify([context.session, context.endpoint, context.account, path]);
       const pending = importReads.get(key);

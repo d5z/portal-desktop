@@ -9,6 +9,19 @@ export interface WeixinQR {
   error_code?: string | null;
   enable: HomeConnectorEnableState | null;
 }
+export const weixinAutoChannelStates = ['starting', 'running', 'stopped', 'reauth_required', 'error'] as const;
+export interface WeixinAutoChannel {
+  binding_id: string | null;
+  enabled: boolean;
+  state: (typeof weixinAutoChannelStates)[number];
+  error_code?: string;
+}
+export interface WeixinAutoChannelSettings {
+  enabled: boolean;
+  profile_id: string;
+  installation_id: string;
+  initialize_only?: true;
+}
 export interface ConnectorImport {
   import_id: string;
   state: 'pending' | 'copying' | 'write_unknown' | 'ready' | 'failed' | 'deleting' | 'delete_unknown' | 'deleted';
@@ -24,12 +37,16 @@ export interface ConnectorAccess {
   context(): Promise<ConnectorContext>;
   access(): Promise<string>;
 }
+export type ConnectorResourceMethod = 'GET' | 'POST' | 'PUT' | 'DELETE';
 export interface ConnectorResources {
   context(): Promise<ConnectorContext>;
-  request<T>(context: ConnectorContext, path: string, method?: 'GET' | 'POST' | 'DELETE', body?: unknown, signal?: AbortSignal): Promise<T>;
+  request<T>(context: ConnectorContext, path: string, method?: ConnectorResourceMethod, body?: unknown, signal?: AbortSignal): Promise<T>;
 }
+export const weixinAutoChannelPath = (connectionId: string) => `/v1/me/connector-connections/${encodeURIComponent(connectionId)}/auto-channel`;
+export const isWeixinAutoChannelPath = (path: string) => /^\/v1\/me\/connector-connections\/[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}\/auto-channel$/i.test(path);
 /** These fixed resources preserve the Home paths; no arbitrary forwarding. */
 export function connectorResourceMethods(path: string): readonly string[] | undefined {
+  if (isWeixinAutoChannelPath(path)) return ['GET', 'PUT'];
   if (/^\/v1\/me\/kit-connector-enables\/[^/]+\/weixin-qr$/.test(path)) return ['GET', 'POST', 'DELETE'];
   if (/^\/v1\/me\/kit-connector-enables\/[^/]+\/weixin-qr\/(advance|verify)$/.test(path)) return ['POST'];
   if (/^\/v1\/me\/connector-imports\/[^/]+$/.test(path)) return ['GET', 'DELETE'];

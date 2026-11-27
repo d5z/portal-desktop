@@ -1,5 +1,6 @@
 import { homeConnectorResources } from '../../shared/services/home-connector-resources';
 import { WeixinPairing } from './weixin-pairing';
+import { WeixinAutoChannelSettingsCard } from './weixin-auto-channel';
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import type {
   HomeConnectorAccount, HomeConnectorBeingAccess, HomeConnectorCatalogItem, HomeConnectorDetail, HomeConnectorEnableState,
@@ -72,12 +73,13 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   const [accountId, setAccountId] = useState<string>();
   const qrActive = useRef(false);
   const homeIdentity = useRef<string | undefined>(undefined);
+  const [homeContextVersion, setHomeContextVersion] = useState<string>();
   const [qrTarget, setQRTarget] = useState<{ kit: HomeConnectorCatalogItem; account?: HomeConnectorAccount; preview?: HomeConnectorPreview }>();
   const [preview, setPreview] = useState<HomeConnectorPreview>();
   const [flow, setFlow] = useState<HomeConnectorEnableState>();
   const [tools, setTools] = useState<HomeConnectorTool[]>();
   const [toolBusy, setToolBusy] = useState<Set<string>>(new Set());
-  const [beingAccess, setBeingAccess] = useState<HomeConnectorBeingAccess>();
+  const [installationAccess, setBeingAccess] = useState<{ installationId: string; access: HomeConnectorBeingAccess }>();
   const [method, setMethod] = useState<string>();
   const [values, setValues] = useState<Record<string, string>>({});
   const [adopt, setAdopt] = useState(false);
@@ -134,7 +136,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
       }
       toolsInstallation.current = installationId;
       setTools(cached.tools);
-      setBeingAccess(cached.access);
+      setBeingAccess({ installationId, access: cached.access });
       setToolsError('');
       setToolsLoading(false);
       return;
@@ -151,7 +153,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
       if (request === toolRequest.current) {
         toolsCache.current.set(installationId, { tools: result, access });
         toolsInstallation.current = installationId;
-        setTools(result); setBeingAccess(access);
+        setTools(result); setBeingAccess({ installationId, access });
       }
     }
     catch (e) { if (request === toolRequest.current) setToolsError(publicErrorMessage(e, '无法读取工具设置。')); }
@@ -164,7 +166,9 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   };
 
   const activeAccount = detail?.accounts.find(account => account.id === accountId);
-  const activeInstallationId = accountInstallation(activeAccount, installations)?.id;
+  const activeInstallation = accountInstallation(activeAccount, installations);
+  const activeInstallationId = activeInstallation?.id;
+  const beingAccess = installationAccess?.installationId === activeInstallationId ? installationAccess?.access : undefined;
   useEffect(() => {
     if (!town.prepareBusy && !town.plan) setPreparingSourceId(undefined);
   }, [town.prepareBusy, town.plan]);
@@ -331,6 +335,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
         setTools(undefined); setBeingAccess(undefined); setToolsLoading(false);
       }
       homeIdentity.current = state.contextVersion;
+      setHomeContextVersion(state.contextVersion);
       if (!state.authenticated || state.authenticating) setQRTarget(undefined);
       if (!state.authenticated && state.error) setCatalogError(publicErrorMessage(state.error));
       if (lastAuthenticated !== state.authenticated) { lastAuthenticated = state.authenticated; void load(''); }
@@ -396,10 +401,10 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
     }
   };
 
-  const connect = async (kit: HomeConnectorCatalogItem, account?: HomeConnectorAccount, chosenMethod?: string) => {
+  const connect = async (kit: HomeConnectorCatalogItem, account?: HomeConnectorAccount, chosenMethod?: string, forceWeixinQR = false) => {
     if (!api) return;
     const preparedQR = !account && page.current?.release_id === kit.release_id && preview && isWeixinPreview(preview) ? preview : undefined;
-    if (page.current?.release_id === kit.release_id && (detail?.pairing === 'weixin_qr' || preparedQR)) {
+    if (page.current?.release_id === kit.release_id && (detail?.pairing === 'weixin_qr' || preparedQR || forceWeixinQR)) {
       if (!resources) { setError('当前客户端不支持微信扫码连接，请更新客户端。'); return; }
       ++navigation.current;
       setPreview(undefined); setFlow(undefined); setValues({}); setError('');
@@ -690,6 +695,13 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
   if (!authenticated && catalogLoading && !authenticating) return <ConnectorLoading label="正在加载应用…" />;
   if (!authenticated) return <section className="connector-empty"><h3>连接 Home 后管理应用</h3><p>请先完成 Home 登录，再回来添加应用。</p><div className="connector-action-row"><button className="primary" type="button" onClick={() => void loginHome()} disabled={authenticating} aria-busy={authenticating}>{authenticating ? '登录中…' : '登录 Home'}</button>{authenticating && <button type="button" onClick={() => void model.api.home!.action('cancel-login').catch(e => setCatalogError(publicErrorMessage(e, '取消登录失败，请重试。')))}>取消登录</button>}</div>{catalogError && <p className="form-error" role="alert">{catalogError}</p>}</section>;
 
+  const weixinSelected = detail?.pairing === 'weixin_qr' || tools?.some(tool => tool.connection_id === accountId && tool.action.startsWith('weixin_bot.'));
+  const autoChannel = selected && resources && activeAccount && activeInstallation && weixinSelected && !authenticating && <WeixinAutoChannelSettingsCard
+    key={JSON.stringify([homeContextVersion, activeAccount.id, activeInstallation.id])}
+    resources={resources} connectionId={activeAccount.id} installationId={activeInstallation.id} profileId={beingAccess?.being_profile_id}
+    canInitialize={activeAccount.usable && activeAccount.status !== 'reauth_required' && activeInstallation.status === 'ready' && activeInstallation.desired_state === 'enabled' && beingAccess?.enabled === true}
+    busy={busy || Boolean(qrTarget)} onToolsChanged={() => void loadTools(activeInstallation.id, true)}
+    onReconnect={() => void connect(selected, activeAccount, undefined, true)} />;
   const pairingPanel = qrTarget && resources && <WeixinPairing key={`${qrTarget.kit.release_id}:${qrTarget.account?.id || 'new'}`}
         resources={resources} releaseId={qrTarget.kit.release_id} initialPreview={qrTarget.preview}
         onClose={() => setQRTarget(undefined)} onReady={async (next, context) => {
@@ -748,7 +760,7 @@ export function ConnectorSettings({ model, onDetailChange }: { model: AppModel; 
       {!detail && <div className="connector-detail-heading"><h3>{selected.name}</h3></div>}
       {!detail && !busy && <button type="button" onClick={() => void openKit(selected)}>重试</button>}
       {pairingPanel}
-      {detail && <ConnectorDetailView kit={selected} detail={detail} localKit={localInstalled(selected)} localDetail={localDetail} localKitsReady={localKitsReady} localKitsError={localKitsError} localInstallAvailable={catalogEnabled && selected.availability === 'listed' && Boolean(localDetail?.bundle)} localPreparing={town.prepareBusy} onInstallLocal={() => installLocal(selected)} onDeleteLocal={localKit => model.town.requestDeleteKit(localKit)} installations={installations} accountId={accountId} onAccount={account => { setQRTarget(undefined); chooseAccount(account); }} preview={preview} flow={flow} method={method} values={values} adopt={adopt} busy={busy || Boolean(qrTarget)} toolBusy={toolBusy} toolToggleRef={toolToggleRef} onConnect={(account, method) => void connect(selected, account, method)} onValue={(name, value) => setValues(current => ({ ...current, [name]: value }))} onAdopt={setAdopt} onConfirm={() => void confirmConnection()} onAdvance={() => void advance()} onCancel={() => void cancelAuthorization()} onOpenAuthorization={() => void openAuthorization()} beingAccess={beingAccess} onRestoreConnection={restoreConnection} tools={tools} toolsLoading={toolsLoading} toolsError={toolsError} onLoadTools={loadTools} removalPending={Boolean(removals.current.get(selected.release_id)?.size)} onRemove={account => void disconnect(selected, account)} onDisconnect={() => void disconnect(selected)} />}
+      {detail && <ConnectorDetailView kit={selected} detail={detail} autoChannel={autoChannel} localKit={localInstalled(selected)} localDetail={localDetail} localKitsReady={localKitsReady} localKitsError={localKitsError} localInstallAvailable={catalogEnabled && selected.availability === 'listed' && Boolean(localDetail?.bundle)} localPreparing={town.prepareBusy} onInstallLocal={() => installLocal(selected)} onDeleteLocal={localKit => model.town.requestDeleteKit(localKit)} installations={installations} accountId={accountId} onAccount={account => { setQRTarget(undefined); chooseAccount(account); }} preview={preview} flow={flow} method={method} values={values} adopt={adopt} busy={busy || Boolean(qrTarget)} toolBusy={toolBusy} toolToggleRef={toolToggleRef} onConnect={(account, method) => void connect(selected, account, method)} onValue={(name, value) => setValues(current => ({ ...current, [name]: value }))} onAdopt={setAdopt} onConfirm={() => void confirmConnection()} onAdvance={() => void advance()} onCancel={() => void cancelAuthorization()} onOpenAuthorization={() => void openAuthorization()} beingAccess={beingAccess} onRestoreConnection={restoreConnection} tools={tools} toolsLoading={toolsLoading} toolsError={toolsError} onLoadTools={loadTools} removalPending={Boolean(removals.current.get(selected.release_id)?.size)} onRemove={account => void disconnect(selected, account)} onDisconnect={() => void disconnect(selected)} />}
     </> : catalogLoading && !catalog.length ? null : <>
       {installedKits.length > 0 && <ConnectorGroup title={`已添加（${installedKits.length}）`} kits={installedKits} connected pendingConnection={pendingConnection} localKits={localKits} localKitsReady={localKitsReady} prepareBusy={town.prepareBusy || Boolean(town.plan)} preparingSourceId={preparingSourceId} onOpen={openKit} onConnect={connect} onInstallLocal={installLocal} />}
       {usedKits.length > 0 && <ConnectorGroup title={`使用过（${usedKits.length}）`} kits={usedKits} pendingConnection={pendingConnection} localKits={localKits} localKitsReady={localKitsReady} prepareBusy={town.prepareBusy || Boolean(town.plan)} preparingSourceId={preparingSourceId} onOpen={openKit} onConnect={connect} onInstallLocal={installLocal} />}
@@ -830,8 +842,8 @@ function ConnectorToolList<T>({ tools, searchText, renderTool, declared }: {
   </>;
 }
 
-function ConnectorDetailView({ kit, detail, localKit, localDetail, localKitsReady, localKitsError, localInstallAvailable, localPreparing, onInstallLocal, onDeleteLocal, installations, accountId, onAccount, preview, flow, method, values, adopt, busy, toolBusy, toolToggleRef, onConnect, onValue, onAdopt, onConfirm, onAdvance, onCancel, onOpenAuthorization, beingAccess, onRestoreConnection, tools, toolsLoading, toolsError, onLoadTools, removalPending, onRemove, onDisconnect }: {
-  kit: HomeConnectorCatalogItem; detail: HomeConnectorDetail; localKit?: LocalKit; localDetail?: HomeLocalKitDetail; localKitsReady: boolean; localKitsError: string; localInstallAvailable: boolean; localPreparing: boolean; onInstallLocal: () => void; onDeleteLocal: (kit: LocalKit) => void; installations: HomeConnectorInstallation[]; accountId?: string; onAccount: (account: HomeConnectorAccount) => void;
+function ConnectorDetailView({ kit, detail, autoChannel, localKit, localDetail, localKitsReady, localKitsError, localInstallAvailable, localPreparing, onInstallLocal, onDeleteLocal, installations, accountId, onAccount, preview, flow, method, values, adopt, busy, toolBusy, toolToggleRef, onConnect, onValue, onAdopt, onConfirm, onAdvance, onCancel, onOpenAuthorization, beingAccess, onRestoreConnection, tools, toolsLoading, toolsError, onLoadTools, removalPending, onRemove, onDisconnect }: {
+  kit: HomeConnectorCatalogItem; detail: HomeConnectorDetail; autoChannel?: ReactNode; localKit?: LocalKit; localDetail?: HomeLocalKitDetail; localKitsReady: boolean; localKitsError: string; localInstallAvailable: boolean; localPreparing: boolean; onInstallLocal: () => void; onDeleteLocal: (kit: LocalKit) => void; installations: HomeConnectorInstallation[]; accountId?: string; onAccount: (account: HomeConnectorAccount) => void;
   preview?: HomeConnectorPreview; flow?: HomeConnectorEnableState; method?: string; values: Record<string, string>; adopt: boolean; busy: boolean; toolBusy: Set<string>; toolToggleRef: { current: ToggleTool };
   onConnect: (account?: HomeConnectorAccount, method?: string) => void; onValue: (name: string, value: string) => void; onAdopt: (value: boolean) => void;
   onConfirm: () => void; onAdvance: () => void; onCancel: () => void; onOpenAuthorization: () => void;
@@ -908,6 +920,7 @@ function ConnectorDetailView({ kit, detail, localKit, localDetail, localKitsRead
         <button type="button" className="connector-account-connect" aria-label={`移除 ${item.display_name || 'default'}`} onClick={() => onRemove(item)} disabled={busy}>移除</button>
       </div>;
     })}{detail.methods.length > 0 && <button type="button" className="connector-account-add" onClick={() => onConnect()} disabled={busy}><Icon className="connector-line-icon" name="plus" aria-hidden="true" /><span>添加其他账户</span></button>}</div></section>}
+    {autoChannel}
     {showFallback && !preview && (!flow || !pendingStatuses.includes(flow.status)) && <div className="connector-connect-panel">{fallbackMethods.map(item => <button className="connector-option" key={item.method} type="button" onClick={() => onConnect(undefined, item.method)} disabled={busy}>{item.method === 'api_key' ? 'API Key' : '自定义凭据'}</button>)}</div>}
     {credentialPreview && <div className="connector-preview"><p>连接成功后，工具会自动准备就绪。</p>{credentialPreview.requires_adoption && <p>接管后，此账号的旧工具入口会停用。</p>}<details open><summary>权限与工具范围</summary><p>初始只读工具：{credentialPreview.read_actions.join('、') || '无'}</p><p>需要明确开启的写工具：{credentialPreview.write_actions.join('、') || '无'}</p><p>第三方授权范围：{credentialPreview.scopes.join('、') || '无额外声明'}</p>{credentialPreview.permission_notes.map(note => <pre key={note}>{note}</pre>)}</details>{fields.map(field => <label className="connector-field" key={field.name}><span>{field.label || field.name}{field.required ? ' *' : ''}</span><input type={field.secret ? 'password' : field.type === 'number' ? 'number' : 'text'} required={field.required} disabled={busy} placeholder={field.placeholder || undefined} autoComplete="off" value={values[field.name] || ''} onChange={event => onValue(field.name, event.target.value)} /><small>{field.description}</small></label>)}{credentialPreview.requires_adoption && <label className="connector-adopt"><input type="checkbox" disabled={busy} checked={adopt} onChange={event => onAdopt(event.target.checked)} />接管并启用</label>}<div className="connector-action-row"><button className="primary" type="button" disabled={busy || credentialPreview.requires_adoption && !adopt || fields.some(field => field.required && !values[field.name]?.trim())} onClick={onConfirm}>连接并启用</button><button type="button" disabled={busy} onClick={onCancel}>取消授权</button></div></div>}
     {!preview && flow && (!account || flow.connection_id === account.id || !detail.accounts.some(item => item.id === flow.connection_id)) && <div className="connector-flow"><p className={flowError ? 'form-error' : undefined} role={flowError ? 'alert' : 'status'}>{statusLabel(flow.status)}</p>{pendingStatuses.includes(flow.status) && <div className="connector-action-row"><button type="button" onClick={onAdvance} disabled={busy}>刷新状态</button>{flow.status === 'awaiting_account' && flow.authorization_url && <button type="button" onClick={onOpenAuthorization} disabled={busy}>继续授权</button>}{!flow.installation_id && <button type="button" onClick={onCancel} disabled={busy}>取消授权</button>}</div>}</div>}
