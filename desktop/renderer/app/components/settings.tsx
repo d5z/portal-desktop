@@ -381,37 +381,42 @@ export const ClientSettings = memo(function ClientSettings({ model }: { model: A
           </div>
           {open && route === 'diagnostics' && <Diagnostics model={app} embedded />}
           <div hidden={route === 'diagnostics' || generalDetail !== 'notifications'}>
-          <section className="settings-group general-settings-group" aria-labelledby="settings-notifications">
-            <h3 id="settings-notifications">通知</h3>
             <div className="settings-section-card">
               <SettingsItem label="桌面通知" htmlFor="notification-enabled"
+                descriptionId="notification-enabled-help"
                 description={app.notificationSettings ? app.notificationSettings.message || '选择允许显示桌面提醒的通知类型。' : '正在读取通知设置…'}>
-                <input id="notification-enabled" type="checkbox" role="switch" aria-label="开启桌面通知"
+                <input id="notification-enabled" type="checkbox" role="switch" aria-label="开启桌面通知" aria-describedby="notification-enabled-help"
                   checked={Boolean(app.notificationSettings?.preferences.enabled)} disabled={app.notificationsBusy || !app.notificationSettings?.supported}
                   onChange={event => void app.changeNotifications({ enabled: event.target.checked })} />
               </SettingsItem>
-              <div className="notification-switches" role="group" aria-label="通知类型">
-                {([
-                  ["mail", "私信", "私信通知"],
-                  ["firesides", "围炉", "围炉通知"],
-                  ["bonfire", "篝火", "篝火通知"],
-                  ["scenes", "场景对话完成", "场景对话完成通知"],
-                ] as const).map(([key, title, help]) => (
-                  <SettingsItem key={key} label={title} htmlFor={`notification-${key}`}>
-                    <input id={`notification-${key}`} type="checkbox" role="switch"
-                      aria-label={help}
-                      checked={Boolean(app.notificationSettings?.preferences[key])}
-                      disabled={app.notificationsBusy || !app.notificationSettings?.supported || !app.notificationSettings.preferences.enabled}
-                      onChange={event => void app.changeNotifications({ [key]: event.target.checked })} />
-                  </SettingsItem>
-                ))}
+            </div>
+            <section className="settings-group general-settings-group" aria-labelledby="settings-notifications">
+              <h3 id="settings-notifications">通知类型</h3>
+              <div className="settings-section-card">
+                <div className="notification-switches">
+                  {([
+                    ["mail", "私信", "私信通知"],
+                    ["firesides", "围炉", "围炉通知"],
+                    ["bonfire", "篝火", "篝火通知"],
+                    ["scenes", "场景对话完成", "场景对话完成通知"],
+                  ] as const).map(([key, title, help]) => (
+                    <SettingsItem key={key} label={title} htmlFor={`notification-${key}`}>
+                      <input id={`notification-${key}`} type="checkbox" role="switch"
+                        aria-label={help}
+                        checked={Boolean(app.notificationSettings?.preferences[key])}
+                        disabled={app.notificationsBusy || !app.notificationSettings?.supported || !app.notificationSettings.preferences.enabled}
+                        onChange={event => void app.changeNotifications({ [key]: event.target.checked })} />
+                    </SettingsItem>
+                  ))}
+                </div>
               </div>
-              {import.meta.env.DEV && <button id="notification-test" type="button"
+            </section>
+            {(import.meta.env.DEV || app.notificationsError) && <div className="general-settings-actions">
+              {app.notificationsError && <p className="form-error" role="alert">{app.notificationsError}</p>}
+              {import.meta.env.DEV && <button id="notification-test" className="secondary" type="button"
                 disabled={app.notificationsBusy || !app.notificationSettings?.supported || !app.notificationSettings.preferences.enabled}
                 onClick={() => void app.testNotification()}>发送测试通知</button>}
-              {app.notificationsError && <p className="form-error" role="alert">{app.notificationsError}</p>}
-            </div>
-          </section>
+            </div>}
           </div>
         </div>
         <div
@@ -570,7 +575,8 @@ export const ConnectionSettings = memo(function ConnectionSettings({ model, embe
                 }
               />
             </SettingsItem>
-            <section className="permission-settings-section"><div className="permission-section-heading"><strong>访问权限</strong><small>主助手与子代理共用</small></div>
+            <section className="permission-settings-section" aria-labelledby="portal-permissions-heading">
+              <h3 id="portal-permissions-heading" className="permission-section-heading">访问权限</h3>
               <PermissionPicker value={form?.permissionMode ?? 'supervised'} onChange={mode => app.editForm('permissionMode', mode)}/>
               <p className="permission-note">仅适用于 Portal 调用，主助手和子代理共用。</p>
             </section>

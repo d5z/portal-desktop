@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { HomeBounds, HomeState } from '../../shared/home';
+import { HOME_PATH_PREFIX } from '../../shared/home';
 import { HOME_ORIGIN, viewerNavigation } from './protocol';
 import { HomeTransport, ViewerExpired, type HomeViewerLog } from './transport';
 /** One local canvas + isolated desktop-cookie session, retained across layout changes. */
@@ -33,7 +34,7 @@ export class HomeViewer {
     jar.webRequest.onBeforeRequest((details, callback) => {
       const target = new URL(details.url);
       const allowed = assets.has(details.url) || target.protocol === 'blob:' || details.url === url ||
-        (target.origin === HOME_ORIGIN && target.pathname.startsWith(`/desktop/${computerId}/browser/`) && !target.search && !target.hash);
+        (target.origin === HOME_ORIGIN && target.pathname.startsWith(`${HOME_PATH_PREFIX}/desktop/${computerId}/browser/`) && !target.search && !target.hash);
       callback({ cancel: !allowed });
     });
     const view = new WebContentsView({ webPreferences: { session: jar, sandbox: true, contextIsolation: true,

@@ -1,3 +1,5 @@
+import { HOME_ORIGIN, HOME_PATH_PREFIX } from './home';
+
 /** Public delivery metadata. Credentials are never part of this protocol. */
 export interface BeingFile {
   path: string;
@@ -21,8 +23,8 @@ export function workspacePath(value: unknown, root = false): string {
 export function homeFileReference(value: string): { path?: string } | null {
   let url: URL;
   try { url = new URL(value); } catch { return null; }
-  if (url.hostname !== 'home.beings.town' || url.pathname !== '/v1/me/files/content') return null;
-  if (url.origin !== 'https://home.beings.town' || url.username || url.password || url.hash ||
+  if (url.hostname !== new URL(HOME_ORIGIN).hostname || url.pathname !== HOME_PATH_PREFIX + '/v1/me/files/content') return null;
+  if (url.origin !== HOME_ORIGIN || url.username || url.password || url.hash ||
       url.searchParams.size !== 1 || !url.searchParams.has('path')) return {};
   try { return { path: workspacePath(url.searchParams.get('path')) }; } catch { return {}; }
 }

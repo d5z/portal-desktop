@@ -1,3 +1,4 @@
+import { connectorResourceMethods } from '../../shared/connector-resources';
 import { randomUUID } from 'node:crypto';
 import { CONNECTOR_NETWORK_METHODS, CONNECTOR_NETWORK_ROUTES } from '../../shared/home';
 import { publicErrorMessage } from '../../shared/errors';
@@ -6,6 +7,7 @@ import { HomeError } from './protocol';
 /** Renderer-visible requests reuse the trusted Connector handlers; Home tokens stay in main. */
 export class ConnectorNetwork {
   readonly key = randomUUID();
+  resource?: (request: Request) => Promise<Response>;
   readonly handlers = new Map<string, (...args: any[]) => unknown>();
   constructor(private shellURL: () => string) {}
 
@@ -14,6 +16,24 @@ export class ConnectorNetwork {
     const origin = `${shell.protocol}//${shell.host}`;
     const headers = { 'Access-Control-Allow-Origin': origin, 'Cache-Control': 'no-store', Vary: 'Origin', 'Access-Control-Expose-Headers': 'X-Connector-Error' };
     const url = new URL(request.url);
+    const resourceMethods = connectorResourceMethods(url.pathname);
+    if (resourceMethods) {
+      if (request.headers.has('Origin') && request.headers.get('Origin') !== origin) return new Response(null, { status: 403 });
+      const resourceHeaders = { ...headers, 'Access-Control-Allow-Methods': resourceMethods.join(', '),
+        'Access-Control-Allow-Headers': 'Content-Type, X-Connector-Access, X-Home-Session, X-Home-Endpoint' };
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: resourceHeaders });
+      if (request.headers.get('X-Connector-Access') !== this.key) return new Response(null, { status: 403, headers: resourceHeaders });
+      try {
+        const upstream = await this.resource?.(request) ?? new Response(null, { status: 503 });
+        const responseHeaders = new Headers(upstream.headers);
+        for (const [name, value] of Object.entries(resourceHeaders)) responseHeaders.set(name, value);
+        return new Response(upstream.body, { status: upstream.status, headers: responseHeaders });
+      } catch (error) {
+        return Response.json({ error: error instanceof HomeError ? error.code : 'connector_request_failed' }, {
+          status: error instanceof HomeError && error.status >= 400 ? error.status : 502, headers: resourceHeaders,
+        });
+      }
+    }
     const routeMatch = (template: string) => {
       const actual = url.pathname.split('/');
       const expected = template.split('/');

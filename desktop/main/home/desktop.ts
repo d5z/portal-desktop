@@ -1,3 +1,4 @@
+import { HomeConnectorResources } from './connector-resources';
 import { dialog, shell, type BrowserWindow } from 'electron';
 import type { RegisterHandler } from '../app/ipc';
 import type { SecretStorage } from '../app/settings';
@@ -33,6 +34,10 @@ export async function createDesktopHome(options: {
     },
   });
   const connectors = new HomeConnectors(homeClient, url => shell.openExternal(url));
+  const resources = new HomeConnectorResources(homeClient, home, () => store.connection?.endpoint || '');
+  home.beforeLogout = () => resources.cancelBeforeLogout();
+  options.network.resource = request => resources.handle(request);
+  handle('beings:home-connector-context', () => resources.context());
   registerHomeIpc(handle, home, homeViewer, homeFiles, connectors, options.network);
   return { home, connectors };
 }

@@ -1188,6 +1188,32 @@
   font-weight: 400;
 }
 
+#client-settings-dialog .connector-auto-channel {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+#client-settings-dialog .connector-auto-channel-copy {
+  display: grid;
+  flex: 1 1 200px;
+  gap: 4px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+#client-settings-dialog .connector-auto-channel-copy .form-error {
+  margin: 0;
+}
+
+#client-settings-dialog .connector-auto-channel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 #client-settings-dialog .connector-info-section > .connector-apps-heading {
   color: var(--text);
   font-weight: 500;

@@ -20,10 +20,11 @@ export class HomeService {
   private refreshFlight?: Promise<HomeState>;
   private actionFlight?: Promise<HomeState>;
   private me?: HomeMe;
+  beforeLogout?: () => Promise<void>;
   constructor(private client: HomeClient, private viewer: Viewer, private connection: () => Connection | null,
     private publish: (state: HomeState) => void) {}
   update(patch: Partial<HomeState> = {}) {
-    this.state = { ...this.state, ...patch, authenticated: this.client.authenticated, authenticating: this.client.authenticating };
+    this.state = { ...this.state, ...patch, contextVersion: `${this.client.sessionVersion}:${this.generation}`, authenticated: this.client.authenticated, authenticating: this.client.authenticating };
     this.publish(this.state); return this.state;
   }
   contextChanged() {
@@ -107,7 +108,7 @@ export class HomeService {
     if (action === 'logout') {
       this.generation++; this.viewer.close(); this.me = undefined; this.refreshFlight = undefined; this.actionFlight = undefined;
       this.state = { authenticated: false, authenticating: false, viewer: 'closed' };
-      return this.client.logout().then(() => this.update()).catch(error => this.update({ error: error.message }));
+      return Promise.resolve(this.beforeLogout?.()).then(() => this.client.logout()).then(() => this.update()).catch(error => this.update({ error: error.message }));
     }
     if (this.actionFlight) return Promise.resolve(this.state);
     const generation = this.generation, viewIntent = this.viewIntent;

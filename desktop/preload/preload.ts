@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, webUtils } from 'electron';
 import type { DesktopAPI, PortalState, TownLiveState } from '../shared/types';
-import { HOME_ORIGIN, CONNECTOR_NETWORK_METHODS, connectorNetworkPath, homeKitBundlePath } from '../shared/home';
+import { resolveHomeResource, CONNECTOR_NETWORK_METHODS, connectorNetworkPath, homeKitBundlePath } from '../shared/home';
 
 async function connectorRequest(operation: keyof typeof CONNECTOR_NETWORK_METHODS, ...args: unknown[]): Promise<any> {
   const key = await ipcRenderer.invoke('beings:home-connector-network-key');
@@ -26,16 +26,19 @@ async function connectorRequest(operation: keyof typeof CONNECTOR_NETWORK_METHOD
   if (!response.ok && !(operation === 'lifecycle' && response.status === 409 && value?.accepted === false)) {
     throw new Error(typeof value?.error === 'string' ? value.error : `Connector 请求失败（HTTP ${response.status}）。`);
   }
+  const icon = (url: string | null | undefined) => {
+    if (!url) return null;
+    try { return resolveHomeResource(url).href; } catch { return null; }
+  };
   if (operation === 'catalog' || operation === 'legacy-catalog') {
     const page = value as import('../shared/home').HomeConnectorCatalogPage;
     if (!page || !Array.isArray(page.items)) throw new Error('统一应用目录响应无效。');
-    return { ...page, items: page.items.map(item => ({ ...item, icon_url: item.icon_url ? URL.parse(item.icon_url, HOME_ORIGIN)?.href ?? null : item.icon_url ?? null })) };
+    return { ...page, items: page.items.map(item => ({ ...item, icon_url: icon(item.icon_url) })) };
   }
   if (operation === 'app-detail') {
     const detail = value as import('../shared/home').HomeAppDetail;
     if (!detail?.app || !['cloud_connector', 'local_kit'].includes(detail.kind) ||
         (detail.kind === 'local_kit' ? !detail.local_kit || !Array.isArray(detail.local_kit.tools) : !detail.connector || !Array.isArray(detail.connector.accounts) || !Array.isArray(detail.connector.methods))) throw new Error('统一应用详情响应无效。');
-    const icon = (url: string | null | undefined) => url ? URL.parse(url, HOME_ORIGIN + '/')?.href ?? null : null;
     detail.app.icon_url = icon(detail.app.icon_url);
     if (detail.kind === 'cloud_connector') detail.connector.icon_url = icon(detail.connector.icon_url);
     return detail;
@@ -45,6 +48,10 @@ async function connectorRequest(operation: keyof typeof CONNECTOR_NETWORK_METHOD
 
 const api: DesktopAPI = {
   home: {
+    connectorResources: {
+      context: () => ipcRenderer.invoke('beings:home-connector-context'),
+      access: () => ipcRenderer.invoke('beings:home-connector-network-key'),
+    },
     connectors: {
       catalog: query => connectorRequest('catalog', query),
       localKitHistory: after => connectorRequest('local-kit-history', after),

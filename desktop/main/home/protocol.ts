@@ -1,5 +1,5 @@
 import { createPublicKey, verify } from 'node:crypto';
-import { HOME_ORIGIN } from '../../shared/home';
+import { HOME_BASE_URL, HOME_ORIGIN, HOME_PATH_PREFIX, resolveHomeResource } from '../../shared/home';
 export { HOME_ORIGIN } from '../../shared/home';
 export const HOME_CLIENT = 'being-desktop';
 export const HOME_CALLBACK = 'http://127.0.0.1:47831/oauth/callback';
@@ -34,14 +34,14 @@ export function homeErrorMessage(status: number, code = '') {
   return '连接失败，请检查网络后重试。';
 }
 export function homeURL(value: string) {
-  const url = new URL(value, HOME_ORIGIN);
-  if (url.origin !== HOME_ORIGIN || url.username || url.password || url.hash) throw new Error('Being Home 返回了无效地址。');
+  const url = resolveHomeResource(value);
+  if (url.origin !== HOME_ORIGIN || (HOME_PATH_PREFIX && !url.pathname.startsWith(HOME_PATH_PREFIX + '/')) || url.username || url.password || url.hash) throw new Error('Being Home 返回了无效地址。');
   return url;
 }
 export function ticketURL(ticket: { ticket: string; expires_at: string; connect_url: string }, now = Date.now()) {
   const url = homeURL(ticket.connect_url);
   const expires = Date.parse(ticket.expires_at);
-  if (url.pathname !== '/desktop/connect' || [...url.searchParams.keys()].join(',') !== 'ticket' ||
+  if (url.pathname !== HOME_PATH_PREFIX + '/desktop/connect' || [...url.searchParams.keys()].join(',') !== 'ticket' ||
       !ticket.ticket || url.searchParams.get('ticket') !== ticket.ticket || !Number.isFinite(expires) || expires <= now)
     throw new Error('云电脑连接已失效，请重新打开。');
   return url.href;
@@ -49,8 +49,8 @@ export function ticketURL(ticket: { ticket: string; expires_at: string; connect_
 export function viewerNavigation(value: string, computerId: string) {
   try {
     const url = homeURL(value);
-    return (url.pathname === '/desktop/connect' && [...url.searchParams.keys()].join(',') === 'ticket') ||
-      (url.pathname === `/desktop/${computerId}/` && !url.search);
+    return (url.pathname === HOME_PATH_PREFIX + '/desktop/connect' && [...url.searchParams.keys()].join(',') === 'ticket') ||
+      (url.pathname === `${HOME_PATH_PREFIX}/desktop/${computerId}/` && !url.search);
   } catch { return false; }
 }
 export function verifyIdentityToken(token: string, keys: { keys: JsonWebKey[] }, nonce: string, now = Date.now()) {
@@ -63,7 +63,7 @@ export function verifyIdentityToken(token: string, keys: { keys: JsonWebKey[] },
     if (header.alg !== 'RS256' || !key || !verify('RSA-SHA256', Buffer.from(parts.slice(0, 2).join('.')),
       createPublicKey({ key: key as import('node:crypto').JsonWebKey, format: 'jwk' }), Buffer.from(parts[2], 'base64url'))) throw new Error();
     const audience = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-    if (claims.iss !== `${HOME_ORIGIN}/oidc/` || !audience.includes(HOME_CLIENT) ||
+    if (claims.iss !== `${HOME_BASE_URL}/oidc/` || !audience.includes(HOME_CLIENT) ||
         (audience.length > 1 && claims.azp !== HOME_CLIENT) || claims.nonce !== nonce ||
         typeof claims.sub !== 'string' || !claims.sub || typeof claims.exp !== 'number' || claims.exp * 1000 <= now ||
         typeof claims.iat !== 'number' || claims.iat * 1000 > now + 60_000) throw new Error();

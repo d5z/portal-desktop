@@ -1119,13 +1119,9 @@ html[data-theme='dark'] .town-logo-light {
 }
 
 #client-settings-dialog .permission-settings-section {
-  margin-top: 24px;
-  padding-top: 0;
+  margin-top: 4px;
+  padding: 14px 16px;
   border: 0;
-}
-
-#client-settings-dialog .settings-item-list .permission-section-heading {
-  font-size: 14px;
 }
 
 #client-settings-dialog #diagnostics-dialog {
@@ -1758,6 +1754,11 @@ html[data-theme='dark'] .town-logo-light {
   padding-bottom: 4px;
 }
 
+#client-settings-dialog .connector-search.connector-tool-search {
+  max-width: none;
+  margin: 8px 0;
+}
+
 #client-settings-dialog .connector-tool {
   min-height: 38px;
   padding: 8px 0;
@@ -1970,6 +1971,24 @@ html[data-theme='dark'] .town-logo-light {
   margin: 0;
   padding: 10px 12px 12px;
   font-size: 12px;
+}
+
+#client-settings-dialog .general-settings-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  margin: 0;
+}
+
+#client-settings-dialog .general-settings-actions .form-error {
+  margin: 0;
+}
+
+#client-settings-dialog .general-settings-actions > button {
+  min-height: 32px;
+  margin-inline-start: auto;
+  padding: 5px 12px;
 }
 
 #client-settings-dialog .settings-nav-search > svg {

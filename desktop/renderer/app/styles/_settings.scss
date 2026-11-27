@@ -741,6 +741,10 @@
 
 .connector-tool-list {
   margin-top: 14px;
+  max-height: min(360px, 42vh);
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+  scrollbar-gutter: stable;
 }
 
 .connector-tool {
@@ -955,4 +959,34 @@
   .client-update-progress:empty {
     animation-duration: 1.8s;
   }
+}
+
+.connector-weixin-dialog {
+  width: 440px;
+}
+
+.connector-weixin-body > p {
+  text-align: center;
+}
+
+.connector-weixin-permissions {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 10px;
+  background: var(--control);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.connector-weixin-permissions summary {
+  cursor: pointer;
+}
+
+.connector-weixin-qr {
+  display: block;
+  width: 240px;
+  max-width: 100%;
+  height: auto;
+  margin: 16px auto;
+  background: white;
 }

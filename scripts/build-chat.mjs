@@ -1,6 +1,7 @@
 import { mkdir, writeFile, copyFile, rm, cp } from "node:fs/promises";
 import path from "node:path";
 import { build } from "./renderer-build.mjs";
+import { useDevHome } from './home-environment.mjs';
 import { writeThirdPartyLicenses } from './third-party-licenses.mjs';
 
 const output = path.resolve("desktop/generated");
@@ -27,7 +28,7 @@ const chatBuild = await build({
   format: "iife",
   platform: "browser",
   jsx: "automatic",
-  define: { "process.env.NODE_ENV": '"production"' },
+  define: { "process.env.NODE_ENV": '"production"', PORTAL_DESKTOP_HOME_DEV: JSON.stringify(useDevHome(process.argv.includes('--development'))) },
   minify: true,
   outfile: path.join(output, "chat.js"),
 });

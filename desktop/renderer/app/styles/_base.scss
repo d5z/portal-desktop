@@ -10,16 +10,9 @@
 }
 
 .permission-section-heading {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin: 0 0 12px;
-  gap: 12px;
-}
-
-.permission-section-heading small {
-  color: var(--muted);
-  font-size: 12px;
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 600;
 }
 
 .permission-note {

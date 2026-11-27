@@ -1,9 +1,21 @@
-export const HOME_ORIGIN = 'https://home.beings.town';
+declare const PORTAL_DESKTOP_HOME_DEV: boolean | undefined;
+export const HOME_DEV = typeof PORTAL_DESKTOP_HOME_DEV !== 'undefined' && PORTAL_DESKTOP_HOME_DEV;
+export const HOME_BASE_URL = HOME_DEV ? 'https://dev.beings.town/being-home' : 'https://home.beings.town';
+const homeBase = new URL(HOME_BASE_URL);
+export const HOME_ORIGIN = homeBase.origin;
+export const HOME_PATH_PREFIX = homeBase.pathname.replace(/\/$/, '');
+export function resolveHomeResource(value: string): URL {
+  if (value.startsWith('/') && !value.startsWith('//') && HOME_PATH_PREFIX &&
+      value !== HOME_PATH_PREFIX && !value.startsWith(HOME_PATH_PREFIX + '/'))
+    return new URL(HOME_PATH_PREFIX + value, HOME_ORIGIN);
+  return new URL(value, HOME_BASE_URL + '/');
+}
 /** Credential-free native Home contract. Remote viewer URLs never cross IPC. */
 export interface HomeComputer { id: string; being_profile_id: string; status: string; desired_state: string; generation: number }
 export interface HomeOperation { id: string; computer_id: string; kind: string; status: string; target_generation: number; error_code: string | null }
 export type HomeAction = 'login' | 'cancel-login' | 'initialize' | 'bind' | 'wake' | 'stop' | 'recreate' | 'open' | 'close' | 'logout';
 export interface HomeState {
+  contextVersion?: string;
   authenticated: boolean;
   authenticating: boolean;
   username?: string;
@@ -22,6 +34,7 @@ export interface HomeState {
 export interface HomeBounds { x: number; y: number; width: number; height: number; visible: boolean; presentation?: 'preview' | 'browser'; dark?: boolean }
 export interface HomeAPI {
   files?: HomeFilesAPI;
+  connectorResources?: import('./connector-resources').ConnectorAccess;
   connectors?: HomeConnectorAPI;
   state(): Promise<HomeState>;
   refresh(): Promise<HomeState>;
@@ -88,6 +101,7 @@ export interface HomeConnectorAccount {
 export interface HomeConnectorField { name: string; label?: string; type?: string; required?: boolean; secret?: boolean; description?: string | null; placeholder?: string | null }
 export interface HomeConnectorSkill { export: string; name: string; description: string }
 export interface HomeConnectorDetail {
+  pairing?: 'weixin_qr' | null;
   name: string;
   /** Absolute URL resolved by the main process from Home's service-relative icon URL. */
   icon_url?: string | null;
@@ -111,9 +125,9 @@ export const MAX_LOCAL_KIT_BUNDLE = 64 * 1024 * 1024;
 /** Only published Home bundle resources can cross the desktop download bridge. */
 export function homeKitBundlePath(releaseId: string, bundle: NonNullable<HomeLocalKitDetail['bundle']>) {
   if (!/^[0-9a-f-]{36}$/i.test(releaseId) || !/^[0-9a-f]{64}$/.test(bundle.sha256) || !Number.isSafeInteger(bundle.size_bytes) || bundle.size_bytes <= 0 || bundle.size_bytes > MAX_LOCAL_KIT_BUNDLE) throw new Error('本地 Kit 安装包信息无效或超过 64 MB。');
-  const url = new URL(bundle.download_url, HOME_ORIGIN + '/');
+  const url = resolveHomeResource(bundle.download_url);
   const expected = `/v1/local-kit-bundles/${releaseId}/${bundle.sha256}`;
-  if (url.origin !== HOME_ORIGIN || url.pathname !== expected || url.search || url.hash || url.username || url.password) throw new Error('Home 返回了无效的本地 Kit 下载地址。');
+  if (url.origin !== HOME_ORIGIN || url.pathname !== HOME_PATH_PREFIX + expected || url.search || url.hash || url.username || url.password) throw new Error('Home 返回了无效的本地 Kit 下载地址。');
   return expected;
 }
 export interface HomeConnectorPreview { id: string; expires_at: string; requires_adoption: boolean; read_actions: string[]; write_actions: string[]; scopes: string[]; permission_notes: string[] }

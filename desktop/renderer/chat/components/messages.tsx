@@ -1,3 +1,4 @@
+import { ConnectorWorkspaceFile } from '../../shared/components/connector-workspace-file';
 import type { SceneTask } from '../../../shared/types';
 import StatusMark from '../../shared/components/react-bits/status-mark/StatusMark';
 import { Icon } from '../../shared/icons/icon';
@@ -97,7 +98,7 @@ export function ChatActivity({ run, sceneLabel, showDetails = true, showProgress
   const attention = !superseded && !repeatError && ["error", "timeout", "stopped"].includes(status);
   const artifacts = [...new Set(run.entries.flatMap(entry => entry.artifactPath ? [entry.artifactPath] : []))];
   const progress = !run.end && showProgress;
-  if (!attention && !progress && !artifacts.length) return null;
+  if (!attention && !progress && !artifacts.length && !run.entries.some(entry => entry.workspaceFile || entry.workspaceError)) return null;
   return <div className="chat-run">
     {attention ? <ChatStatusRow title={CHAT_SCENE_ACTIVITY_LABELS[status]}
       detail={[sceneLabel, run.hint || (run.label !== CHAT_SCENE_ACTIVITY_LABELS[status] ? run.label : '')].filter(Boolean).join(' · ')}
@@ -110,6 +111,8 @@ export function ChatActivity({ run, sceneLabel, showDetails = true, showProgress
         <span className="thinking-dots" aria-hidden="true"><i /><i /><i /></span>
       </div>
     </div>}
+    {[...new Map(run.entries.flatMap(entry => entry.workspaceFile ? [[entry.workspaceFile.import_id, entry.workspaceFile] as const] : [])).values()].map(file => <ConnectorWorkspaceFile key={file.import_id} initial={file} />)}
+    {run.entries.filter(entry => entry.workspaceError).map((entry, index) => <p role="alert" key={`workspace-error-${index}`}>第三方调用已返回，但工作区保存登记失败：{entry.workspaceError}</p>)}
     {artifacts.length > 0 && <div className="run-artifacts" aria-label="生成的文件">
       {artifacts.map(path => <LocalFileLink key={path} path={path} card>{path.split(/[\\/]/).pop() || path}</LocalFileLink>)}
     </div>}
@@ -220,6 +223,8 @@ function DetailedChatActivity({
         </>}
       </div>
     </details>
+    {[...new Map(run.entries.flatMap(entry => entry.workspaceFile ? [[entry.workspaceFile.import_id, entry.workspaceFile] as const] : [])).values()].map(file => <ConnectorWorkspaceFile key={file.import_id} initial={file} />)}
+    {run.entries.filter(entry => entry.workspaceError).map((entry, index) => <p role="alert" key={`workspace-error-${index}`}>第三方调用已返回，但工作区保存登记失败：{entry.workspaceError}</p>)}
     {artifacts.length > 0 && <div className="run-artifacts" aria-label="生成的文件">
       {artifacts.map(path => <LocalFileLink key={path} path={path} card>{path.split(/[\\/]/).pop() || path}</LocalFileLink>)}
     </div>}
